@@ -1,0 +1,29 @@
+{
+  "tool_id": 1,
+  "name": "echo",
+  "perm": 1,
+  "cost": 1,
+  "app_path": "tool-app/echo_app.py",
+  "description": "Echo tool that returns payload as-is for debugging and simple round-trip checks.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "message": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": true
+  },
+  "examples": [
+    {
+      "payload": {
+        "message": "hello"
+      }
+    },
+    {
+      "payload": {
+        "echo": "legacy"
+      }
+    }
+  ]
+}

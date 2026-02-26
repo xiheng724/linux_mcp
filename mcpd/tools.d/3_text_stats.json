@@ -1,0 +1,32 @@
+{
+  "tool_id": 3,
+  "name": "text_stats",
+  "perm": 1,
+  "cost": 1,
+  "app_path": "tool-app/text_stats_app.py",
+  "description": "Compute text statistics (chars/words/lines) from payload text.",
+  "input_schema": {
+    "type": "object",
+    "required": [
+      "text"
+    ],
+    "properties": {
+      "text": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "examples": [
+    {
+      "payload": {
+        "text": "hello world"
+      }
+    },
+    {
+      "payload": {
+        "text": "line1\\nline2"
+      }
+    }
+  ]
+}
