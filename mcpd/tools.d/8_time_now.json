@@ -1,0 +1,29 @@
+{
+  "tool_id": 8,
+  "name": "time_now",
+  "perm": 1,
+  "cost": 1,
+  "app_path": "tool-app/time_now_app.py",
+  "description": "Return current local/UTC date-time and epoch timestamp.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "timezone": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": true
+  },
+  "examples": [
+    {
+      "payload": {
+        "timezone": "local"
+      }
+    },
+    {
+      "payload": {
+        "timezone": "utc"
+      }
+    }
+  ]
+}

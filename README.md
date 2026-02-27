@@ -74,26 +74,38 @@ sudo bash scripts/load_module.sh
 bash scripts/run_mcpd.sh
 ```
 
-4. Run llm-app single request:
+4. Activate venv for app development (recommended):
+
+```bash
+source .venv/bin/activate
+```
+
+5. Run llm-app single request:
 
 ```bash
 python3 llm-app/cli.py --once "hello"
 ```
 
-5. Run llm-app REPL:
+6. Run llm-app REPL:
 
 ```bash
 python3 llm-app/cli.py --repl
 ```
 
-6. Optional DeepSeek selector:
+7. Run llm-app GUI:
+
+```bash
+python3 llm-app/gui_app.py
+```
+
+8. Optional DeepSeek selector:
 
 ```bash
 export DEEPSEEK_API_KEY="your_key"
 python3 llm-app/cli.py --selector deepseek --repl
 ```
 
-7. Stop and unload:
+9. Stop and unload:
 
 ```bash
 bash scripts/stop_mcpd.sh

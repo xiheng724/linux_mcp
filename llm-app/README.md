@@ -22,6 +22,11 @@ Run:
 python3 llm-app/cli.py --once "hello"
 python3 llm-app/cli.py --once "burn cpu for 200ms"
 python3 llm-app/cli.py --once "count words in this sentence"
+python3 llm-app/cli.py --once "show system info"
+python3 llm-app/cli.py --once "calculate (21+7)*3"
+python3 llm-app/cli.py --once "preview README.md 20 lines"
+python3 llm-app/cli.py --once "hash text hello with sha256"
+python3 llm-app/cli.py --once "what time is it now"
 ```
 
 REPL mode:
@@ -40,6 +45,34 @@ REPL options:
 - `--agent-id a1` (default: `a1`)
 - `--sock /tmp/mcpd.sock` (default: `/tmp/mcpd.sock`)
 - `--show-tools` print full tool list every turn (default only print on first/changes; otherwise prints `tools unchanged`)
+
+GUI mode (PySide6):
+
+```bash
+python3 llm-app/gui_app.py
+```
+
+GUI uses the same tool-selection logic as CLI (shared code):
+- `--selector auto|heuristic|deepseek`
+- `--deepseek-model ...`
+- `--deepseek-url ...`
+- `--deepseek-timeout-sec ...`
+
+Recommended dev workflow (venv):
+
+```bash
+cd ~/Code/linux-mcp
+source .venv/bin/activate
+python llm-app/gui_app.py
+```
+
+If missing dependency:
+
+```bash
+sudo apt-get install python3-pyside6
+# or
+pip install PySide6
+```
 
 DeepSeek selection:
 
@@ -63,7 +96,27 @@ user> hello
 [llm-app] result={"message":"hello"}
 ```
 
+## Recommended Demo Flow (GUI)
+
+1. Optional baseline:
+   - `sudo bash scripts/demo_acceptance.sh`
+2. Start gateway:
+   - `bash scripts/run_mcpd.sh`
+3. Start GUI:
+   - `python3 llm-app/gui_app.py`
+4. Try inputs:
+   - `hello`
+   - `burn cpu for a bit`
+   - `统计这段文字：linux mcp demo`
+   - `show system info`
+   - `calculate 123 * (45 + 6)`
+   - `preview llm-app/cli.py 20 lines`
+   - `hash "linux-mcp" with md5`
+   - `what time is it now`
+5. Stop gateway:
+   - `bash scripts/stop_mcpd.sh`
+
 Selector modes:
-- `--selector auto` (default): use DeepSeek when key exists, otherwise heuristic.
+- `--selector deepseek` (default): require DeepSeek and fail if unavailable.
+- `--selector auto`: use DeepSeek when key exists, otherwise heuristic.
 - `--selector heuristic`: local keyword routing only.
-- `--selector deepseek`: require DeepSeek and fail if unavailable.

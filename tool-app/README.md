@@ -17,4 +17,8 @@ Each tool app is a standalone script under `tool-app/` and should support:
 - `echo_app.py`
 - `cpu_burn_app.py`
 - `text_stats_app.py`
-
+- `sys_info_app.py`
+- `calc_app.py`
+- `file_preview_app.py`
+- `hash_text_app.py`
+- `time_now_app.py`

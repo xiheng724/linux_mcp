@@ -43,3 +43,10 @@ Phase 6: cgroup (optional)
 - sysfs/kobject lifecycle: every created kobject must be released; module exit must remove sysfs tree cleanly; repeated insmod/rmmod must not leak or crash.
 - Concurrency: token accounting must be atomic or protected by spinlock; never update shared counters without protection.
 - Rate limiting: DO NOT use timers or kernel threads. Use lazy refill based on jiffies delta on each request.
+
+
+以后每次开发/运行 GUI：
+
+cd ~/Code/linux-mcp
+source .venv/bin/activate
+python llm-app/gui_app.py

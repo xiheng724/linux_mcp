@@ -1,6 +1,7 @@
 # Python cache
 __pycache__/
 *.pyc
+.venv/
 
 # Local editor / OS
 .DS_Store
@@ -25,4 +26,3 @@ kernel-mcp/src/.*.cmd
 
 # Runtime temp files
 *.log
-

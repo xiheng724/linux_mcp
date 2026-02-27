@@ -10,6 +10,11 @@ Userspace daemon for policy, arbitration, and data-plane bridge (Unix Domain Soc
   - `tool_id=1` echo
   - `tool_id=2` cpu_burn (`{"ms": 200}`)
   - `tool_id=3` text_stats (`{"text": "..."}`)
+  - `tool_id=4` sys_info (`{"path": "."}`)
+  - `tool_id=5` calc (`{"expression": "(21+7)*3"}`)
+  - `tool_id=6` file_preview (`{"path": "README.md", "max_lines": 30}`)
+  - `tool_id=7` hash_text (`{"text": "hello", "algorithm": "sha256"}`)
+  - `tool_id=8` time_now (`{"timezone": "local"}`)
 - Tool code location:
   - `tool-app/*.py`
 
