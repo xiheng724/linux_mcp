@@ -169,15 +169,18 @@ def worker_main(
                 if tool_id == 2:
                     payload = {"ms": burn_ms}
                     tool_name = "cpu_burn"
+                    app_id = "settings_app"
                 else:
                     payload = {"echo": f"{agent_id}-{req_idx}"}
                     tool_name = "echo"
+                    app_id = "utility_app"
 
                 t1 = time.perf_counter()
                 resp = uds_exec(
                     {
                         "req_id": req_id,
                         "agent_id": agent_id,
+                        "app_id": app_id,
                         "tool_id": tool_id,
                         "tool_name": tool_name,
                         "payload": payload,

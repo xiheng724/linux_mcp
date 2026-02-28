@@ -100,9 +100,14 @@ def send_frame(conn: socket.socket, payload: bytes) -> None:
 def exec_via_mcpd(
     req_id: int, agent_id: str, tool_id: int, payload: Dict[str, Any], sock_path: str
 ) -> Dict[str, Any]:
+    if tool_id == 2:
+        app_id = "settings_app"
+    else:
+        app_id = "utility_app"
     req = {
         "req_id": req_id,
         "agent_id": agent_id,
+        "app_id": app_id,
         "tool_id": tool_id,
         "payload": payload,
     }

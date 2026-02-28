@@ -2,14 +2,15 @@
 
 Simple CLI demo that:
 
-1. fetches tool semantics via `{"sys":"list_tools"}` from `mcpd`
-2. chooses a tool by prompt semantics (DeepSeek or local heuristic)
-3. sends `{"kind":"tool:exec", ...}` to `mcpd` only
-4. `mcpd` performs kernel arbitration + tool execution + completion report
+1. fetches app catalog via `{"sys":"list_apps"}` from `mcpd`
+2. chooses an app first (DeepSeek or local heuristic)
+3. fetches app-scoped tools via `{"sys":"list_tools","app_id":"..."}` and chooses one tool
+4. sends `{"kind":"tool:exec","app_id":"...", ...}` to `mcpd` only
+5. `mcpd` performs kernel arbitration + tool execution + completion report
 
 Tool semantics source:
-- `mcpd/tools.d/*.json` (`description`, `input_schema`, `examples`)
-- llm-app only sees semantic fields and hash (no `app_path`)
+- `mcpd/apps.d/*.json` (`tools[].description`, `tools[].input_schema`, `tools[].examples`)
+- llm-app only sees semantic fields and hash (no runtime endpoint/handler fields)
 
 Prerequisites:
 - `kernel_mcp` loaded
@@ -27,6 +28,12 @@ python3 llm-app/cli.py --once "calculate (21+7)*3"
 python3 llm-app/cli.py --once "preview README.md 20 lines"
 python3 llm-app/cli.py --once "hash text hello with sha256"
 python3 llm-app/cli.py --once "what time is it now"
+python3 llm-app/cli.py --once "set volume to 30"
+python3 llm-app/cli.py --once "create file tmp/demo.txt with content 'hello'"
+python3 llm-app/cli.py --once "list files in tool-app"
+python3 llm-app/cli.py --once "delete file tmp/demo.txt"
+python3 llm-app/cli.py --once "copy file README.md to tmp/README.copy.md"
+python3 llm-app/cli.py --once "rename file tmp/README.copy.md to tmp/README.renamed.md"
 ```
 
 REPL mode:
@@ -37,6 +44,7 @@ python3 llm-app/cli.py --repl
 
 REPL commands:
 - `/help` show commands
+- `/apps` refresh and print app list
 - `/tools` refresh and print tool list
 - `/exit` quit
 - `Ctrl-D` quit

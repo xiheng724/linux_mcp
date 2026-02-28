@@ -1,0 +1,42 @@
+{
+  "app_id": "calculator_app",
+  "app_name": "Calculator App",
+  "mode": "uds_service",
+  "endpoint": "/tmp/linux-mcp-apps/calculator_app.sock",
+  "service_path": "tool-app/app_service.py",
+  "app_impl": "tool-app/apps/calculator_app.py",
+  "tools": [
+    {
+      "tool_id": 5,
+      "name": "calc",
+      "perm": 1,
+      "cost": 1,
+      "handler": "calc",
+      "description": "Evaluate arithmetic expressions for quick calculations.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "payload": {
+            "expression": "(21 + 7) * 3"
+          }
+        },
+        {
+          "payload": {
+            "expression": "100 / 4 + 6"
+          }
+        }
+      ]
+    }
+  ]
+}

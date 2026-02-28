@@ -9,10 +9,16 @@ VENV_DIR="${LINUX_MCP_VENV_DIR:-/tmp/linux-mcp-venv}"
 REQUIRED_DIRS=(
   kernel-mcp
   mcpd
+  mcpd/apps.d
+  tool-app
+  tool-app/apps
+  llm-app
   client
-  bench
   scripts
-  docs
+)
+
+OPTIONAL_DIRS=(
+  bench
   results
   plots
 )
@@ -20,6 +26,7 @@ REQUIRED_DIRS=(
 REQUIRED_SCRIPTS=(
   scripts/bootstrap.sh
   scripts/build_kernel.sh
+  scripts/clean_repo.sh
   scripts/load_module.sh
   scripts/unload_module.sh
   scripts/reload_10x.sh
@@ -29,7 +36,15 @@ REQUIRED_SCRIPTS=(
 echo "[smoke] verify directory layout"
 for d in "${REQUIRED_DIRS[@]}"; do
   [[ -d "$d" ]] || { echo "missing directory: $d"; exit 1; }
-  echo "ok dir: $d"
+  echo "ok core dir: $d"
+done
+
+for d in "${OPTIONAL_DIRS[@]}"; do
+  if [[ -d "$d" ]]; then
+    echo "ok optional dir: $d"
+  else
+    echo "skip optional dir: $d"
+  fi
 done
 
 echo "[smoke] verify scripts exist"

@@ -29,18 +29,17 @@ if [[ "$TARGET_USER" != "root" ]]; then
   fi
 fi
 
-chown -R mcpd:mcpd tool-app mcpd/tools.d
+chown -R mcpd:mcpd tool-app mcpd/apps.d
 chmod 750 tool-app mcpd
-if ls mcpd/tools.d/*.json >/dev/null 2>&1; then
-  chmod 640 mcpd/tools.d/*.json
+if ls mcpd/apps.d/*.json >/dev/null 2>&1; then
+  chmod 640 mcpd/apps.d/*.json
 fi
 
 if [[ "$TARGET_USER" != "root" ]]; then
-  if ! sudo -u "$TARGET_USER" test -r mcpd/tools.d/1_echo.json; then
+  if ! sudo -u "$TARGET_USER" test -r mcpd/apps.d/04_utility_app.json; then
     echo "WARN: post-check failed: $TARGET_USER cannot read manifests; keeping current state, please review manually."
     exit 0
   fi
 fi
 
 echo "hardened: owner=mcpd:mcpd, tool-app/mcpd=750, manifests=640"
-

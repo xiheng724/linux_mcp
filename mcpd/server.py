@@ -11,39 +11,52 @@ import re
 import signal
 import socket
 import struct
-import subprocess
 import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from netlink_client import KernelMcpNetlinkClient
+
 SOCK_PATH = "/tmp/mcpd.sock"
 MAX_MSG_SIZE = 16 * 1024 * 1024
 MAX_DEFER_RETRIES = 50
-TOOLS_DIR = Path(__file__).resolve().parent / "tools.d"
-ROOT_DIR = Path(__file__).resolve().parent.parent
+APPS_DIR = Path(__file__).resolve().parent / "apps.d"
 LOGGER = logging.getLogger("mcpd")
-DECISION_RE = re.compile(
-    r"decision=(?P<decision>[A-Z]+)\s+wait_ms=(?P<wait>\d+)\s+tokens_left=(?P<tokens>\d+)\s+reason=(?P<reason>.+)$"
-)
 HASH_RE = re.compile(r"^[0-9a-fA-F]{8}$")
+SEMANTIC_HASH_FIELDS = (
+    "tool_id",
+    "name",
+    "app_id",
+    "app_name",
+    "perm",
+    "cost",
+    "description",
+    "input_schema",
+    "examples",
+)
 
 _stop_event = threading.Event()
 _agents_lock = threading.Lock()
 _registered_agents: set[str] = set()
+_kernel_client: KernelMcpNetlinkClient | None = None
 
 
 @dataclass(frozen=True)
 class ToolMeta:
     tool_id: int
     name: str
+    app_id: str
+    app_name: str
     perm: int
     cost: int
     description: str
     input_schema: Dict[str, Any]
     examples: List[Any]
-    app_path: str
+    handler: str
+    mode: str
+    endpoint: str
     manifest_hash: str
 
 
@@ -78,6 +91,15 @@ def _canonical_json_bytes(obj: Any) -> bytes:
     )
 
 
+def _manifest_semantic_hash(raw: Dict[str, Any], path: Path) -> str:
+    semantic: Dict[str, Any] = {}
+    for field in SEMANTIC_HASH_FIELDS:
+        if field not in raw:
+            raise ValueError(f"{path}: missing semantic hash field '{field}'")
+        semantic[field] = raw[field]
+    return hashlib.sha256(_canonical_json_bytes(semantic)).hexdigest()[:8]
+
+
 def _ensure_int(name: str, value: Any) -> int:
     if isinstance(value, bool):
         raise ValueError(f"{name} must be int")
@@ -92,77 +114,137 @@ def _ensure_non_empty_str(name: str, value: Any) -> str:
     return value
 
 
-def _load_one_manifest(path: Path) -> ToolMeta:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError(f"{path}: manifest must be JSON object")
+def _ensure_tool_path(name: str, value: Any, path: Path) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{path}: {name} must be non-empty string")
+    if value.startswith("/"):
+        raise ValueError(f"{path}: {name} must be relative to repo root")
+    if not value.startswith("tool-app/"):
+        raise ValueError(f"{path}: {name} must be under tool-app/")
+    return value
 
+
+def _load_tool_from_app_manifest(
+    app_manifest_path: Path,
+    app_id: str,
+    app_name: str,
+    mode: str,
+    endpoint: str,
+    tool_raw: Dict[str, Any],
+) -> ToolMeta:
     required_fields = [
         "tool_id",
         "name",
         "perm",
         "cost",
-        "app_path",
+        "handler",
         "description",
         "input_schema",
         "examples",
     ]
     for field in required_fields:
-        if field not in raw:
-            raise ValueError(f"{path}: missing field '{field}'")
+        if field not in tool_raw:
+            raise ValueError(f"{app_manifest_path}: tool missing field '{field}'")
 
-    tool_id = _ensure_int("tool_id", raw["tool_id"])
-    perm = _ensure_int("perm", raw["perm"])
-    cost = _ensure_int("cost", raw["cost"])
-    name = raw["name"]
-    description = raw["description"]
-    input_schema = raw["input_schema"]
-    examples = raw["examples"]
-    app_path = raw["app_path"]
+    tool_id = _ensure_int("tool_id", tool_raw["tool_id"])
+    perm = _ensure_int("perm", tool_raw["perm"])
+    cost = _ensure_int("cost", tool_raw["cost"])
+    name = tool_raw["name"]
+    description = tool_raw["description"]
+    input_schema = tool_raw["input_schema"]
+    examples = tool_raw["examples"]
+    handler = _ensure_non_empty_str("handler", tool_raw["handler"])
 
     if not isinstance(name, str) or not name:
-        raise ValueError(f"{path}: name must be non-empty string")
-    if not isinstance(app_path, str) or not app_path:
-        raise ValueError(f"{path}: app_path must be non-empty string")
-    if app_path.startswith("/"):
-        raise ValueError(f"{path}: app_path must be relative to repo root")
-    if not app_path.startswith("tool-app/"):
-        raise ValueError(f"{path}: app_path must be under tool-app/")
+        raise ValueError(f"{app_manifest_path}: tool name must be non-empty string")
     if not isinstance(description, str) or not description:
-        raise ValueError(f"{path}: description must be non-empty string")
+        raise ValueError(f"{app_manifest_path}: description must be non-empty string")
     if not isinstance(input_schema, dict):
-        raise ValueError(f"{path}: input_schema must be object")
+        raise ValueError(f"{app_manifest_path}: input_schema must be object")
     if not isinstance(examples, list):
-        raise ValueError(f"{path}: examples must be list")
+        raise ValueError(f"{app_manifest_path}: examples must be list")
 
-    digest = hashlib.sha256(_canonical_json_bytes(raw)).hexdigest()[:8]
+    semantic_raw: Dict[str, Any] = {
+        "tool_id": tool_id,
+        "name": name,
+        "app_id": app_id,
+        "app_name": app_name,
+        "perm": perm,
+        "cost": cost,
+        "description": description,
+        "input_schema": input_schema,
+        "examples": examples,
+    }
+    digest = _manifest_semantic_hash(semantic_raw, app_manifest_path)
 
     return ToolMeta(
         tool_id=tool_id,
         name=name,
+        app_id=app_id,
+        app_name=app_name,
         perm=perm,
         cost=cost,
         description=description,
         input_schema=input_schema,
         examples=examples,
-        app_path=app_path,
+        handler=handler,
+        mode=mode,
+        endpoint=endpoint,
         manifest_hash=digest,
     )
 
 
-def _load_tool_registry(tools_dir: Path) -> Dict[int, ToolMeta]:
-    if not tools_dir.is_dir():
-        raise ValueError(f"tool manifest directory missing: {tools_dir}")
+def _load_tool_registry(apps_dir: Path) -> Dict[int, ToolMeta]:
+    if not apps_dir.is_dir():
+        raise ValueError(f"app manifest directory missing: {apps_dir}")
 
     registry: Dict[int, ToolMeta] = {}
-    for path in sorted(tools_dir.glob("*.json")):
-        tool = _load_one_manifest(path)
-        if tool.tool_id in registry:
-            raise ValueError(f"duplicate tool_id in manifests: {tool.tool_id}")
-        registry[tool.tool_id] = tool
+    app_ids: set[str] = set()
+    for app_manifest in sorted(apps_dir.glob("*.json")):
+        raw = json.loads(app_manifest.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError(f"{app_manifest}: manifest must be JSON object")
+
+        for field in ("app_id", "app_name", "mode", "endpoint", "app_impl", "tools"):
+            if field not in raw:
+                raise ValueError(f"{app_manifest}: missing field '{field}'")
+
+        app_id = _ensure_non_empty_str("app_id", raw["app_id"])
+        app_name = _ensure_non_empty_str("app_name", raw["app_name"])
+        mode = _ensure_non_empty_str("mode", raw["mode"])
+        endpoint = _ensure_non_empty_str("endpoint", raw["endpoint"])
+        _ensure_tool_path("app_impl", raw["app_impl"], app_manifest)
+        if app_id in app_ids:
+            raise ValueError(f"duplicate app_id in manifests: {app_id}")
+        app_ids.add(app_id)
+
+        if mode != "uds_service":
+            raise ValueError(f"{app_manifest}: mode must be 'uds_service'")
+        if not endpoint.startswith("/tmp/linux-mcp-apps/"):
+            raise ValueError(f"{app_manifest}: endpoint must start with /tmp/linux-mcp-apps/")
+
+        tools_raw = raw["tools"]
+        if not isinstance(tools_raw, list) or not tools_raw:
+            raise ValueError(f"{app_manifest}: tools must be non-empty list")
+
+        for tool_raw in tools_raw:
+            if not isinstance(tool_raw, dict):
+                raise ValueError(f"{app_manifest}: each tool must be object")
+            tool = _load_tool_from_app_manifest(
+                app_manifest,
+                app_id=app_id,
+                app_name=app_name,
+                mode=mode,
+                endpoint=endpoint,
+                tool_raw=tool_raw,
+            )
+            if tool.tool_id in registry:
+                raise ValueError(f"duplicate tool_id in manifests: {tool.tool_id}")
+            registry[tool.tool_id] = tool
 
     if not registry:
-        raise ValueError(f"no tool manifests found under {tools_dir}")
+        raise ValueError(f"no app manifests found under {apps_dir}")
+
     return registry
 
 
@@ -218,43 +300,10 @@ def _validate_payload(input_schema: Dict[str, Any], payload: Any) -> None:
             raise ValueError(f"field '{key}' type mismatch: expected {expected_type}")
 
 
-def _resolve_tool_app_path(app_path: str) -> Path:
-    app_file = (ROOT_DIR / app_path).resolve()
-    try:
-        app_file.relative_to(ROOT_DIR)
-    except ValueError as exc:
-        raise ValueError(f"app_path escapes repo root: {app_path}") from exc
-    return app_file
-
-
-def _run_cmd(cmd: List[str]) -> str:
-    proc = subprocess.run(
-        cmd,
-        cwd=str(ROOT_DIR),
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"command failed: {' '.join(cmd)}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
-        )
-    return proc.stdout
-
-
-def _parse_decision(stdout: str) -> Tuple[str, int, int, str]:
-    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
-    if not lines:
-        raise RuntimeError("empty genl_tool_request output")
-    match = DECISION_RE.search(lines[-1])
-    if not match:
-        raise RuntimeError(f"unexpected genl_tool_request output: {lines[-1]}")
-    return (
-        match.group("decision"),
-        int(match.group("wait")),
-        int(match.group("tokens")),
-        match.group("reason"),
-    )
+def _get_kernel_client() -> KernelMcpNetlinkClient:
+    if _kernel_client is None:
+        raise RuntimeError("kernel netlink client is not initialized")
+    return _kernel_client
 
 
 def _ensure_agent_registered(agent_id: str) -> None:
@@ -262,7 +311,9 @@ def _ensure_agent_registered(agent_id: str) -> None:
         if agent_id in _registered_agents:
             return
 
-    _run_cmd(["./client/bin/genl_register_agent", "--id", agent_id])
+    client = _get_kernel_client()
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    client.register_agent(agent_id, pid=os.getpid(), uid=uid)
     LOGGER.info("agent registered via netlink: %s", agent_id)
 
     with _agents_lock:
@@ -275,20 +326,18 @@ def _kernel_arbitrate(
     tool_id: int,
     tool_hash: str,
 ) -> Tuple[str, int, int, str, int]:
+    client = _get_kernel_client()
     for attempt in range(1, MAX_DEFER_RETRIES + 1):
-        cmd = [
-            "./client/bin/genl_tool_request",
-            "--agent",
-            agent_id,
-            "--tool",
-            str(tool_id),
-            "--tool-hash",
-            tool_hash,
-            "--n",
-            "1",
-        ]
-        stdout = _run_cmd(cmd)
-        decision, wait_ms, tokens_left, reason = _parse_decision(stdout)
+        decision_reply = client.tool_request(
+            req_id=req_id,
+            agent_id=agent_id,
+            tool_id=tool_id,
+            tool_hash=tool_hash,
+        )
+        decision = decision_reply.decision
+        wait_ms = decision_reply.wait_ms
+        tokens_left = decision_reply.tokens_left
+        reason = decision_reply.reason
         LOGGER.info(
             "arb req_id=%d agent=%s tool=%d attempt=%d decision=%s wait_ms=%d tokens_left=%d reason=%s",
             req_id,
@@ -317,60 +366,88 @@ def _kernel_report_complete(
     status_code: int,
     exec_ms: int,
 ) -> None:
-    _run_cmd(
-        [
-            "./client/bin/genl_tool_complete",
-            "--agent",
-            agent_id,
-            "--tool",
-            str(tool_id),
-            "--req-id",
-            str(req_id),
-            "--status",
-            str(status_code),
-            "--exec-ms",
-            str(exec_ms),
-        ]
+    client = _get_kernel_client()
+    client.tool_complete(
+        req_id=req_id,
+        agent_id=agent_id,
+        tool_id=tool_id,
+        status_code=status_code,
+        exec_ms=exec_ms,
     )
 
 
-def _run_tool_app(tool: ToolMeta, payload: Any) -> Any:
-    app_file = _resolve_tool_app_path(tool.app_path)
-    if not app_file.is_file():
-        raise ValueError(f"tool app missing for tool {tool.tool_id}: {tool.app_path}")
-
-    proc = subprocess.run(
-        ["python3", str(app_file), "--stdin-json"],
-        cwd=str(ROOT_DIR),
-        input=json.dumps(payload, ensure_ascii=True),
-        text=True,
-        capture_output=True,
-        timeout=30,
-        check=False,
-    )
-    if proc.returncode != 0:
-        err = proc.stderr.strip() or proc.stdout.strip() or f"exit code={proc.returncode}"
-        raise ValueError(f"tool app failed ({tool.name}): {err}")
-
-    lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-    if not lines:
-        raise ValueError(f"tool app returned empty output ({tool.name})")
+def _call_tool_service(tool: ToolMeta, req_id: int, agent_id: str, payload: Any) -> Dict[str, Any]:
+    req = {
+        "req_id": req_id,
+        "agent_id": agent_id,
+        "tool_id": tool.tool_id,
+        "payload": payload,
+    }
+    encoded = json.dumps(req, ensure_ascii=True).encode("utf-8")
     try:
-        return json.loads(lines[-1])
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
+            conn.settimeout(30)
+            conn.connect(tool.endpoint)
+            _send_frame(conn, encoded)
+            raw = _recv_frame(conn)
+    except (FileNotFoundError, ConnectionRefusedError, TimeoutError, OSError) as exc:
+        raise ValueError(f"tool service offline: {tool.endpoint}") from exc
+
+    try:
+        resp = json.loads(raw.decode("utf-8"))
     except json.JSONDecodeError as exc:
-        raise ValueError(f"tool app returned invalid JSON ({tool.name}): {lines[-1]}") from exc
+        raise ValueError(f"tool service returned invalid JSON ({tool.name})") from exc
+    if not isinstance(resp, dict):
+        raise ValueError(f"tool service returned non-object response ({tool.name})")
+    status = resp.get("status", "")
+    if status not in ("ok", "error"):
+        raise ValueError(f"tool service returned invalid status ({tool.name})")
+    return resp
 
 
 def _tool_to_public(tool: ToolMeta) -> Dict[str, Any]:
     return {
         "tool_id": tool.tool_id,
         "name": tool.name,
+        "app_id": tool.app_id,
+        "app_name": tool.app_name,
         "description": tool.description,
         "input_schema": tool.input_schema,
+        "examples": tool.examples,
         "perm": tool.perm,
         "cost": tool.cost,
         "hash": tool.manifest_hash,
     }
+
+
+def _app_to_public(app_id: str, app_name: str, tools: List[ToolMeta]) -> Dict[str, Any]:
+    ordered = sorted(tools, key=lambda item: item.tool_id)
+    return {
+        "app_id": app_id,
+        "app_name": app_name,
+        "tool_count": len(ordered),
+        "tool_ids": [tool.tool_id for tool in ordered],
+        "tool_names": [tool.name for tool in ordered],
+    }
+
+
+def _build_app_map(registry: Dict[int, ToolMeta]) -> Dict[str, List[ToolMeta]]:
+    out: Dict[str, List[ToolMeta]] = {}
+    for tool in registry.values():
+        out.setdefault(tool.app_id, []).append(tool)
+    return out
+
+
+def _list_tools_public(registry: Dict[int, ToolMeta], app_id: str = "") -> List[Dict[str, Any]]:
+    tools: List[ToolMeta] = []
+    if app_id:
+        for tool in registry.values():
+            if tool.app_id == app_id:
+                tools.append(tool)
+    else:
+        tools = list(registry.values())
+    tools.sort(key=lambda item: item.tool_id)
+    return [_tool_to_public(tool) for tool in tools]
 
 
 def _build_error(req_id: int, err: str, t_ms: int) -> Dict[str, Any]:
@@ -395,10 +472,15 @@ def _resolve_tool_hash(req: Dict[str, Any], tool: ToolMeta) -> str:
 def _handle_tool_exec(req: Dict[str, Any], registry: Dict[int, ToolMeta]) -> Dict[str, Any]:
     req_id = _ensure_int("req_id", req.get("req_id", 0))
     agent_id = _ensure_non_empty_str("agent_id", req.get("agent_id", ""))
+    app_id = _ensure_non_empty_str("app_id", req.get("app_id", ""))
     tool_id = _ensure_int("tool_id", req.get("tool_id", 0))
     tool = registry.get(tool_id)
     if tool is None:
         raise ValueError(f"unsupported tool_id: {tool_id}")
+    if tool.app_id != app_id:
+        raise ValueError(
+            f"tool_id={tool_id} does not belong to app_id={app_id} (expected {tool.app_id})"
+        )
 
     payload = req.get("payload", {})
     _validate_payload(tool.input_schema, payload)
@@ -428,14 +510,26 @@ def _handle_tool_exec(req: Dict[str, Any], registry: Dict[int, ToolMeta]) -> Dic
     exec_start = time.perf_counter()
     status_code = 1
     try:
-        result = _run_tool_app(tool, payload)
-        status_code = 0
+        tool_resp = _call_tool_service(tool, req_id=req_id, agent_id=agent_id, payload=payload)
+        status = tool_resp.get("status")
+        result = tool_resp.get("result", {})
+        err = tool_resp.get("error", "")
+        tool_t_ms = tool_resp.get("t_ms")
+        if not isinstance(result, dict):
+            result = {"value": result}
+        if not isinstance(err, str):
+            err = str(err)
+        if not isinstance(tool_t_ms, int) or isinstance(tool_t_ms, bool) or tool_t_ms < 0:
+            tool_t_ms = int((time.perf_counter() - exec_start) * 1000)
+        if status == "ok":
+            status_code = 0
         return {
             "req_id": req_id,
-            "status": "ok",
-            "result": result,
-            "error": "",
-            "t_ms": int((time.perf_counter() - exec_start) * 1000),
+            "status": status,
+            "result": result if status == "ok" else {},
+            "error": "" if status == "ok" else err,
+            "t_ms": tool_t_ms,
+            "tool_name": tool.name,
             "decision": decision,
             "wait_ms": wait_ms,
             "tokens_left": tokens_left,
@@ -463,10 +557,12 @@ def _handle_tool_exec(req: Dict[str, Any], registry: Dict[int, ToolMeta]) -> Dic
 
 
 def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> None:
+    app_map = _build_app_map(registry)
     with conn:
         while True:
             req_id = 0
             agent_id = "unknown"
+            app_id = ""
             tool_id = 0
             req_kind = "tool:exec"
             t0 = time.perf_counter()
@@ -476,17 +572,44 @@ def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> No
                 if not isinstance(req, dict):
                     raise ValueError("request must be JSON object")
 
+                if req.get("sys") == "list_apps":
+                    req_kind = "sys:list_apps"
+                    apps_public: List[Dict[str, Any]] = []
+                    for key in sorted(app_map.keys()):
+                        tools = app_map[key]
+                        if not tools:
+                            continue
+                        apps_public.append(_app_to_public(key, tools[0].app_name, tools))
+                    resp = {"status": "ok", "apps": apps_public}
+                    _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
+                    t_ms = int((time.perf_counter() - t0) * 1000)
+                    LOGGER.info(
+                        "kind=%s status=ok apps=%d t_ms=%d",
+                        req_kind,
+                        len(apps_public),
+                        t_ms,
+                    )
+                    continue
+
                 if req.get("sys") == "list_tools":
                     req_kind = "sys:list_tools"
+                    app_id_req = req.get("app_id", "")
+                    if app_id_req not in ("", None) and not isinstance(app_id_req, str):
+                        raise ValueError("app_id must be string when provided")
+                    app_id_str = "" if app_id_req in ("", None) else app_id_req
+                    if app_id_str and app_id_str not in app_map:
+                        raise ValueError(f"unknown app_id: {app_id_str}")
                     resp = {
                         "status": "ok",
-                        "tools": [_tool_to_public(registry[idx]) for idx in sorted(registry.keys())],
+                        "app_id": app_id_str,
+                        "tools": _list_tools_public(registry, app_id=app_id_str),
                     }
                     _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                     t_ms = int((time.perf_counter() - t0) * 1000)
                     LOGGER.info(
-                        "kind=%s status=ok tools=%d t_ms=%d",
+                        "kind=%s status=ok app_id=%s tools=%d t_ms=%d",
                         req_kind,
+                        app_id_str or "all",
                         len(resp["tools"]),
                         t_ms,
                     )
@@ -497,14 +620,16 @@ def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> No
 
                 req_id = _ensure_int("req_id", req.get("req_id", 0))
                 agent_id = _ensure_non_empty_str("agent_id", req.get("agent_id", ""))
+                app_id = _ensure_non_empty_str("app_id", req.get("app_id", ""))
                 tool_id = _ensure_int("tool_id", req.get("tool_id", 0))
                 resp = _handle_tool_exec(req, registry)
                 _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                 t_ms = int((time.perf_counter() - t0) * 1000)
                 LOGGER.info(
-                    "req_id=%d agent=%s tool=%d kind=%s status=%s t_ms=%d",
+                    "req_id=%d agent=%s app=%s tool=%d kind=%s status=%s t_ms=%d",
                     req_id,
                     agent_id,
+                    app_id,
                     tool_id,
                     req_kind,
                     resp.get("status"),
@@ -523,9 +648,10 @@ def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> No
                 except Exception:  # noqa: BLE001
                     return
                 LOGGER.error(
-                    "req_id=%d agent=%s tool=%d kind=%s status=error err=%s",
+                    "req_id=%d agent=%s app=%s tool=%d kind=%s status=error err=%s",
                     req_id,
                     agent_id,
+                    app_id,
                     tool_id,
                     req_kind,
                     exc,
@@ -555,41 +681,52 @@ def _signal_handler(_sig: int, _frame: Any) -> None:
 
 
 def main() -> int:
+    global _kernel_client
+
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     signal.signal(signal.SIGTERM, _signal_handler)
     signal.signal(signal.SIGINT, _signal_handler)
 
     try:
-        registry = _load_tool_registry(TOOLS_DIR)
+        registry = _load_tool_registry(APPS_DIR)
     except Exception as exc:  # noqa: BLE001
-        LOGGER.error("failed to load tool manifests: %s", exc)
+        LOGGER.error("failed to load app manifests: %s", exc)
         return 1
 
-    LOGGER.info("loaded tool manifests count=%d dir=%s", len(registry), TOOLS_DIR)
+    try:
+        _kernel_client = KernelMcpNetlinkClient()
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.error("failed to initialize kernel netlink client: %s", exc)
+        return 1
+
+    LOGGER.info("loaded app manifests app_dir=%s tool_count=%d", APPS_DIR, len(registry))
     _cleanup_socket(SOCK_PATH)
 
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
-        server.bind(SOCK_PATH)
-        os.chmod(SOCK_PATH, 0o666)
-        server.listen(128)
-        server.settimeout(0.5)
-        LOGGER.info("mcpd listening on %s", SOCK_PATH)
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+            server.bind(SOCK_PATH)
+            os.chmod(SOCK_PATH, 0o666)
+            server.listen(128)
+            server.settimeout(0.5)
+            LOGGER.info("mcpd listening on %s", SOCK_PATH)
 
-        accept_thread = threading.Thread(
-            target=_accept_loop,
-            args=(server, registry),
-            daemon=True,
-        )
-        accept_thread.start()
+            accept_thread = threading.Thread(
+                target=_accept_loop,
+                args=(server, registry),
+                daemon=True,
+            )
+            accept_thread.start()
 
-        while not _stop_event.is_set():
-            time.sleep(0.2)
-
-    _cleanup_socket(SOCK_PATH)
-    LOGGER.info("mcpd stopped")
-    return 0
+            while not _stop_event.is_set():
+                time.sleep(0.2)
+        return 0
+    finally:
+        _cleanup_socket(SOCK_PATH)
+        if _kernel_client is not None:
+            _kernel_client.close()
+            _kernel_client = None
+        LOGGER.info("mcpd stopped")
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

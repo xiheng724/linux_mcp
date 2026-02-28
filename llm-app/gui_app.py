@@ -40,6 +40,7 @@ from app_logic import (
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
     build_payload_for_tool,
+    select_app_for_input,
     select_tool_for_input,
 )
 from rpc import mcpd_call
@@ -61,6 +62,7 @@ class ExecRequest:
     agent_id: str
     sock_path: str
     selector_cfg: SelectorConfig
+    cached_apps: List[Dict[str, Any]]
     cached_tools: List[Dict[str, Any]]
     cached_at: float
 
@@ -74,23 +76,60 @@ class ExecWorker(QObject):
 
     def run(self) -> None:
         now = time.time()
-        tools = self.req.cached_tools
-        if not tools or (now - self.req.cached_at) > TOOLS_CACHE_TTL_S:
-            resp = mcpd_call({"sys": "list_tools"}, sock_path=self.req.sock_path, timeout_s=5)
+        apps = self.req.cached_apps
+        if not apps or (now - self.req.cached_at) > TOOLS_CACHE_TTL_S:
+            resp = mcpd_call({"sys": "list_apps"}, sock_path=self.req.sock_path, timeout_s=5)
             if resp.get("status") != "ok":
                 self.finished.emit(
                     {
                         "status": "error",
-                        "error": resp.get("error", "list_tools failed"),
+                        "error": resp.get("error", "list_apps failed"),
                     }
                 )
                 return
-            raw_tools = resp.get("tools", [])
-            tools = raw_tools if isinstance(raw_tools, list) else []
+            raw_apps = resp.get("apps", [])
+            apps = raw_apps if isinstance(raw_apps, list) else []
 
         warnings: List[str] = []
         try:
-            selected, selector_source, selector_reason = select_tool_for_input(
+            selected_app, app_selector_source, app_selector_reason = select_app_for_input(
+                self.req.user_text,
+                apps,
+                self.req.selector_cfg,
+                warn_cb=lambda msg: warnings.append(msg),
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.finished.emit({"status": "error", "error": str(exc), "warnings": warnings})
+            return
+
+        app_id = selected_app.get("app_id")
+        app_name = selected_app.get("app_name", "")
+        if not isinstance(app_id, str) or not app_id:
+            self.finished.emit({"status": "error", "error": "selected app missing app_id"})
+            return
+
+        tools_resp = mcpd_call(
+            {"sys": "list_tools", "app_id": app_id},
+            sock_path=self.req.sock_path,
+            timeout_s=5,
+        )
+        if tools_resp.get("status") != "ok":
+            self.finished.emit(
+                {
+                    "status": "error",
+                    "error": tools_resp.get("error", "list_tools failed"),
+                    "warnings": warnings,
+                }
+            )
+            return
+        raw_tools = tools_resp.get("tools", [])
+        tools = raw_tools if isinstance(raw_tools, list) else []
+        if not tools:
+            self.finished.emit({"status": "error", "error": f"app has no tools: {app_id}"})
+            return
+
+        try:
+            selected_tool, tool_selector_source, tool_selector_reason = select_tool_for_input(
                 self.req.user_text,
                 tools,
                 self.req.selector_cfg,
@@ -100,9 +139,9 @@ class ExecWorker(QObject):
             self.finished.emit({"status": "error", "error": str(exc), "warnings": warnings})
             return
 
-        tool_id = selected.get("tool_id")
-        tool_name = selected.get("name", "unknown")
-        tool_hash = selected.get("hash", "")
+        tool_id = selected_tool.get("tool_id")
+        tool_name = selected_tool.get("name", "unknown")
+        tool_hash = selected_tool.get("hash", "")
         if not isinstance(tool_id, int):
             self.finished.emit({"status": "error", "error": "selected tool missing tool_id"})
             return
@@ -110,6 +149,8 @@ class ExecWorker(QObject):
             tool_name = str(tool_name)
         if not isinstance(tool_hash, str):
             tool_hash = ""
+        if not isinstance(app_name, str):
+            app_name = str(app_name)
 
         req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
         payload = build_payload_for_tool(tool_name, self.req.user_text)
@@ -118,6 +159,7 @@ class ExecWorker(QObject):
                 "kind": "tool:exec",
                 "req_id": req_id,
                 "agent_id": self.req.agent_id,
+                "app_id": app_id,
                 "tool_id": tool_id,
                 "tool_hash": tool_hash,
                 "payload": payload,
@@ -129,15 +171,20 @@ class ExecWorker(QObject):
             {
                 "status": "ok",
                 "selected": {
+                    "app_id": app_id,
+                    "app_name": app_name,
                     "tool_id": tool_id,
                     "tool_name": tool_name,
                     "tool_hash": tool_hash,
                 },
-                "selector_source": selector_source,
-                "selector_reason": selector_reason,
+                "app_selector_source": app_selector_source,
+                "app_selector_reason": app_selector_reason,
+                "tool_selector_source": tool_selector_source,
+                "tool_selector_reason": tool_selector_reason,
                 "warnings": warnings,
                 "req_id": req_id,
                 "response": exec_resp,
+                "apps": apps,
                 "tools": tools,
                 "tools_at": time.time(),
             }
@@ -150,6 +197,7 @@ class MainWindow(QMainWindow):
         self.sock_path = sock_path
         self.agent_id = agent_id
         self.selector_cfg = selector_cfg
+        self.apps_cache: List[Dict[str, Any]] = []
         self.tools_cache: List[Dict[str, Any]] = []
         self.tools_cache_at: float = 0.0
         self._thread: Optional[QThread] = None
@@ -167,7 +215,7 @@ class MainWindow(QMainWindow):
 
         left = QWidget(self)
         left_layout = QVBoxLayout(left)
-        self.refresh_btn = QPushButton("Refresh Tools", self)
+        self.refresh_btn = QPushButton("Refresh Apps/Tools", self)
         self.tools_list = QListWidget(self)
         left_layout.addWidget(self.refresh_btn)
         left_layout.addWidget(self.tools_list)
@@ -207,6 +255,15 @@ class MainWindow(QMainWindow):
         self.refresh_btn.setEnabled(not busy)
 
     def refresh_tools(self) -> None:
+        apps_resp = mcpd_call({"sys": "list_apps"}, sock_path=self.sock_path, timeout_s=5)
+        if apps_resp.get("status") != "ok":
+            self._append(f"[system] app refresh failed: {apps_resp.get('error', 'unknown error')}")
+            return
+        raw_apps = apps_resp.get("apps", [])
+        if not isinstance(raw_apps, list):
+            self._append("[system] app refresh failed: invalid apps list")
+            return
+
         resp = mcpd_call({"sys": "list_tools"}, sock_path=self.sock_path, timeout_s=5)
         if resp.get("status") != "ok":
             self._append(f"[system] tool refresh failed: {resp.get('error', 'unknown error')}")
@@ -216,16 +273,25 @@ class MainWindow(QMainWindow):
             self._append("[system] tool refresh failed: invalid tools list")
             return
 
+        self.apps_cache = raw_apps
         self.tools_cache = raw_tools
         self.tools_cache_at = time.time()
         self.tools_list.clear()
+        for app in self.apps_cache:
+            app_id = app.get("app_id")
+            app_name = app.get("app_name")
+            item = QListWidgetItem(f"[APP] id={app_id}  name={app_name}")
+            self.tools_list.addItem(item)
         for tool in self.tools_cache:
             tid = tool.get("tool_id")
             name = tool.get("name")
+            app_name = tool.get("app_name", "-")
             desc = tool.get("description")
-            item = QListWidgetItem(f"id={tid}  name={name}\n{desc}")
+            item = QListWidgetItem(f"[TOOL] id={tid}  name={name}  app={app_name}\n{desc}")
             self.tools_list.addItem(item)
-        self._append(f"[system] tools refreshed: {len(self.tools_cache)}")
+        self._append(
+            f"[system] catalog refreshed: apps={len(self.apps_cache)} tools={len(self.tools_cache)}"
+        )
 
     def handle_send(self) -> None:
         text = self.input_box.text().strip()
@@ -242,6 +308,7 @@ class MainWindow(QMainWindow):
             agent_id=self.agent_id,
             sock_path=self.sock_path,
             selector_cfg=self.selector_cfg,
+            cached_apps=self.apps_cache,
             cached_tools=self.tools_cache,
             cached_at=self.tools_cache_at,
         )
@@ -267,6 +334,9 @@ class MainWindow(QMainWindow):
             self._worker = None
             return
 
+        apps = payload.get("apps")
+        if isinstance(apps, list):
+            self.apps_cache = apps
         tools = payload.get("tools")
         tools_at = payload.get("tools_at")
         if isinstance(tools, list):
@@ -280,16 +350,22 @@ class MainWindow(QMainWindow):
             selected = {}
         if not isinstance(resp, dict):
             resp = {"status": "error", "error": "invalid response"}
+        app_name = selected.get("app_name", "unknown")
+        app_id = selected.get("app_id", "?")
         tool_name = selected.get("tool_name", "unknown")
         tool_id = selected.get("tool_id", "?")
         req_id = payload.get("req_id", "?")
-        selector_source = payload.get("selector_source", "unknown")
-        selector_reason = payload.get("selector_reason", "")
+        app_selector_source = payload.get("app_selector_source", "unknown")
+        app_selector_reason = payload.get("app_selector_reason", "")
+        tool_selector_source = payload.get("tool_selector_source", "unknown")
+        tool_selector_reason = payload.get("tool_selector_reason", "")
 
         for msg in payload.get("warnings", []):
             self._append(f"Warn: {msg}")
+        self._append(f"Selected app: {app_name} (id={app_id})")
         self._append(f"Selected tool: {tool_name} (id={tool_id})")
-        self._append(f"Selector: {selector_source} ({selector_reason})")
+        self._append(f"App Selector: {app_selector_source} ({app_selector_reason})")
+        self._append(f"Tool Selector: {tool_selector_source} ({tool_selector_reason})")
         self._append(f"req_id: {req_id}")
         self._append(f"status: {resp.get('status')}  t_ms: {resp.get('t_ms')}")
         if resp.get("status") == "ok":

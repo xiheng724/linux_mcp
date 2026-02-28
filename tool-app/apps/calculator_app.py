@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""Arithmetic calculator tool app."""
+"""Calculator App handlers."""
 
 from __future__ import annotations
 
-import argparse
 import ast
-import json
 import re
-import sys
-from typing import Any, Dict, Union
+from typing import Any, Callable, Dict, Union
 
 Number = Union[int, float]
 
@@ -42,10 +39,6 @@ def _eval_node(node: ast.AST) -> Number:
             return left * right
         if isinstance(node.op, ast.Div):
             return left / right
-        if isinstance(node.op, ast.FloorDiv):
-            return left // right
-        if isinstance(node.op, ast.Mod):
-            return left % right
         if isinstance(node.op, ast.Pow):
             return left**right
         raise ValueError("unsupported binary operator")
@@ -61,22 +54,22 @@ def _extract_expression(payload: Dict[str, Any]) -> str:
     else:
         raise ValueError("calc payload requires non-empty expression/message")
 
-    m = re.search(r"`([^`]+)`|\"([^\"]+)\"|'([^']+)'", text)
-    if m:
+    quoted = re.search(r"`([^`]+)`|\"([^\"]+)\"|'([^']+)'", text)
+    if quoted:
         for idx in (1, 2, 3):
-            part = m.group(idx)
+            part = quoted.group(idx)
             if part:
                 return part.strip()
 
-    candidates = re.findall(r"[0-9\.\+\-\*\/%\(\)\s]{3,}", text)
+    candidates = re.findall(r"[0-9\.\+\-\*\/\(\)\s]{3,}", text)
     for cand in sorted(candidates, key=len, reverse=True):
         expr = " ".join(cand.split())
-        if any(ch.isdigit() for ch in expr) and any(ch in expr for ch in "+-*/%"):
+        if any(ch.isdigit() for ch in expr) and any(ch in expr for ch in "+-*/"):
             return expr
     return text
 
 
-def run(payload: Any) -> Dict[str, Any]:
+def calc(payload: Any) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("calc payload must be object")
 
@@ -89,22 +82,7 @@ def run(payload: Any) -> Dict[str, Any]:
     return {"expression": expr, "result": result}
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--stdin-json", action="store_true")
-    args = parser.parse_args()
+HANDLERS: Dict[str, Callable[[Any], Dict[str, Any]]] = {
+    "calc": calc,
+}
 
-    try:
-        if args.stdin_json:
-            payload = json.loads(sys.stdin.read())
-        else:
-            payload = {}
-        print(json.dumps(run(payload), ensure_ascii=True))
-        return 0
-    except Exception as exc:  # noqa: BLE001
-        print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=True))
-        return 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

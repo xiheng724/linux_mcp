@@ -32,8 +32,120 @@ def _index_tools(tools: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
     return by_id
 
 
+def _index_apps(apps: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    by_id: Dict[str, Dict[str, Any]] = {}
+    for app in apps:
+        app_id = app.get("app_id")
+        if isinstance(app_id, str) and app_id:
+            by_id[app_id] = app
+    return by_id
+
+
+def _heuristic_app_id(user_text: str) -> Tuple[str, str]:
+    lower = user_text.lower()
+    if any(
+        k in lower
+        for k in (
+            "calc",
+            "calculate",
+            "compute",
+            "eval",
+            "math",
+            "算",
+            "计算",
+        )
+    ):
+        return "calculator_app", "keyword(calc/compute/math/计算)"
+    if any(
+        k in lower
+        for k in (
+            "preview",
+            "read file",
+            "show file",
+            "cat ",
+            "hash",
+            "sha",
+            "md5",
+            "digest",
+            "delete",
+            "remove",
+            "copy",
+            "rename",
+            "move",
+            "list",
+            "ls",
+            "dir",
+            "text",
+            "file",
+            "文件",
+            "路径",
+            "摘要",
+            "哈希",
+        )
+    ) or ".md" in lower or ".py" in lower:
+        return "file_manager_app", "keyword(file/preview/hash/text)"
+    if any(
+        k in lower
+        for k in (
+            "burn",
+            "stress",
+            "pressure",
+            "system",
+            "uptime",
+            "load",
+            "memory",
+            "mem",
+            "disk",
+            "sysinfo",
+            "time",
+            "date",
+            "clock",
+            "volume",
+            "setting",
+            "设置",
+            "时间",
+            "系统信息",
+            "负载",
+            "内存",
+            "磁盘",
+        )
+    ):
+        return "settings_app", "keyword(settings/system/time/volume)"
+    return "utility_app", "default(utility)"
+
+
 def _heuristic_tool_id(user_text: str) -> Tuple[int, str]:
     lower = user_text.lower()
+    if any(
+        k in lower
+        for k in ("rename file", "move file", "rename ", "move ", "重命名", "移动文件")
+    ):
+        return 14, "keyword(rename/move file)"
+    if any(
+        k in lower
+        for k in ("copy file", "duplicate file", "copy ", "复制文件", "拷贝文件")
+    ):
+        return 13, "keyword(copy file)"
+    if any(
+        k in lower
+        for k in ("delete file", "remove file", "unlink", "删除文件", "删除")
+    ):
+        return 12, "keyword(delete/remove file)"
+    if any(
+        k in lower
+        for k in ("list files", "list dir", "ls ", "dir ", "目录", "列出文件")
+    ):
+        return 11, "keyword(list/dir)"
+    if any(
+        k in lower
+        for k in ("create file", "new file", "write file", "touch ", "创建文件", "写入文件")
+    ):
+        return 10, "keyword(create/write file)"
+    if any(
+        k in lower
+        for k in ("volume", "mute", "unmute", "louder", "quieter", "音量", "静音")
+    ):
+        return 9, "keyword(volume/mute)"
     if any(k in lower for k in ("burn", "stress", "pressure", "压力", "忙")):
         return 2, "keyword(burn/stress/压力/忙)"
     if any(k in lower for k in ("system", "uptime", "load", "memory", "mem", "disk", "sysinfo", "系统信息", "负载", "内存", "磁盘")):
@@ -143,6 +255,124 @@ def _call_deepseek_selector(
     return tool_id, reason
 
 
+def _call_deepseek_app_selector(
+    user_text: str,
+    apps: List[Dict[str, Any]],
+    api_key: str,
+    cfg: SelectorConfig,
+) -> Tuple[str, str]:
+    app_brief: List[Dict[str, Any]] = []
+    for app in apps:
+        app_id = app.get("app_id")
+        if not isinstance(app_id, str) or not app_id:
+            continue
+        app_brief.append(
+            {
+                "app_id": app_id,
+                "app_name": app.get("app_name", ""),
+                "tool_names": app.get("tool_names", []),
+            }
+        )
+
+    prompt = {
+        "user_input": user_text,
+        "apps": app_brief,
+        "output_format": {"app_id": "string", "reason": "string"},
+        "rule": "Return one JSON object only. No markdown.",
+    }
+    req_obj = {
+        "model": cfg.deepseek_model,
+        "temperature": 0,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are an app router. Select exactly one app_id from the provided apps. "
+                    "Respond with strict JSON only: {\"app_id\":\"...\",\"reason\":\"...\"}."
+                ),
+            },
+            {"role": "user", "content": json.dumps(prompt, ensure_ascii=True)},
+        ],
+    }
+
+    payload = json.dumps(req_obj, ensure_ascii=True).encode("utf-8")
+    req = urllib.request.Request(
+        cfg.deepseek_url,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=cfg.deepseek_timeout_sec) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"DeepSeek HTTP {exc.code}: {detail}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"DeepSeek request failed: {exc}") from exc
+
+    data = json.loads(raw.decode("utf-8"))
+    choices = data.get("choices", [])
+    if not isinstance(choices, list) or not choices:
+        raise RuntimeError(f"invalid DeepSeek response, missing choices: {data}")
+    msg = choices[0].get("message", {})
+    content = msg.get("content", "")
+    if not isinstance(content, str) or not content:
+        raise RuntimeError(f"invalid DeepSeek response content: {data}")
+
+    obj = _extract_json_object(content)
+    app_id = obj.get("app_id")
+    if not isinstance(app_id, str) or not app_id:
+        raise RuntimeError(f"DeepSeek returned invalid app_id: {obj}")
+    reason = obj.get("reason", "")
+    if not isinstance(reason, str):
+        reason = str(reason)
+    return app_id, reason
+
+
+def select_app_for_input(
+    user_text: str,
+    apps: List[Dict[str, Any]],
+    cfg: SelectorConfig,
+    warn_cb: Callable[[str], None] | None = None,
+) -> Tuple[Dict[str, Any], str, str]:
+    """Select one app from list by DeepSeek/heuristic."""
+    by_id = _index_apps(apps)
+    if not by_id:
+        raise RuntimeError("no valid apps discovered from mcpd")
+
+    api_key = os.getenv("DEEPSEEK_API_KEY", "")
+    if cfg.mode in ("auto", "deepseek"):
+        if api_key:
+            try:
+                selected_id, reason = _call_deepseek_app_selector(user_text, apps, api_key, cfg)
+                selected = by_id.get(selected_id)
+                if selected is None:
+                    raise RuntimeError(
+                        f"DeepSeek selected unavailable app_id={selected_id}; "
+                        f"available={sorted(by_id.keys())}"
+                    )
+                return selected, "deepseek", reason or "model-selected"
+            except Exception as exc:  # noqa: BLE001
+                if cfg.mode == "deepseek":
+                    raise RuntimeError(f"DeepSeek app selection failed: {exc}") from exc
+                if warn_cb is not None:
+                    warn_cb(f"DeepSeek unavailable ({exc}), fallback to heuristic")
+        elif cfg.mode == "deepseek":
+            raise RuntimeError("DEEPSEEK_API_KEY not set, cannot use deepseek mode")
+
+    selected_id, reason = _heuristic_app_id(user_text)
+    selected = by_id.get(selected_id)
+    if selected is None:
+        fallback_id = sorted(by_id.keys())[0]
+        selected = by_id[fallback_id]
+        reason = f"{reason}; fallback_first_available={fallback_id}"
+    return selected, "heuristic", reason
+
+
 def select_tool_for_input(
     user_text: str,
     tools: List[Dict[str, Any]],
@@ -228,7 +458,7 @@ def _extract_file_path(user_text: str, default_path: str = "README.md") -> str:
                 if candidate:
                     return candidate
 
-    key_match = re.search(r"(?i)\b(?:file|path)\s*[:=]?\s*([A-Za-z0-9_./\-]+)", user_text)
+    key_match = re.search(r"(?i)\b(?:file|path)\b\s*[:=]?\s*([A-Za-z0-9_./\-]+)", user_text)
     if key_match:
         return key_match.group(1).strip()
 
@@ -276,7 +506,165 @@ def _extract_hash_text(user_text: str) -> str:
     return cleaned or user_text
 
 
+def _extract_timezone(user_text: str) -> str:
+    lower = user_text.lower()
+    if any(k in lower for k in ("utc", "gmt", "zulu", "协调世界时")):
+        return "utc"
+    return "local"
+
+
+def _extract_volume_payload(user_text: str) -> Dict[str, Any]:
+    lower = user_text.lower()
+    if any(k in lower for k in ("current volume", "get volume", "what volume", "音量多少")):
+        return {"action": "get"}
+    if any(k in lower for k in ("mute", "静音")) and "unmute" not in lower:
+        return {"action": "mute"}
+    if any(k in lower for k in ("unmute", "取消静音")):
+        return {"action": "unmute"}
+
+    found = re.search(r"(\d+)", lower)
+    value = 10
+    if found:
+        value = max(1, min(100, int(found.group(1))))
+
+    if any(k in lower for k in ("increase", "up", "louder", "raise", "调高", "增大")):
+        return {"action": "change", "step": value}
+    if any(k in lower for k in ("decrease", "down", "quieter", "lower", "调低", "减小")):
+        return {"action": "change", "step": -value}
+    if "set" in lower or "to " in lower or "音量" in lower:
+        return {"action": "set", "level": value}
+    return {"action": "get"}
+
+
+def _extract_create_file_payload(user_text: str) -> Dict[str, Any]:
+    path = ""
+    path_match = re.search(
+        r"(?i)\b(?:create|new|write|touch)\s+(?:a\s+)?(?:file\s+)?([A-Za-z0-9_./\-]+)",
+        user_text,
+    )
+    if path_match:
+        path = path_match.group(1).strip()
+    if not path:
+        key_match = re.search(r"(?i)\b(?:file|path)\s*[:=]?\s*([A-Za-z0-9_./\-]+)", user_text)
+        if key_match:
+            path = key_match.group(1).strip()
+    if not path:
+        path = _extract_file_path(user_text, default_path="notes.txt")
+
+    quoted = re.findall(r"`([^`]+)`|\"([^\"]+)\"|'([^']+)'", user_text)
+    values: List[str] = []
+    for tup in quoted:
+        for part in tup:
+            if part:
+                values.append(part)
+    content = ""
+    if values:
+        content = values[-1]
+    else:
+        m = re.search(r"(?i)(?:with|content)\s*[:=]?\s+(.+)$", user_text)
+        if m:
+            content = m.group(1).strip()
+
+    overwrite = bool(
+        re.search(r"(?i)\b(overwrite|replace|force|覆盖|替换|强制)\b", user_text)
+    )
+    return {"path": path, "content": content, "overwrite": overwrite}
+
+
+def _extract_list_files_payload(user_text: str) -> Dict[str, Any]:
+    path = _extract_file_path(user_text, default_path=".")
+    max_entries = 100
+    found = re.search(r"(?i)\b(\d+)\s*(?:entries|files|items|条)\b", user_text)
+    if found:
+        max_entries = int(found.group(1))
+    if max_entries < 1:
+        max_entries = 1
+    if max_entries > 1000:
+        max_entries = 1000
+    return {"path": path, "max_entries": max_entries}
+
+
+def _extract_delete_file_payload(user_text: str) -> Dict[str, Any]:
+    path = ""
+    path_match = re.search(
+        r"(?i)\b(?:delete|remove|unlink)\s+(?:file\s+)?([A-Za-z0-9_./\-]+)",
+        user_text,
+    )
+    if path_match:
+        path = path_match.group(1).strip()
+    if not path:
+        path = _extract_file_path(user_text, default_path="")
+    if not path:
+        path = "tmp/demo_created_by_mcp.txt"
+
+    recursive = bool(re.search(r"(?i)\b(recursive|directory|dir|目录|递归)\b", user_text))
+    allow_missing = bool(re.search(r"(?i)\b(ignore missing|allow missing|忽略不存在)\b", user_text))
+    return {"path": path, "recursive": recursive, "allow_missing": allow_missing}
+
+
+def _extract_src_dst_paths(user_text: str) -> Tuple[str, str]:
+    lower = user_text.lower()
+    m = re.search(
+        r"(?i)\b(?:copy|rename|move)\s+(?:file\s+)?([A-Za-z0-9_./\-]+)\s+(?:to|as|->)\s+([A-Za-z0-9_./\-]+)",
+        user_text,
+    )
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+
+    quoted = re.findall(r"`([^`]+)`|\"([^\"]+)\"|'([^']+)'", user_text)
+    values: List[str] = []
+    for tup in quoted:
+        for part in tup:
+            if part:
+                values.append(part.strip())
+    if len(values) >= 2:
+        return values[0], values[1]
+
+    tokens = [t.strip(".,;:()[]{}") for t in re.findall(r"[A-Za-z0-9_./\-]+", user_text)]
+    paths = [t for t in tokens if ("/" in t or "." in t) and t not in {"to", "as"}]
+    if len(paths) >= 2:
+        return paths[0], paths[1]
+
+    if "rename" in lower or "move" in lower:
+        return "tmp/a.txt", "tmp/a_renamed.txt"
+    return "README.md", "tmp/README.copy.md"
+
+
+def _extract_copy_file_payload(user_text: str) -> Dict[str, Any]:
+    src_path, dst_path = _extract_src_dst_paths(user_text)
+    overwrite = bool(re.search(r"(?i)\b(overwrite|replace|force|覆盖|替换|强制)\b", user_text))
+    return {
+        "src_path": src_path,
+        "dst_path": dst_path,
+        "overwrite": overwrite,
+        "create_parents": True,
+    }
+
+
+def _extract_rename_file_payload(user_text: str) -> Dict[str, Any]:
+    src_path, dst_path = _extract_src_dst_paths(user_text)
+    overwrite = bool(re.search(r"(?i)\b(overwrite|replace|force|覆盖|替换|强制)\b", user_text))
+    return {
+        "src_path": src_path,
+        "dst_path": dst_path,
+        "overwrite": overwrite,
+        "create_parents": True,
+    }
+
+
 def build_payload_for_tool(tool_name: str, user_text: str) -> Dict[str, Any]:
+    if tool_name == "file_copy":
+        return _extract_copy_file_payload(user_text)
+    if tool_name == "file_rename":
+        return _extract_rename_file_payload(user_text)
+    if tool_name == "file_list":
+        return _extract_list_files_payload(user_text)
+    if tool_name == "file_delete":
+        return _extract_delete_file_payload(user_text)
+    if tool_name == "volume_control":
+        return _extract_volume_payload(user_text)
+    if tool_name == "file_create":
+        return _extract_create_file_payload(user_text)
     if tool_name == "cpu_burn":
         return {"ms": _extract_burn_ms(user_text)}
     if tool_name == "text_stats":
@@ -293,5 +681,5 @@ def build_payload_for_tool(tool_name: str, user_text: str) -> Dict[str, Any]:
     if tool_name == "hash_text":
         return {"text": _extract_hash_text(user_text), "algorithm": _extract_hash_algorithm(user_text)}
     if tool_name == "time_now":
-        return {}
+        return {"timezone": _extract_timezone(user_text)}
     return {"message": user_text}

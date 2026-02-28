@@ -1,33 +1,26 @@
-# bench
+# bench (optional)
 
-Benchmark drivers and harness scripts.
+`bench/` 是可选压测模块，不参与主链路运行。
 
-## Quick Benchmark (Phase 5)
+## 用途
 
-Prerequisites:
-- Kernel module loaded
-- `mcpd` running on `/tmp/mcpd.sock`
-- Client binaries built (`make -C client`, outputs in `client/bin/`)
+- 批量压测仲裁与执行路径
+- 产出吞吐、延迟、fairness 指标
 
-Run benchmark:
+## 前置条件
+
+- `kernel_mcp` 已加载
+- `mcpd` 正在运行
+- `client/bin` 已编译
+
+## 运行
 
 ```bash
 python3 bench/bench_runner.py --agents 10 --requests 50 --tool cpu_burn --burn-ms 50 --out results/phase5_run.json
 ```
 
-Generate plots:
+## 绘图
 
 ```bash
 python3 bench/plot_results.py --in results/phase5_run.json --outdir plots
 ```
-
-Generated artifacts:
-- `results/phase5_run.json`: machine-readable per-request and per-agent metrics
-- `plots/throughput.png`
-- `plots/latency_p95.png`
-- `plots/fairness.png`
-
-Key metrics:
-- Throughput: successful executions per second per agent
-- Latency: end-to-end p50/p95/p99 (includes DEFER retries)
-- Fairness: coefficient of variation (`std/mean`) of per-agent ALLOW counts

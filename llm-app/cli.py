@@ -16,6 +16,7 @@ from app_logic import (
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
     build_payload_for_tool,
+    select_app_for_input,
     select_tool_for_input,
 )
 from rpc import mcpd_call
@@ -34,8 +35,32 @@ def _tools_signature(tools: List[Dict[str, Any]]) -> str:
     return hashlib.sha256(encoded).hexdigest()[:12]
 
 
-def _list_tools(sock_path: str) -> List[Dict[str, Any]]:
-    resp = mcpd_call({"sys": "list_tools"}, sock_path=sock_path, timeout_s=5)
+def _apps_signature(apps: List[Dict[str, Any]]) -> str:
+    encoded = json.dumps(apps, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest()[:12]
+
+
+def _list_apps(sock_path: str) -> List[Dict[str, Any]]:
+    resp = mcpd_call({"sys": "list_apps"}, sock_path=sock_path, timeout_s=5)
+    if resp.get("status") != "ok":
+        raise CliError(resp.get("error", "list_apps failed"))
+    apps = resp.get("apps", [])
+    if not isinstance(apps, list):
+        raise CliError("list_apps response missing apps list")
+    typed_apps: List[Dict[str, Any]] = []
+    for app in apps:
+        if isinstance(app, dict):
+            typed_apps.append(app)
+    return typed_apps
+
+
+def _list_tools(sock_path: str, app_id: str = "") -> List[Dict[str, Any]]:
+    req: Dict[str, Any] = {"sys": "list_tools"}
+    if app_id:
+        req["app_id"] = app_id
+    resp = mcpd_call(req, sock_path=sock_path, timeout_s=5)
     if resp.get("status") != "ok":
         raise CliError(resp.get("error", "list_tools failed"))
     tools = resp.get("tools", [])
@@ -46,6 +71,21 @@ def _list_tools(sock_path: str) -> List[Dict[str, Any]]:
         if isinstance(tool, dict):
             typed_tools.append(tool)
     return typed_tools
+
+
+def _print_apps(apps: List[Dict[str, Any]]) -> None:
+    print(f"[llm-app] apps ({len(apps)}):", flush=True)
+    for app in apps:
+        print(
+            (
+                f"[llm-app]   - id={app.get('app_id')} "
+                f"name={app.get('app_name')} tools={app.get('tool_count')}"
+            ),
+            flush=True,
+        )
+        tool_names = app.get("tool_names", [])
+        if isinstance(tool_names, list) and tool_names:
+            print(f"[llm-app]     tool_names={','.join(str(x) for x in tool_names)}", flush=True)
 
 
 def _print_tools(tools: List[Dict[str, Any]]) -> None:
@@ -61,18 +101,33 @@ def _print_tools(tools: List[Dict[str, Any]]) -> None:
         print(f"[llm-app]     desc={tool.get('description')}", flush=True)
 
 
-def _execute_once_with_tools(
+def _execute_once_with_apps(
     user_text: str,
     agent_id: str,
     sock_path: str,
     cfg: SelectorConfig,
-    tools: List[Dict[str, Any]],
+    apps: List[Dict[str, Any]],
 ) -> int:
-    if not tools:
-        raise CliError("no tools returned by mcpd")
+    if not apps:
+        raise CliError("no apps returned by mcpd")
 
     warnings: List[str] = []
-    selected, selector_source, selector_reason = select_tool_for_input(
+    selected_app, app_selector_source, app_selector_reason = select_app_for_input(
+        user_text,
+        apps,
+        cfg,
+        warn_cb=lambda msg: warnings.append(msg),
+    )
+    app_id = str(selected_app.get("app_id", ""))
+    app_name = str(selected_app.get("app_name", app_id))
+    if not app_id:
+        raise CliError("selected app has empty app_id")
+
+    tools = _list_tools(sock_path, app_id=app_id)
+    if not tools:
+        raise CliError(f"selected app has no tools: {app_id}")
+
+    selected_tool, tool_selector_source, tool_selector_reason = select_tool_for_input(
         user_text,
         tools,
         cfg,
@@ -81,14 +136,19 @@ def _execute_once_with_tools(
     for msg in warnings:
         print(f"[llm-app] WARN: {msg}", flush=True)
 
-    tool_id = int(selected["tool_id"])
-    tool_name = str(selected.get("name", "unknown"))
-    tool_hash_raw = selected.get("hash")
+    tool_id = int(selected_tool["tool_id"])
+    tool_name = str(selected_tool.get("name", "unknown"))
+    tool_hash_raw = selected_tool.get("hash")
     tool_hash = tool_hash_raw if isinstance(tool_hash_raw, str) and tool_hash_raw else ""
     payload = build_payload_for_tool(tool_name, user_text)
 
+    print(f"[llm-app] selected app={app_name} id={app_id}", flush=True)
     print(f"[llm-app] selected tool={tool_name} id={tool_id} hash={tool_hash or '-'}", flush=True)
-    print(f"[llm-app] selector={selector_source} reason={selector_reason}", flush=True)
+    print(f"[llm-app] app_selector={app_selector_source} reason={app_selector_reason}", flush=True)
+    print(
+        f"[llm-app] tool_selector={tool_selector_source} reason={tool_selector_reason}",
+        flush=True,
+    )
 
     req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
     resp = mcpd_call(
@@ -96,6 +156,7 @@ def _execute_once_with_tools(
             "kind": "tool:exec",
             "req_id": req_id,
             "agent_id": agent_id,
+            "app_id": app_id,
             "tool_id": tool_id,
             "tool_hash": tool_hash,
             "payload": payload,
@@ -114,26 +175,32 @@ def _execute_once_with_tools(
 
 
 def _run_once(user_text: str, agent_id: str, sock_path: str, cfg: SelectorConfig) -> int:
+    apps = _list_apps(sock_path)
     tools = _list_tools(sock_path)
+    _print_apps(apps)
     _print_tools(tools)
-    return _execute_once_with_tools(user_text, agent_id, sock_path, cfg, tools)
+    return _execute_once_with_apps(user_text, agent_id, sock_path, cfg, apps)
 
 
 def _print_help() -> None:
     print("[llm-app] commands:", flush=True)
     print("[llm-app]   /help  show help", flush=True)
+    print("[llm-app]   /apps  force refresh and print apps", flush=True)
     print("[llm-app]   /tools force refresh and print tools", flush=True)
     print("[llm-app]   /exit  quit", flush=True)
 
 
 def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: bool) -> int:
+    apps = _list_apps(sock_path)
     tools = _list_tools(sock_path)
-    if not tools:
-        raise CliError("no tools returned by mcpd")
+    if not apps:
+        raise CliError("no apps returned by mcpd")
 
     print("[llm-app] REPL mode started", flush=True)
     _print_help()
+    _print_apps(apps)
     _print_tools(tools)
+    last_apps_sig = _apps_signature(apps)
     last_sig = _tools_signature(tools)
 
     while True:
@@ -150,11 +217,25 @@ def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: b
         if user_text == "/help":
             _print_help()
             continue
+        if user_text == "/apps":
+            apps = _list_apps(sock_path)
+            _print_apps(apps)
+            last_apps_sig = _apps_signature(apps)
+            continue
         if user_text == "/tools":
             tools = _list_tools(sock_path)
             _print_tools(tools)
             last_sig = _tools_signature(tools)
             continue
+
+        apps = _list_apps(sock_path)
+        app_sig = _apps_signature(apps)
+        if app_sig != last_apps_sig:
+            print("[llm-app] apps changed", flush=True)
+            _print_apps(apps)
+        else:
+            print("[llm-app] apps unchanged", flush=True)
+        last_apps_sig = app_sig
 
         tools = _list_tools(sock_path)
         sig = _tools_signature(tools)
@@ -167,7 +248,7 @@ def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: b
             print("[llm-app] tools unchanged", flush=True)
         last_sig = sig
 
-        rc = _execute_once_with_tools(user_text, agent_id, sock_path, cfg, tools)
+        rc = _execute_once_with_apps(user_text, agent_id, sock_path, cfg, apps)
         if rc != 0:
             print(f"[llm-app] request failed rc={rc}", flush=True)
 

@@ -1,24 +1,21 @@
 # tool-app
 
-Independent tool applications executed by `mcpd`.
+App-level tool implementations executed by `mcpd`.
 
-## Contract
+## Structure
 
-Each tool app is a standalone script under `tool-app/` and should support:
+- `tool-app/app_service.py`: generic resident UDS server.
+- `tool-app/apps/*.py`: app modules, each exposing:
+  - `HANDLERS: Dict[str, Callable[[Any], Dict[str, Any]]]`
+- `mcpd/apps.d/*.json`:
+  - app-level fields (`app_id`, `app_impl`, `endpoint`, ...)
+  - tool entries use `handler` key to reference `HANDLERS`.
 
-- `--stdin-json`: read tool payload JSON from stdin.
-- write JSON result to stdout.
-- return non-zero on error and print JSON error message (best effort).
+`mcpd` dispatches requests by app `endpoint` and `tool_id`; `app_service.py` resolves `tool_id -> handler`.
 
-`mcpd` dispatches tools by `app_path` declared in `mcpd/tools.d/*.json`.
+## Current App Modules
 
-## Current Apps
-
-- `echo_app.py`
-- `cpu_burn_app.py`
-- `text_stats_app.py`
-- `sys_info_app.py`
-- `calc_app.py`
-- `file_preview_app.py`
-- `hash_text_app.py`
-- `time_now_app.py`
+- `apps/settings_app.py`
+- `apps/file_manager_app.py`
+- `apps/calculator_app.py`
+- `apps/utility_app.py`

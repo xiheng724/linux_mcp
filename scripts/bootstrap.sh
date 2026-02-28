@@ -8,10 +8,16 @@ VENV_DIR="${LINUX_MCP_VENV_DIR:-/tmp/linux-mcp-venv}"
 REQUIRED_DIRS=(
   kernel-mcp
   mcpd
+  mcpd/apps.d
+  tool-app
+  tool-app/apps
+  llm-app
   client
-  bench
   scripts
-  docs
+)
+
+OPTIONAL_DIRS=(
+  bench
   results
   plots
 )
@@ -19,7 +25,15 @@ REQUIRED_DIRS=(
 echo "[bootstrap] ensure directory layout"
 for d in "${REQUIRED_DIRS[@]}"; do
   mkdir -p "$d"
-  echo "ok dir: $d"
+  echo "ok core dir: $d"
+done
+
+for d in "${OPTIONAL_DIRS[@]}"; do
+  if [[ -d "$d" ]]; then
+    echo "ok optional dir (exists): $d"
+  else
+    echo "skip optional dir: $d"
+  fi
 done
 
 echo "[bootstrap] check build tools"

@@ -1,73 +1,28 @@
 # client
 
-Raw Generic Netlink test clients and Python demo client for linux-mcp.
+`client/` 提供底层 Generic Netlink 调试/注册工具（C 版本）。
 
-## Build
+## 是否必要
 
-Build all C tools:
+- 对主链路来说：**当前必要**。  
+  `mcpd/reconcile_kernel.py` 会调用：
+  - `client/bin/genl_register_tool`
+  - `client/bin/genl_list_tools`
+- 其他二进制（如 `genl_ping`、`genl_register_agent`、`genl_tool_request`、`genl_tool_complete`）主要用于调试与独立验证。
+
+## 编译
 
 ```bash
 make -C client clean
 make -C client
 ```
 
-All binaries are generated in `client/bin/`.
-
-## Tool Registration
-
-1) Ensure the kernel module is loaded:
-
-```bash
-sudo bash scripts/load_module.sh
-```
-
-2) Register a tool:
-
-```bash
-./client/bin/genl_register_tool --id 24 --name clock_tool --perm 1 --cost 1
-```
-
-3) Verify registration:
-
-```bash
-./client/bin/genl_list_tools
-ls -l /sys/kernel/mcp/tools/24
-cat /sys/kernel/mcp/tools/24/name
-cat /sys/kernel/mcp/tools/24/perm
-cat /sys/kernel/mcp/tools/24/cost
-cat /sys/kernel/mcp/tools/24/status
-```
-
-Notes:
-- `id`: unique tool id (`u32`), used as the kernel registry key.
-- `name`: human-readable tool name.
-- `perm`: policy metadata field (`u32`).
-- `cost`: cost metadata field (`u32`).
-- Re-registering the same `id` updates metadata in place.
-
-## Common Operations
-
-Ping kernel family:
+## 常用命令
 
 ```bash
 ./client/bin/genl_ping "hello-kernel-mcp"
-```
-
-Register default tools:
-
-```bash
 ./client/bin/genl_register_tool --id 1 --name echo --perm 1 --cost 1
-./client/bin/genl_register_tool --id 2 --name cpu_burn --perm 1 --cost 3
-```
-
-Register agent:
-
-```bash
+./client/bin/genl_list_tools
 ./client/bin/genl_register_agent --id a1
-```
-
-Request arbitration decisions:
-
-```bash
-./client/bin/genl_tool_request --agent a1 --tool 2 --n 10
+./client/bin/genl_tool_request --agent a1 --tool 2 --n 5
 ```
