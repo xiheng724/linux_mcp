@@ -22,7 +22,6 @@ from netlink_client import KernelMcpNetlinkClient
 SOCK_PATH = "/tmp/mcpd.sock"
 MAX_MSG_SIZE = 16 * 1024 * 1024
 MAX_DEFER_RETRIES = 50
-APPS_DIR = Path(__file__).resolve().parent / "apps.d"
 LOGGER = logging.getLogger("mcpd")
 HASH_RE = re.compile(r"^[0-9a-fA-F]{8}$")
 SEMANTIC_HASH_FIELDS = (
@@ -39,7 +38,9 @@ SEMANTIC_HASH_FIELDS = (
 
 _stop_event = threading.Event()
 _agents_lock = threading.Lock()
+_registry_lock = threading.RLock()
 _registered_agents: set[str] = set()
+_app_registry: Dict[str, Dict[int, "ToolMeta"]] = {}
 _kernel_client: KernelMcpNetlinkClient | None = None
 
 
@@ -125,7 +126,7 @@ def _ensure_tool_path(name: str, value: Any, path: Path) -> str:
 
 
 def _load_tool_from_app_manifest(
-    app_manifest_path: Path,
+    app_manifest_path: str,
     app_id: str,
     app_name: str,
     mode: str,
@@ -194,58 +195,92 @@ def _load_tool_from_app_manifest(
     )
 
 
-def _load_tool_registry(apps_dir: Path) -> Dict[int, ToolMeta]:
-    if not apps_dir.is_dir():
-        raise ValueError(f"app manifest directory missing: {apps_dir}")
+def _load_tools_from_manifest_raw(source: str, raw: Any) -> tuple[str, str, List[ToolMeta]]:
+    if not isinstance(raw, dict):
+        raise ValueError(f"{source}: manifest must be JSON object")
 
-    registry: Dict[int, ToolMeta] = {}
-    app_ids: set[str] = set()
-    for app_manifest in sorted(apps_dir.glob("*.json")):
-        raw = json.loads(app_manifest.read_text(encoding="utf-8"))
-        if not isinstance(raw, dict):
-            raise ValueError(f"{app_manifest}: manifest must be JSON object")
+    for field in ("app_id", "app_name", "mode", "endpoint", "app_impl", "service_path", "tools"):
+        if field not in raw:
+            raise ValueError(f"{source}: missing field '{field}'")
 
-        for field in ("app_id", "app_name", "mode", "endpoint", "app_impl", "tools"):
-            if field not in raw:
-                raise ValueError(f"{app_manifest}: missing field '{field}'")
+    app_id = _ensure_non_empty_str("app_id", raw["app_id"])
+    app_name = _ensure_non_empty_str("app_name", raw["app_name"])
+    mode = _ensure_non_empty_str("mode", raw["mode"])
+    endpoint = _ensure_non_empty_str("endpoint", raw["endpoint"])
+    _ensure_tool_path("app_impl", raw["app_impl"], Path(source))
+    _ensure_tool_path("service_path", raw["service_path"], Path(source))
 
-        app_id = _ensure_non_empty_str("app_id", raw["app_id"])
-        app_name = _ensure_non_empty_str("app_name", raw["app_name"])
-        mode = _ensure_non_empty_str("mode", raw["mode"])
-        endpoint = _ensure_non_empty_str("endpoint", raw["endpoint"])
-        _ensure_tool_path("app_impl", raw["app_impl"], app_manifest)
-        if app_id in app_ids:
-            raise ValueError(f"duplicate app_id in manifests: {app_id}")
-        app_ids.add(app_id)
+    if mode != "uds_service":
+        raise ValueError(f"{source}: mode must be 'uds_service'")
+    if not endpoint.startswith("/tmp/linux-mcp-apps/"):
+        raise ValueError(f"{source}: endpoint must start with /tmp/linux-mcp-apps/")
 
-        if mode != "uds_service":
-            raise ValueError(f"{app_manifest}: mode must be 'uds_service'")
-        if not endpoint.startswith("/tmp/linux-mcp-apps/"):
-            raise ValueError(f"{app_manifest}: endpoint must start with /tmp/linux-mcp-apps/")
+    tools_raw = raw["tools"]
+    if not isinstance(tools_raw, list) or not tools_raw:
+        raise ValueError(f"{source}: tools must be non-empty list")
 
-        tools_raw = raw["tools"]
-        if not isinstance(tools_raw, list) or not tools_raw:
-            raise ValueError(f"{app_manifest}: tools must be non-empty list")
+    tools: List[ToolMeta] = []
+    seen_ids: set[int] = set()
+    for tool_raw in tools_raw:
+        if not isinstance(tool_raw, dict):
+            raise ValueError(f"{source}: each tool must be object")
+        tool = _load_tool_from_app_manifest(
+            source,
+            app_id=app_id,
+            app_name=app_name,
+            mode=mode,
+            endpoint=endpoint,
+            tool_raw=tool_raw,
+        )
+        if tool.tool_id in seen_ids:
+            raise ValueError(f"{source}: duplicate tool_id in manifest: {tool.tool_id}")
+        seen_ids.add(tool.tool_id)
+        tools.append(tool)
+    return app_id, app_name, tools
 
-        for tool_raw in tools_raw:
-            if not isinstance(tool_raw, dict):
-                raise ValueError(f"{app_manifest}: each tool must be object")
-            tool = _load_tool_from_app_manifest(
-                app_manifest,
-                app_id=app_id,
-                app_name=app_name,
-                mode=mode,
-                endpoint=endpoint,
-                tool_raw=tool_raw,
-            )
-            if tool.tool_id in registry:
-                raise ValueError(f"duplicate tool_id in manifests: {tool.tool_id}")
-            registry[tool.tool_id] = tool
 
-    if not registry:
-        raise ValueError(f"no app manifests found under {apps_dir}")
+def _register_tool_with_kernel(tool: ToolMeta) -> None:
+    client = _get_kernel_client()
+    client.register_tool(
+        tool_id=tool.tool_id,
+        name=tool.name,
+        perm=tool.perm,
+        cost=tool.cost,
+        tool_hash=tool.manifest_hash,
+    )
 
-    return registry
+
+def _register_manifest(raw: Any, source: str) -> Dict[str, Any]:
+    app_id, app_name, tools = _load_tools_from_manifest_raw(source, raw)
+    tool_map = {tool.tool_id: tool for tool in tools}
+
+    with _registry_lock:
+        for tool_id in sorted(tool_map.keys()):
+            for other_app_id, other_tools in _app_registry.items():
+                if other_app_id == app_id:
+                    continue
+                if tool_id in other_tools:
+                    raise ValueError(
+                        f"{source}: tool_id={tool_id} already owned by app_id={other_app_id}"
+                    )
+        for tool in tools:
+            _register_tool_with_kernel(tool)
+        _app_registry[app_id] = tool_map
+
+    LOGGER.info(
+        "registered manifest source=%s app_id=%s app_name=%s tools=%s",
+        source,
+        app_id,
+        app_name,
+        sorted(tool_map.keys()),
+    )
+    return {
+        "status": "ok",
+        "app_id": app_id,
+        "app_name": app_name,
+        "tool_count": len(tool_map),
+        "tool_ids": sorted(tool_map.keys()),
+    }
 
 
 def _matches_primitive(expected: str, value: Any) -> bool:
@@ -450,6 +485,31 @@ def _list_tools_public(registry: Dict[int, ToolMeta], app_id: str = "") -> List[
     return [_tool_to_public(tool) for tool in tools]
 
 
+def _flatten_registry_locked() -> Dict[int, ToolMeta]:
+    flat: Dict[int, ToolMeta] = {}
+    for app_tools in _app_registry.values():
+        for tool_id, tool in app_tools.items():
+            flat[tool_id] = tool
+    return flat
+
+
+def _list_apps_public() -> List[Dict[str, Any]]:
+    with _registry_lock:
+        apps_public: List[Dict[str, Any]] = []
+        for app_id in sorted(_app_registry.keys()):
+            tools = sorted(_app_registry[app_id].values(), key=lambda item: item.tool_id)
+            if not tools:
+                continue
+            apps_public.append(_app_to_public(app_id, tools[0].app_name, tools))
+        return apps_public
+
+
+def _list_tools_public_runtime(app_id: str = "") -> List[Dict[str, Any]]:
+    with _registry_lock:
+        registry = _flatten_registry_locked()
+        return _list_tools_public(registry, app_id=app_id)
+
+
 def _build_error(req_id: int, err: str, t_ms: int) -> Dict[str, Any]:
     return {
         "req_id": req_id,
@@ -469,12 +529,13 @@ def _resolve_tool_hash(req: Dict[str, Any], tool: ToolMeta) -> str:
     return raw.lower()
 
 
-def _handle_tool_exec(req: Dict[str, Any], registry: Dict[int, ToolMeta]) -> Dict[str, Any]:
+def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
     req_id = _ensure_int("req_id", req.get("req_id", 0))
     agent_id = _ensure_non_empty_str("agent_id", req.get("agent_id", ""))
     app_id = _ensure_non_empty_str("app_id", req.get("app_id", ""))
     tool_id = _ensure_int("tool_id", req.get("tool_id", 0))
-    tool = registry.get(tool_id)
+    with _registry_lock:
+        tool = _flatten_registry_locked().get(tool_id)
     if tool is None:
         raise ValueError(f"unsupported tool_id: {tool_id}")
     if tool.app_id != app_id:
@@ -556,8 +617,7 @@ def _handle_tool_exec(req: Dict[str, Any], registry: Dict[int, ToolMeta]) -> Dic
             )
 
 
-def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> None:
-    app_map = _build_app_map(registry)
+def _handle_connection(conn: socket.socket) -> None:
     with conn:
         while True:
             req_id = 0
@@ -574,12 +634,7 @@ def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> No
 
                 if req.get("sys") == "list_apps":
                     req_kind = "sys:list_apps"
-                    apps_public: List[Dict[str, Any]] = []
-                    for key in sorted(app_map.keys()):
-                        tools = app_map[key]
-                        if not tools:
-                            continue
-                        apps_public.append(_app_to_public(key, tools[0].app_name, tools))
+                    apps_public = _list_apps_public()
                     resp = {"status": "ok", "apps": apps_public}
                     _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                     t_ms = int((time.perf_counter() - t0) * 1000)
@@ -597,12 +652,13 @@ def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> No
                     if app_id_req not in ("", None) and not isinstance(app_id_req, str):
                         raise ValueError("app_id must be string when provided")
                     app_id_str = "" if app_id_req in ("", None) else app_id_req
-                    if app_id_str and app_id_str not in app_map:
-                        raise ValueError(f"unknown app_id: {app_id_str}")
+                    with _registry_lock:
+                        if app_id_str and app_id_str not in _app_registry:
+                            raise ValueError(f"unknown app_id: {app_id_str}")
                     resp = {
                         "status": "ok",
                         "app_id": app_id_str,
-                        "tools": _list_tools_public(registry, app_id=app_id_str),
+                        "tools": _list_tools_public_runtime(app_id=app_id_str),
                     }
                     _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                     t_ms = int((time.perf_counter() - t0) * 1000)
@@ -615,6 +671,20 @@ def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> No
                     )
                     continue
 
+                if req.get("sys") == "register_manifest":
+                    req_kind = "sys:register_manifest"
+                    resp = _register_manifest(req.get("manifest"), "rpc:register_manifest")
+                    _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
+                    t_ms = int((time.perf_counter() - t0) * 1000)
+                    LOGGER.info(
+                        "kind=%s status=ok app_id=%s tools=%d t_ms=%d",
+                        req_kind,
+                        resp.get("app_id", "?"),
+                        resp.get("tool_count", 0),
+                        t_ms,
+                    )
+                    continue
+
                 if "kind" in req and req.get("kind") != "tool:exec":
                     raise ValueError(f"unsupported request kind: {req.get('kind')}")
 
@@ -622,7 +692,7 @@ def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> No
                 agent_id = _ensure_non_empty_str("agent_id", req.get("agent_id", ""))
                 app_id = _ensure_non_empty_str("app_id", req.get("app_id", ""))
                 tool_id = _ensure_int("tool_id", req.get("tool_id", 0))
-                resp = _handle_tool_exec(req, registry)
+                resp = _handle_tool_exec(req)
                 _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                 t_ms = int((time.perf_counter() - t0) * 1000)
                 LOGGER.info(
@@ -658,7 +728,7 @@ def _handle_connection(conn: socket.socket, registry: Dict[int, ToolMeta]) -> No
                 )
 
 
-def _accept_loop(server: socket.socket, registry: Dict[int, ToolMeta]) -> None:
+def _accept_loop(server: socket.socket) -> None:
     while not _stop_event.is_set():
         try:
             conn, _addr = server.accept()
@@ -666,7 +736,7 @@ def _accept_loop(server: socket.socket, registry: Dict[int, ToolMeta]) -> None:
             if _stop_event.is_set():
                 return
             continue
-        th = threading.Thread(target=_handle_connection, args=(conn, registry), daemon=True)
+        th = threading.Thread(target=_handle_connection, args=(conn,), daemon=True)
         th.start()
 
 
@@ -688,18 +758,12 @@ def main() -> int:
     signal.signal(signal.SIGINT, _signal_handler)
 
     try:
-        registry = _load_tool_registry(APPS_DIR)
-    except Exception as exc:  # noqa: BLE001
-        LOGGER.error("failed to load app manifests: %s", exc)
-        return 1
-
-    try:
         _kernel_client = KernelMcpNetlinkClient()
     except Exception as exc:  # noqa: BLE001
         LOGGER.error("failed to initialize kernel netlink client: %s", exc)
         return 1
 
-    LOGGER.info("loaded app manifests app_dir=%s tool_count=%d", APPS_DIR, len(registry))
+    LOGGER.info("mcpd runtime registry ready; waiting for tool-app manifest registration")
     _cleanup_socket(SOCK_PATH)
 
     try:
@@ -712,7 +776,7 @@ def main() -> int:
 
             accept_thread = threading.Thread(
                 target=_accept_loop,
-                args=(server, registry),
+                args=(server,),
                 daemon=True,
             )
             accept_thread.start()

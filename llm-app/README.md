@@ -9,7 +9,8 @@ Simple CLI demo that:
 5. `mcpd` performs kernel arbitration + tool execution + completion report
 
 Tool semantics source:
-- `mcpd/apps.d/*.json` (`tools[].description`, `tools[].input_schema`, `tools[].examples`)
+- `tool-app/manifests/*.json` (`tools[].description`, `tools[].input_schema`, `tools[].examples`)
+- semantics are pushed to `mcpd` by `tool-app/app_service.py` over UDS registration
 - llm-app only sees semantic fields and hash (no runtime endpoint/handler fields)
 
 Prerequisites:

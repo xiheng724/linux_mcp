@@ -9,9 +9,9 @@ VENV_DIR="${LINUX_MCP_VENV_DIR:-/tmp/linux-mcp-venv}"
 REQUIRED_DIRS=(
   kernel-mcp
   mcpd
-  mcpd/apps.d
   tool-app
   tool-app/apps
+  tool-app/manifests
   llm-app
   client
   scripts

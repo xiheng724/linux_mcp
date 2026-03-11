@@ -8,6 +8,7 @@ import importlib.util
 import json
 import signal
 import socket
+import struct
 import sys
 import threading
 import time
@@ -18,6 +19,9 @@ from service_lib import recv_msg, send_msg
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 TOOL_APP_DIR = Path(__file__).resolve().parent
+DEFAULT_MCPD_SOCK = "/tmp/mcpd.sock"
+REGISTER_RETRY_SEC = 1.0
+REGISTER_REFRESH_SEC = 5.0
 if str(TOOL_APP_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_APP_DIR))
 
@@ -122,13 +126,65 @@ def _load_manifest(manifest_path: Path) -> tuple[str, str, Dict[int, Callable[[A
     return app_id, app_name, handlers
 
 
-def _serve(endpoint_path: str, handlers: Dict[int, Callable[[Any], Any]]) -> int:
+def _register_manifest_once(manifest_raw: Dict[str, Any], sock_path: str, timeout_s: float = 3.0) -> Dict[str, Any]:
+    payload = json.dumps({"sys": "register_manifest", "manifest": manifest_raw}, ensure_ascii=True).encode(
+        "utf-8"
+    )
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
+        conn.settimeout(timeout_s)
+        conn.connect(sock_path)
+        conn.sendall(struct.pack(">I", len(payload)))
+        conn.sendall(payload)
+        raw = recv_msg(conn)
+    if not isinstance(raw, dict):
+        raise ValueError("mcpd returned non-object response during manifest registration")
+    return raw
+
+
+def _registration_loop(
+    manifest_raw: Dict[str, Any],
+    sock_path: str,
+    stop_event: threading.Event,
+) -> None:
+    app_id = str(manifest_raw.get("app_id", "unknown"))
+    last_error = ""
+    registered = False
+    while not stop_event.is_set():
+        try:
+            resp = _register_manifest_once(manifest_raw, sock_path=sock_path)
+            if resp.get("status") != "ok":
+                raise ValueError(str(resp.get("error", "register_manifest failed")))
+            if not registered:
+                print(
+                    f"[app_service] registered manifest app_id={app_id} tools={resp.get('tool_count', '?')} via={sock_path}",
+                    flush=True,
+                )
+            registered = True
+            last_error = ""
+            stop_event.wait(REGISTER_REFRESH_SEC)
+            continue
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc)
+            if not registered or msg != last_error:
+                print(
+                    f"[app_service] manifest registration pending app_id={app_id} sock={sock_path} err={msg}",
+                    flush=True,
+                )
+            registered = False
+            last_error = msg
+            stop_event.wait(REGISTER_RETRY_SEC)
+
+
+def _serve(
+    endpoint_path: str,
+    handlers: Dict[int, Callable[[Any], Any]],
+    *,
+    stop_event: threading.Event,
+) -> int:
     endpoint = Path(endpoint_path)
     endpoint.parent.mkdir(parents=True, exist_ok=True)
     if endpoint.exists():
         endpoint.unlink()
-
-    stop_event = threading.Event()
 
     def _signal_handler(_sig: int, _frame: Any) -> None:
         stop_event.set()
@@ -227,6 +283,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", required=True, type=str)
     parser.add_argument("--serve", required=True, type=str)
+    parser.add_argument("--mcpd-sock", default=DEFAULT_MCPD_SOCK, type=str)
     args = parser.parse_args()
 
     manifest_path = Path(args.manifest).resolve()
@@ -243,7 +300,14 @@ def main() -> int:
         f"[app_service] serving app_id={app_id} app_name={app_name} tools={sorted(handlers.keys())} endpoint={args.serve}",
         flush=True,
     )
-    return _serve(args.serve, handlers)
+    stop_event = threading.Event()
+    registration_thread = threading.Thread(
+        target=_registration_loop,
+        args=(raw, args.mcpd_sock, stop_event),
+        daemon=True,
+    )
+    registration_thread.start()
+    return _serve(args.serve, handlers, stop_event=stop_event)
 
 
 if __name__ == "__main__":

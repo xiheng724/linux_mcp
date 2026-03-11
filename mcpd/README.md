@@ -35,7 +35,7 @@ Userspace daemon for policy, arbitration, and data-plane bridge (Unix Domain Soc
 
 ## Tool Semantic Registry
 
-- Manifest directory: `mcpd/apps.d/*.json`
+- Manifest directory: `tool-app/manifests/*.json`
 - Natural-language semantics are registered in manifest fields:
   - `tools[].description`
   - `tools[].input_schema`
@@ -47,7 +47,10 @@ Userspace daemon for policy, arbitration, and data-plane bridge (Unix Domain Soc
   - `endpoint` (app resident socket)
   - `tools[].handler` (handler key in app module `HANDLERS`)
 - Startup behavior:
-  - load app manifests, expand tool registry
+  - start with empty runtime registry
+  - accept `{"sys":"register_manifest","manifest":{...}}` from `tool-app`
+  - validate and expand tool registry in memory
+  - sync `tool_id/name/perm/cost/hash` to kernel
   - compute per-tool semantic hash from canonical subset:
     - `tool_id/name/app_id/app_name/perm/cost/description/input_schema/examples`
   - expose app discovery API via UDS:
@@ -58,7 +61,7 @@ Userspace daemon for policy, arbitration, and data-plane bridge (Unix Domain Soc
     - request (filtered): `{"sys":"list_tools","app_id":"settings_app"}`
     - response: `{"status":"ok","tools":[...]}` (semantic fields only; hides runtime fields)
 - Kernel mapping sync:
-  - `scripts/run_mcpd.sh` runs `python3 mcpd/reconcile_kernel.py` before start
+  - `scripts/run_mcpd.sh` waits for tool manifests to register, then runs `python3 mcpd/reconcile_kernel.py`
   - daemon start fails fast if manifest and kernel tool registry mismatch
   - strict 1:1 mapping on `tool_id/name/perm/cost`
   - also verifies `hash` when hash-aware clients are used

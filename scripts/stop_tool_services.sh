@@ -52,7 +52,7 @@ while IFS= read -r endpoint; do
 done < <(
   "$PYTHON_BIN" - <<'PY'
 import glob,json
-for p in sorted(glob.glob("mcpd/apps.d/*.json")):
+for p in sorted(glob.glob("tool-app/manifests/*.json")):
     raw=json.load(open(p,encoding="utf-8"))
     ep=raw.get("endpoint","")
     if isinstance(ep,str) and ep:

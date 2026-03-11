@@ -14,7 +14,7 @@ SOCK_DIR="/tmp/linux-mcp-apps"
 mkdir -p "$SOCK_DIR"
 
 found_manifest=0
-for manifest in "$ROOT_DIR"/mcpd/apps.d/*.json; do
+for manifest in "$ROOT_DIR"/tool-app/manifests/*.json; do
   [[ -f "$manifest" ]] || continue
   found_manifest=1
   IFS=$'\t' read -r app_id app_name service_path endpoint mode < <(
@@ -87,6 +87,6 @@ PY
 done
 
 if [[ "$found_manifest" -ne 1 ]]; then
-  echo "no manifests found in mcpd/apps.d"
+  echo "no manifests found in tool-app/manifests"
   exit 1
 fi

@@ -235,6 +235,34 @@ class KernelMcpNetlinkClient:
             need_ack=True,
         )
 
+    def register_tool(
+        self,
+        *,
+        tool_id: int,
+        name: str,
+        perm: int,
+        cost: int,
+        tool_hash: str = "",
+    ) -> None:
+        if tool_id <= 0:
+            raise ValueError("tool_id must be positive")
+        if not name:
+            raise ValueError("name must be non-empty")
+        attrs = [
+            (ATTR["TOOL_ID"], struct.pack("=I", tool_id)),
+            (ATTR["TOOL_NAME"], name.encode("utf-8") + b"\x00"),
+            (ATTR["TOOL_PERM"], struct.pack("=I", perm)),
+            (ATTR["TOOL_COST"], struct.pack("=I", cost)),
+        ]
+        if tool_hash:
+            attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
+        self._request(
+            msg_type=self._family_id,
+            cmd=CMD["TOOL_REGISTER"],
+            attrs=attrs,
+            need_ack=True,
+        )
+
     def tool_request(
         self,
         *,

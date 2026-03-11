@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-APPS_DIR = ROOT_DIR / "mcpd" / "apps.d"
+APPS_DIR = ROOT_DIR / "tool-app" / "manifests"
 REGISTER_BIN = ROOT_DIR / "client" / "bin" / "genl_register_tool"
 LIST_BIN = ROOT_DIR / "client" / "bin" / "genl_list_tools"
 
