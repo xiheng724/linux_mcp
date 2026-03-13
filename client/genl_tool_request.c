@@ -58,7 +58,8 @@ struct req_result {
 static void usage(const char *prog)
 {
 	fprintf(stderr,
-		"Usage: %s --agent <id> --tool <u32> [--tool-hash <8hex>] --n <count>\n",
+		"Usage: %s --participant <id> --capability <u32> [--capability-hash <8hex>] --n <count>\n"
+		"Deprecated aliases: --agent --tool --tool-hash\n",
 		prog);
 }
 
@@ -104,7 +105,9 @@ static int parse_args(int argc, char **argv, struct req_args *args)
 
 	memset(args, 0, sizeof(*args));
 	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--agent") == 0 && i + 1 < argc) {
+		if ((strcmp(argv[i], "--participant") == 0 ||
+		     strcmp(argv[i], "--agent") == 0) &&
+		    i + 1 < argc) {
 			size_t n = strlen(argv[++i]);
 			if (n == 0 || n >= sizeof(args->agent))
 				return -EINVAL;
@@ -112,13 +115,17 @@ static int parse_args(int argc, char **argv, struct req_args *args)
 			seen_agent = 1;
 			continue;
 		}
-		if (strcmp(argv[i], "--tool") == 0 && i + 1 < argc) {
+		if ((strcmp(argv[i], "--capability") == 0 ||
+		     strcmp(argv[i], "--tool") == 0) &&
+		    i + 1 < argc) {
 			if (parse_u32(argv[++i], &args->tool_id))
 				return -EINVAL;
 			seen_tool = 1;
 			continue;
 		}
-		if (strcmp(argv[i], "--tool-hash") == 0 && i + 1 < argc) {
+		if ((strcmp(argv[i], "--capability-hash") == 0 ||
+		     strcmp(argv[i], "--tool-hash") == 0) &&
+		    i + 1 < argc) {
 			if (parse_hash(argv[++i], args->tool_hash,
 				       sizeof(args->tool_hash)))
 				return -EINVAL;
@@ -437,7 +444,7 @@ int main(int argc, char **argv)
 
 		ret = request_once(fd, family_id, &args, req_id, &res);
 		if (ret < 0) {
-			fprintf(stderr, "tool_request req=%u failed: %s\n", i + 1,
+			fprintf(stderr, "capability_request req=%u failed: %s\n", i + 1,
 				strerror(-ret));
 			close(fd);
 			return 4;

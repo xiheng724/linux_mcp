@@ -39,23 +39,40 @@
 	 (struct nlattr *)(((char *)(nla)) + NLA_ALIGN((nla)->nla_len)))
 #endif
 
-struct agent_args {
+struct participant_args {
 	char id[64];
+	uint32_t participant_type;
 	uint64_t req_id;
 };
 
 static void usage(const char *prog)
 {
-	fprintf(stderr, "Usage: %s --id <agent_id>\n", prog);
+	fprintf(stderr,
+		"Usage: %s --id <participant_id> [--type planner|broker]\n",
+		prog);
 }
 
-static int parse_args(int argc, char **argv, struct agent_args *args)
+static int parse_participant_type(const char *value, uint32_t *out)
+{
+	if (strcmp(value, "planner") == 0) {
+		*out = KERNEL_MCP_PARTICIPANT_TYPE_PLANNER;
+		return 0;
+	}
+	if (strcmp(value, "broker") == 0) {
+		*out = KERNEL_MCP_PARTICIPANT_TYPE_BROKER;
+		return 0;
+	}
+	return -EINVAL;
+}
+
+static int parse_args(int argc, char **argv, struct participant_args *args)
 {
 	int i;
 	int seen_id = 0;
 
 	memset(args, 0, sizeof(*args));
 	args->req_id = 1;
+	args->participant_type = KERNEL_MCP_PARTICIPANT_TYPE_PLANNER;
 
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--id") == 0 && i + 1 < argc) {
@@ -64,6 +81,11 @@ static int parse_args(int argc, char **argv, struct agent_args *args)
 				return -EINVAL;
 			memcpy(args->id, argv[i], n + 1);
 			seen_id = 1;
+			continue;
+		}
+		if (strcmp(argv[i], "--type") == 0 && i + 1 < argc) {
+			if (parse_participant_type(argv[++i], &args->participant_type))
+				return -EINVAL;
 			continue;
 		}
 		return -EINVAL;
@@ -205,7 +227,8 @@ static int resolve_family_id(int fd, uint16_t *family_id)
 	return -ENOENT;
 }
 
-static int register_agent(int fd, uint16_t family_id, const struct agent_args *args)
+static int register_participant(int fd, uint16_t family_id,
+				const struct participant_args *args)
 {
 	char txbuf[1024] = {0};
 	char rxbuf[8192] = {0};
@@ -223,7 +246,7 @@ static int register_agent(int fd, uint16_t family_id, const struct agent_args *a
 	nlh->nlmsg_pid = (uint32_t)getpid();
 
 	ghdr = (struct genlmsghdr *)NLMSG_DATA(nlh);
-	ghdr->cmd = KERNEL_MCP_CMD_AGENT_REGISTER;
+	ghdr->cmd = KERNEL_MCP_CMD_PARTICIPANT_REGISTER;
 	ghdr->version = KERNEL_MCP_GENL_FAMILY_VERSION;
 
 	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_AGENT_ID, args->id,
@@ -238,6 +261,10 @@ static int register_agent(int fd, uint16_t family_id, const struct agent_args *a
 		return ret;
 	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_REQ_ID, &args->req_id,
 		       sizeof(args->req_id));
+	if (ret)
+		return ret;
+	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
+		       &args->participant_type, sizeof(args->participant_type));
 	if (ret)
 		return ret;
 
@@ -257,7 +284,7 @@ static int register_agent(int fd, uint16_t family_id, const struct agent_args *a
 
 int main(int argc, char **argv)
 {
-	struct agent_args args;
+	struct participant_args args;
 	uint16_t family_id = 0;
 	int fd;
 	int ret;
@@ -280,15 +307,18 @@ int main(int argc, char **argv)
 		return 3;
 	}
 
-	ret = register_agent(fd, family_id, &args);
+	ret = register_participant(fd, family_id, &args);
 	if (ret < 0) {
-		fprintf(stderr, "register_agent failed: %s\n", strerror(-ret));
+		fprintf(stderr, "register_participant failed: %s\n", strerror(-ret));
 		close(fd);
 		return 4;
 	}
 
-	printf("registered agent id=%s pid=%u\n", args.id, (uint32_t)getpid());
+	printf("registered participant id=%s type=%s pid=%u\n", args.id,
+	       args.participant_type == KERNEL_MCP_PARTICIPANT_TYPE_BROKER ?
+		       "broker" :
+		       "planner",
+	       (uint32_t)getpid());
 	close(fd);
 	return 0;
 }
-

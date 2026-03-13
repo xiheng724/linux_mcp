@@ -79,22 +79,22 @@ def mcpd_call(
 
 
 def _selftest() -> int:
-    resp = mcpd_call({"sys": "list_tools"})
+    resp = mcpd_call({"sys": "list_capabilities"})
     if resp.get("status") != "ok":
         print(f"[rpc] ERROR: {resp.get('error', 'unknown error')}", flush=True)
         print("[rpc] Hint: start mcpd with: bash scripts/run_mcpd.sh", flush=True)
         return 1
 
-    tools = resp.get("tools", [])
-    if not isinstance(tools, list):
-        print("[rpc] ERROR: list_tools response missing tools list", flush=True)
+    capabilities = resp.get("capabilities", [])
+    if not isinstance(capabilities, list):
+        print("[rpc] ERROR: list_capabilities response missing capabilities list", flush=True)
         return 1
 
-    print(f"[rpc] list_tools ok: count={len(tools)}", flush=True)
-    for tool in tools[:2]:
-        if isinstance(tool, dict):
+    print(f"[rpc] list_capabilities ok: count={len(capabilities)}", flush=True)
+    for capability in capabilities[:2]:
+        if isinstance(capability, dict):
             print(
-                f"[rpc] tool id={tool.get('tool_id')} name={tool.get('name')} hash={tool.get('hash', '-')}",
+                f"[rpc] capability id={capability.get('capability_id')} domain={capability.get('capability_domain')} hash={capability.get('hash', '-')}",
                 flush=True,
             )
     return 0

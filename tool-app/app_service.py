@@ -156,7 +156,7 @@ def _registration_loop(
                 raise ValueError(str(resp.get("error", "register_manifest failed")))
             if not registered:
                 print(
-                    f"[app_service] registered manifest app_id={app_id} tools={resp.get('tool_count', '?')} via={sock_path}",
+                    f"[app_service] registered manifest app_id={app_id} actions={resp.get('action_count', '?')} via={sock_path}",
                     flush=True,
                 )
             registered = True
@@ -207,13 +207,13 @@ def _serve(
                 if isinstance(req_id_raw, int) and not isinstance(req_id_raw, bool):
                     req_id = req_id_raw
 
-                tool_id_raw = req.get("tool_id", 0)
-                if isinstance(tool_id_raw, bool) or not isinstance(tool_id_raw, int):
-                    raise ValueError("tool_id must be integer")
-                tool_id = tool_id_raw
-                handler = handlers.get(tool_id)
+                action_id_raw = req.get("action_id", 0)
+                if isinstance(action_id_raw, bool) or not isinstance(action_id_raw, int):
+                    raise ValueError("action_id must be integer")
+                action_id = action_id_raw
+                handler = handlers.get(action_id)
                 if handler is None:
-                    raise ValueError(f"unsupported tool_id: {tool_id}")
+                    raise ValueError(f"unsupported action_id: {action_id}")
 
                 payload = req.get("payload", {})
                 if not isinstance(payload, dict):

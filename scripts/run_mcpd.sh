@@ -21,11 +21,6 @@ if ! lsmod | awk '{print $1}' | grep -qx kernel_mcp; then
   exit 1
 fi
 
-if [[ ! -x ./client/bin/genl_register_tool || ! -x ./client/bin/genl_list_tools ]]; then
-  echo "missing client binaries; run: make -C client clean && make -C client"
-  exit 1
-fi
-
 if [[ -f "$LEGACY_PID_PATH" && ! -f "$PID_PATH" ]]; then
   old_pid="$(cat "$LEGACY_PID_PATH" 2>/dev/null || true)"
   if [[ -n "${old_pid}" ]] && kill -0 "$old_pid" 2>/dev/null; then
@@ -93,7 +88,7 @@ if [[ ! -S "$SOCK_PATH" ]]; then
   exit 1
 fi
 
-expected_tools="$("$PYTHON_BIN" - <<'PY'
+expected_actions="$("$PYTHON_BIN" - <<'PY'
 import glob,json
 count=0
 for p in sorted(glob.glob("tool-app/manifests/*.json")):
@@ -106,10 +101,10 @@ PY
 )"
 
 for _ in $(seq 1 80); do
-  registered_tools="$("$PYTHON_BIN" - <<'PY'
+  registered_actions="$("$PYTHON_BIN" - <<'PY'
 import json,socket,struct
 sock_path="/tmp/mcpd.sock"
-req=json.dumps({"sys":"list_tools"}, ensure_ascii=True).encode("utf-8")
+req=json.dumps({"sys":"list_actions"}, ensure_ascii=True).encode("utf-8")
 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
     conn.settimeout(2.0)
     conn.connect(sock_path)
@@ -126,19 +121,19 @@ with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
             raise SystemExit(1)
         data += chunk
 resp=json.loads(data.decode("utf-8"))
-tools=resp.get("tools", [])
-print(len(tools) if isinstance(tools, list) else -1)
+actions=resp.get("actions", [])
+print(len(actions) if isinstance(actions, list) else -1)
 PY
 )"
-  if [[ "$registered_tools" == "$expected_tools" ]]; then
-    echo "tool manifests registered: $registered_tools/$expected_tools"
+  if [[ "$registered_actions" == "$expected_actions" ]]; then
+    echo "provider actions registered: $registered_actions/$expected_actions"
     break
   fi
   sleep 0.25
 done
 
-if [[ "$registered_tools" != "$expected_tools" ]]; then
-  echo "timed out waiting for tool manifest registration: expected=$expected_tools got=$registered_tools"
+if [[ "$registered_actions" != "$expected_actions" ]]; then
+  echo "timed out waiting for provider action registration: expected=$expected_actions got=$registered_actions"
   echo "see log: $LOG_PATH"
   exit 1
 fi

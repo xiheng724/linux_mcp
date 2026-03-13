@@ -33,7 +33,8 @@ struct complete_args {
 static void usage(const char *prog)
 {
 	fprintf(stderr,
-		"Usage: %s --agent <id> --tool <u32> --req-id <u64> --status <u32> --exec-ms <u32>\n",
+		"Usage: %s --participant <id> --capability <u32> --req-id <u64> --status <u32> --exec-ms <u32>\n"
+		"Deprecated aliases: --agent --tool\n",
 		prog);
 }
 
@@ -74,7 +75,9 @@ static int parse_args(int argc, char **argv, struct complete_args *args)
 
 	memset(args, 0, sizeof(*args));
 	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--agent") == 0 && i + 1 < argc) {
+		if ((strcmp(argv[i], "--participant") == 0 ||
+		     strcmp(argv[i], "--agent") == 0) &&
+		    i + 1 < argc) {
 			size_t n = strlen(argv[++i]);
 			if (n == 0 || n >= sizeof(args->agent))
 				return -EINVAL;
@@ -82,7 +85,9 @@ static int parse_args(int argc, char **argv, struct complete_args *args)
 			seen_agent = 1;
 			continue;
 		}
-		if (strcmp(argv[i], "--tool") == 0 && i + 1 < argc) {
+		if ((strcmp(argv[i], "--capability") == 0 ||
+		     strcmp(argv[i], "--tool") == 0) &&
+		    i + 1 < argc) {
 			if (parse_u32(argv[++i], &args->tool_id))
 				return -EINVAL;
 			seen_tool = 1;
@@ -329,12 +334,12 @@ int main(int argc, char **argv)
 
 	ret = send_complete(fd, family_id, &args);
 	if (ret < 0) {
-		fprintf(stderr, "tool_complete failed: %s\n", strerror(-ret));
+		fprintf(stderr, "capability_complete failed: %s\n", strerror(-ret));
 		close(fd);
 		return 4;
 	}
 
-	printf("reported complete req_id=%llu agent=%s tool=%u status=%u exec_ms=%u\n",
+	printf("reported capability completion req_id=%llu participant=%s capability=%u status=%u exec_ms=%u\n",
 	       (unsigned long long)args.req_id, args.agent, args.tool_id,
 	       args.status, args.exec_ms);
 	close(fd);

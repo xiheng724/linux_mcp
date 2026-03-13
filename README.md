@@ -46,7 +46,6 @@
 - planner 只能请求能力域，例如 `file.write`、`info.lookup`、`external.write`。
 - 高风险动作必须走：
   `planner -> kernel MCP -> broker -> executor -> provider`
-- 兼容路径 `tool:exec` 仍保留，但已经被限制成过渡接口，不能作为绕过主链路的后门。
 
 ## 3. 当前已实现的能力域模型
 
@@ -74,21 +73,12 @@
 1. `llm-app` 接收用户输入。
 2. `llm-app` 请求 `mcpd` 执行 `capability:exec`。
 3. `mcpd` 根据 capability catalog、broker catalog、provider/action 映射选择 broker、provider、action、executor。
-4. `mcpd` 向 kernel MCP 发 `tool_request`。
+4. `mcpd` 向 kernel MCP 发 `capability_request`。
 5. kernel MCP 校验 capability-domain policy，决定 `ALLOW / DENY / DEFER`。
 6. 如果 `ALLOW`，kernel 发放单次 lease。
 7. `mcpd` 用结构化 payload 调 provider 的常驻 UDS 服务。
-8. 执行结束后 `mcpd` 回写 `tool_complete`。
+8. 执行结束后 `mcpd` 回写 `capability_complete`。
 9. kernel MCP 完成 lease 消费、记账和审计。
-
-### 4.2 兼容路径
-
-旧的 `tool:exec` 仍能工作，但已经有这些限制：
-
-- 必须先映射到 capability-domain 流
-- 高风险能力域默认拒绝
-- 只有显式 `allow_legacy_high_risk=true` 才允许部分高风险兼容请求
-- 全部兼容请求都会带 `legacy_path=true` 审计标记
 
 ## 5. 当前安全边界
 
@@ -96,7 +86,7 @@
 
 `kernel-mcp` 已经具备这些控制平面能力：
 
-- agent registry
+- participant registry
 - capability-domain registry
 - capability-based authorization
 - trust/risk policy
@@ -249,7 +239,7 @@ kernel 会输出结构化审计事件，覆盖：
 
 - `req_id`
 - `capability_domain`
-- `planner_agent_id`
+- `planner_participant_id`
 - `broker_id`
 - `broker_pid`
 - `broker_epoch`
@@ -285,9 +275,7 @@ kernel 会输出结构化审计事件，覆盖：
 - `client/`
   - C 版 Generic Netlink 调试和验证工具
 - `scripts/`
-  - 启停脚本和开发辅助脚本
-- `bench/`
-  - 性能测试和实验脚本
+  - 启停脚本和 schema 校验脚本
 
 ## 10. 当前主要模块职责
 
@@ -329,7 +317,7 @@ kernel 会输出结构化审计事件，覆盖：
 负责：
 
 - 暴露 provider 侧 UDS 服务
-- 按 `tool_id` 找到 handler
+- 按 `action_id` 找到 handler
 - 执行本地 demo 功能
 - 启动后向 `mcpd` 注册 manifest
 
@@ -392,10 +380,12 @@ bash scripts/stop_tool_services.sh
 
 ## 13. 开发者常用入口
 
-- 查看当前 provider / capability / broker 对外视图：
-  - `mcpd` UDS 的 `list_providers` / `list_tools` / `list_capabilities` / `list_brokers`
+- 查看当前 provider / action / capability / broker 对外视图：
+  - `mcpd` UDS 的 `list_providers` / `list_actions` / `list_capabilities` / `list_brokers`
 - 重建并同步 kernel capability registry：
   - `python3 mcpd/reconcile_kernel.py`
+- 校验 Generic Netlink schema 是否同步：
+  - `python3 scripts/verify_schema_sync.py`
 - 本地快速验证：
   - `python3 -m py_compile mcpd/architecture.py mcpd/server.py mcpd/netlink_client.py`
   - `make -C kernel-mcp`

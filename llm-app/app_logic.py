@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared selection and payload logic for llm-app CLI/GUI."""
+"""Shared capability selection and payload logic for llm-app."""
 
 from __future__ import annotations
 
@@ -21,24 +21,6 @@ class SelectorConfig:
     deepseek_url: str
     deepseek_model: str
     deepseek_timeout_sec: int
-
-
-def _index_tools(tools: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
-    by_id: Dict[int, Dict[str, Any]] = {}
-    for tool in tools:
-        tool_id = tool.get("tool_id")
-        if isinstance(tool_id, int):
-            by_id[tool_id] = tool
-    return by_id
-
-
-def _index_apps(apps: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-    by_id: Dict[str, Dict[str, Any]] = {}
-    for app in apps:
-        app_id = app.get("app_id")
-        if isinstance(app_id, str) and app_id:
-            by_id[app_id] = app
-    return by_id
 
 
 def _index_capabilities(capabilities: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -74,128 +56,6 @@ def _heuristic_capability_domain(user_text: str) -> Tuple[str, str]:
     return "info.lookup", "default(info.lookup)"
 
 
-def _heuristic_app_id(user_text: str) -> Tuple[str, str]:
-    lower = user_text.lower()
-    if any(
-        k in lower
-        for k in (
-            "calc",
-            "calculate",
-            "compute",
-            "eval",
-            "math",
-            "算",
-            "计算",
-        )
-    ):
-        return "calculator_app", "keyword(calc/compute/math/计算)"
-    if any(
-        k in lower
-        for k in (
-            "preview",
-            "read file",
-            "show file",
-            "cat ",
-            "hash",
-            "sha",
-            "md5",
-            "digest",
-            "delete",
-            "remove",
-            "copy",
-            "rename",
-            "move",
-            "list",
-            "ls",
-            "dir",
-            "text",
-            "file",
-            "文件",
-            "路径",
-            "摘要",
-            "哈希",
-        )
-    ) or ".md" in lower or ".py" in lower:
-        return "file_manager_app", "keyword(file/preview/hash/text)"
-    if any(
-        k in lower
-        for k in (
-            "burn",
-            "stress",
-            "pressure",
-            "system",
-            "uptime",
-            "load",
-            "memory",
-            "mem",
-            "disk",
-            "sysinfo",
-            "time",
-            "date",
-            "clock",
-            "volume",
-            "setting",
-            "设置",
-            "时间",
-            "系统信息",
-            "负载",
-            "内存",
-            "磁盘",
-        )
-    ):
-        return "settings_app", "keyword(settings/system/time/volume)"
-    return "utility_app", "default(utility)"
-
-
-def _heuristic_tool_id(user_text: str) -> Tuple[int, str]:
-    lower = user_text.lower()
-    if any(
-        k in lower
-        for k in ("rename file", "move file", "rename ", "move ", "重命名", "移动文件")
-    ):
-        return 14, "keyword(rename/move file)"
-    if any(
-        k in lower
-        for k in ("copy file", "duplicate file", "copy ", "复制文件", "拷贝文件")
-    ):
-        return 13, "keyword(copy file)"
-    if any(
-        k in lower
-        for k in ("delete file", "remove file", "unlink", "删除文件", "删除")
-    ):
-        return 12, "keyword(delete/remove file)"
-    if any(
-        k in lower
-        for k in ("list files", "list dir", "ls ", "dir ", "目录", "列出文件")
-    ):
-        return 11, "keyword(list/dir)"
-    if any(
-        k in lower
-        for k in ("create file", "new file", "write file", "touch ", "创建文件", "写入文件")
-    ):
-        return 10, "keyword(create/write file)"
-    if any(
-        k in lower
-        for k in ("volume", "mute", "unmute", "louder", "quieter", "音量", "静音")
-    ):
-        return 9, "keyword(volume/mute)"
-    if any(k in lower for k in ("burn", "stress", "pressure", "压力", "忙")):
-        return 2, "keyword(burn/stress/压力/忙)"
-    if any(k in lower for k in ("system", "uptime", "load", "memory", "mem", "disk", "sysinfo", "系统信息", "负载", "内存", "磁盘")):
-        return 4, "keyword(system/uptime/load/memory/disk)"
-    if any(k in lower for k in ("calc", "calculate", "compute", "eval", "math", "算", "计算")):
-        return 5, "keyword(calc/compute/math/计算)"
-    if any(k in lower for k in ("preview", "read file", "show file", "cat ", "文件", "路径", "path", "open ")) or ".md" in lower or ".py" in lower:
-        return 6, "keyword(file/preview/path)"
-    if any(k in lower for k in ("hash", "sha", "md5", "digest", "摘要", "哈希")):
-        return 7, "keyword(hash/sha/md5/摘要)"
-    if any(k in lower for k in ("time", "date", "now", "clock", "几点", "时间", "日期")):
-        return 8, "keyword(time/date/clock)"
-    if any(k in lower for k in ("count", "stat", "word", "line", "text", "stats", "统计", "词")):
-        return 3, "keyword(text/stats/统计/词)"
-    return 1, "default(echo)"
-
-
 def _extract_json_object(text: str) -> Dict[str, Any]:
     decoder = json.JSONDecoder()
     for idx, ch in enumerate(text):
@@ -208,84 +68,6 @@ def _extract_json_object(text: str) -> Dict[str, Any]:
         if isinstance(obj, dict):
             return obj
     raise ValueError(f"no JSON object found in model output: {text!r}")
-
-
-def _call_deepseek_selector(
-    user_text: str,
-    tools: List[Dict[str, Any]],
-    api_key: str,
-    cfg: SelectorConfig,
-) -> Tuple[int, str]:
-    tool_brief: List[Dict[str, Any]] = []
-    for tool in tools:
-        if not isinstance(tool.get("tool_id"), int):
-            continue
-        tool_brief.append(
-            {
-                "tool_id": tool["tool_id"],
-                "name": tool.get("name", ""),
-                "description": tool.get("description", ""),
-                "input_schema": tool.get("input_schema", {}),
-            }
-        )
-
-    prompt = {
-        "user_input": user_text,
-        "tools": tool_brief,
-        "output_format": {"tool_id": "int", "reason": "string"},
-        "rule": "Return one JSON object only. No markdown.",
-    }
-    req_obj = {
-        "model": cfg.deepseek_model,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a tool router. Select exactly one tool_id from the provided tools. "
-                    "Respond with strict JSON only: {\"tool_id\":<int>,\"reason\":\"...\"}."
-                ),
-            },
-            {"role": "user", "content": json.dumps(prompt, ensure_ascii=True)},
-        ],
-    }
-
-    payload = json.dumps(req_obj, ensure_ascii=True).encode("utf-8")
-    req = urllib.request.Request(
-        cfg.deepseek_url,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=cfg.deepseek_timeout_sec) as resp:
-            raw = resp.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"DeepSeek HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"DeepSeek request failed: {exc}") from exc
-
-    data = json.loads(raw.decode("utf-8"))
-    choices = data.get("choices", [])
-    if not isinstance(choices, list) or not choices:
-        raise RuntimeError(f"invalid DeepSeek response, missing choices: {data}")
-    msg = choices[0].get("message", {})
-    content = msg.get("content", "")
-    if not isinstance(content, str) or not content:
-        raise RuntimeError(f"invalid DeepSeek response content: {data}")
-
-    obj = _extract_json_object(content)
-    tool_id = obj.get("tool_id")
-    if isinstance(tool_id, bool) or not isinstance(tool_id, int):
-        raise RuntimeError(f"DeepSeek returned invalid tool_id: {obj}")
-    reason = obj.get("reason", "")
-    if not isinstance(reason, str):
-        reason = str(reason)
-    return tool_id, reason
 
 
 def _call_deepseek_capability_selector(
@@ -367,164 +149,6 @@ def _call_deepseek_capability_selector(
     if not isinstance(reason, str):
         reason = str(reason)
     return capability_name, reason
-
-
-def _call_deepseek_app_selector(
-    user_text: str,
-    apps: List[Dict[str, Any]],
-    api_key: str,
-    cfg: SelectorConfig,
-) -> Tuple[str, str]:
-    app_brief: List[Dict[str, Any]] = []
-    for app in apps:
-        app_id = app.get("app_id")
-        if not isinstance(app_id, str) or not app_id:
-            continue
-        app_brief.append(
-            {
-                "app_id": app_id,
-                "app_name": app.get("app_name", ""),
-                "tool_names": app.get("tool_names", []),
-            }
-        )
-
-    prompt = {
-        "user_input": user_text,
-        "apps": app_brief,
-        "output_format": {"app_id": "string", "reason": "string"},
-        "rule": "Return one JSON object only. No markdown.",
-    }
-    req_obj = {
-        "model": cfg.deepseek_model,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are an app router. Select exactly one app_id from the provided apps. "
-                    "Respond with strict JSON only: {\"app_id\":\"...\",\"reason\":\"...\"}."
-                ),
-            },
-            {"role": "user", "content": json.dumps(prompt, ensure_ascii=True)},
-        ],
-    }
-
-    payload = json.dumps(req_obj, ensure_ascii=True).encode("utf-8")
-    req = urllib.request.Request(
-        cfg.deepseek_url,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=cfg.deepseek_timeout_sec) as resp:
-            raw = resp.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"DeepSeek HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"DeepSeek request failed: {exc}") from exc
-
-    data = json.loads(raw.decode("utf-8"))
-    choices = data.get("choices", [])
-    if not isinstance(choices, list) or not choices:
-        raise RuntimeError(f"invalid DeepSeek response, missing choices: {data}")
-    msg = choices[0].get("message", {})
-    content = msg.get("content", "")
-    if not isinstance(content, str) or not content:
-        raise RuntimeError(f"invalid DeepSeek response content: {data}")
-
-    obj = _extract_json_object(content)
-    app_id = obj.get("app_id")
-    if not isinstance(app_id, str) or not app_id:
-        raise RuntimeError(f"DeepSeek returned invalid app_id: {obj}")
-    reason = obj.get("reason", "")
-    if not isinstance(reason, str):
-        reason = str(reason)
-    return app_id, reason
-
-
-def select_app_for_input(
-    user_text: str,
-    apps: List[Dict[str, Any]],
-    cfg: SelectorConfig,
-    warn_cb: Callable[[str], None] | None = None,
-) -> Tuple[Dict[str, Any], str, str]:
-    """Select one app from list by DeepSeek/heuristic."""
-    by_id = _index_apps(apps)
-    if not by_id:
-        raise RuntimeError("no valid apps discovered from mcpd")
-
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    if cfg.mode in ("auto", "deepseek"):
-        if api_key:
-            try:
-                selected_id, reason = _call_deepseek_app_selector(user_text, apps, api_key, cfg)
-                selected = by_id.get(selected_id)
-                if selected is None:
-                    raise RuntimeError(
-                        f"DeepSeek selected unavailable app_id={selected_id}; "
-                        f"available={sorted(by_id.keys())}"
-                    )
-                return selected, "deepseek", reason or "model-selected"
-            except Exception as exc:  # noqa: BLE001
-                if cfg.mode == "deepseek":
-                    raise RuntimeError(f"DeepSeek app selection failed: {exc}") from exc
-                if warn_cb is not None:
-                    warn_cb(f"DeepSeek unavailable ({exc}), fallback to heuristic")
-        elif cfg.mode == "deepseek":
-            raise RuntimeError("DEEPSEEK_API_KEY not set, cannot use deepseek mode")
-
-    selected_id, reason = _heuristic_app_id(user_text)
-    selected = by_id.get(selected_id)
-    if selected is None:
-        fallback_id = sorted(by_id.keys())[0]
-        selected = by_id[fallback_id]
-        reason = f"{reason}; fallback_first_available={fallback_id}"
-    return selected, "heuristic", reason
-
-
-def select_tool_for_input(
-    user_text: str,
-    tools: List[Dict[str, Any]],
-    cfg: SelectorConfig,
-    warn_cb: Callable[[str], None] | None = None,
-) -> Tuple[Dict[str, Any], str, str]:
-    """Select one tool from list by DeepSeek/heuristic."""
-    by_id = _index_tools(tools)
-    if not by_id:
-        raise RuntimeError("no valid tools discovered from mcpd")
-
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    if cfg.mode in ("auto", "deepseek"):
-        if api_key:
-            try:
-                selected_id, reason = _call_deepseek_selector(user_text, tools, api_key, cfg)
-                selected = by_id.get(selected_id)
-                if selected is None:
-                    raise RuntimeError(
-                        f"DeepSeek selected unavailable tool_id={selected_id}; "
-                        f"available={sorted(by_id.keys())}"
-                    )
-                return selected, "deepseek", reason or "model-selected"
-            except Exception as exc:  # noqa: BLE001
-                if cfg.mode == "deepseek":
-                    raise RuntimeError(f"DeepSeek selection failed: {exc}") from exc
-                if warn_cb is not None:
-                    warn_cb(f"DeepSeek unavailable ({exc}), fallback to heuristic")
-        elif cfg.mode == "deepseek":
-            raise RuntimeError("DEEPSEEK_API_KEY not set, cannot use deepseek mode")
-
-    selected_id, reason = _heuristic_tool_id(user_text)
-    selected = by_id.get(selected_id)
-    if selected is None:
-        fallback_id = sorted(by_id.keys())[0]
-        selected = by_id[fallback_id]
-        reason = f"{reason}; fallback_first_available={fallback_id}"
-    return selected, "heuristic", reason
 
 
 def select_capability_for_input(
@@ -808,34 +432,37 @@ def _extract_rename_file_payload(user_text: str) -> Dict[str, Any]:
     }
 
 
-def build_payload_for_tool(tool_name: str, user_text: str) -> Dict[str, Any]:
-    if tool_name == "file_copy":
+def build_payload_for_action(action_name: str, user_text: str) -> Dict[str, Any]:
+    if action_name == "file_copy":
         return _extract_copy_file_payload(user_text)
-    if tool_name == "file_rename":
+    if action_name == "file_rename":
         return _extract_rename_file_payload(user_text)
-    if tool_name == "file_list":
+    if action_name == "file_list":
         return _extract_list_files_payload(user_text)
-    if tool_name == "file_delete":
+    if action_name == "file_delete":
         return _extract_delete_file_payload(user_text)
-    if tool_name == "volume_control":
+    if action_name == "volume_control":
         return _extract_volume_payload(user_text)
-    if tool_name == "file_create":
+    if action_name == "file_create":
         return _extract_create_file_payload(user_text)
-    if tool_name == "cpu_burn":
+    if action_name == "cpu_burn":
         return {"ms": _extract_burn_ms(user_text)}
-    if tool_name == "text_stats":
+    if action_name == "text_stats":
         return {"text": user_text}
-    if tool_name == "sys_info":
+    if action_name == "sys_info":
         path = _extract_file_path(user_text, default_path="")
         if path:
             return {"path": path}
         return {}
-    if tool_name == "calc":
+    if action_name == "calc":
         return {"expression": _extract_calc_expression(user_text)}
-    if tool_name == "file_preview":
+    if action_name == "file_preview":
         return {"path": _extract_file_path(user_text), "max_lines": _extract_max_lines(user_text)}
-    if tool_name == "hash_text":
+    if action_name == "hash_text":
         return {"text": _extract_hash_text(user_text), "algorithm": _extract_hash_algorithm(user_text)}
-    if tool_name == "time_now":
+    if action_name == "time_now":
         return {"timezone": _extract_timezone(user_text)}
     return {"message": user_text}
+
+
+# Deprecated compatibility alias. Prefer build_payload_for_action().

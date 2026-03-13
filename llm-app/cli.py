@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LLM-app CLI with shared selection logic (same as GUI)."""
+"""LLM-app CLI for capability-domain selection and execution."""
 
 from __future__ import annotations
 
@@ -26,49 +26,49 @@ class CliError(Exception):
     """User-facing CLI error."""
 
 
-def _tools_signature(tools: List[Dict[str, Any]]) -> str:
-    encoded = json.dumps(tools, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
+def _actions_signature(actions: List[Dict[str, Any]]) -> str:
+    encoded = json.dumps(actions, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
         "utf-8"
     )
     return hashlib.sha256(encoded).hexdigest()[:12]
 
 
-def _apps_signature(apps: List[Dict[str, Any]]) -> str:
-    encoded = json.dumps(apps, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
+def _providers_signature(providers: List[Dict[str, Any]]) -> str:
+    encoded = json.dumps(providers, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
         "utf-8"
     )
     return hashlib.sha256(encoded).hexdigest()[:12]
 
 
-def _list_apps(sock_path: str) -> List[Dict[str, Any]]:
-    resp = mcpd_call({"sys": "list_apps"}, sock_path=sock_path, timeout_s=5)
+def _list_providers(sock_path: str) -> List[Dict[str, Any]]:
+    resp = mcpd_call({"sys": "list_providers"}, sock_path=sock_path, timeout_s=5)
     if resp.get("status") != "ok":
-        raise CliError(resp.get("error", "list_apps failed"))
-    apps = resp.get("apps", [])
-    if not isinstance(apps, list):
-        raise CliError("list_apps response missing apps list")
-    typed_apps: List[Dict[str, Any]] = []
-    for app in apps:
-        if isinstance(app, dict):
-            typed_apps.append(app)
-    return typed_apps
+        raise CliError(resp.get("error", "list_providers failed"))
+    providers = resp.get("providers", [])
+    if not isinstance(providers, list):
+        raise CliError("list_providers response missing providers list")
+    typed_providers: List[Dict[str, Any]] = []
+    for provider in providers:
+        if isinstance(provider, dict):
+            typed_providers.append(provider)
+    return typed_providers
 
 
-def _list_tools(sock_path: str, app_id: str = "") -> List[Dict[str, Any]]:
-    req: Dict[str, Any] = {"sys": "list_tools"}
-    if app_id:
-        req["app_id"] = app_id
+def _list_actions(sock_path: str, provider_id: str = "") -> List[Dict[str, Any]]:
+    req: Dict[str, Any] = {"sys": "list_actions"}
+    if provider_id:
+        req["provider_id"] = provider_id
     resp = mcpd_call(req, sock_path=sock_path, timeout_s=5)
     if resp.get("status") != "ok":
-        raise CliError(resp.get("error", "list_tools failed"))
-    tools = resp.get("tools", [])
-    if not isinstance(tools, list):
-        raise CliError("list_tools response missing tools list")
-    typed_tools: List[Dict[str, Any]] = []
-    for tool in tools:
-        if isinstance(tool, dict):
-            typed_tools.append(tool)
-    return typed_tools
+        raise CliError(resp.get("error", "list_actions failed"))
+    actions = resp.get("actions", [])
+    if not isinstance(actions, list):
+        raise CliError("list_actions response missing actions list")
+    typed_actions: List[Dict[str, Any]] = []
+    for action in actions:
+        if isinstance(action, dict):
+            typed_actions.append(action)
+    return typed_actions
 
 
 def _list_capabilities(sock_path: str) -> List[Dict[str, Any]]:
@@ -85,17 +85,17 @@ def _list_capabilities(sock_path: str) -> List[Dict[str, Any]]:
     return typed_capabilities
 
 
-def _print_providers(apps: List[Dict[str, Any]]) -> None:
-    print(f"[llm-app] providers ({len(apps)}):", flush=True)
-    for app in apps:
+def _print_providers(providers: List[Dict[str, Any]]) -> None:
+    print(f"[llm-app] providers ({len(providers)}):", flush=True)
+    for provider in providers:
         print(
             (
-                f"[llm-app]   - id={app.get('provider_id', app.get('app_id'))} "
-                f"name={app.get('app_name')} actions={app.get('tool_count')}"
+                f"[llm-app]   - id={provider.get('provider_id')} "
+                f"name={provider.get('app_name')} actions={provider.get('action_count')}"
             ),
             flush=True,
         )
-        capability_domains = app.get("capability_domains", [])
+        capability_domains = provider.get("capability_domains", [])
         if isinstance(capability_domains, list) and capability_domains:
             print(
                 f"[llm-app]     capability_domains={','.join(str(x) for x in capability_domains)}",
@@ -103,17 +103,17 @@ def _print_providers(apps: List[Dict[str, Any]]) -> None:
             )
 
 
-def _print_tools(tools: List[Dict[str, Any]]) -> None:
-    print(f"[llm-app] provider actions ({len(tools)}):", flush=True)
-    for tool in tools:
+def _print_actions(actions: List[Dict[str, Any]]) -> None:
+    print(f"[llm-app] provider actions ({len(actions)}):", flush=True)
+    for action in actions:
         print(
             (
-                f"[llm-app]   - id={tool.get('tool_id')} "
-                f"name={tool.get('name')} capability={tool.get('capability_domain', '-')}"
+                f"[llm-app]   - id={action.get('action_id')} "
+                f"name={action.get('name')} capability={action.get('capability_domain', '-')}"
             ),
             flush=True,
         )
-        print(f"[llm-app]     desc={tool.get('description')}", flush=True)
+        print(f"[llm-app]     desc={action.get('description')}", flush=True)
 
 
 def _print_capabilities(capabilities: List[Dict[str, Any]]) -> None:
@@ -121,7 +121,7 @@ def _print_capabilities(capabilities: List[Dict[str, Any]]) -> None:
     for capability in capabilities:
         print(
             (
-                f"[llm-app]   - id={capability.get('capability_id', capability.get('tool_id'))} "
+                f"[llm-app]   - id={capability.get('capability_id')} "
                 f"domain={capability.get('capability_domain')} broker={capability.get('broker_id')}"
             ),
             flush=True,
@@ -134,7 +134,7 @@ def _print_capabilities(capabilities: List[Dict[str, Any]]) -> None:
 
 def _execute_once_with_capabilities(
     user_text: str,
-    agent_id: str,
+    participant_id: str,
     sock_path: str,
     cfg: SelectorConfig,
     capabilities: List[Dict[str, Any]],
@@ -153,7 +153,7 @@ def _execute_once_with_capabilities(
         print(f"[llm-app] WARN: {msg}", flush=True)
 
     capability_domain = str(selected_capability.get("capability_domain", ""))
-    capability_id = int(selected_capability.get("capability_id", selected_capability.get("tool_id", 0)))
+    capability_id = int(selected_capability.get("capability_id", 0))
     capability_hash_raw = selected_capability.get("hash")
     capability_hash = (
         capability_hash_raw if isinstance(capability_hash_raw, str) and capability_hash_raw else ""
@@ -173,7 +173,7 @@ def _execute_once_with_capabilities(
         {
             "kind": "capability:exec",
             "req_id": req_id,
-            "agent_id": agent_id,
+            "participant_id": participant_id,
             "capability_domain": capability_domain,
             "capability_id": capability_id,
             "capability_hash": capability_hash,
@@ -197,43 +197,43 @@ def _execute_once_with_capabilities(
         print("[llm-app] done", flush=True)
         return 0
     print(f"[llm-app] error={resp.get('error', 'unknown error')}", flush=True)
-    print("[llm-app] tool execution failed", flush=True)
+    print("[llm-app] capability execution failed", flush=True)
     return 3
 
 
-def _run_once(user_text: str, agent_id: str, sock_path: str, cfg: SelectorConfig) -> int:
-    apps = _list_apps(sock_path)
-    tools = _list_tools(sock_path)
+def _run_once(user_text: str, participant_id: str, sock_path: str, cfg: SelectorConfig) -> int:
+    providers = _list_providers(sock_path)
+    actions = _list_actions(sock_path)
     capabilities = _list_capabilities(sock_path)
-    _print_providers(apps)
-    _print_tools(tools)
+    _print_providers(providers)
+    _print_actions(actions)
     _print_capabilities(capabilities)
-    return _execute_once_with_capabilities(user_text, agent_id, sock_path, cfg, capabilities)
+    return _execute_once_with_capabilities(user_text, participant_id, sock_path, cfg, capabilities)
 
 
 def _print_help() -> None:
     print("[llm-app] commands:", flush=True)
     print("[llm-app]   /help  show help", flush=True)
-    print("[llm-app]   /apps  force refresh and print providers", flush=True)
-    print("[llm-app]   /tools force refresh and print tools", flush=True)
+    print("[llm-app]   /providers  force refresh and print providers", flush=True)
+    print("[llm-app]   /actions force refresh and print provider actions", flush=True)
     print("[llm-app]   /caps  force refresh and print capability domains", flush=True)
     print("[llm-app]   /exit  quit", flush=True)
 
 
-def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: bool) -> int:
-    apps = _list_apps(sock_path)
-    tools = _list_tools(sock_path)
+def _repl_loop(participant_id: str, sock_path: str, cfg: SelectorConfig, show_actions: bool) -> int:
+    providers = _list_providers(sock_path)
+    actions = _list_actions(sock_path)
     capabilities = _list_capabilities(sock_path)
-    if not apps:
-        raise CliError("no apps returned by mcpd")
+    if not providers:
+        raise CliError("no providers returned by mcpd")
 
     print("[llm-app] REPL mode started", flush=True)
     _print_help()
-    _print_providers(apps)
-    _print_tools(tools)
+    _print_providers(providers)
+    _print_actions(actions)
     _print_capabilities(capabilities)
-    last_apps_sig = _apps_signature(apps)
-    last_sig = _tools_signature(tools)
+    last_providers_sig = _providers_signature(providers)
+    last_sig = _actions_signature(actions)
 
     while True:
         try:
@@ -249,43 +249,43 @@ def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: b
         if user_text == "/help":
             _print_help()
             continue
-        if user_text == "/apps":
-            apps = _list_apps(sock_path)
-            _print_providers(apps)
-            last_apps_sig = _apps_signature(apps)
+        if user_text == "/providers":
+            providers = _list_providers(sock_path)
+            _print_providers(providers)
+            last_providers_sig = _providers_signature(providers)
             continue
-        if user_text == "/tools":
-            tools = _list_tools(sock_path)
-            _print_tools(tools)
-            last_sig = _tools_signature(tools)
+        if user_text == "/actions":
+            actions = _list_actions(sock_path)
+            _print_actions(actions)
+            last_sig = _actions_signature(actions)
             continue
         if user_text == "/caps":
             capabilities = _list_capabilities(sock_path)
             _print_capabilities(capabilities)
             continue
 
-        apps = _list_apps(sock_path)
-        app_sig = _apps_signature(apps)
-        if app_sig != last_apps_sig:
+        providers = _list_providers(sock_path)
+        providers_sig = _providers_signature(providers)
+        if providers_sig != last_providers_sig:
             print("[llm-app] providers changed", flush=True)
-            _print_providers(apps)
+            _print_providers(providers)
         else:
             print("[llm-app] providers unchanged", flush=True)
-        last_apps_sig = app_sig
+        last_providers_sig = providers_sig
 
-        tools = _list_tools(sock_path)
-        sig = _tools_signature(tools)
-        if show_tools:
-            _print_tools(tools)
+        actions = _list_actions(sock_path)
+        sig = _actions_signature(actions)
+        if show_actions:
+            _print_actions(actions)
         elif sig != last_sig:
-            print("[llm-app] tools changed", flush=True)
-            _print_tools(tools)
+            print("[llm-app] provider actions changed", flush=True)
+            _print_actions(actions)
         else:
-            print("[llm-app] tools unchanged", flush=True)
+            print("[llm-app] provider actions unchanged", flush=True)
         last_sig = sig
 
         capabilities = _list_capabilities(sock_path)
-        rc = _execute_once_with_capabilities(user_text, agent_id, sock_path, cfg, capabilities)
+        rc = _execute_once_with_capabilities(user_text, participant_id, sock_path, cfg, capabilities)
         if rc != 0:
             print(f"[llm-app] request failed rc={rc}", flush=True)
 
@@ -298,7 +298,7 @@ def main() -> int:
         "--selector",
         choices=["auto", "heuristic", "deepseek"],
         default="deepseek",
-        help="tool selection strategy",
+        help="capability selection strategy",
     )
     parser.add_argument("--deepseek-model", default=DEFAULT_DEEPSEEK_MODEL)
     parser.add_argument(
@@ -306,14 +306,12 @@ def main() -> int:
         default=os.getenv("DEEPSEEK_API_URL", DEFAULT_DEEPSEEK_URL),
     )
     parser.add_argument("--deepseek-timeout-sec", type=int, default=20)
-    parser.add_argument("--agent-id", default="a1", help="agent id for tool execution")
+    parser.add_argument("--participant-id", default="planner-main", help="planner participant id")
     parser.add_argument("--sock", default=SOCK_PATH, help="mcpd unix socket path")
-    parser.add_argument("--show-tools", action="store_true", help="always print full tool list in REPL")
-    parser.add_argument("--agent", dest="agent_legacy", help=argparse.SUPPRESS)
+    parser.add_argument("--show-actions", action="store_true", help="always print full action list in REPL")
     parser.add_argument("--socket", dest="socket_legacy", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    agent_id = args.agent_legacy or args.agent_id
     sock_path = args.socket_legacy or args.sock
     cfg = SelectorConfig(
         mode=args.selector,
@@ -326,12 +324,12 @@ def main() -> int:
         if args.once and args.repl:
             raise CliError("use either --once or --repl, not both")
         if args.once:
-            return _run_once(args.once, agent_id, sock_path, cfg)
+            return _run_once(args.once, args.participant_id, sock_path, cfg)
         if args.repl:
-            return _repl_loop(agent_id, sock_path, cfg, args.show_tools)
+            return _repl_loop(args.participant_id, sock_path, cfg, args.show_actions)
         if not sys.stdin.isatty():
             raise CliError("no --once/--repl provided and stdin is not interactive")
-        return _repl_loop(agent_id, sock_path, cfg, args.show_tools)
+        return _repl_loop(args.participant_id, sock_path, cfg, args.show_actions)
     except CliError as exc:
         print(f"[llm-app] ERROR: {exc}", flush=True)
         return 1

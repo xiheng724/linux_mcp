@@ -4,8 +4,6 @@
 from __future__ import annotations
 
 import json
-import re
-import subprocess
 from pathlib import Path
 from typing import Dict
 
@@ -14,35 +12,12 @@ from netlink_client import KernelMcpNetlinkClient
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 MANIFESTS_DIR = ROOT_DIR / "tool-app" / "manifests"
-LIST_BIN = ROOT_DIR / "client" / "bin" / "genl_list_tools"
-
-LIST_RE = re.compile(
-    r"^id=(?P<id>\d+)\s+name=(?P<name>\S+)\s+perm=(?P<perm>\d+)\s+cost=(?P<cost>\d+)\s+status=(?P<status>\S+)(?:\s+hash=(?P<hash>\S+))?$"
-)
-
-
-def _run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(cmd, cwd=str(ROOT_DIR), text=True, capture_output=True)
-    if check and proc.returncode != 0:
-        raise RuntimeError(
-            f"command failed: {' '.join(cmd)}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
-        )
-    return proc
+SYSFS_CAPABILITIES_DIR = Path("/sys/kernel/mcp/capabilities")
 
 
 def _check_prerequisites() -> None:
-    if not LIST_BIN.exists():
-        raise RuntimeError("client binary missing; run: make -C client clean && make -C client")
-
-    lsmod = _run_cmd(["lsmod"])
-    loaded = False
-    for line in lsmod.stdout.splitlines()[1:]:
-        cols = line.split()
-        if cols and cols[0] == "kernel_mcp":
-            loaded = True
-            break
-    if not loaded:
-        raise RuntimeError("kernel module kernel_mcp not loaded")
+    if not SYSFS_CAPABILITIES_DIR.is_dir():
+        raise RuntimeError("kernel capability sysfs not available; is kernel_mcp loaded?")
 
 
 def _load_capabilities() -> Dict[str, dict]:
@@ -57,7 +32,7 @@ def _load_capabilities() -> Dict[str, dict]:
     out: Dict[str, dict] = {}
     for capability_name, capability in capabilities.items():
         out[capability_name] = {
-            "tool_id": capability.capability_id,
+            "capability_id": capability.capability_id,
             "name": capability.name,
             "perm": capability.perm,
             "cost": capability.cost,
@@ -77,12 +52,12 @@ def _register_capabilities(capabilities: Dict[str, dict]) -> None:
     try:
         for capability_name in sorted(capabilities.keys()):
             capability = capabilities[capability_name]
-            client.register_tool(
-                tool_id=int(capability["tool_id"]),
+            client.register_capability(
+                capability_id=int(capability["capability_id"]),
                 name=str(capability["name"]),
                 perm=int(capability["perm"]),
                 cost=int(capability["cost"]),
-                tool_hash=str(capability["hash"]),
+                capability_hash=str(capability["hash"]),
                 required_caps=int(capability["required_caps"]),
                 risk_level=int(capability["risk_level"]),
                 approval_mode=int(capability["approval_mode"]),
@@ -100,7 +75,7 @@ def _register_capabilities(capabilities: Dict[str, dict]) -> None:
             )
             print(
                 "[reconcile] registered capability id={} name={} perm={} cost={} hash={} required_caps={} risk_level={} approval_mode={} audit_mode={}".format(
-                    capability["tool_id"],
+                    capability["capability_id"],
                     capability["name"],
                     capability["perm"],
                     capability["cost"],
@@ -116,30 +91,31 @@ def _register_capabilities(capabilities: Dict[str, dict]) -> None:
         client.close()
 
 
-def _list_kernel_tools() -> Dict[int, Dict[str, str]]:
-    proc = _run_cmd([str(LIST_BIN)])
-    tools: Dict[int, Dict[str, str]] = {}
-    for line in proc.stdout.splitlines():
-        line = line.strip()
-        if not line:
+def _read_sysfs_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8").strip()
+
+
+def _list_kernel_capabilities() -> Dict[int, Dict[str, str]]:
+    capabilities: Dict[int, Dict[str, str]] = {}
+    for item in sorted(SYSFS_CAPABILITIES_DIR.iterdir()):
+        if not item.is_dir():
             continue
-        match = LIST_RE.match(line)
-        if not match:
+        if not item.name.isdigit():
             continue
-        tool_id = int(match.group("id"))
-        tools[tool_id] = {
-            "tool_id": tool_id,
-            "name": match.group("name"),
-            "perm": int(match.group("perm")),
-            "cost": int(match.group("cost")),
-            "hash": match.group("hash") or "",
+        capability_id = int(item.name)
+        capabilities[capability_id] = {
+            "capability_id": capability_id,
+            "name": _read_sysfs_text(item / "name"),
+            "perm": int(_read_sysfs_text(item / "perm")),
+            "cost": int(_read_sysfs_text(item / "cost")),
+            "hash": _read_sysfs_text(item / "hash"),
         }
-    return tools
+    return capabilities
 
 
-def _verify(capabilities: Dict[str, dict], kernel_tools: Dict[int, Dict[str, str]]) -> None:
-    expected_ids = {capability["tool_id"] for capability in capabilities.values()}
-    actual_ids = set(kernel_tools.keys())
+def _verify(capabilities: Dict[str, dict], kernel_capabilities: Dict[int, Dict[str, str]]) -> None:
+    expected_ids = {capability["capability_id"] for capability in capabilities.values()}
+    actual_ids = set(kernel_capabilities.keys())
     ok = True
 
     missing = sorted(expected_ids - actual_ids)
@@ -152,7 +128,7 @@ def _verify(capabilities: Dict[str, dict], kernel_tools: Dict[int, Dict[str, str
         ok = False
 
     for capability in capabilities.values():
-        actual = kernel_tools.get(capability["tool_id"])
+        actual = kernel_capabilities.get(capability["capability_id"])
         if actual is None:
             continue
         if (
@@ -163,7 +139,7 @@ def _verify(capabilities: Dict[str, dict], kernel_tools: Dict[int, Dict[str, str
         ):
             print(
                 "[reconcile] mismatch id={}: expected name={} perm={} cost={} hash={}, got name={} perm={} cost={} hash={}".format(
-                    capability["tool_id"],
+                    capability["capability_id"],
                     capability["name"],
                     capability["perm"],
                     capability["cost"],
@@ -192,8 +168,8 @@ def main() -> int:
             flush=True,
         )
         _register_capabilities(capabilities)
-        kernel_tools = _list_kernel_tools()
-        _verify(capabilities, kernel_tools)
+        kernel_capabilities = _list_kernel_capabilities()
+        _verify(capabilities, kernel_capabilities)
         print("[reconcile] OK: provider manifests and kernel capability registry are in sync", flush=True)
         return 0
     except Exception as exc:  # noqa: BLE001

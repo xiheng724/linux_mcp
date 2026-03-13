@@ -52,7 +52,8 @@ struct tool_args {
 static void usage(const char *prog)
 {
 	fprintf(stderr,
-		"Usage: %s --id <u32> --name <str> --perm <u32> --cost <u32> [--hash <8hex>]\n",
+		"Usage: %s --capability-id <u32> --capability-name <str> --perm <u32> --cost <u32> [--capability-hash <8hex>]\n"
+		"Deprecated aliases: --id --name --hash\n",
 		prog);
 }
 
@@ -99,13 +100,17 @@ static int parse_args(int argc, char **argv, struct tool_args *args)
 
 	memset(args, 0, sizeof(*args));
 	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--id") == 0 && i + 1 < argc) {
+		if ((strcmp(argv[i], "--capability-id") == 0 ||
+		     strcmp(argv[i], "--id") == 0) &&
+		    i + 1 < argc) {
 			if (parse_u32(argv[++i], &args->id))
 				return -EINVAL;
 			seen_id = 1;
 			continue;
 		}
-		if (strcmp(argv[i], "--name") == 0 && i + 1 < argc) {
+		if ((strcmp(argv[i], "--capability-name") == 0 ||
+		     strcmp(argv[i], "--name") == 0) &&
+		    i + 1 < argc) {
 			size_t nlen = strlen(argv[++i]);
 			if (nlen == 0 || nlen >= sizeof(args->name))
 				return -EINVAL;
@@ -119,7 +124,9 @@ static int parse_args(int argc, char **argv, struct tool_args *args)
 			seen_perm = 1;
 			continue;
 		}
-		if (strcmp(argv[i], "--hash") == 0 && i + 1 < argc) {
+		if ((strcmp(argv[i], "--capability-hash") == 0 ||
+		     strcmp(argv[i], "--hash") == 0) &&
+		    i + 1 < argc) {
 			if (parse_hash(argv[++i], args->hash, sizeof(args->hash)))
 				return -EINVAL;
 			args->has_hash = true;
@@ -370,7 +377,7 @@ int main(int argc, char **argv)
 
 	ret = register_tool(fd, family_id, &args);
 	if (ret < 0) {
-		fprintf(stderr, "register_tool failed: %s\n", strerror(-ret));
+		fprintf(stderr, "register_capability failed: %s\n", strerror(-ret));
 		close(fd);
 		return 4;
 	}

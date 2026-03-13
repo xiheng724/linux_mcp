@@ -1,17 +1,13 @@
 # llm-app
 
-Simple CLI demo that:
+CLI planner for the current capability-domain flow:
 
-1. fetches app catalog via `{"sys":"list_apps"}` from `mcpd`
-2. chooses an app first (DeepSeek or local heuristic)
-3. fetches app-scoped tools via `{"sys":"list_tools","app_id":"..."}` and chooses one tool
-4. sends `{"kind":"tool:exec","app_id":"...", ...}` to `mcpd` only
-5. `mcpd` performs kernel arbitration + tool execution + completion report
+1. fetch capability domains from `mcpd` via `{"sys":"list_capabilities"}`
+2. choose one capability domain with DeepSeek or local heuristic
+3. send `{"kind":"capability:exec", ...}` to `mcpd`
+4. `mcpd` performs broker selection, kernel arbitration, provider dispatch, and completion report
 
-Tool semantics source:
-- `tool-app/manifests/*.json` (`tools[].description`, `tools[].input_schema`, `tools[].examples`)
-- semantics are pushed to `mcpd` by `tool-app/app_service.py` over UDS registration
-- llm-app only sees semantic fields and hash (no runtime endpoint/handler fields)
+`llm-app` now uses only the canonical inspection calls `list_providers`, `list_actions`, and `list_capabilities`.
 
 Prerequisites:
 - `kernel_mcp` loaded
@@ -45,15 +41,16 @@ python3 llm-app/cli.py --repl
 
 REPL commands:
 - `/help` show commands
-- `/apps` refresh and print app list
-- `/tools` refresh and print tool list
+- `/providers` refresh and print provider list
+- `/actions` refresh and print provider action list
+- `/caps` refresh and print capability domains
 - `/exit` quit
 - `Ctrl-D` quit
 
 REPL options:
-- `--agent-id a1` (default: `a1`)
+- `--participant-id planner-main` (default: `planner-main`)
 - `--sock /tmp/mcpd.sock` (default: `/tmp/mcpd.sock`)
-- `--show-tools` print full tool list every turn (default only print on first/changes; otherwise prints `tools unchanged`)
+- `--show-actions` print full action list every turn
 
 GUI mode (PySide6):
 
@@ -61,19 +58,11 @@ GUI mode (PySide6):
 python3 llm-app/gui_app.py
 ```
 
-GUI uses the same tool-selection logic as CLI (shared code):
-- `--selector auto|heuristic|deepseek`
-- `--deepseek-model ...`
-- `--deepseek-url ...`
-- `--deepseek-timeout-sec ...`
-
-Recommended dev workflow (venv):
-
-```bash
-cd ~/Code/linux-mcp
-source .venv/bin/activate
-python llm-app/gui_app.py
-```
+Current GUI behavior:
+- shows capability domains, providers, and provider actions side by side
+- executes only through `capability:exec`
+- supports manual capability override, provider preference, `interactive`, and `explicit_approval`
+- displays selected capability, broker/provider/action result, and raw response JSON
 
 If missing dependency:
 
@@ -96,34 +85,14 @@ Example REPL output:
 [llm-app] REPL mode started
 [llm-app] commands:
 [llm-app]   /help  show help
-[llm-app]   /tools force refresh and print tools
+[llm-app]   /actions force refresh and print provider actions
 [llm-app]   /exit  quit
 user> hello
-[llm-app] tools unchanged
-[llm-app] selected tool=echo id=1 hash=...
+[llm-app] capabilities unchanged
+[llm-app] selected capability=info.lookup id=1 hash=...
 [llm-app] req_id=... status=ok t_ms=...
 [llm-app] result={"message":"hello"}
 ```
-
-## Recommended Demo Flow (GUI)
-
-1. Optional baseline:
-   - `sudo bash scripts/demo_acceptance.sh`
-2. Start gateway:
-   - `bash scripts/run_mcpd.sh`
-3. Start GUI:
-   - `python3 llm-app/gui_app.py`
-4. Try inputs:
-   - `hello`
-   - `burn cpu for a bit`
-   - `统计这段文字：linux mcp demo`
-   - `show system info`
-   - `calculate 123 * (45 + 6)`
-   - `preview llm-app/cli.py 20 lines`
-   - `hash "linux-mcp" with md5`
-   - `what time is it now`
-5. Stop gateway:
-   - `bash scripts/stop_mcpd.sh`
 
 Selector modes:
 - `--selector deepseek` (default): require DeepSeek and fail if unavailable.

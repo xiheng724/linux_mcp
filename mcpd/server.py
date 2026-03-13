@@ -40,7 +40,7 @@ LLM_APP_DIR = ROOT_DIR / "llm-app"
 if str(LLM_APP_DIR) not in sys.path:
     sys.path.insert(0, str(LLM_APP_DIR))
 
-from app_logic import build_payload_for_tool
+from app_logic import build_payload_for_action
 
 SOCK_PATH = "/tmp/mcpd.sock"
 MAX_MSG_SIZE = 16 * 1024 * 1024
@@ -50,7 +50,8 @@ HASH_RE = re.compile(r"^[0-9a-fA-F]{8}$")
 
 REQUEST_FLAG_INTERACTIVE_SESSION = 1 << 0
 REQUEST_FLAG_EXPLICIT_APPROVED = 1 << 1
-REQUEST_FLAG_LEGACY_PATH = 1 << 2
+PARTICIPANT_TYPE_PLANNER = 1
+PARTICIPANT_TYPE_BROKER = 2
 
 _stop_event = threading.Event()
 _agents_lock = threading.Lock()
@@ -59,7 +60,6 @@ _registered_agents: set[str] = set()
 _provider_registry: Dict[str, ProviderDef] = {}
 _capability_registry: Dict[str, CapabilityDomain] = {}
 _broker_registry: Dict[str, BrokerDef] = {}
-_action_index: Dict[int, Tuple[str, ProviderAction]] = {}
 _kernel_client: KernelMcpNetlinkClient | None = None
 
 PLANNER_CAPS = 0
@@ -176,43 +176,52 @@ def _emit_audit_event(event_type: str, **fields: Any) -> None:
     LOGGER.info(json.dumps(entry, sort_keys=True, ensure_ascii=True))
 
 
-def _ensure_registered_agent(agent_id: str, *, caps: int, trust_level: int, flags: int = 0) -> None:
+def _ensure_registered_participant(
+    participant_id: str,
+    *,
+    caps: int,
+    trust_level: int,
+    flags: int = 0,
+    participant_type: int,
+) -> None:
     with _agents_lock:
-        if agent_id in _registered_agents:
+        if participant_id in _registered_agents:
             return
 
     client = _get_kernel_client()
     uid = os.getuid() if hasattr(os, "getuid") else 0
-    client.register_agent(
-        agent_id,
+    client.register_participant(
+        participant_id,
         pid=os.getpid(),
         uid=uid,
         caps=caps,
         trust_level=trust_level,
         flags=flags,
+        participant_type=participant_type,
     )
     LOGGER.info(
-        "agent registered via netlink: id=%s caps=%d trust=%d flags=%d",
-        agent_id,
+        "participant registered via netlink: id=%s type=%d caps=%d trust=%d flags=%d",
+        participant_id,
+        participant_type,
         caps,
         trust_level,
         flags,
     )
 
     with _agents_lock:
-        _registered_agents.add(agent_id)
+        _registered_agents.add(participant_id)
 
 
 def _sync_capability_domains(capabilities: List[CapabilityDomain]) -> None:
     client = _get_kernel_client()
     for capability in sorted(capabilities, key=lambda item: item.capability_id):
         rate_limit = capability.rate_limit
-        client.register_tool(
-            tool_id=capability.capability_id,
+        client.register_capability(
+            capability_id=capability.capability_id,
             name=capability.name,
             perm=capability.perm,
             cost=capability.cost,
-            tool_hash=capability.manifest_hash,
+            capability_hash=capability.manifest_hash,
             required_caps=capability.required_caps,
             risk_level=capability.risk_level,
             approval_mode=capability.approval_mode,
@@ -238,7 +247,6 @@ def _sync_capability_domains(capabilities: List[CapabilityDomain]) -> None:
 def _rebuild_catalogs_locked() -> None:
     global _capability_registry
     global _broker_registry
-    global _action_index
 
     action_index: Dict[int, Tuple[str, ProviderAction]] = {}
     for provider in _provider_registry.values():
@@ -246,13 +254,12 @@ def _rebuild_catalogs_locked() -> None:
             if action_id in action_index:
                 other_provider_id, _other_action = action_index[action_id]
                 raise ValueError(
-                    f"duplicate action/tool_id={action_id} providers={other_provider_id},{provider.provider_id}"
+                    f"duplicate action_id={action_id} providers={other_provider_id},{provider.provider_id}"
                 )
             action_index[action_id] = (provider.provider_id, action)
 
     _capability_registry = build_capability_catalog(_provider_registry.values())
     _broker_registry = build_broker_catalog(_provider_registry.values(), _capability_registry)
-    _action_index = action_index
 
 
 def _register_manifest(raw: Any, source: str) -> Dict[str, Any]:
@@ -279,28 +286,18 @@ def _register_manifest(raw: Any, source: str) -> Dict[str, Any]:
     return {
         "status": "ok",
         "provider_id": provider.provider_id,
-        "app_id": provider.provider_id,
         "app_name": provider.app_name,
-        "tool_count": len(provider.actions),
-        "tool_ids": sorted(provider.actions.keys()),
+        "action_count": len(provider.actions),
+        "action_ids": sorted(provider.actions.keys()),
         "capability_count": len(provider_capabilities),
         "capability_domains": provider_capabilities,
     }
-
-
-def _flatten_actions_locked() -> Dict[int, Tuple[ProviderDef, ProviderAction]]:
-    out: Dict[int, Tuple[ProviderDef, ProviderAction]] = {}
-    for provider in _provider_registry.values():
-        for action_id, action in provider.actions.items():
-            out[action_id] = (provider, action)
-    return out
 
 
 def _provider_to_public(provider: ProviderDef) -> Dict[str, Any]:
     actions = sorted(provider.actions.values(), key=lambda item: item.action_id)
     capability_domains = sorted({action.capability_domain for action in actions})
     return {
-        "app_id": provider.provider_id,
         "app_name": provider.app_name,
         "provider_id": provider.provider_id,
         "provider_instance_id": provider.instance_id,
@@ -308,18 +305,17 @@ def _provider_to_public(provider: ProviderDef) -> Dict[str, Any]:
         "trust_class": provider.trust_class,
         "auth_mode": provider.auth_mode,
         "broker_domain": provider.broker_domain,
-        "tool_count": len(actions),
-        "tool_ids": [action.action_id for action in actions],
-        "tool_names": [action.name for action in actions],
+        "action_count": len(actions),
+        "action_ids": [action.action_id for action in actions],
+        "action_names": [action.name for action in actions],
         "capability_domains": capability_domains,
     }
 
 
 def _action_to_public(provider: ProviderDef, action: ProviderAction) -> Dict[str, Any]:
     return {
-        "tool_id": action.action_id,
+        "action_id": action.action_id,
         "name": action.name,
-        "app_id": provider.provider_id,
         "app_name": provider.app_name,
         "provider_id": provider.provider_id,
         "provider_type": provider.provider_type,
@@ -343,7 +339,6 @@ def _action_to_public(provider: ProviderDef, action: ProviderAction) -> Dict[str
 
 def _capability_to_public(capability: CapabilityDomain) -> Dict[str, Any]:
     return {
-        "tool_id": capability.capability_id,
         "capability_id": capability.capability_id,
         "capability_domain": capability.name,
         "name": capability.name,
@@ -382,15 +377,15 @@ def _list_providers_public() -> List[Dict[str, Any]]:
         return [_provider_to_public(provider) for provider in providers]
 
 
-def _list_tools_public(provider_id: str = "") -> List[Dict[str, Any]]:
+def _list_actions_public(provider_id: str = "") -> List[Dict[str, Any]]:
     with _registry_lock:
-        tools: List[Dict[str, Any]] = []
+        actions: List[Dict[str, Any]] = []
         for provider in sorted(_provider_registry.values(), key=lambda item: item.provider_id):
             if provider_id and provider.provider_id != provider_id:
                 continue
             for action in sorted(provider.actions.values(), key=lambda item: item.action_id):
-                tools.append(_action_to_public(provider, action))
-        return tools
+                actions.append(_action_to_public(provider, action))
+        return actions
 
 
 def _list_capabilities_public() -> List[Dict[str, Any]]:
@@ -406,11 +401,11 @@ def _list_brokers_public() -> List[Dict[str, Any]]:
 
 
 def _resolve_requested_hash(req: Dict[str, Any], default_hash: str) -> str:
-    raw = req.get("tool_hash", req.get("capability_hash", ""))
+    raw = req.get("capability_hash", "")
     if raw in (None, ""):
         return default_hash
     if not isinstance(raw, str) or not HASH_RE.fullmatch(raw):
-        raise ValueError("capability/tool hash must be 8 hex chars")
+        raise ValueError("capability_hash must be 8 hex chars")
     return raw.lower()
 
 
@@ -424,14 +419,12 @@ def _approval_state_name(approval_state: int) -> str:
     return "REJECTED"
 
 
-def _build_request_flags(req: Dict[str, Any], request_mode: str) -> int:
+def _build_request_flags(req: Dict[str, Any]) -> int:
     flags = 0
     if bool(req.get("interactive", False)):
         flags |= REQUEST_FLAG_INTERACTIVE_SESSION
     if bool(req.get("explicit_approval", False)):
         flags |= REQUEST_FLAG_EXPLICIT_APPROVED
-    if request_mode == "tool:exec":
-        flags |= REQUEST_FLAG_LEGACY_PATH
     return flags
 
 
@@ -459,7 +452,7 @@ def _validate_executor_contract(plan: BrokerDispatchPlan, payload: Dict[str, Any
 
 def _kernel_arbitrate(
     req_id: int,
-    agent_id: str,
+    planner_participant_id: str,
     capability: CapabilityDomain,
     broker_id: str,
     provider_id: str,
@@ -472,11 +465,11 @@ def _kernel_arbitrate(
 ) -> Tuple[str, int, int, str, int, int, int, int]:
     client = _get_kernel_client()
     for attempt in range(1, MAX_DEFER_RETRIES + 1):
-        decision_reply = client.tool_request(
+        decision_reply = client.capability_request(
             req_id=req_id,
-            agent_id=agent_id,
-            tool_id=capability.capability_id,
-            tool_hash=requested_hash,
+            participant_id=planner_participant_id,
+            capability_id=capability.capability_id,
+            capability_hash=requested_hash,
             broker_id=broker_id,
             provider_id=provider_id,
             executor_id=executor_id,
@@ -495,7 +488,7 @@ def _kernel_arbitrate(
         LOGGER.info(
             "arb req_id=%d planner=%s capability=%s broker=%s provider=%s executor=%s executor_instance=%s attempt=%d decision=%s wait_ms=%d tokens_left=%d reason=%s approval_state=%s",
             req_id,
-            agent_id,
+            planner_participant_id,
             capability.name,
             broker_id,
             provider_id,
@@ -528,7 +521,7 @@ def _kernel_arbitrate(
 
 
 def _kernel_report_complete(
-    agent_id: str,
+    planner_participant_id: str,
     capability: CapabilityDomain,
     req_id: int,
     status_code: int,
@@ -542,10 +535,10 @@ def _kernel_report_complete(
     approval_state: int,
 ) -> None:
     client = _get_kernel_client()
-    client.tool_complete(
+    client.capability_complete(
         req_id=req_id,
-        agent_id=agent_id,
-        tool_id=capability.capability_id,
+        participant_id=planner_participant_id,
+        capability_id=capability.capability_id,
         status_code=status_code,
         exec_ms=exec_ms,
         broker_id=broker_id,
@@ -579,7 +572,7 @@ def _executor_binding_to_public(plan: BrokerDispatchPlan) -> Dict[str, Any]:
 def _call_provider_executor(
     plan: BrokerDispatchPlan,
     req_id: int,
-    agent_id: str,
+    participant_id: str,
     payload: Dict[str, Any],
     lease_id: int,
     approval_state: int,
@@ -589,8 +582,8 @@ def _call_provider_executor(
     _ensure_executor_workdir(plan.executor.working_directory)
     req = {
         "req_id": req_id,
-        "agent_id": agent_id,
-        "tool_id": plan.action.action_id,
+        "participant_id": participant_id,
+        "action_id": plan.action.action_id,
         "provider_id": plan.provider.provider_id,
         "provider_instance_id": provider_instance_id,
         "capability_domain": plan.capability.name,
@@ -639,7 +632,7 @@ def _build_action_payload(action: ProviderAction, req: Dict[str, Any]) -> Dict[s
     payload = req.get("payload")
     if payload is None:
         user_text = str(req.get("user_text", ""))
-        payload = build_payload_for_tool(action.name, user_text)
+        payload = build_payload_for_action(action.name, user_text)
     if not isinstance(payload, dict):
         raise ValueError("payload must be object")
     return payload
@@ -647,7 +640,7 @@ def _build_action_payload(action: ProviderAction, req: Dict[str, Any]) -> Dict[s
 
 def _execute_plan(
     req: Dict[str, Any],
-    agent_id: str,
+    participant_id: str,
     plan: BrokerDispatchPlan,
     *,
     request_mode: str,
@@ -656,22 +649,24 @@ def _execute_plan(
     req_id = _ensure_int("req_id", req.get("req_id", 0))
     requested_hash = _resolve_requested_hash(req, plan.capability.manifest_hash)
     markers = list(audit_markers or [])
-    request_flags = _build_request_flags(req, request_mode)
+    request_flags = _build_request_flags(req)
     approval_token = str(req.get("approval_token", ""))
     provider_instance_id = plan.provider.instance_id
     executor_instance_id = _make_executor_instance_id(plan, req_id)
 
-    _ensure_registered_agent(
-        agent_id,
+    _ensure_registered_participant(
+        participant_id,
         caps=PLANNER_CAPS,
         trust_level=PLANNER_TRUST_LEVEL,
         flags=PLANNER_FLAGS,
+        participant_type=PARTICIPANT_TYPE_PLANNER,
     )
-    _ensure_registered_agent(
+    _ensure_registered_participant(
         plan.broker.broker_id,
         caps=plan.capability.required_caps,
         trust_level=BROKER_TRUST_LEVEL,
         flags=BROKER_FLAGS,
+        participant_type=PARTICIPANT_TYPE_BROKER,
     )
 
     payload = _build_action_payload(plan.action, req)
@@ -681,7 +676,7 @@ def _execute_plan(
         "capability_request",
         req_id=req_id,
         capability_domain=plan.capability.name,
-        planner_agent_id=agent_id,
+        planner_participant_id=participant_id,
         broker_id=plan.broker.broker_id,
         broker_pid=os.getpid(),
         provider_id=plan.provider.provider_id,
@@ -693,7 +688,7 @@ def _execute_plan(
         approval_state=_approval_state_name(APPROVAL_STATE_PENDING),
         decision_reason="pending",
         expiry_time=0,
-        legacy_path_flag=bool(request_flags & REQUEST_FLAG_LEGACY_PATH),
+        legacy_path_flag=False,
         audit_markers=markers,
         request_mode=request_mode,
     )
@@ -709,7 +704,7 @@ def _execute_plan(
         approval_state,
     ) = _kernel_arbitrate(
         req_id=req_id,
-        agent_id=agent_id,
+        planner_participant_id=participant_id,
         capability=plan.capability,
         broker_id=plan.broker.broker_id,
         provider_id=plan.provider.provider_id,
@@ -726,7 +721,7 @@ def _execute_plan(
             "request_denied",
             req_id=req_id,
             capability_domain=plan.capability.name,
-            planner_agent_id=agent_id,
+            planner_participant_id=participant_id,
             broker_id=plan.broker.broker_id,
             broker_pid=os.getpid(),
             provider_id=plan.provider.provider_id,
@@ -738,7 +733,7 @@ def _execute_plan(
             approval_state=_approval_state_name(approval_state),
             decision_reason=reason,
             expiry_time=expiry_time,
-            legacy_path_flag=bool(request_flags & REQUEST_FLAG_LEGACY_PATH),
+            legacy_path_flag=False,
             audit_markers=markers,
             request_mode=request_mode,
         )
@@ -773,7 +768,7 @@ def _execute_plan(
             "lease_issued",
             req_id=req_id,
             capability_domain=plan.capability.name,
-            planner_agent_id=agent_id,
+            planner_participant_id=participant_id,
             broker_id=plan.broker.broker_id,
             broker_pid=os.getpid(),
             provider_id=plan.provider.provider_id,
@@ -785,14 +780,14 @@ def _execute_plan(
             approval_state=_approval_state_name(approval_state),
             decision_reason=reason,
             expiry_time=expiry_time,
-            legacy_path_flag=bool(request_flags & REQUEST_FLAG_LEGACY_PATH),
+            legacy_path_flag=False,
             audit_markers=markers,
             request_mode=request_mode,
         )
         executor_resp = _call_provider_executor(
             plan,
             req_id=req_id,
-            agent_id=agent_id,
+            participant_id=participant_id,
             payload=payload,
             lease_id=lease_id,
             approval_state=approval_state,
@@ -826,14 +821,15 @@ def _execute_plan(
             "lease_id": lease_id,
             "lease_expires_ms": lease_expires_ms,
             "audit_markers": markers,
+            "participant_id": participant_id,
             "capability_domain": plan.capability.name,
             "capability_id": plan.capability.capability_id,
             "broker_id": plan.broker.broker_id,
             "provider_id": plan.provider.provider_id,
             "provider_instance_id": provider_instance_id,
             "provider_type": plan.provider.provider_type,
+            "action_id": plan.action.action_id,
             "action_name": plan.action.action_name,
-            "tool_name": plan.action.name,
             "executor_id": plan.executor.executor_id,
             "executor_instance_id": executor_instance_id,
             "executor_type": plan.executor.executor_type,
@@ -849,7 +845,7 @@ def _execute_plan(
         exec_ms = int((time.perf_counter() - exec_start) * 1000)
         try:
             _kernel_report_complete(
-                agent_id=agent_id,
+                planner_participant_id=participant_id,
                 capability=plan.capability,
                 req_id=req_id,
                 status_code=status_code,
@@ -866,7 +862,7 @@ def _execute_plan(
                 "execution_completed",
                 req_id=req_id,
                 capability_domain=plan.capability.name,
-                planner_agent_id=agent_id,
+                planner_participant_id=participant_id,
                 broker_id=plan.broker.broker_id,
                 broker_pid=os.getpid(),
                 provider_id=plan.provider.provider_id,
@@ -878,7 +874,7 @@ def _execute_plan(
                 approval_state=_approval_state_name(approval_state),
                 decision_reason="ok" if status_code == 0 else "error",
                 expiry_time=expiry_time,
-                legacy_path_flag=bool(request_flags & REQUEST_FLAG_LEGACY_PATH),
+                legacy_path_flag=False,
                 audit_markers=markers,
                 request_mode=request_mode,
             )
@@ -888,7 +884,7 @@ def _execute_plan(
                 event_type,
                 req_id=req_id,
                 capability_domain=plan.capability.name,
-                planner_agent_id=agent_id,
+                planner_participant_id=participant_id,
                 broker_id=plan.broker.broker_id,
                 broker_pid=os.getpid(),
                 provider_id=plan.provider.provider_id,
@@ -900,27 +896,24 @@ def _execute_plan(
                 approval_state=_approval_state_name(approval_state),
                 decision_reason=str(exc),
                 expiry_time=expiry_time,
-                legacy_path_flag=bool(request_flags & REQUEST_FLAG_LEGACY_PATH),
+                legacy_path_flag=False,
                 audit_markers=markers,
                 request_mode=request_mode,
             )
             LOGGER.error(
-                "tool_complete report failed req_id=%d planner=%s capability=%s err=%s",
+                "capability_complete report failed req_id=%d planner_participant=%s capability=%s err=%s",
                 req_id,
-                agent_id,
+                participant_id,
                 plan.capability.name,
                 exc,
             )
 
 
 def _handle_capability_exec(req: Dict[str, Any]) -> Dict[str, Any]:
-    req_id = _ensure_int("req_id", req.get("req_id", 0))
-    agent_id = _ensure_non_empty_str("agent_id", req.get("agent_id", ""))
+    participant_id = _ensure_non_empty_str("participant_id", req.get("participant_id", ""))
     user_text = _ensure_non_empty_str("user_text", req.get("user_text", ""))
-    preferred_provider_id = str(req.get("preferred_provider_id", req.get("provider_id", "")))
+    preferred_provider_id = str(req.get("preferred_provider_id", ""))
     audit_markers: List[str] = []
-    if preferred_provider_id and "preferred_provider_id" not in req and "provider_id" in req:
-        audit_markers.append("deprecated_provider_id_alias")
 
     capability_name = req.get("capability_domain")
     if capability_name in ("", None):
@@ -955,75 +948,9 @@ def _handle_capability_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         )
     return _execute_plan(
         req,
-        agent_id,
+        participant_id,
         plan,
         request_mode="capability:exec",
-        audit_markers=audit_markers,
-    )
-
-
-def _handle_legacy_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
-    agent_id = _ensure_non_empty_str("agent_id", req.get("agent_id", ""))
-    provider_id = _ensure_non_empty_str("app_id", req.get("app_id", ""))
-    tool_id = _ensure_int("tool_id", req.get("tool_id", 0))
-    audit_markers = ["compat_tool_exec", "deprecated_legacy_path"]
-    _emit_audit_event(
-        "compatibility_path_usage",
-        req_id=int(req.get("req_id", 0)),
-        capability_domain="",
-        planner_agent_id=agent_id,
-        broker_id="",
-        broker_pid=os.getpid(),
-        provider_id=provider_id,
-        executor_instance_id="",
-        lease_id=0,
-        approval_mode=0,
-        approval_state="PENDING",
-        decision_reason="legacy_path",
-        expiry_time=0,
-        legacy_path_flag=True,
-        audit_markers=audit_markers,
-        request_mode="tool:exec",
-    )
-    LOGGER.warning(
-        "legacy tool:exec request agent=%s app_id=%s tool_id=%d",
-        agent_id,
-        provider_id,
-        tool_id,
-    )
-    with _registry_lock:
-        provider = _provider_registry.get(provider_id)
-        if provider is None:
-            raise ValueError(f"unknown provider/app_id: {provider_id}")
-        action = provider.actions.get(tool_id)
-        if action is None:
-            raise ValueError(f"tool_id={tool_id} does not belong to app_id={provider_id}")
-        capability = _capability_registry.get(action.capability_domain)
-        if capability is None:
-            raise ValueError(f"missing capability_domain mapping: {action.capability_domain}")
-        broker = _broker_registry.get(capability.broker_id)
-        if broker is None:
-            raise ValueError(f"missing broker mapping: {capability.broker_id}")
-        if capability.risk_level >= HIGH_RISK_LEVEL and not bool(
-            req.get("allow_legacy_high_risk", False)
-        ):
-            raise ValueError(
-                f"legacy tool:exec blocked for high-risk capability_domain={capability.name}"
-            )
-        if capability.risk_level >= HIGH_RISK_LEVEL:
-            audit_markers.append("legacy_high_risk_override")
-        plan = BrokerDispatchPlan(
-            capability=capability,
-            broker=broker,
-            provider=provider,
-            action=action,
-            executor=build_executor_binding(provider, action),
-        )
-    return _execute_plan(
-        req,
-        agent_id,
-        plan,
-        request_mode="tool:exec",
         audit_markers=audit_markers,
     )
 
@@ -1042,7 +969,7 @@ def _handle_connection(conn: socket.socket) -> None:
     with conn:
         while True:
             req_id = 0
-            agent_id = "unknown"
+            participant_id = "unknown"
             req_kind = "capability:exec"
             try:
                 t0 = time.perf_counter()
@@ -1051,25 +978,25 @@ def _handle_connection(conn: socket.socket) -> None:
                 if not isinstance(req, dict):
                     raise ValueError("request must be JSON object")
 
-                if req.get("sys") == "list_apps" or req.get("sys") == "list_providers":
+                if req.get("sys") == "list_providers":
                     req_kind = "sys:list_providers"
-                    resp = {"status": "ok", "apps": _list_providers_public(), "providers": _list_providers_public()}
+                    resp = {"status": "ok", "providers": _list_providers_public()}
                     _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                     continue
 
-                if req.get("sys") == "list_tools":
-                    req_kind = "sys:list_tools"
-                    app_id_req = req.get("app_id", "")
-                    if app_id_req not in ("", None) and not isinstance(app_id_req, str):
-                        raise ValueError("app_id must be string when provided")
-                    provider_id = "" if app_id_req in ("", None) else app_id_req
+                if req.get("sys") == "list_actions":
+                    req_kind = "sys:list_actions"
+                    provider_id_req = req.get("provider_id", "")
+                    if provider_id_req not in ("", None) and not isinstance(provider_id_req, str):
+                        raise ValueError("provider_id must be string when provided")
+                    provider_id = "" if provider_id_req in ("", None) else provider_id_req
                     with _registry_lock:
                         if provider_id and provider_id not in _provider_registry:
-                            raise ValueError(f"unknown app_id/provider_id: {provider_id}")
+                            raise ValueError(f"unknown provider_id: {provider_id}")
                     resp = {
                         "status": "ok",
-                        "app_id": provider_id,
-                        "tools": _list_tools_public(provider_id=provider_id),
+                        "provider_id": provider_id,
+                        "actions": _list_actions_public(provider_id=provider_id),
                     }
                     _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                     continue
@@ -1093,21 +1020,19 @@ def _handle_connection(conn: socket.socket) -> None:
                     continue
 
                 req_id = _ensure_int("req_id", req.get("req_id", 0))
-                agent_id = _ensure_non_empty_str("agent_id", req.get("agent_id", ""))
+                participant_id = _ensure_non_empty_str("participant_id", req.get("participant_id", ""))
                 req_kind = str(req.get("kind", "capability:exec"))
                 if req_kind == "capability:exec":
                     resp = _handle_capability_exec(req)
-                elif req_kind == "tool:exec":
-                    resp = _handle_legacy_tool_exec(req)
                 else:
                     raise ValueError(f"unsupported request kind: {req_kind}")
 
                 _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                 t_ms = int((time.perf_counter() - t0) * 1000)
                 LOGGER.info(
-                    "req_id=%d agent=%s kind=%s status=%s capability=%s provider=%s broker=%s t_ms=%d",
+                    "req_id=%d participant=%s kind=%s status=%s capability=%s provider=%s broker=%s t_ms=%d",
                     req_id,
-                    agent_id,
+                    participant_id,
                     req_kind,
                     resp.get("status"),
                     resp.get("capability_domain", "-"),
@@ -1130,9 +1055,9 @@ def _handle_connection(conn: socket.socket) -> None:
                 except Exception:  # noqa: BLE001
                     return
                 LOGGER.error(
-                    "req_id=%d agent=%s kind=%s status=error err=%s",
+                    "req_id=%d participant=%s kind=%s status=error err=%s",
                     req_id,
-                    agent_id,
+                    participant_id,
                     req_kind,
                     exc,
                 )
