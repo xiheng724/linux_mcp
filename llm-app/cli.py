@@ -15,9 +15,7 @@ from app_logic import (
     DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
-    build_payload_for_tool,
-    select_app_for_input,
-    select_tool_for_input,
+    select_capability_for_input,
 )
 from rpc import mcpd_call
 
@@ -73,99 +71,128 @@ def _list_tools(sock_path: str, app_id: str = "") -> List[Dict[str, Any]]:
     return typed_tools
 
 
-def _print_apps(apps: List[Dict[str, Any]]) -> None:
-    print(f"[llm-app] apps ({len(apps)}):", flush=True)
+def _list_capabilities(sock_path: str) -> List[Dict[str, Any]]:
+    resp = mcpd_call({"sys": "list_capabilities"}, sock_path=sock_path, timeout_s=5)
+    if resp.get("status") != "ok":
+        raise CliError(resp.get("error", "list_capabilities failed"))
+    capabilities = resp.get("capabilities", [])
+    if not isinstance(capabilities, list):
+        raise CliError("list_capabilities response missing capabilities list")
+    typed_capabilities: List[Dict[str, Any]] = []
+    for capability in capabilities:
+        if isinstance(capability, dict):
+            typed_capabilities.append(capability)
+    return typed_capabilities
+
+
+def _print_providers(apps: List[Dict[str, Any]]) -> None:
+    print(f"[llm-app] providers ({len(apps)}):", flush=True)
     for app in apps:
         print(
             (
-                f"[llm-app]   - id={app.get('app_id')} "
-                f"name={app.get('app_name')} tools={app.get('tool_count')}"
+                f"[llm-app]   - id={app.get('provider_id', app.get('app_id'))} "
+                f"name={app.get('app_name')} actions={app.get('tool_count')}"
             ),
             flush=True,
         )
-        tool_names = app.get("tool_names", [])
-        if isinstance(tool_names, list) and tool_names:
-            print(f"[llm-app]     tool_names={','.join(str(x) for x in tool_names)}", flush=True)
+        capability_domains = app.get("capability_domains", [])
+        if isinstance(capability_domains, list) and capability_domains:
+            print(
+                f"[llm-app]     capability_domains={','.join(str(x) for x in capability_domains)}",
+                flush=True,
+            )
 
 
 def _print_tools(tools: List[Dict[str, Any]]) -> None:
-    print(f"[llm-app] tools ({len(tools)}):", flush=True)
+    print(f"[llm-app] provider actions ({len(tools)}):", flush=True)
     for tool in tools:
         print(
             (
                 f"[llm-app]   - id={tool.get('tool_id')} "
-                f"name={tool.get('name')} hash={tool.get('hash', '-')}"
+                f"name={tool.get('name')} capability={tool.get('capability_domain', '-')}"
             ),
             flush=True,
         )
         print(f"[llm-app]     desc={tool.get('description')}", flush=True)
 
 
-def _execute_once_with_apps(
+def _print_capabilities(capabilities: List[Dict[str, Any]]) -> None:
+    print(f"[llm-app] capabilities ({len(capabilities)}):", flush=True)
+    for capability in capabilities:
+        print(
+            (
+                f"[llm-app]   - id={capability.get('capability_id', capability.get('tool_id'))} "
+                f"domain={capability.get('capability_domain')} broker={capability.get('broker_id')}"
+            ),
+            flush=True,
+        )
+        print(
+            f"[llm-app]     risk={capability.get('risk_level')} providers={capability.get('provider_ids', [])}",
+            flush=True,
+        )
+
+
+def _execute_once_with_capabilities(
     user_text: str,
     agent_id: str,
     sock_path: str,
     cfg: SelectorConfig,
-    apps: List[Dict[str, Any]],
+    capabilities: List[Dict[str, Any]],
 ) -> int:
-    if not apps:
-        raise CliError("no apps returned by mcpd")
+    if not capabilities:
+        raise CliError("no capabilities returned by mcpd")
 
     warnings: List[str] = []
-    selected_app, app_selector_source, app_selector_reason = select_app_for_input(
+    selected_capability, selector_source, selector_reason = select_capability_for_input(
         user_text,
-        apps,
-        cfg,
-        warn_cb=lambda msg: warnings.append(msg),
-    )
-    app_id = str(selected_app.get("app_id", ""))
-    app_name = str(selected_app.get("app_name", app_id))
-    if not app_id:
-        raise CliError("selected app has empty app_id")
-
-    tools = _list_tools(sock_path, app_id=app_id)
-    if not tools:
-        raise CliError(f"selected app has no tools: {app_id}")
-
-    selected_tool, tool_selector_source, tool_selector_reason = select_tool_for_input(
-        user_text,
-        tools,
+        capabilities,
         cfg,
         warn_cb=lambda msg: warnings.append(msg),
     )
     for msg in warnings:
         print(f"[llm-app] WARN: {msg}", flush=True)
 
-    tool_id = int(selected_tool["tool_id"])
-    tool_name = str(selected_tool.get("name", "unknown"))
-    tool_hash_raw = selected_tool.get("hash")
-    tool_hash = tool_hash_raw if isinstance(tool_hash_raw, str) and tool_hash_raw else ""
-    payload = build_payload_for_tool(tool_name, user_text)
+    capability_domain = str(selected_capability.get("capability_domain", ""))
+    capability_id = int(selected_capability.get("capability_id", selected_capability.get("tool_id", 0)))
+    capability_hash_raw = selected_capability.get("hash")
+    capability_hash = (
+        capability_hash_raw if isinstance(capability_hash_raw, str) and capability_hash_raw else ""
+    )
 
-    print(f"[llm-app] selected app={app_name} id={app_id}", flush=True)
-    print(f"[llm-app] selected tool={tool_name} id={tool_id} hash={tool_hash or '-'}", flush=True)
-    print(f"[llm-app] app_selector={app_selector_source} reason={app_selector_reason}", flush=True)
     print(
-        f"[llm-app] tool_selector={tool_selector_source} reason={tool_selector_reason}",
+        f"[llm-app] selected capability={capability_domain} id={capability_id} hash={capability_hash or '-'}",
+        flush=True,
+    )
+    print(
+        f"[llm-app] capability_selector={selector_source} reason={selector_reason}",
         flush=True,
     )
 
     req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
     resp = mcpd_call(
         {
-            "kind": "tool:exec",
+            "kind": "capability:exec",
             "req_id": req_id,
             "agent_id": agent_id,
-            "app_id": app_id,
-            "tool_id": tool_id,
-            "tool_hash": tool_hash,
-            "payload": payload,
+            "capability_domain": capability_domain,
+            "capability_id": capability_id,
+            "capability_hash": capability_hash,
+            "user_text": user_text,
         },
         sock_path=sock_path,
         timeout_s=20,
     )
     print(f"[llm-app] req_id={req_id} status={resp.get('status')} t_ms={resp.get('t_ms')}", flush=True)
     if resp.get("status") == "ok":
+        print(
+            "[llm-app] broker={} provider={} action={} executor={}".format(
+                resp.get("broker_id"),
+                resp.get("provider_id"),
+                resp.get("action_name"),
+                resp.get("executor_id"),
+            ),
+            flush=True,
+        )
         print(f"[llm-app] result={json.dumps(resp.get('result', {}), ensure_ascii=True)}", flush=True)
         print("[llm-app] done", flush=True)
         return 0
@@ -177,29 +204,34 @@ def _execute_once_with_apps(
 def _run_once(user_text: str, agent_id: str, sock_path: str, cfg: SelectorConfig) -> int:
     apps = _list_apps(sock_path)
     tools = _list_tools(sock_path)
-    _print_apps(apps)
+    capabilities = _list_capabilities(sock_path)
+    _print_providers(apps)
     _print_tools(tools)
-    return _execute_once_with_apps(user_text, agent_id, sock_path, cfg, apps)
+    _print_capabilities(capabilities)
+    return _execute_once_with_capabilities(user_text, agent_id, sock_path, cfg, capabilities)
 
 
 def _print_help() -> None:
     print("[llm-app] commands:", flush=True)
     print("[llm-app]   /help  show help", flush=True)
-    print("[llm-app]   /apps  force refresh and print apps", flush=True)
+    print("[llm-app]   /apps  force refresh and print providers", flush=True)
     print("[llm-app]   /tools force refresh and print tools", flush=True)
+    print("[llm-app]   /caps  force refresh and print capability domains", flush=True)
     print("[llm-app]   /exit  quit", flush=True)
 
 
 def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: bool) -> int:
     apps = _list_apps(sock_path)
     tools = _list_tools(sock_path)
+    capabilities = _list_capabilities(sock_path)
     if not apps:
         raise CliError("no apps returned by mcpd")
 
     print("[llm-app] REPL mode started", flush=True)
     _print_help()
-    _print_apps(apps)
+    _print_providers(apps)
     _print_tools(tools)
+    _print_capabilities(capabilities)
     last_apps_sig = _apps_signature(apps)
     last_sig = _tools_signature(tools)
 
@@ -219,7 +251,7 @@ def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: b
             continue
         if user_text == "/apps":
             apps = _list_apps(sock_path)
-            _print_apps(apps)
+            _print_providers(apps)
             last_apps_sig = _apps_signature(apps)
             continue
         if user_text == "/tools":
@@ -227,14 +259,18 @@ def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: b
             _print_tools(tools)
             last_sig = _tools_signature(tools)
             continue
+        if user_text == "/caps":
+            capabilities = _list_capabilities(sock_path)
+            _print_capabilities(capabilities)
+            continue
 
         apps = _list_apps(sock_path)
         app_sig = _apps_signature(apps)
         if app_sig != last_apps_sig:
-            print("[llm-app] apps changed", flush=True)
-            _print_apps(apps)
+            print("[llm-app] providers changed", flush=True)
+            _print_providers(apps)
         else:
-            print("[llm-app] apps unchanged", flush=True)
+            print("[llm-app] providers unchanged", flush=True)
         last_apps_sig = app_sig
 
         tools = _list_tools(sock_path)
@@ -248,7 +284,8 @@ def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: b
             print("[llm-app] tools unchanged", flush=True)
         last_sig = sig
 
-        rc = _execute_once_with_apps(user_text, agent_id, sock_path, cfg, apps)
+        capabilities = _list_capabilities(sock_path)
+        rc = _execute_once_with_capabilities(user_text, agent_id, sock_path, cfg, capabilities)
         if rc != 0:
             print(f"[llm-app] request failed rc={rc}", flush=True)
 

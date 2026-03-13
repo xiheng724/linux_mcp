@@ -93,6 +93,13 @@ def _attr_u32(attrs: Dict[int, List[bytes]], key: int) -> int:
     return struct.unpack_from("=I", raw, 0)[0]
 
 
+def _attr_u64(attrs: Dict[int, List[bytes]], key: int) -> int:
+    raw = _attr_first(attrs, key)
+    if len(raw) < 8:
+        raise RuntimeError(f"invalid u64 attr length key={key} len={len(raw)}")
+    return struct.unpack_from("=Q", raw, 0)[0]
+
+
 def _attr_u16(attrs: Dict[int, List[bytes]], key: int) -> int:
     raw = _attr_first(attrs, key)
     if len(raw) < 2:
@@ -111,6 +118,9 @@ class ToolDecision:
     wait_ms: int
     tokens_left: int
     reason: str
+    lease_id: int
+    lease_expires_ms: int
+    approval_state: int
 
 
 class KernelMcpNetlinkClient:
@@ -220,7 +230,16 @@ class KernelMcpNetlinkClient:
             raise RuntimeError(f"invalid family_id: {family_id}")
         return family_id
 
-    def register_agent(self, agent_id: str, *, pid: int, uid: int) -> None:
+    def register_agent(
+        self,
+        agent_id: str,
+        *,
+        pid: int,
+        uid: int,
+        caps: int = 0,
+        trust_level: int = 0,
+        flags: int = 0,
+    ) -> None:
         if not agent_id:
             raise ValueError("agent_id must be non-empty")
         attrs = [
@@ -228,6 +247,12 @@ class KernelMcpNetlinkClient:
             (ATTR["PID"], struct.pack("=I", pid)),
             (ATTR["UID"], struct.pack("=I", uid)),
         ]
+        if caps:
+            attrs.append((ATTR["AGENT_CAPS"], struct.pack("=Q", caps)))
+        if trust_level:
+            attrs.append((ATTR["AGENT_TRUST_LEVEL"], struct.pack("=I", trust_level)))
+        if flags:
+            attrs.append((ATTR["AGENT_FLAGS"], struct.pack("=I", flags)))
         self._request(
             msg_type=self._family_id,
             cmd=CMD["AGENT_REGISTER"],
@@ -243,6 +268,18 @@ class KernelMcpNetlinkClient:
         perm: int,
         cost: int,
         tool_hash: str = "",
+        required_caps: int = 0,
+        risk_level: int = 0,
+        approval_mode: int = 0,
+        audit_mode: int = 0,
+        max_inflight_per_agent: int = 0,
+        rl_enabled: bool = False,
+        rl_burst: int = 0,
+        rl_refill_tokens: int = 0,
+        rl_refill_jiffies: int = 0,
+        rl_default_cost: int = 0,
+        rl_max_inflight_per_agent: int = 0,
+        rl_defer_wait_ms: int = 0,
     ) -> None:
         if tool_id <= 0:
             raise ValueError("tool_id must be positive")
@@ -256,6 +293,40 @@ class KernelMcpNetlinkClient:
         ]
         if tool_hash:
             attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
+        if required_caps:
+            attrs.append((ATTR["TOOL_REQUIRED_CAPS"], struct.pack("=Q", required_caps)))
+        if risk_level:
+            attrs.append((ATTR["TOOL_RISK_LEVEL"], struct.pack("=I", risk_level)))
+        if approval_mode:
+            attrs.append((ATTR["TOOL_APPROVAL_MODE"], struct.pack("=I", approval_mode)))
+        if audit_mode:
+            attrs.append((ATTR["TOOL_AUDIT_MODE"], struct.pack("=I", audit_mode)))
+        if max_inflight_per_agent:
+            attrs.append(
+                (
+                    ATTR["TOOL_MAX_INFLIGHT_PER_AGENT"],
+                    struct.pack("=I", max_inflight_per_agent),
+                )
+            )
+        if rl_enabled:
+            attrs.append((ATTR["RL_ENABLED"], struct.pack("=I", 1)))
+        if rl_burst:
+            attrs.append((ATTR["RL_BURST"], struct.pack("=I", rl_burst)))
+        if rl_refill_tokens:
+            attrs.append((ATTR["RL_REFILL_TOKENS"], struct.pack("=I", rl_refill_tokens)))
+        if rl_refill_jiffies:
+            attrs.append((ATTR["RL_REFILL_JIFFIES"], struct.pack("=I", rl_refill_jiffies)))
+        if rl_default_cost:
+            attrs.append((ATTR["RL_DEFAULT_COST"], struct.pack("=I", rl_default_cost)))
+        if rl_max_inflight_per_agent:
+            attrs.append(
+                (
+                    ATTR["RL_MAX_INFLIGHT_PER_AGENT"],
+                    struct.pack("=I", rl_max_inflight_per_agent),
+                )
+            )
+        if rl_defer_wait_ms:
+            attrs.append((ATTR["RL_DEFER_WAIT_MS"], struct.pack("=I", rl_defer_wait_ms)))
         self._request(
             msg_type=self._family_id,
             cmd=CMD["TOOL_REGISTER"],
@@ -270,6 +341,13 @@ class KernelMcpNetlinkClient:
         agent_id: str,
         tool_id: int,
         tool_hash: str,
+        broker_id: str = "",
+        provider_id: str = "",
+        executor_id: str = "",
+        provider_instance_id: str = "",
+        executor_instance_id: str = "",
+        request_flags: int = 0,
+        approval_token: str = "",
     ) -> ToolDecision:
         attrs = [
             (ATTR["AGENT_ID"], agent_id.encode("utf-8") + b"\x00"),
@@ -278,6 +356,24 @@ class KernelMcpNetlinkClient:
         ]
         if tool_hash:
             attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
+        if broker_id:
+            attrs.append((ATTR["BROKER_ID"], broker_id.encode("utf-8") + b"\x00"))
+        if provider_id:
+            attrs.append((ATTR["PROVIDER_ID"], provider_id.encode("utf-8") + b"\x00"))
+        if executor_id:
+            attrs.append((ATTR["EXECUTOR_ID"], executor_id.encode("utf-8") + b"\x00"))
+        if provider_instance_id:
+            attrs.append(
+                (ATTR["PROVIDER_INSTANCE_ID"], provider_instance_id.encode("utf-8") + b"\x00")
+            )
+        if executor_instance_id:
+            attrs.append(
+                (ATTR["EXECUTOR_INSTANCE_ID"], executor_instance_id.encode("utf-8") + b"\x00")
+            )
+        if request_flags:
+            attrs.append((ATTR["REQUEST_FLAGS"], struct.pack("=I", request_flags)))
+        if approval_token:
+            attrs.append((ATTR["APPROVAL_TOKEN"], approval_token.encode("utf-8") + b"\x00"))
 
         genl_cmd, resp_attrs = self._request(
             msg_type=self._family_id,
@@ -295,6 +391,15 @@ class KernelMcpNetlinkClient:
             wait_ms=_attr_u32(resp_attrs, ATTR["WAIT_MS"]),
             tokens_left=_attr_u32(resp_attrs, ATTR["TOKENS_LEFT"]),
             reason=_attr_string(resp_attrs, ATTR["MESSAGE"]),
+            lease_id=_attr_u64(resp_attrs, ATTR["LEASE_ID"])
+            if ATTR["LEASE_ID"] in resp_attrs
+            else 0,
+            lease_expires_ms=_attr_u32(resp_attrs, ATTR["LEASE_EXPIRES_MS"])
+            if ATTR["LEASE_EXPIRES_MS"] in resp_attrs
+            else 0,
+            approval_state=_attr_u32(resp_attrs, ATTR["APPROVAL_STATE"])
+            if ATTR["APPROVAL_STATE"] in resp_attrs
+            else 0,
         )
 
     def tool_complete(
@@ -305,6 +410,13 @@ class KernelMcpNetlinkClient:
         tool_id: int,
         status_code: int,
         exec_ms: int,
+        broker_id: str = "",
+        provider_id: str = "",
+        executor_id: str = "",
+        lease_id: int = 0,
+        provider_instance_id: str = "",
+        executor_instance_id: str = "",
+        approval_state: int = 0,
     ) -> None:
         attrs = [
             (ATTR["REQ_ID"], struct.pack("=Q", req_id)),
@@ -313,6 +425,24 @@ class KernelMcpNetlinkClient:
             (ATTR["STATUS"], struct.pack("=I", status_code)),
             (ATTR["EXEC_MS"], struct.pack("=I", exec_ms)),
         ]
+        if broker_id:
+            attrs.append((ATTR["BROKER_ID"], broker_id.encode("utf-8") + b"\x00"))
+        if provider_id:
+            attrs.append((ATTR["PROVIDER_ID"], provider_id.encode("utf-8") + b"\x00"))
+        if executor_id:
+            attrs.append((ATTR["EXECUTOR_ID"], executor_id.encode("utf-8") + b"\x00"))
+        if lease_id:
+            attrs.append((ATTR["LEASE_ID"], struct.pack("=Q", lease_id)))
+        if provider_instance_id:
+            attrs.append(
+                (ATTR["PROVIDER_INSTANCE_ID"], provider_instance_id.encode("utf-8") + b"\x00")
+            )
+        if executor_instance_id:
+            attrs.append(
+                (ATTR["EXECUTOR_INSTANCE_ID"], executor_instance_id.encode("utf-8") + b"\x00")
+            )
+        if approval_state:
+            attrs.append((ATTR["APPROVAL_STATE"], struct.pack("=I", approval_state)))
         self._request(
             msg_type=self._family_id,
             cmd=CMD["TOOL_COMPLETE"],

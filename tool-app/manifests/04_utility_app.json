@@ -1,6 +1,11 @@
 {
   "app_id": "utility_app",
   "app_name": "Utility App",
+  "provider_id": "utility-provider",
+  "provider_type": "utility",
+  "trust_class": "local",
+  "auth_mode": "local-process",
+  "broker_domain": "info",
   "mode": "uds_service",
   "endpoint": "/tmp/linux-mcp-apps/utility_app.sock",
   "service_path": "tool-app/app_service.py",
@@ -12,6 +17,11 @@
       "perm": 1,
       "cost": 1,
       "handler": "echo",
+      "action_name": "echo_payload",
+      "capability_domain": "info.lookup",
+      "risk_level": 1,
+      "executor_type": "broker-uds",
+      "validation_policy": "json_schema_v1",
       "description": "Echo tool that returns payload as-is for debugging and simple round-trip checks.",
       "input_schema": {
         "type": "object",

@@ -41,6 +41,39 @@ def _index_apps(apps: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     return by_id
 
 
+def _index_capabilities(capabilities: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    by_name: Dict[str, Dict[str, Any]] = {}
+    for capability in capabilities:
+        capability_name = capability.get("capability_domain")
+        if isinstance(capability_name, str) and capability_name:
+            by_name[capability_name] = capability
+    return by_name
+
+
+def _heuristic_capability_domain(user_text: str) -> Tuple[str, str]:
+    lower = user_text.lower()
+    if any(k in lower for k in ("wechat", "message", "send", "email", "短信", "发消息", "发送")):
+        return "message.send", "keyword(message/send/wechat)"
+    if any(k in lower for k in ("inbox", "read message", "messages", "收件箱", "读消息")):
+        return "message.read", "keyword(message/read)"
+    if any(k in lower for k in ("browser", "open website", "click", "网页", "浏览器")):
+        return "browser.automation", "keyword(browser/网页)"
+    if any(k in lower for k in ("github", "notion", "issue", "update page", "post", "api", "外部", "同步")):
+        return "external.write", "keyword(github/notion/external)"
+    if any(
+        k in lower
+        for k in ("create file", "write file", "copy", "rename", "delete", "remove", "touch", "写文件", "删除文件")
+    ):
+        return "file.write", "keyword(file/write/copy/delete)"
+    if any(k in lower for k in ("list files", "preview", "read file", "show file", "open file", "读文件", "查看文件")):
+        return "file.read", "keyword(file/read/preview)"
+    if any(k in lower for k in ("run", "execute", "stress", "command", "执行", "运行", "压力")):
+        return "exec.run", "keyword(exec/run)"
+    if any(k in lower for k in ("weather", "fetch", "http", "download", "tomorrow", "网络", "天气")):
+        return "network.fetch.readonly", "keyword(network/weather/fetch)"
+    return "info.lookup", "default(info.lookup)"
+
+
 def _heuristic_app_id(user_text: str) -> Tuple[str, str]:
     lower = user_text.lower()
     if any(
@@ -255,6 +288,87 @@ def _call_deepseek_selector(
     return tool_id, reason
 
 
+def _call_deepseek_capability_selector(
+    user_text: str,
+    capabilities: List[Dict[str, Any]],
+    api_key: str,
+    cfg: SelectorConfig,
+) -> Tuple[str, str]:
+    capability_brief: List[Dict[str, Any]] = []
+    for capability in capabilities:
+        capability_name = capability.get("capability_domain")
+        if not isinstance(capability_name, str) or not capability_name:
+            continue
+        capability_brief.append(
+            {
+                "capability_domain": capability_name,
+                "description": capability.get("description", ""),
+                "risk_level": capability.get("risk_level", 0),
+                "broker_id": capability.get("broker_id", ""),
+                "provider_ids": capability.get("provider_ids", []),
+            }
+        )
+
+    prompt = {
+        "user_input": user_text,
+        "capabilities": capability_brief,
+        "output_format": {"capability_domain": "string", "reason": "string"},
+        "rule": "Return one JSON object only. No markdown.",
+    }
+    req_obj = {
+        "model": cfg.deepseek_model,
+        "temperature": 0,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a capability router. Select exactly one capability_domain "
+                    "from the provided capabilities. Respond with strict JSON only: "
+                    "{\"capability_domain\":\"...\",\"reason\":\"...\"}."
+                ),
+            },
+            {"role": "user", "content": json.dumps(prompt, ensure_ascii=True)},
+        ],
+    }
+
+    payload = json.dumps(req_obj, ensure_ascii=True).encode("utf-8")
+    req = urllib.request.Request(
+        cfg.deepseek_url,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=cfg.deepseek_timeout_sec) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"DeepSeek HTTP {exc.code}: {detail}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"DeepSeek request failed: {exc}") from exc
+
+    data = json.loads(raw.decode("utf-8"))
+    choices = data.get("choices", [])
+    if not isinstance(choices, list) or not choices:
+        raise RuntimeError(f"invalid DeepSeek response, missing choices: {data}")
+    msg = choices[0].get("message", {})
+    content = msg.get("content", "")
+    if not isinstance(content, str) or not content:
+        raise RuntimeError(f"invalid DeepSeek response content: {data}")
+
+    obj = _extract_json_object(content)
+    capability_name = obj.get("capability_domain")
+    if not isinstance(capability_name, str) or not capability_name:
+        raise RuntimeError(f"DeepSeek returned invalid capability_domain: {obj}")
+    reason = obj.get("reason", "")
+    if not isinstance(reason, str):
+        reason = str(reason)
+    return capability_name, reason
+
+
 def _call_deepseek_app_selector(
     user_text: str,
     apps: List[Dict[str, Any]],
@@ -410,6 +524,48 @@ def select_tool_for_input(
         fallback_id = sorted(by_id.keys())[0]
         selected = by_id[fallback_id]
         reason = f"{reason}; fallback_first_available={fallback_id}"
+    return selected, "heuristic", reason
+
+
+def select_capability_for_input(
+    user_text: str,
+    capabilities: List[Dict[str, Any]],
+    cfg: SelectorConfig,
+    warn_cb: Callable[[str], None] | None = None,
+) -> Tuple[Dict[str, Any], str, str]:
+    """Select one capability domain from list by DeepSeek/heuristic."""
+    by_name = _index_capabilities(capabilities)
+    if not by_name:
+        raise RuntimeError("no valid capabilities discovered from mcpd")
+
+    api_key = os.getenv("DEEPSEEK_API_KEY", "")
+    if cfg.mode in ("auto", "deepseek"):
+        if api_key:
+            try:
+                selected_name, reason = _call_deepseek_capability_selector(
+                    user_text, capabilities, api_key, cfg
+                )
+                selected = by_name.get(selected_name)
+                if selected is None:
+                    raise RuntimeError(
+                        f"DeepSeek selected unavailable capability_domain={selected_name}; "
+                        f"available={sorted(by_name.keys())}"
+                    )
+                return selected, "deepseek", reason or "model-selected"
+            except Exception as exc:  # noqa: BLE001
+                if cfg.mode == "deepseek":
+                    raise RuntimeError(f"DeepSeek capability selection failed: {exc}") from exc
+                if warn_cb is not None:
+                    warn_cb(f"DeepSeek unavailable ({exc}), fallback to heuristic")
+        elif cfg.mode == "deepseek":
+            raise RuntimeError("DEEPSEEK_API_KEY not set, cannot use deepseek mode")
+
+    selected_name, reason = _heuristic_capability_domain(user_text)
+    selected = by_name.get(selected_name)
+    if selected is None:
+        fallback_name = sorted(by_name.keys())[0]
+        selected = by_name[fallback_name]
+        reason = f"{reason}; fallback_first_available={fallback_name}"
     return selected, "heuristic", reason
 
 
