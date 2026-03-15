@@ -1,0 +1,106 @@
+{
+  "provider_id": "notes-provider",
+  "display_name": "Notes Provider",
+  "provider_type": "notes",
+  "trust_class": "local",
+  "auth_mode": "local-process",
+  "broker_domain": "external",
+  "mode": "uds_service",
+  "endpoint": "/tmp/linux-mcp-providers/notes_provider.sock",
+  "provider_impl": "provider-app/providers/notes_provider.py",
+  "actions": [
+    {
+      "action_id": 40,
+      "name": "write_note",
+      "perm": 1,
+      "cost": 1,
+      "handler": "write_note",
+      "action_name": "append_note",
+      "capability_domain": "external.write",
+      "risk_level": 8,
+      "side_effect": true,
+      "auth_required": true,
+      "data_sensitivity": "external-account",
+      "executor_type": "broker-isolated-uds",
+      "validation_policy": "json_schema_strict_v1",
+      "parameter_schema_id": "external.write:append_note:v1",
+      "selection_priority": 78,
+      "description": "Append structured notes to a local external-style sink under tmp/provider-notes for onboarding verification.",
+      "input_schema_path": "provider-app/schemas/external_write_append_note_v1.json",
+      "intent_tags": [
+        "note",
+        "notes",
+        "journal",
+        "append",
+        "write",
+        "save",
+        "log"
+      ],
+      "arg_hints": {
+        "note": {
+          "kind": "quoted_or_tail",
+          "after": [
+            "note",
+            "content",
+            "message"
+          ],
+          "strip_prefixes": [
+            "write note",
+            "append note",
+            "save note"
+          ]
+        },
+        "path": {
+          "kind": "path",
+          "after": [
+            "path",
+            "file",
+            "to"
+          ],
+          "default": "inbox/notes.log"
+        },
+        "append": {
+          "kind": "boolean",
+          "true_tokens": [
+            "append",
+            "keep existing"
+          ],
+          "false_tokens": [
+            "overwrite",
+            "replace"
+          ],
+          "default": true
+        },
+        "tags": {
+          "kind": "list",
+          "after": [
+            "tags"
+          ],
+          "default": []
+        }
+      },
+      "examples": [
+        {
+          "intent": "notes-provider append note 'smoke external write' to smoke/external.log tags smoke,external",
+          "payload": {
+            "note": "smoke external write",
+            "path": "smoke/external.log",
+            "append": true,
+            "tags": [
+              "smoke",
+              "external"
+            ]
+          }
+        },
+        {
+          "intent": "save note 'release checklist updated' to inbox/releases.log",
+          "payload": {
+            "note": "release checklist updated",
+            "path": "inbox/releases.log",
+            "append": true
+          }
+        }
+      ]
+    }
+  ]
+}

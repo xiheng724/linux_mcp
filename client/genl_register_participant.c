@@ -22,101 +22,76 @@
 #define NLA_HDRLEN ((int)NLA_ALIGN(sizeof(struct nlattr)))
 #endif
 
-struct complete_args {
-	char agent[64];
-	uint32_t tool_id;
+#ifndef NLA_DATA
+#define NLA_DATA(nla) ((void *)((char *)(nla) + NLA_HDRLEN))
+#endif
+
+#ifndef NLA_OK
+#define NLA_OK(nla, len)                                                        \
+	((len) >= (int)sizeof(struct nlattr) &&                                 \
+	 (nla)->nla_len >= sizeof(struct nlattr) &&                             \
+	 (nla)->nla_len <= (len))
+#endif
+
+#ifndef NLA_NEXT
+#define NLA_NEXT(nla, attrlen)                                                  \
+	((attrlen) -= NLA_ALIGN((nla)->nla_len),                              \
+	 (struct nlattr *)(((char *)(nla)) + NLA_ALIGN((nla)->nla_len)))
+#endif
+
+struct participant_args {
+	char participant_id[64];
+	uint32_t participant_type;
 	uint64_t req_id;
-	uint32_t status;
-	uint32_t exec_ms;
 };
 
 static void usage(const char *prog)
 {
 	fprintf(stderr,
-		"Usage: %s --participant <id> --capability <u32> --req-id <u64> --status <u32> --exec-ms <u32>\n"
-		"Deprecated aliases: --agent --tool\n",
+		"Usage: %s --participant-id <participant_id> [--type planner|broker]\n",
 		prog);
 }
 
-static int parse_u32(const char *s, uint32_t *out)
+static int parse_participant_type(const char *value, uint32_t *out)
 {
-	unsigned long v;
-	char *end = NULL;
-
-	errno = 0;
-	v = strtoul(s, &end, 10);
-	if (errno != 0 || end == s || *end != '\0' || v > UINT32_MAX)
-		return -EINVAL;
-	*out = (uint32_t)v;
-	return 0;
+	if (strcmp(value, "planner") == 0) {
+		*out = KERNEL_MCP_PARTICIPANT_TYPE_PLANNER;
+		return 0;
+	}
+	if (strcmp(value, "broker") == 0) {
+		*out = KERNEL_MCP_PARTICIPANT_TYPE_BROKER;
+		return 0;
+	}
+	return -EINVAL;
 }
 
-static int parse_u64(const char *s, uint64_t *out)
-{
-	unsigned long long v;
-	char *end = NULL;
-
-	errno = 0;
-	v = strtoull(s, &end, 10);
-	if (errno != 0 || end == s || *end != '\0')
-		return -EINVAL;
-	*out = (uint64_t)v;
-	return 0;
-}
-
-static int parse_args(int argc, char **argv, struct complete_args *args)
+static int parse_args(int argc, char **argv, struct participant_args *args)
 {
 	int i;
-	int seen_agent = 0;
-	int seen_tool = 0;
-	int seen_req = 0;
-	int seen_status = 0;
-	int seen_exec = 0;
+	int seen_participant_id = 0;
 
 	memset(args, 0, sizeof(*args));
+	args->req_id = 1;
+	args->participant_type = KERNEL_MCP_PARTICIPANT_TYPE_PLANNER;
+
 	for (i = 1; i < argc; i++) {
-		if ((strcmp(argv[i], "--participant") == 0 ||
-		     strcmp(argv[i], "--agent") == 0) &&
-		    i + 1 < argc) {
+		if (strcmp(argv[i], "--participant-id") == 0 && i + 1 < argc) {
 			size_t n = strlen(argv[++i]);
-			if (n == 0 || n >= sizeof(args->agent))
+			if (n == 0 || n >= sizeof(args->participant_id))
 				return -EINVAL;
-			memcpy(args->agent, argv[i], n + 1);
-			seen_agent = 1;
+			memcpy(args->participant_id, argv[i], n + 1);
+			seen_participant_id = 1;
 			continue;
 		}
-		if ((strcmp(argv[i], "--capability") == 0 ||
-		     strcmp(argv[i], "--tool") == 0) &&
-		    i + 1 < argc) {
-			if (parse_u32(argv[++i], &args->tool_id))
+		if (strcmp(argv[i], "--type") == 0 && i + 1 < argc) {
+			if (parse_participant_type(argv[++i], &args->participant_type))
 				return -EINVAL;
-			seen_tool = 1;
-			continue;
-		}
-		if (strcmp(argv[i], "--req-id") == 0 && i + 1 < argc) {
-			if (parse_u64(argv[++i], &args->req_id))
-				return -EINVAL;
-			seen_req = 1;
-			continue;
-		}
-		if (strcmp(argv[i], "--status") == 0 && i + 1 < argc) {
-			if (parse_u32(argv[++i], &args->status))
-				return -EINVAL;
-			seen_status = 1;
-			continue;
-		}
-		if (strcmp(argv[i], "--exec-ms") == 0 && i + 1 < argc) {
-			if (parse_u32(argv[++i], &args->exec_ms))
-				return -EINVAL;
-			seen_exec = 1;
 			continue;
 		}
 		return -EINVAL;
 	}
 
-	if (!seen_agent || !seen_tool || !seen_req || !seen_status || !seen_exec)
-		return -EINVAL;
-	return 0;
+	return seen_participant_id ? 0 : -EINVAL;
 }
 
 static int add_attr(struct nlmsghdr *nlh, size_t maxlen, uint16_t type,
@@ -147,10 +122,8 @@ static int open_genl_socket(void)
 
 	if (fd < 0)
 		return -errno;
-
 	local.nl_family = AF_NETLINK;
 	local.nl_pid = (uint32_t)getpid();
-	local.nl_groups = 0;
 	if (bind(fd, (struct sockaddr *)&local, sizeof(local)) < 0) {
 		int err = -errno;
 		close(fd);
@@ -169,8 +142,17 @@ static int send_nlmsg(int fd, struct nlmsghdr *nlh)
 		      sizeof(kernel));
 	if (sent < 0)
 		return -errno;
-	if ((size_t)sent != nlh->nlmsg_len)
-		return -EIO;
+	return (size_t)sent == nlh->nlmsg_len ? 0 : -EIO;
+}
+
+static int recv_nlmsg(int fd, char *buf, size_t len, ssize_t *out_len)
+{
+	ssize_t n = recv(fd, buf, len, 0);
+	if (n < 0)
+		return -errno;
+	if ((size_t)n < sizeof(struct nlmsghdr))
+		return -EPROTO;
+	*out_len = n;
 	return 0;
 }
 
@@ -212,15 +194,14 @@ static int resolve_family_id(int fd, uint16_t *family_id)
 		       strlen(KERNEL_MCP_GENL_FAMILY_NAME) + 1);
 	if (ret)
 		return ret;
+
 	ret = send_nlmsg(fd, nlh);
 	if (ret)
 		return ret;
 
-	rxlen = recv(fd, rxbuf, sizeof(rxbuf), 0);
-	if (rxlen < 0)
-		return -errno;
-	if ((size_t)rxlen < sizeof(struct nlmsghdr))
-		return -EPROTO;
+	ret = recv_nlmsg(fd, rxbuf, sizeof(rxbuf), &rxlen);
+	if (ret)
+		return ret;
 
 	nlh = (struct nlmsghdr *)rxbuf;
 	ret = parse_nl_error(nlh);
@@ -234,60 +215,56 @@ static int resolve_family_id(int fd, uint16_t *family_id)
 	ghdr = (struct genlmsghdr *)NLMSG_DATA(nlh);
 	attr = (struct nlattr *)((char *)ghdr + GENL_HDRLEN);
 	attr_len = (int)(nlh->nlmsg_len - NLMSG_LENGTH(GENL_HDRLEN));
-	while (attr_len >= (int)sizeof(struct nlattr) &&
-	       attr->nla_len >= sizeof(struct nlattr) &&
-	       attr->nla_len <= attr_len) {
+	while (NLA_OK(attr, attr_len)) {
 		if (attr->nla_type == CTRL_ATTR_FAMILY_ID) {
 			if (attr->nla_len < NLA_HDRLEN + sizeof(uint16_t))
 				return -EPROTO;
-			memcpy(family_id, (char *)attr + NLA_HDRLEN,
-			       sizeof(uint16_t));
+			memcpy(family_id, NLA_DATA(attr), sizeof(uint16_t));
 			return 0;
 		}
-		attr_len -= NLA_ALIGN(attr->nla_len);
-		attr = (struct nlattr *)((char *)attr + NLA_ALIGN(attr->nla_len));
+		attr = NLA_NEXT(attr, attr_len);
 	}
 	return -ENOENT;
 }
 
-static int send_complete(int fd, uint16_t family_id, const struct complete_args *args)
+static int register_participant(int fd, uint16_t family_id,
+				const struct participant_args *args)
 {
 	char txbuf[1024] = {0};
 	char rxbuf[8192] = {0};
 	struct nlmsghdr *nlh = (struct nlmsghdr *)txbuf;
 	struct genlmsghdr *ghdr;
 	ssize_t rxlen;
+	uint32_t pid = (uint32_t)getpid();
+	uint32_t uid = (uint32_t)getuid();
 	int ret;
 
 	nlh->nlmsg_len = NLMSG_LENGTH(GENL_HDRLEN);
 	nlh->nlmsg_type = family_id;
 	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
-	nlh->nlmsg_seq = 41;
+	nlh->nlmsg_seq = 2;
 	nlh->nlmsg_pid = (uint32_t)getpid();
 
 	ghdr = (struct genlmsghdr *)NLMSG_DATA(nlh);
-	ghdr->cmd = KERNEL_MCP_CMD_TOOL_COMPLETE;
+	ghdr->cmd = KERNEL_MCP_CMD_PARTICIPANT_REGISTER;
 	ghdr->version = KERNEL_MCP_GENL_FAMILY_VERSION;
-	ghdr->reserved = 0;
 
+	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_PARTICIPANT_ID,
+		       args->participant_id, strlen(args->participant_id) + 1);
+	if (ret)
+		return ret;
+	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_PID, &pid, sizeof(pid));
+	if (ret)
+		return ret;
+	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_UID, &uid, sizeof(uid));
+	if (ret)
+		return ret;
 	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_REQ_ID, &args->req_id,
 		       sizeof(args->req_id));
 	if (ret)
 		return ret;
-	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_AGENT_ID, args->agent,
-		       strlen(args->agent) + 1);
-	if (ret)
-		return ret;
-	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_TOOL_ID, &args->tool_id,
-		       sizeof(args->tool_id));
-	if (ret)
-		return ret;
-	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_STATUS, &args->status,
-		       sizeof(args->status));
-	if (ret)
-		return ret;
-	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_EXEC_MS, &args->exec_ms,
-		       sizeof(args->exec_ms));
+	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
+		       &args->participant_type, sizeof(args->participant_type));
 	if (ret)
 		return ret;
 
@@ -295,11 +272,9 @@ static int send_complete(int fd, uint16_t family_id, const struct complete_args 
 	if (ret)
 		return ret;
 
-	rxlen = recv(fd, rxbuf, sizeof(rxbuf), 0);
-	if (rxlen < 0)
-		return -errno;
-	if ((size_t)rxlen < sizeof(struct nlmsghdr))
-		return -EPROTO;
+	ret = recv_nlmsg(fd, rxbuf, sizeof(rxbuf), &rxlen);
+	if (ret)
+		return ret;
 
 	nlh = (struct nlmsghdr *)rxbuf;
 	if (nlh->nlmsg_type != NLMSG_ERROR)
@@ -309,7 +284,7 @@ static int send_complete(int fd, uint16_t family_id, const struct complete_args 
 
 int main(int argc, char **argv)
 {
-	struct complete_args args;
+	struct participant_args args;
 	uint16_t family_id = 0;
 	int fd;
 	int ret;
@@ -332,16 +307,18 @@ int main(int argc, char **argv)
 		return 3;
 	}
 
-	ret = send_complete(fd, family_id, &args);
+	ret = register_participant(fd, family_id, &args);
 	if (ret < 0) {
-		fprintf(stderr, "capability_complete failed: %s\n", strerror(-ret));
+		fprintf(stderr, "register_participant failed: %s\n", strerror(-ret));
 		close(fd);
 		return 4;
 	}
 
-	printf("reported capability completion req_id=%llu participant=%s capability=%u status=%u exec_ms=%u\n",
-	       (unsigned long long)args.req_id, args.agent, args.tool_id,
-	       args.status, args.exec_ms);
+	printf("registered participant id=%s type=%s pid=%u\n", args.participant_id,
+	       args.participant_type == KERNEL_MCP_PARTICIPANT_TYPE_BROKER ?
+		       "broker" :
+		       "planner",
+	       (uint32_t)getpid());
 	close(fd);
 	return 0;
 }

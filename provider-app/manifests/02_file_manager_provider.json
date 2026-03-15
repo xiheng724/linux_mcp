@@ -1,0 +1,735 @@
+{
+  "display_name": "File Manager Provider",
+  "provider_id": "file-manager-provider",
+  "provider_type": "filesystem",
+  "trust_class": "local",
+  "auth_mode": "local-process",
+  "broker_domain": "file",
+  "mode": "uds_service",
+  "endpoint": "/tmp/linux-mcp-providers/file_manager_provider.sock",
+  "provider_impl": "provider-app/providers/file_manager_provider.py",
+  "actions": [
+    {
+      "action_id": 3,
+      "name": "text_stats",
+      "perm": 1,
+      "cost": 1,
+      "handler": "text_stats",
+      "action_name": "compute_text_stats",
+      "capability_domain": "info.lookup",
+      "risk_level": 1,
+      "side_effect": false,
+      "auth_required": false,
+      "data_sensitivity": "low",
+      "executor_type": "broker-uds",
+      "validation_policy": "json_schema_v1",
+      "parameter_schema_id": "info.lookup:compute_text_stats:v1",
+      "selection_priority": 50,
+      "description": "Compute text statistics (chars/words/lines) from payload text.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "intent_tags": [
+        "count",
+        "statistics",
+        "words",
+        "lines",
+        "characters",
+        "text"
+      ],
+      "arg_hints": {
+        "text": {
+          "kind": "quoted_or_tail",
+          "after": [
+            "text",
+            "message",
+            "content"
+          ],
+          "strip_prefixes": [
+            "count words in",
+            "count lines in",
+            "count characters in",
+            "compute text stats for"
+          ]
+        }
+      },
+      "examples": [
+        {
+          "intent": "count words in 'hello world'",
+          "payload": {
+            "text": "hello world"
+          }
+        },
+        {
+          "intent": "compute text statistics for 'line1\\nline2'",
+          "payload": {
+            "text": "line1\\nline2"
+          }
+        }
+      ]
+    },
+    {
+      "action_id": 6,
+      "name": "file_preview",
+      "perm": 1,
+      "cost": 1,
+      "handler": "file_preview",
+      "action_name": "preview_text_file",
+      "capability_domain": "file.read",
+      "risk_level": 3,
+      "side_effect": false,
+      "auth_required": false,
+      "data_sensitivity": "filesystem",
+      "executor_type": "broker-uds",
+      "validation_policy": "json_schema_v1",
+      "parameter_schema_id": "file.read:preview_text_file:v1",
+      "selection_priority": 60,
+      "description": "Preview text files from this repository with line limits and safe path checks.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "max_lines": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "intent_tags": [
+        "preview",
+        "read",
+        "open",
+        "show",
+        "file",
+        "lines"
+      ],
+      "arg_hints": {
+        "path": {
+          "kind": "path",
+          "after": [
+            "file",
+            "path",
+            "open",
+            "read",
+            "preview"
+          ]
+        },
+        "max_lines": {
+          "kind": "integer",
+          "units": [
+            "line",
+            "lines"
+          ],
+          "default": 30
+        },
+        "message": {
+          "kind": "tail_text",
+          "default": ""
+        }
+      },
+      "examples": [
+        {
+          "intent": "preview README.md 20 lines",
+          "payload": {
+            "path": "README.md",
+            "max_lines": 20
+          }
+        },
+        {
+          "intent": "show planner-app/cli.py",
+          "payload": {
+            "path": "planner-app/cli.py",
+            "max_lines": 30
+          }
+        }
+      ]
+    },
+    {
+      "action_id": 7,
+      "name": "hash_text",
+      "perm": 1,
+      "cost": 1,
+      "handler": "hash_text",
+      "action_name": "hash_text_payload",
+      "capability_domain": "info.lookup",
+      "risk_level": 1,
+      "side_effect": false,
+      "auth_required": false,
+      "data_sensitivity": "low",
+      "executor_type": "broker-uds",
+      "validation_policy": "json_schema_v1",
+      "parameter_schema_id": "info.lookup:hash_text_payload:v1",
+      "selection_priority": 55,
+      "description": "Generate SHA-256/SHA-1/MD5 digests for text content.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "algorithm": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "intent_tags": [
+        "hash",
+        "digest",
+        "sha256",
+        "sha1",
+        "md5",
+        "text"
+      ],
+      "arg_hints": {
+        "text": {
+          "kind": "quoted_or_tail",
+          "after": [
+            "text",
+            "message",
+            "content"
+          ],
+          "strip_prefixes": [
+            "hash",
+            "hash text",
+            "generate hash for"
+          ]
+        },
+        "message": {
+          "kind": "tail_text",
+          "default": ""
+        },
+        "algorithm": {
+          "kind": "enum",
+          "choices": [
+            "sha256",
+            "sha1",
+            "md5"
+          ],
+          "aliases_by_choice": {
+            "sha256": [
+              "sha256",
+              "sha-256"
+            ],
+            "sha1": [
+              "sha1",
+              "sha-1"
+            ],
+            "md5": [
+              "md5"
+            ]
+          },
+          "default": "sha256"
+        }
+      },
+      "examples": [
+        {
+          "intent": "hash text hello with sha256",
+          "payload": {
+            "text": "hello",
+            "algorithm": "sha256"
+          }
+        },
+        {
+          "intent": "hash 'linux-mcp' with md5",
+          "payload": {
+            "text": "linux-mcp",
+            "algorithm": "md5"
+          }
+        }
+      ]
+    },
+    {
+      "action_id": 10,
+      "name": "file_create",
+      "perm": 1,
+      "cost": 1,
+      "handler": "file_create",
+      "action_name": "create_file",
+      "capability_domain": "file.write",
+      "risk_level": 8,
+      "side_effect": true,
+      "auth_required": true,
+      "data_sensitivity": "filesystem",
+      "executor_type": "broker-isolated-uds",
+      "validation_policy": "json_schema_strict_v1",
+      "parameter_schema_id": "file.write:create_file:v1",
+      "selection_priority": 60,
+      "description": "Create or overwrite a text file under repository root with safe path checks.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "overwrite": {
+            "type": "boolean"
+          },
+          "create_parents": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "intent_tags": [
+        "create",
+        "write",
+        "save",
+        "file",
+        "content",
+        "overwrite"
+      ],
+      "arg_hints": {
+        "path": {
+          "kind": "path",
+          "after": [
+            "file",
+            "path",
+            "at"
+          ]
+        },
+        "content": {
+          "kind": "quoted_or_tail",
+          "after": [
+            "content",
+            "with content"
+          ]
+        },
+        "overwrite": {
+          "kind": "boolean",
+          "true_tokens": [
+            "overwrite",
+            "replace",
+            "force"
+          ],
+          "false_tokens": [
+            "no overwrite",
+            "without overwrite"
+          ],
+          "default": false
+        },
+        "create_parents": {
+          "kind": "boolean",
+          "true_tokens": [
+            "create parents",
+            "make parents",
+            "mkdir parents"
+          ],
+          "false_tokens": [
+            "no parents",
+            "without parents"
+          ],
+          "default": true
+        }
+      },
+      "examples": [
+        {
+          "intent": "create file tmp/demo.txt with content 'hello'",
+          "payload": {
+            "path": "tmp/demo.txt",
+            "content": "hello"
+          }
+        },
+        {
+          "intent": "create file notes/today.md with content '# Today' and overwrite it",
+          "payload": {
+            "path": "notes/today.md",
+            "content": "# Today",
+            "overwrite": true
+          }
+        }
+      ]
+    },
+    {
+      "action_id": 11,
+      "name": "file_list",
+      "perm": 1,
+      "cost": 1,
+      "handler": "file_list",
+      "action_name": "list_files",
+      "capability_domain": "file.read",
+      "risk_level": 3,
+      "side_effect": false,
+      "auth_required": false,
+      "data_sensitivity": "filesystem",
+      "executor_type": "broker-uds",
+      "validation_policy": "json_schema_v1",
+      "parameter_schema_id": "file.read:list_files:v1",
+      "selection_priority": 58,
+      "description": "List directory entries or inspect a file under repository root with safe path checks.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "max_entries": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "intent_tags": [
+        "list",
+        "directory",
+        "files",
+        "folder",
+        "entries",
+        "inspect"
+      ],
+      "arg_hints": {
+        "path": {
+          "kind": "path",
+          "after": [
+            "in",
+            "under",
+            "path",
+            "directory",
+            "folder"
+          ],
+          "default": "."
+        },
+        "max_entries": {
+          "kind": "integer",
+          "units": [
+            "entry",
+            "entries",
+            "file",
+            "files",
+            "item",
+            "items"
+          ],
+          "default": 100
+        }
+      },
+      "examples": [
+        {
+          "intent": "list files in . with 50 entries",
+          "payload": {
+            "path": ".",
+            "max_entries": 50
+          }
+        },
+        {
+          "intent": "list files in provider-app",
+          "payload": {
+            "path": "provider-app"
+          }
+        }
+      ]
+    },
+    {
+      "action_id": 12,
+      "name": "file_delete",
+      "perm": 1,
+      "cost": 1,
+      "handler": "file_delete",
+      "action_name": "delete_file",
+      "capability_domain": "file.write",
+      "risk_level": 8,
+      "side_effect": true,
+      "auth_required": true,
+      "data_sensitivity": "filesystem",
+      "executor_type": "broker-isolated-uds",
+      "validation_policy": "json_schema_strict_v1",
+      "parameter_schema_id": "file.write:delete_file:v1",
+      "selection_priority": 60,
+      "description": "Delete a file (or directory with recursive=true) under repository root with safety checks.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "recursive": {
+            "type": "boolean"
+          },
+          "allow_missing": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "intent_tags": [
+        "delete",
+        "remove",
+        "unlink",
+        "recursive",
+        "file",
+        "directory"
+      ],
+      "arg_hints": {
+        "path": {
+          "kind": "path",
+          "after": [
+            "file",
+            "path",
+            "remove",
+            "delete"
+          ]
+        },
+        "recursive": {
+          "kind": "boolean",
+          "true_tokens": [
+            "recursive",
+            "recursively"
+          ],
+          "default": false
+        },
+        "allow_missing": {
+          "kind": "boolean",
+          "true_tokens": [
+            "allow missing",
+            "ignore missing"
+          ],
+          "default": false
+        }
+      },
+      "examples": [
+        {
+          "intent": "delete file tmp/demo_created_by_mcp.txt",
+          "payload": {
+            "path": "tmp/demo_created_by_mcp.txt"
+          }
+        },
+        {
+          "intent": "delete tmp/old_logs recursively",
+          "payload": {
+            "path": "tmp/old_logs",
+            "recursive": true
+          }
+        }
+      ]
+    },
+    {
+      "action_id": 13,
+      "name": "file_copy",
+      "perm": 1,
+      "cost": 1,
+      "handler": "file_copy",
+      "action_name": "copy_file",
+      "capability_domain": "file.write",
+      "risk_level": 8,
+      "side_effect": true,
+      "auth_required": true,
+      "data_sensitivity": "filesystem",
+      "executor_type": "broker-isolated-uds",
+      "validation_policy": "json_schema_strict_v1",
+      "parameter_schema_id": "file.write:copy_file:v1",
+      "selection_priority": 60,
+      "description": "Copy a file under repository root with safe path checks.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "src_path",
+          "dst_path"
+        ],
+        "properties": {
+          "src_path": {
+            "type": "string"
+          },
+          "dst_path": {
+            "type": "string"
+          },
+          "overwrite": {
+            "type": "boolean"
+          },
+          "create_parents": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "intent_tags": [
+        "copy",
+        "duplicate",
+        "clone",
+        "file",
+        "destination"
+      ],
+      "arg_hints": {
+        "src_path": {
+          "kind": "path",
+          "position": 0,
+          "after": [
+            "from"
+          ]
+        },
+        "dst_path": {
+          "kind": "path",
+          "position": 1,
+          "after": [
+            "to",
+            "into",
+            "as"
+          ]
+        },
+        "overwrite": {
+          "kind": "boolean",
+          "true_tokens": [
+            "overwrite",
+            "replace",
+            "force"
+          ],
+          "default": false
+        },
+        "create_parents": {
+          "kind": "boolean",
+          "true_tokens": [
+            "create parents",
+            "make parents"
+          ],
+          "false_tokens": [
+            "no parents"
+          ],
+          "default": true
+        }
+      },
+      "examples": [
+        {
+          "intent": "copy file README.md to tmp/README.copy.md",
+          "payload": {
+            "src_path": "README.md",
+            "dst_path": "tmp/README.copy.md"
+          }
+        },
+        {
+          "intent": "copy tmp/a.txt to tmp/b.txt and overwrite",
+          "payload": {
+            "src_path": "tmp/a.txt",
+            "dst_path": "tmp/b.txt",
+            "overwrite": true
+          }
+        }
+      ]
+    },
+    {
+      "action_id": 14,
+      "name": "file_rename",
+      "perm": 1,
+      "cost": 1,
+      "handler": "file_rename",
+      "action_name": "rename_file",
+      "capability_domain": "file.write",
+      "risk_level": 8,
+      "side_effect": true,
+      "auth_required": true,
+      "data_sensitivity": "filesystem",
+      "executor_type": "broker-isolated-uds",
+      "validation_policy": "json_schema_strict_v1",
+      "parameter_schema_id": "file.write:rename_file:v1",
+      "selection_priority": 60,
+      "description": "Rename or move a file under repository root with safe path checks.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "src_path",
+          "dst_path"
+        ],
+        "properties": {
+          "src_path": {
+            "type": "string"
+          },
+          "dst_path": {
+            "type": "string"
+          },
+          "overwrite": {
+            "type": "boolean"
+          },
+          "create_parents": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "intent_tags": [
+        "rename",
+        "move",
+        "file",
+        "destination",
+        "path"
+      ],
+      "arg_hints": {
+        "src_path": {
+          "kind": "path",
+          "position": 0,
+          "after": [
+            "from"
+          ]
+        },
+        "dst_path": {
+          "kind": "path",
+          "position": 1,
+          "after": [
+            "to",
+            "into",
+            "as"
+          ]
+        },
+        "overwrite": {
+          "kind": "boolean",
+          "true_tokens": [
+            "overwrite",
+            "replace",
+            "force"
+          ],
+          "default": false
+        },
+        "create_parents": {
+          "kind": "boolean",
+          "true_tokens": [
+            "create parents",
+            "make parents"
+          ],
+          "false_tokens": [
+            "no parents"
+          ],
+          "default": true
+        }
+      },
+      "examples": [
+        {
+          "intent": "rename file tmp/a.txt to tmp/a_renamed.txt",
+          "payload": {
+            "src_path": "tmp/a.txt",
+            "dst_path": "tmp/a_renamed.txt"
+          }
+        },
+        {
+          "intent": "move tmp/a.txt to tmp/archive/a.txt and create parents",
+          "payload": {
+            "src_path": "tmp/a.txt",
+            "dst_path": "tmp/archive/a.txt",
+            "create_parents": true
+          }
+        }
+      ]
+    }
+  ]
+}

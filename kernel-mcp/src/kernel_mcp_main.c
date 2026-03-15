@@ -40,7 +40,6 @@
 #define KERNEL_MCP_PARTICIPANT_FLAG_INTERACTIVE_APPROVED 0x1U
 #define KERNEL_MCP_REQUEST_FLAG_INTERACTIVE_SESSION 0x1U
 #define KERNEL_MCP_REQUEST_FLAG_EXPLICIT_APPROVED 0x2U
-#define KERNEL_MCP_REQUEST_FLAG_LEGACY_PATH 0x4U
 
 enum kernel_mcp_approval_mode {
 	KERNEL_MCP_APPROVAL_MODE_AUTO = 0,
@@ -89,18 +88,18 @@ enum kernel_mcp_reason_code {
 	KERNEL_MCP_REASON_TIMEOUT,
 };
 
-/* New struct: per-tool configurable rate limit state. */
+/* Per-capability configurable rate-limit policy. */
 struct kernel_mcp_rate_limit {
 	bool enabled;
 	u32 burst;
 	u32 refill_tokens;
 	u32 refill_jiffies;
 	u32 default_cost;
-	u32 max_inflight_per_agent;
+	u32 max_inflight_per_participant;
 	u32 defer_wait_ms;
 };
 
-/* New struct: per-agent-per-tool rate limit/accounting state. */
+/* Per-participant-per-capability rate/accounting state. */
 struct kernel_mcp_participant_capability_state {
 	u32 capability_id;
 	u32 tokens;
@@ -120,7 +119,7 @@ struct kernel_mcp_capability {
 	u32 risk_level;
 	u32 approval_mode;
 	u32 audit_mode;
-	u32 max_inflight_per_agent;
+	u32 max_inflight_per_participant;
 	struct kernel_mcp_rate_limit rl;
 	u64 request_count;
 	u64 allow_count;
@@ -142,13 +141,13 @@ struct kernel_mcp_capability_snapshot {
 	u32 risk_level;
 	u32 approval_mode;
 	u32 audit_mode;
-	u32 max_inflight_per_agent;
+	u32 max_inflight_per_participant;
 	u32 rl_enabled;
 	u32 rl_burst;
 	u32 rl_refill_tokens;
 	u32 rl_refill_jiffies;
 	u32 rl_default_cost;
-	u32 rl_max_inflight_per_agent;
+	u32 rl_max_inflight_per_participant;
 	u32 rl_defer_wait_ms;
 	u64 request_count;
 	u64 allow_count;
@@ -250,7 +249,7 @@ struct kernel_mcp_capability_view {
 	u32 risk_level;
 	u32 approval_mode;
 	u32 audit_mode;
-	u32 max_inflight_per_agent;
+	u32 max_inflight_per_participant;
 	struct kernel_mcp_rate_limit rl;
 };
 
@@ -283,12 +282,12 @@ static struct genl_family kernel_mcp_genl_family;
 
 static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_PARTICIPANT_TYPE + 1] = {
 	[KERNEL_MCP_ATTR_REQ_ID] = { .type = NLA_U64 },
-	[KERNEL_MCP_ATTR_TOOL_ID] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_TOOL_NAME] = {
+	[KERNEL_MCP_ATTR_CAPABILITY_ID] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_CAPABILITY_NAME] = {
 		.type = NLA_NUL_STRING,
 		.len = KERNEL_MCP_CAPABILITY_NAME_MAX - 1,
 	},
-	[KERNEL_MCP_ATTR_AGENT_ID] = {
+	[KERNEL_MCP_ATTR_PARTICIPANT_ID] = {
 		.type = NLA_NUL_STRING,
 		.len = KERNEL_MCP_PARTICIPANT_ID_MAX - 1,
 	},
@@ -300,28 +299,28 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_PARTICIPANT_TYP
 	[KERNEL_MCP_ATTR_PAYLOAD_LEN] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_AUDIT_SEQ] = { .type = NLA_U64 },
 	[KERNEL_MCP_ATTR_TS_NS] = { .type = NLA_U64 },
-	[KERNEL_MCP_ATTR_TOOL_PERM] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_TOOL_COST] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_CAPABILITY_PERM] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_CAPABILITY_COST] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_PID] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_UID] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_DECISION] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_WAIT_MS] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_TOOL_HASH] = {
+	[KERNEL_MCP_ATTR_CAPABILITY_HASH] = {
 		.type = NLA_NUL_STRING,
 		.len = KERNEL_MCP_CAPABILITY_HASH_MAX - 1,
 	},
 	[KERNEL_MCP_ATTR_EXEC_MS] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_TOOL_REQUIRED_CAPS] = { .type = NLA_U64 },
-	[KERNEL_MCP_ATTR_TOOL_RISK_LEVEL] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_AGENT_CAPS] = { .type = NLA_U64 },
-	[KERNEL_MCP_ATTR_AGENT_TRUST_LEVEL] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_AGENT_FLAGS] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_CAPABILITY_REQUIRED_CAPS] = { .type = NLA_U64 },
+	[KERNEL_MCP_ATTR_CAPABILITY_RISK_LEVEL] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_PARTICIPANT_CAPS] = { .type = NLA_U64 },
+	[KERNEL_MCP_ATTR_PARTICIPANT_TRUST_LEVEL] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_PARTICIPANT_FLAGS] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_RL_ENABLED] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_RL_BURST] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_RL_REFILL_TOKENS] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_RL_REFILL_JIFFIES] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_RL_DEFAULT_COST] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_RL_MAX_INFLIGHT_PER_AGENT] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_RL_MAX_INFLIGHT_PER_PARTICIPANT] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_RL_DEFER_WAIT_MS] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_BROKER_ID] = {
 		.type = NLA_NUL_STRING,
@@ -336,9 +335,9 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_PARTICIPANT_TYP
 		.len = KERNEL_MCP_CONTEXT_ID_MAX - 1,
 	},
 	[KERNEL_MCP_ATTR_LEASE_ID] = { .type = NLA_U64 },
-	[KERNEL_MCP_ATTR_TOOL_APPROVAL_MODE] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_TOOL_AUDIT_MODE] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_TOOL_MAX_INFLIGHT_PER_AGENT] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_CAPABILITY_APPROVAL_MODE] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_CAPABILITY_AUDIT_MODE] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_CAPABILITY_MAX_INFLIGHT_PER_PARTICIPANT] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_LEASE_EXPIRES_MS] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_BROKER_EPOCH] = { .type = NLA_U64 },
 	[KERNEL_MCP_ATTR_PROVIDER_INSTANCE_ID] = {
@@ -358,7 +357,7 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_PARTICIPANT_TYP
 	[KERNEL_MCP_ATTR_PARTICIPANT_TYPE] = { .type = NLA_U32 },
 };
 
-/* New helper: centralized reason string mapping. */
+/* Centralized reason string mapping for canonical capability/participant paths. */
 static const char *
 kernel_mcp_reason_str(enum kernel_mcp_reason_code code)
 {
@@ -591,19 +590,21 @@ static u64 kernel_mcp_next_seq(u64 *seq)
 }
 
 static void
-kernel_mcp_copy_tool_view_locked(const struct kernel_mcp_capability *tool,
-				 struct kernel_mcp_capability_view *out)
+kernel_mcp_copy_capability_view_locked(
+	const struct kernel_mcp_capability *capability,
+	struct kernel_mcp_capability_view *out)
 {
 	memset(out, 0, sizeof(*out));
-	strscpy(out->name, tool->name, sizeof(out->name));
-	strscpy(out->hash, tool->hash, sizeof(out->hash));
-	out->cost = tool->cost;
-	out->required_caps = tool->required_caps;
-	out->risk_level = tool->risk_level;
-	out->approval_mode = tool->approval_mode;
-	out->audit_mode = tool->audit_mode;
-	out->max_inflight_per_agent = tool->max_inflight_per_agent;
-	out->rl = tool->rl;
+	strscpy(out->name, capability->name, sizeof(out->name));
+	strscpy(out->hash, capability->hash, sizeof(out->hash));
+	out->cost = capability->cost;
+	out->required_caps = capability->required_caps;
+	out->risk_level = capability->risk_level;
+	out->approval_mode = capability->approval_mode;
+	out->audit_mode = capability->audit_mode;
+	out->max_inflight_per_participant =
+		capability->max_inflight_per_participant;
+	out->rl = capability->rl;
 }
 
 static u64 kernel_mcp_expiry_time_ms(unsigned long expiry_jiffies)
@@ -628,50 +629,52 @@ kernel_mcp_audit_event(const char *event_type, const char *capability_domain,
 {
 	u64 seq = kernel_mcp_next_seq(&kernel_mcp_audit_seq);
 
-	pr_info("kernel_mcp_audit {\"seq\":%llu,\"event\":\"%s\",\"req_id\":%llu,\"capability_domain\":\"%s\",\"planner_participant_id\":\"%s\",\"broker_id\":\"%s\",\"broker_pid\":%u,\"broker_epoch\":%llu,\"provider_id\":\"%s\",\"provider_instance_id\":\"%s\",\"executor_id\":\"%s\",\"executor_instance_id\":\"%s\",\"lease_id\":%llu,\"approval_mode\":%u,\"approval_state\":\"%s\",\"decision_reason\":\"%s\",\"expiry_time_ms\":%llu,\"legacy_path_flag\":%u}\n",
-		seq, event_type, req_id,
-		capability_domain ? capability_domain : "",
-		planner_participant_id ? planner_participant_id : "",
+	pr_info("kernel_mcp_audit {\"seq\":%llu,\"event\":\"%s\",\"req_id\":%llu,\"capability_domain\":\"%s\",\"planner_participant_id\":\"%s\",\"broker_id\":\"%s\",\"broker_pid\":%u,\"broker_epoch\":%llu,\"provider_id\":\"%s\",\"provider_instance_id\":\"%s\",\"executor_id\":\"%s\",\"executor_instance_id\":\"%s\",\"lease_id\":%llu,\"approval_mode\":%u,\"approval_state\":\"%s\",\"decision_reason\":\"%s\",\"expiry_time_ms\":%llu}\n",
+			seq, event_type, req_id,
+			capability_domain ? capability_domain : "",
+			planner_participant_id ? planner_participant_id : "",
 		ctx ? ctx->broker_id : "", broker_pid, broker_epoch,
 		ctx ? ctx->provider_id : "",
 		ctx ? ctx->provider_instance_id : "",
 		ctx ? ctx->executor_id : "",
 		ctx ? ctx->executor_instance_id : "", lease_id, approval_mode,
-		kernel_mcp_approval_state_str(approval_state),
-		kernel_mcp_reason_str(reason),
-		kernel_mcp_expiry_time_ms(expiry_jiffies),
-		(ctx && (ctx->request_flags & KERNEL_MCP_REQUEST_FLAG_LEGACY_PATH)) ? 1U :
-										    0U);
+			kernel_mcp_approval_state_str(approval_state),
+			kernel_mcp_reason_str(reason),
+			kernel_mcp_expiry_time_ms(expiry_jiffies));
 }
 
-static void kernel_mcp_copy_tool_snapshot_locked(const struct kernel_mcp_capability *tool,
-						 struct kernel_mcp_capability_snapshot *out)
+static void
+kernel_mcp_copy_capability_snapshot_locked(
+	const struct kernel_mcp_capability *capability,
+	struct kernel_mcp_capability_snapshot *out)
 {
 	memset(out, 0, sizeof(*out));
-	strscpy(out->name, tool->name, sizeof(out->name));
-	strscpy(out->hash, tool->hash, sizeof(out->hash));
-	out->perm = tool->perm;
-	out->cost = tool->cost;
-	out->required_caps = tool->required_caps;
-	out->risk_level = tool->risk_level;
-	out->approval_mode = tool->approval_mode;
-	out->audit_mode = tool->audit_mode;
-	out->max_inflight_per_agent = tool->max_inflight_per_agent;
-	out->rl_enabled = tool->rl.enabled ? 1U : 0U;
-	out->rl_burst = tool->rl.burst;
-	out->rl_refill_tokens = tool->rl.refill_tokens;
-	out->rl_refill_jiffies = tool->rl.refill_jiffies;
-	out->rl_default_cost = tool->rl.default_cost;
-	out->rl_max_inflight_per_agent = tool->rl.max_inflight_per_agent;
-	out->rl_defer_wait_ms = tool->rl.defer_wait_ms;
-	out->request_count = tool->request_count;
-	out->allow_count = tool->allow_count;
-	out->deny_count = tool->deny_count;
-	out->defer_count = tool->defer_count;
-	out->completed_ok_count = tool->completed_ok_count;
-	out->completed_err_count = tool->completed_err_count;
-	out->hash_mismatch_count = tool->hash_mismatch_count;
-	out->rate_limit_hit_count = tool->rate_limit_hit_count;
+	strscpy(out->name, capability->name, sizeof(out->name));
+	strscpy(out->hash, capability->hash, sizeof(out->hash));
+	out->perm = capability->perm;
+	out->cost = capability->cost;
+	out->required_caps = capability->required_caps;
+	out->risk_level = capability->risk_level;
+	out->approval_mode = capability->approval_mode;
+	out->audit_mode = capability->audit_mode;
+	out->max_inflight_per_participant =
+		capability->max_inflight_per_participant;
+	out->rl_enabled = capability->rl.enabled ? 1U : 0U;
+	out->rl_burst = capability->rl.burst;
+	out->rl_refill_tokens = capability->rl.refill_tokens;
+	out->rl_refill_jiffies = capability->rl.refill_jiffies;
+	out->rl_default_cost = capability->rl.default_cost;
+	out->rl_max_inflight_per_participant =
+		capability->rl.max_inflight_per_participant;
+	out->rl_defer_wait_ms = capability->rl.defer_wait_ms;
+	out->request_count = capability->request_count;
+	out->allow_count = capability->allow_count;
+	out->deny_count = capability->deny_count;
+	out->defer_count = capability->defer_count;
+	out->completed_ok_count = capability->completed_ok_count;
+	out->completed_err_count = capability->completed_err_count;
+	out->hash_mismatch_count = capability->hash_mismatch_count;
+	out->rate_limit_hit_count = capability->rate_limit_hit_count;
 }
 
 static void
@@ -718,41 +721,42 @@ static u32 kernel_mcp_default_audit_mode(u32 risk_level)
 }
 
 static u32
-kernel_mcp_effective_max_inflight(const struct kernel_mcp_capability_view *tool)
+kernel_mcp_effective_max_inflight(
+	const struct kernel_mcp_capability_view *capability)
 {
-	if (tool->max_inflight_per_agent != 0)
-		return tool->max_inflight_per_agent;
-	return tool->rl.max_inflight_per_agent;
+	if (capability->max_inflight_per_participant != 0)
+		return capability->max_inflight_per_participant;
+	return capability->rl.max_inflight_per_participant;
 }
 
-static u64 kernel_mcp_issue_lease_id(u64 req_id, u32 tool_id)
+static u64 kernel_mcp_issue_lease_id(u64 req_id, u32 capability_id)
 {
 	u64 seq = kernel_mcp_next_seq(&kernel_mcp_lease_seq);
 
 	return (seq << 24) ^ ((req_id & 0xFFFFFFFFULL) << 8) ^
-		(u64)(tool_id & 0xFFU);
+		(u64)(capability_id & 0xFFU);
 }
 
 static void
-kernel_mcp_capability_account_decision(u32 tool_id,
-				 const struct kernel_mcp_decision_result *result)
+kernel_mcp_capability_account_decision(
+	u32 capability_id, const struct kernel_mcp_decision_result *result)
 {
-	struct kernel_mcp_capability *tool;
+	struct kernel_mcp_capability *capability;
 
 	mutex_lock(&kernel_mcp_capabilities_lock);
-	tool = xa_load(&kernel_mcp_capabilities, tool_id);
-	if (tool) {
-		tool->request_count++;
+	capability = xa_load(&kernel_mcp_capabilities, capability_id);
+	if (capability) {
+		capability->request_count++;
 		if (result->decision == KERNEL_MCP_DECISION_ALLOW)
-			tool->allow_count++;
+			capability->allow_count++;
 		else if (result->decision == KERNEL_MCP_DECISION_DENY)
-			tool->deny_count++;
+			capability->deny_count++;
 		else
-			tool->defer_count++;
+			capability->defer_count++;
 		if (result->reason == KERNEL_MCP_REASON_HASH_MISMATCH)
-			tool->hash_mismatch_count++;
+			capability->hash_mismatch_count++;
 		if (result->reason == KERNEL_MCP_REASON_DEFER_RATE_LIMIT)
-			tool->rate_limit_hit_count++;
+			capability->rate_limit_hit_count++;
 	}
 	mutex_unlock(&kernel_mcp_capabilities_lock);
 }
@@ -761,23 +765,23 @@ static int
 kernel_mcp_lookup_capability_snapshot(struct kobject *kobj,
 				struct kernel_mcp_capability_snapshot *out)
 {
-	unsigned long tool_id;
+	unsigned long capability_id;
 	const char *id_str;
-	struct kernel_mcp_capability *tool;
+	struct kernel_mcp_capability *capability;
 	int ret;
 
 	id_str = kobject_name(kobj);
-	ret = kstrtoul(id_str, 10, &tool_id);
+	ret = kstrtoul(id_str, 10, &capability_id);
 	if (ret)
 		return ret;
 
 	mutex_lock(&kernel_mcp_capabilities_lock);
-	tool = xa_load(&kernel_mcp_capabilities, tool_id);
-	if (!tool) {
+	capability = xa_load(&kernel_mcp_capabilities, capability_id);
+	if (!capability) {
 		mutex_unlock(&kernel_mcp_capabilities_lock);
 		return -ENOENT;
 	}
-	kernel_mcp_copy_tool_snapshot_locked(tool, out);
+	kernel_mcp_copy_capability_snapshot_locked(capability, out);
 	mutex_unlock(&kernel_mcp_capabilities_lock);
 	return 0;
 }
@@ -927,9 +931,9 @@ static ssize_t kernel_mcp_capability_audit_mode_show(struct kobject *kobj,
 }
 
 static ssize_t
-kernel_mcp_capability_max_inflight_per_agent_show(struct kobject *kobj,
-					    struct kobj_attribute *attr,
-					    char *buf)
+kernel_mcp_capability_max_inflight_per_participant_show(struct kobject *kobj,
+							struct kobj_attribute *attr,
+							char *buf)
 {
 	struct kernel_mcp_capability_snapshot snapshot;
 	int ret;
@@ -938,7 +942,8 @@ kernel_mcp_capability_max_inflight_per_agent_show(struct kobject *kobj,
 	ret = kernel_mcp_lookup_capability_snapshot(kobj, &snapshot);
 	if (ret)
 		return ret;
-	return sysfs_emit(buf, "%u\n", snapshot.max_inflight_per_agent);
+	return sysfs_emit(buf, "%u\n",
+			  snapshot.max_inflight_per_participant);
 }
 
 static ssize_t kernel_mcp_capability_request_count_show(struct kobject *kobj,
@@ -1124,9 +1129,8 @@ static ssize_t kernel_mcp_capability_rl_default_cost_show(struct kobject *kobj,
 }
 
 static ssize_t
-kernel_mcp_capability_rl_max_inflight_per_agent_show(struct kobject *kobj,
-					       struct kobj_attribute *attr,
-					       char *buf)
+kernel_mcp_capability_rl_max_inflight_per_participant_show(
+	struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	struct kernel_mcp_capability_snapshot snapshot;
 	int ret;
@@ -1135,7 +1139,8 @@ kernel_mcp_capability_rl_max_inflight_per_agent_show(struct kobject *kobj,
 	ret = kernel_mcp_lookup_capability_snapshot(kobj, &snapshot);
 	if (ret)
 		return ret;
-	return sysfs_emit(buf, "%u\n", snapshot.rl_max_inflight_per_agent);
+	return sysfs_emit(buf, "%u\n",
+			  snapshot.rl_max_inflight_per_participant);
 }
 
 static ssize_t kernel_mcp_capability_rl_defer_wait_ms_show(struct kobject *kobj,
@@ -1466,9 +1471,10 @@ static struct kobj_attribute kernel_mcp_capability_approval_mode_attr =
 	__ATTR(approval_mode, 0444, kernel_mcp_capability_approval_mode_show, NULL);
 static struct kobj_attribute kernel_mcp_capability_audit_mode_attr =
 	__ATTR(audit_mode, 0444, kernel_mcp_capability_audit_mode_show, NULL);
-static struct kobj_attribute kernel_mcp_capability_max_inflight_per_agent_attr =
+static struct kobj_attribute
+kernel_mcp_capability_max_inflight_per_participant_attr =
 	__ATTR(max_inflight_per_participant, 0444,
-	       kernel_mcp_capability_max_inflight_per_agent_show, NULL);
+	       kernel_mcp_capability_max_inflight_per_participant_show, NULL);
 static struct kobj_attribute kernel_mcp_capability_request_count_attr =
 	__ATTR(request_count, 0444, kernel_mcp_capability_request_count_show, NULL);
 static struct kobj_attribute kernel_mcp_capability_allow_count_attr =
@@ -1503,9 +1509,10 @@ static struct kobj_attribute kernel_mcp_capability_rl_default_cost_attr =
 	__ATTR(rl_default_cost, 0444,
 	       kernel_mcp_capability_rl_default_cost_show, NULL);
 static struct kobj_attribute
-kernel_mcp_capability_rl_max_inflight_per_agent_attr =
+kernel_mcp_capability_rl_max_inflight_per_participant_attr =
 	__ATTR(rl_max_inflight_per_participant, 0444,
-	       kernel_mcp_capability_rl_max_inflight_per_agent_show, NULL);
+	       kernel_mcp_capability_rl_max_inflight_per_participant_show,
+	       NULL);
 static struct kobj_attribute kernel_mcp_capability_rl_defer_wait_ms_attr =
 	__ATTR(rl_defer_wait_ms, 0444,
 	       kernel_mcp_capability_rl_defer_wait_ms_show, NULL);
@@ -1520,7 +1527,7 @@ static struct attribute *kernel_mcp_capability_attrs[] = {
 	&kernel_mcp_capability_risk_level_attr.attr,
 	&kernel_mcp_capability_approval_mode_attr.attr,
 	&kernel_mcp_capability_audit_mode_attr.attr,
-	&kernel_mcp_capability_max_inflight_per_agent_attr.attr,
+	&kernel_mcp_capability_max_inflight_per_participant_attr.attr,
 	&kernel_mcp_capability_request_count_attr.attr,
 	&kernel_mcp_capability_allow_count_attr.attr,
 	&kernel_mcp_capability_deny_count_attr.attr,
@@ -1534,7 +1541,7 @@ static struct attribute *kernel_mcp_capability_attrs[] = {
 	&kernel_mcp_capability_rl_refill_tokens_attr.attr,
 	&kernel_mcp_capability_rl_refill_jiffies_attr.attr,
 	&kernel_mcp_capability_rl_default_cost_attr.attr,
-	&kernel_mcp_capability_rl_max_inflight_per_agent_attr.attr,
+	&kernel_mcp_capability_rl_max_inflight_per_participant_attr.attr,
 	&kernel_mcp_capability_rl_defer_wait_ms_attr.attr,
 	NULL,
 };
@@ -1618,57 +1625,63 @@ static const struct attribute_group kernel_mcp_participant_attr_group = {
 	.attrs = kernel_mcp_participant_attrs,
 };
 
-static void kernel_mcp_capability_sysfs_remove(struct kernel_mcp_capability *tool)
+static void
+kernel_mcp_capability_sysfs_remove(struct kernel_mcp_capability *capability)
 {
-	if (!tool->kobj)
+	if (!capability->kobj)
 		return;
-	sysfs_remove_group(tool->kobj, &kernel_mcp_capability_attr_group);
-	kobject_put(tool->kobj);
-	tool->kobj = NULL;
+	sysfs_remove_group(capability->kobj, &kernel_mcp_capability_attr_group);
+	kobject_put(capability->kobj);
+	capability->kobj = NULL;
 }
 
-static int kernel_mcp_capability_sysfs_create(struct kernel_mcp_capability *tool)
+static int
+kernel_mcp_capability_sysfs_create(struct kernel_mcp_capability *capability)
 {
-	char tool_id_dir[16];
+	char capability_id_dir[16];
 	int ret;
 
 	if (!kernel_mcp_sysfs_capabilities)
 		return -ENODEV;
 
-	snprintf(tool_id_dir, sizeof(tool_id_dir), "%u", tool->id);
-	tool->kobj = kobject_create_and_add(tool_id_dir, kernel_mcp_sysfs_capabilities);
-	if (!tool->kobj)
+	snprintf(capability_id_dir, sizeof(capability_id_dir), "%u",
+		 capability->id);
+	capability->kobj = kobject_create_and_add(capability_id_dir,
+						  kernel_mcp_sysfs_capabilities);
+	if (!capability->kobj)
 		return -ENOMEM;
 
-	ret = sysfs_create_group(tool->kobj, &kernel_mcp_capability_attr_group);
+	ret = sysfs_create_group(capability->kobj,
+				 &kernel_mcp_capability_attr_group);
 	if (ret) {
-		kobject_put(tool->kobj);
-		tool->kobj = NULL;
+		kobject_put(capability->kobj);
+		capability->kobj = NULL;
 		return ret;
 	}
 	return 0;
 }
 
-static void kernel_mcp_capability_free(struct kernel_mcp_capability *tool)
+static void kernel_mcp_capability_free(struct kernel_mcp_capability *capability)
 {
-	if (!tool)
+	if (!capability)
 		return;
-	kernel_mcp_capability_sysfs_remove(tool);
-	kfree(tool);
+	kernel_mcp_capability_sysfs_remove(capability);
+	kfree(capability);
 }
 
 static void kernel_mcp_capabilities_destroy_all(void)
 {
-	struct kernel_mcp_capability *tool;
+	struct kernel_mcp_capability *capability;
 	unsigned long index = 0;
 
 	mutex_lock(&kernel_mcp_capabilities_lock);
 	for (;;) {
-		tool = xa_find(&kernel_mcp_capabilities, &index, ULONG_MAX, XA_PRESENT);
-		if (!tool)
+		capability = xa_find(&kernel_mcp_capabilities, &index, ULONG_MAX,
+				     XA_PRESENT);
+		if (!capability)
 			break;
 		xa_erase(&kernel_mcp_capabilities, index);
-		kernel_mcp_capability_free(tool);
+		kernel_mcp_capability_free(capability);
 		index++;
 	}
 	mutex_unlock(&kernel_mcp_capabilities_lock);
@@ -1678,10 +1691,10 @@ static int kernel_mcp_register_capability(u32 capability_id, const char *name,
 					  u32 perm, u32 cost, const char *hash,
 					  u64 required_caps, u32 risk_level,
 					  u32 approval_mode, u32 audit_mode,
-					  u32 max_inflight_per_agent,
+					  u32 max_inflight_per_participant,
 					  const struct kernel_mcp_rate_limit *rl)
 {
-	struct kernel_mcp_capability *tool;
+	struct kernel_mcp_capability *capability;
 	struct kernel_mcp_rate_limit rl_cfg = { 0 };
 	int ret;
 
@@ -1693,8 +1706,9 @@ static int kernel_mcp_register_capability(u32 capability_id, const char *name,
 	if (audit_mode == KERNEL_MCP_AUDIT_MODE_BASIC &&
 	    risk_level >= KERNEL_MCP_HIGH_RISK_LEVEL)
 		audit_mode = kernel_mcp_default_audit_mode(risk_level);
-	if (max_inflight_per_agent == 0)
-		max_inflight_per_agent = rl_cfg.max_inflight_per_agent;
+	if (max_inflight_per_participant == 0)
+		max_inflight_per_participant =
+			rl_cfg.max_inflight_per_participant;
 	if (rl_cfg.enabled) {
 		if (rl_cfg.burst == 0)
 			rl_cfg.burst = 1;
@@ -1707,54 +1721,56 @@ static int kernel_mcp_register_capability(u32 capability_id, const char *name,
 	}
 
 	mutex_lock(&kernel_mcp_capabilities_lock);
-	tool = xa_load(&kernel_mcp_capabilities, capability_id);
-	if (tool) {
-		strscpy(tool->name, name, sizeof(tool->name));
+	capability = xa_load(&kernel_mcp_capabilities, capability_id);
+	if (capability) {
+		strscpy(capability->name, name, sizeof(capability->name));
 		if (hash)
-			strscpy(tool->hash, hash, sizeof(tool->hash));
-		tool->perm = perm;
-		tool->cost = cost;
-		tool->required_caps = required_caps;
-		tool->risk_level = risk_level;
-		tool->approval_mode = approval_mode;
-		tool->audit_mode = audit_mode;
-		tool->max_inflight_per_agent = max_inflight_per_agent;
-		tool->rl = rl_cfg;
+			strscpy(capability->hash, hash, sizeof(capability->hash));
+		capability->perm = perm;
+		capability->cost = cost;
+		capability->required_caps = required_caps;
+		capability->risk_level = risk_level;
+		capability->approval_mode = approval_mode;
+		capability->audit_mode = audit_mode;
+		capability->max_inflight_per_participant =
+			max_inflight_per_participant;
+		capability->rl = rl_cfg;
 		mutex_unlock(&kernel_mcp_capabilities_lock);
 		return 0;
 	}
 
-	tool = kzalloc(sizeof(*tool), GFP_KERNEL);
-	if (!tool) {
+	capability = kzalloc(sizeof(*capability), GFP_KERNEL);
+	if (!capability) {
 		mutex_unlock(&kernel_mcp_capabilities_lock);
 		return -ENOMEM;
 	}
 
-	tool->id = capability_id;
-	tool->perm = perm;
-	tool->cost = cost;
-	tool->required_caps = required_caps;
-	tool->risk_level = risk_level;
-	tool->approval_mode = approval_mode;
-	tool->audit_mode = audit_mode;
-	tool->max_inflight_per_agent = max_inflight_per_agent;
-	strscpy(tool->name, name, sizeof(tool->name));
+	capability->id = capability_id;
+	capability->perm = perm;
+	capability->cost = cost;
+	capability->required_caps = required_caps;
+	capability->risk_level = risk_level;
+	capability->approval_mode = approval_mode;
+	capability->audit_mode = audit_mode;
+	capability->max_inflight_per_participant =
+		max_inflight_per_participant;
+	strscpy(capability->name, name, sizeof(capability->name));
 	if (hash)
-		strscpy(tool->hash, hash, sizeof(tool->hash));
-	tool->rl = rl_cfg;
+		strscpy(capability->hash, hash, sizeof(capability->hash));
+	capability->rl = rl_cfg;
 
-	ret = xa_err(xa_store(&kernel_mcp_capabilities, capability_id, tool,
+	ret = xa_err(xa_store(&kernel_mcp_capabilities, capability_id, capability,
 			      GFP_KERNEL));
 	if (ret) {
-		kfree(tool);
+		kfree(capability);
 		mutex_unlock(&kernel_mcp_capabilities_lock);
 		return ret;
 	}
 
-	ret = kernel_mcp_capability_sysfs_create(tool);
+	ret = kernel_mcp_capability_sysfs_create(capability);
 	if (ret) {
 		xa_erase(&kernel_mcp_capabilities, capability_id);
-		kfree(tool);
+		kfree(capability);
 		mutex_unlock(&kernel_mcp_capabilities_lock);
 		return ret;
 	}
@@ -1763,60 +1779,66 @@ static int kernel_mcp_register_capability(u32 capability_id, const char *name,
 	return 0;
 }
 
-static void kernel_mcp_participant_sysfs_remove(struct kernel_mcp_participant *agent)
+static void
+kernel_mcp_participant_sysfs_remove(struct kernel_mcp_participant *participant)
 {
-	if (!agent->kobj)
+	if (!participant->kobj)
 		return;
-	sysfs_remove_group(agent->kobj, &kernel_mcp_participant_attr_group);
-	kobject_put(agent->kobj);
-	agent->kobj = NULL;
+	sysfs_remove_group(participant->kobj, &kernel_mcp_participant_attr_group);
+	kobject_put(participant->kobj);
+	participant->kobj = NULL;
 }
 
-static int kernel_mcp_participant_sysfs_create(struct kernel_mcp_participant *agent)
+static int
+kernel_mcp_participant_sysfs_create(struct kernel_mcp_participant *participant)
 {
 	int ret;
 
 	if (!kernel_mcp_sysfs_participants)
 		return -ENODEV;
 
-	agent->kobj = kobject_create_and_add(agent->id, kernel_mcp_sysfs_participants);
-	if (!agent->kobj)
+	participant->kobj = kobject_create_and_add(participant->id,
+						   kernel_mcp_sysfs_participants);
+	if (!participant->kobj)
 		return -ENOMEM;
 
-	ret = sysfs_create_group(agent->kobj, &kernel_mcp_participant_attr_group);
+	ret = sysfs_create_group(participant->kobj,
+				 &kernel_mcp_participant_attr_group);
 	if (ret) {
-		kobject_put(agent->kobj);
-		agent->kobj = NULL;
+		kobject_put(participant->kobj);
+		participant->kobj = NULL;
 		return ret;
 	}
 	return 0;
 }
 
-static void kernel_mcp_participant_free(struct kernel_mcp_participant *agent)
+static void
+kernel_mcp_participant_free(struct kernel_mcp_participant *participant)
 {
 	struct kernel_mcp_participant_capability_state *state;
 	struct kernel_mcp_participant_capability_state *tmp;
 
-	if (!agent)
+	if (!participant)
 		return;
-	list_for_each_entry_safe(state, tmp, &agent->rl_states, link) {
+	list_for_each_entry_safe(state, tmp, &participant->rl_states, link) {
 		list_del(&state->link);
 		kfree(state);
 	}
-	kernel_mcp_participant_sysfs_remove(agent);
-	kfree(agent);
+	kernel_mcp_participant_sysfs_remove(participant);
+	kfree(participant);
 }
 
 static void kernel_mcp_participants_destroy_all(void)
 {
-	struct kernel_mcp_participant *agent;
+	struct kernel_mcp_participant *participant;
 	struct hlist_node *tmp;
 	int bkt;
 
 	mutex_lock(&kernel_mcp_participants_lock);
-	hash_for_each_safe(kernel_mcp_participants, bkt, tmp, agent, hnode) {
-		hash_del(&agent->hnode);
-		kernel_mcp_participant_free(agent);
+	hash_for_each_safe(kernel_mcp_participants, bkt, tmp, participant,
+			   hnode) {
+		hash_del(&participant->hnode);
+		kernel_mcp_participant_free(participant);
 	}
 	mutex_unlock(&kernel_mcp_participants_lock);
 }
@@ -1887,21 +1909,22 @@ static int kernel_mcp_register_participant(const char *participant_id,
 /* New helper: capability/trust based authorization. */
 static bool
 kernel_mcp_authorize(const struct kernel_mcp_participant *participant,
-		     const struct kernel_mcp_capability_view *tool,
+		     const struct kernel_mcp_capability_view *capability,
 		     u32 request_flags, const char *approval_token,
 		     u32 *approval_state,
 		     enum kernel_mcp_reason_code *reason)
 {
 	if (approval_state)
 		*approval_state = KERNEL_MCP_APPROVAL_STATE_PENDING;
-	if ((participant->caps & tool->required_caps) != tool->required_caps) {
+	if ((participant->caps & capability->required_caps) !=
+	    capability->required_caps) {
 		*reason = KERNEL_MCP_REASON_DENY_UNAUTHORIZED;
 		if (approval_state)
 			*approval_state = KERNEL_MCP_APPROVAL_STATE_REJECTED;
 		return false;
 	}
 
-	switch (tool->approval_mode) {
+	switch (capability->approval_mode) {
 	case KERNEL_MCP_APPROVAL_MODE_ROOT_ONLY:
 		if (!participant->uid_set || participant->uid != 0) {
 			*reason = KERNEL_MCP_REASON_DENY_APPROVAL_REQUIRED;
@@ -1953,7 +1976,7 @@ kernel_mcp_authorize(const struct kernel_mcp_participant *participant,
 		break;
 	}
 
-	if (tool->risk_level >= KERNEL_MCP_HIGH_RISK_LEVEL &&
+	if (capability->risk_level >= KERNEL_MCP_HIGH_RISK_LEVEL &&
 	    (!participant->uid_set || participant->uid != 0) &&
 	    participant->trust_level < KERNEL_MCP_HIGH_TRUST_THRESHOLD) {
 		*reason = KERNEL_MCP_REASON_DENY_APPROVAL_REQUIRED;
@@ -1967,7 +1990,7 @@ kernel_mcp_authorize(const struct kernel_mcp_participant *participant,
 
 static bool
 kernel_mcp_validate_request_context_locked(const char *planner_participant_id,
-					   const struct kernel_mcp_capability_view *tool,
+					   const struct kernel_mcp_capability_view *capability,
 					   const char *broker_id,
 					   const char *provider_id,
 					   const char *executor_id,
@@ -1991,11 +2014,6 @@ kernel_mcp_validate_request_context_locked(const char *planner_participant_id,
 		*reason = KERNEL_MCP_REASON_DENY_BROKER_IDENTITY;
 		return false;
 	}
-	if ((request_flags & KERNEL_MCP_REQUEST_FLAG_LEGACY_PATH) != 0 &&
-	    tool->risk_level >= KERNEL_MCP_HIGH_RISK_LEVEL)
-		pr_warn("kernel_mcp legacy-path request for high-risk capability=%s\n",
-			tool->name);
-
 	broker_key = kernel_mcp_participant_hash_key(broker_id);
 	broker_participant = kernel_mcp_find_participant_locked(broker_id,
 							      broker_key);
@@ -2009,7 +2027,7 @@ kernel_mcp_validate_request_context_locked(const char *planner_participant_id,
 		return false;
 	}
 
-	if (!kernel_mcp_authorize(broker_participant, tool, request_flags,
+	if (!kernel_mcp_authorize(broker_participant, capability, request_flags,
 				  NULL, NULL, reason)) {
 		*reason = KERNEL_MCP_REASON_DENY_BROKER_IDENTITY;
 		return false;
@@ -2051,11 +2069,11 @@ kernel_mcp_rate_limit_refill_locked(struct kernel_mcp_participant_capability_sta
 }
 
 static u32
-kernel_mcp_rate_limit_cost(const struct kernel_mcp_capability_view *tool)
+kernel_mcp_rate_limit_cost(const struct kernel_mcp_capability_view *capability)
 {
-	if (tool->rl.default_cost != 0)
-		return tool->rl.default_cost;
-	return max(tool->cost, 1U);
+	if (capability->rl.default_cost != 0)
+		return capability->rl.default_cost;
+	return max(capability->cost, 1U);
 }
 
 static int
@@ -2236,7 +2254,7 @@ kernel_mcp_decide_request(const char *planner_participant_id, u32 capability_id,
 		mutex_unlock(&kernel_mcp_capabilities_lock);
 		return 0;
 	}
-	kernel_mcp_copy_tool_view_locked(capability, &capability_view);
+	kernel_mcp_copy_capability_view_locked(capability, &capability_view);
 	mutex_unlock(&kernel_mcp_capabilities_lock);
 	kernel_mcp_copy_request_context(&audit_ctx, broker_id, provider_id,
 					executor_id, provider_instance_id,
@@ -2248,15 +2266,6 @@ kernel_mcp_decide_request(const char *planner_participant_id, u32 capability_id,
 			       capability_view.approval_mode,
 			       KERNEL_MCP_APPROVAL_STATE_PENDING,
 			       KERNEL_MCP_REASON_ALLOW, 0);
-	if ((request_flags & KERNEL_MCP_REQUEST_FLAG_LEGACY_PATH) != 0)
-		kernel_mcp_audit_event("compatibility_path_usage",
-				       capability_view.name,
-				       planner_participant_id, &audit_ctx,
-				       req_id, 0, 0, 0,
-				       capability_view.approval_mode,
-				       KERNEL_MCP_APPROVAL_STATE_PENDING,
-				       KERNEL_MCP_REASON_ALLOW, 0);
-
 	result->reason = KERNEL_MCP_REASON_DENY_UNKNOWN_PARTICIPANT;
 	result->approval_state = KERNEL_MCP_APPROVAL_STATE_REJECTED;
 	participant_key =
@@ -2482,12 +2491,11 @@ nla_fail:
 	return -EMSGSIZE;
 }
 
-static int kernel_mcp_reply_tool_decision(struct genl_info *info,
-					  const char *agent_id, u32 tool_id,
-					  u64 req_id, u32 decision,
-					  u32 wait_ms, u32 tokens_left,
-					  const struct kernel_mcp_decision_result *result,
-					  const char *reason)
+static int
+kernel_mcp_reply_capability_decision(
+	struct genl_info *info, const char *participant_id, u32 capability_id,
+	u64 req_id, u32 decision, u32 wait_ms, u32 tokens_left,
+	const struct kernel_mcp_decision_result *result, const char *reason)
 {
 	struct sk_buff *reply_skb;
 	void *reply_hdr;
@@ -2498,16 +2506,18 @@ static int kernel_mcp_reply_tool_decision(struct genl_info *info,
 		return -ENOMEM;
 
 	reply_hdr = genlmsg_put_reply(reply_skb, info, &kernel_mcp_genl_family, 0,
-				      KERNEL_MCP_CMD_TOOL_DECISION);
+				      KERNEL_MCP_CMD_CAPABILITY_DECISION);
 	if (!reply_hdr) {
 		nlmsg_free(reply_skb);
 		return -EMSGSIZE;
 	}
 
-	ret = nla_put_string(reply_skb, KERNEL_MCP_ATTR_AGENT_ID, agent_id);
+	ret = nla_put_string(reply_skb, KERNEL_MCP_ATTR_PARTICIPANT_ID,
+			     participant_id);
 	if (ret)
 		goto nla_fail;
-	ret = nla_put_u32(reply_skb, KERNEL_MCP_ATTR_TOOL_ID, tool_id);
+	ret = nla_put_u32(reply_skb, KERNEL_MCP_ATTR_CAPABILITY_ID,
+			  capability_id);
 	if (ret)
 		goto nla_fail;
 	ret = nla_put_u64_64bit(reply_skb, KERNEL_MCP_ATTR_REQ_ID, req_id,
@@ -2583,48 +2593,49 @@ static int kernel_mcp_cmd_ping(struct sk_buff *skb, struct genl_info *info)
 static int kernel_mcp_cmd_capability_register(struct sk_buff *skb,
 					      struct genl_info *info)
 {
-	u32 tool_id;
+	u32 capability_id;
 	u32 perm;
 	u32 cost;
 	u32 risk_level = 0;
 	u32 approval_mode = 0;
 	u32 audit_mode = 0;
-	u32 max_inflight_per_agent = 0;
+	u32 max_inflight_per_participant = 0;
 	struct kernel_mcp_rate_limit rl = { 0 };
 	u64 required_caps = 0;
-	const char *tool_name;
-	const char *tool_hash = NULL;
+	const char *capability_name;
+	const char *capability_hash = NULL;
 
 	(void)skb;
 	if (!info)
 		return -EINVAL;
-	if (!info->attrs[KERNEL_MCP_ATTR_TOOL_ID] ||
-	    !info->attrs[KERNEL_MCP_ATTR_TOOL_NAME] ||
-	    !info->attrs[KERNEL_MCP_ATTR_TOOL_PERM] ||
-	    !info->attrs[KERNEL_MCP_ATTR_TOOL_COST])
+	if (!info->attrs[KERNEL_MCP_ATTR_CAPABILITY_ID] ||
+	    !info->attrs[KERNEL_MCP_ATTR_CAPABILITY_NAME] ||
+	    !info->attrs[KERNEL_MCP_ATTR_CAPABILITY_PERM] ||
+	    !info->attrs[KERNEL_MCP_ATTR_CAPABILITY_COST])
 		return -EINVAL;
 
-	tool_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_ID]);
-	tool_name = nla_data(info->attrs[KERNEL_MCP_ATTR_TOOL_NAME]);
-	perm = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_PERM]);
-	cost = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_COST]);
-	if (info->attrs[KERNEL_MCP_ATTR_TOOL_HASH])
-		tool_hash = nla_data(info->attrs[KERNEL_MCP_ATTR_TOOL_HASH]);
-	if (info->attrs[KERNEL_MCP_ATTR_TOOL_REQUIRED_CAPS])
+	capability_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_ID]);
+	capability_name = nla_data(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_NAME]);
+	perm = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_PERM]);
+	cost = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_COST]);
+	if (info->attrs[KERNEL_MCP_ATTR_CAPABILITY_HASH])
+		capability_hash =
+			nla_data(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_HASH]);
+	if (info->attrs[KERNEL_MCP_ATTR_CAPABILITY_REQUIRED_CAPS])
 		required_caps =
-			nla_get_u64(info->attrs[KERNEL_MCP_ATTR_TOOL_REQUIRED_CAPS]);
-	if (info->attrs[KERNEL_MCP_ATTR_TOOL_RISK_LEVEL])
+			nla_get_u64(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_REQUIRED_CAPS]);
+	if (info->attrs[KERNEL_MCP_ATTR_CAPABILITY_RISK_LEVEL])
 		risk_level =
-			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_RISK_LEVEL]);
-	if (info->attrs[KERNEL_MCP_ATTR_TOOL_APPROVAL_MODE])
+			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_RISK_LEVEL]);
+	if (info->attrs[KERNEL_MCP_ATTR_CAPABILITY_APPROVAL_MODE])
 		approval_mode =
-			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_APPROVAL_MODE]);
-	if (info->attrs[KERNEL_MCP_ATTR_TOOL_AUDIT_MODE])
+			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_APPROVAL_MODE]);
+	if (info->attrs[KERNEL_MCP_ATTR_CAPABILITY_AUDIT_MODE])
 		audit_mode =
-			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_AUDIT_MODE]);
-	if (info->attrs[KERNEL_MCP_ATTR_TOOL_MAX_INFLIGHT_PER_AGENT])
-		max_inflight_per_agent = nla_get_u32(
-			info->attrs[KERNEL_MCP_ATTR_TOOL_MAX_INFLIGHT_PER_AGENT]);
+			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_AUDIT_MODE]);
+	if (info->attrs[KERNEL_MCP_ATTR_CAPABILITY_MAX_INFLIGHT_PER_PARTICIPANT])
+		max_inflight_per_participant = nla_get_u32(
+			info->attrs[KERNEL_MCP_ATTR_CAPABILITY_MAX_INFLIGHT_PER_PARTICIPANT]);
 	if (info->attrs[KERNEL_MCP_ATTR_RL_ENABLED])
 		rl.enabled =
 			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_RL_ENABLED]) != 0;
@@ -2639,18 +2650,18 @@ static int kernel_mcp_cmd_capability_register(struct sk_buff *skb,
 	if (info->attrs[KERNEL_MCP_ATTR_RL_DEFAULT_COST])
 		rl.default_cost =
 			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_RL_DEFAULT_COST]);
-	if (info->attrs[KERNEL_MCP_ATTR_RL_MAX_INFLIGHT_PER_AGENT])
-		rl.max_inflight_per_agent =
-			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_RL_MAX_INFLIGHT_PER_AGENT]);
+	if (info->attrs[KERNEL_MCP_ATTR_RL_MAX_INFLIGHT_PER_PARTICIPANT])
+		rl.max_inflight_per_participant = nla_get_u32(
+			info->attrs[KERNEL_MCP_ATTR_RL_MAX_INFLIGHT_PER_PARTICIPANT]);
 	if (info->attrs[KERNEL_MCP_ATTR_RL_DEFER_WAIT_MS])
 		rl.defer_wait_ms =
 			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_RL_DEFER_WAIT_MS]);
 
-	return kernel_mcp_register_capability(tool_id, tool_name, perm, cost,
-					      tool_hash, required_caps,
+	return kernel_mcp_register_capability(capability_id, capability_name, perm,
+					      cost, capability_hash, required_caps,
 					      risk_level, approval_mode,
 					      audit_mode,
-					      max_inflight_per_agent, &rl);
+					      max_inflight_per_participant, &rl);
 }
 
 static int kernel_mcp_cmd_participant_register(struct sk_buff *skb,
@@ -2668,23 +2679,23 @@ static int kernel_mcp_cmd_participant_register(struct sk_buff *skb,
 	(void)skb;
 	if (!info)
 		return -EINVAL;
-	if (!info->attrs[KERNEL_MCP_ATTR_AGENT_ID] ||
+	if (!info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_ID] ||
 	    !info->attrs[KERNEL_MCP_ATTR_PID])
 		return -EINVAL;
 
-	participant_id = nla_data(info->attrs[KERNEL_MCP_ATTR_AGENT_ID]);
+	participant_id = nla_data(info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_ID]);
 	pid = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_PID]);
 	if (info->attrs[KERNEL_MCP_ATTR_UID]) {
 		uid = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_UID]);
 		uid_set = true;
 	}
-	if (info->attrs[KERNEL_MCP_ATTR_AGENT_CAPS])
-		caps = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_CAPS]);
-	if (info->attrs[KERNEL_MCP_ATTR_AGENT_TRUST_LEVEL])
+	if (info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_CAPS])
+		caps = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_CAPS]);
+	if (info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_TRUST_LEVEL])
 		trust_level =
-			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_AGENT_TRUST_LEVEL]);
-	if (info->attrs[KERNEL_MCP_ATTR_AGENT_FLAGS])
-		flags = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_AGENT_FLAGS]);
+			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_TRUST_LEVEL]);
+	if (info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_FLAGS])
+		flags = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_FLAGS]);
 	if (info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_TYPE])
 		participant_type =
 			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_TYPE]);
@@ -2698,15 +2709,15 @@ static int kernel_mcp_cmd_capability_request(struct sk_buff *skb,
 					     struct genl_info *info)
 {
 	struct kernel_mcp_decision_result result;
-	const char *agent_id;
+	const char *participant_id;
 	const char *broker_id = NULL;
 	const char *provider_id = NULL;
 	const char *provider_instance_id = NULL;
 	const char *executor_id = NULL;
 	const char *executor_instance_id = NULL;
-	const char *requested_tool_hash = NULL;
+	const char *requested_capability_hash = NULL;
 	const char *approval_token = NULL;
-	u32 tool_id;
+	u32 capability_id;
 	u32 request_flags = 0;
 	u64 req_id;
 	int ret;
@@ -2714,17 +2725,17 @@ static int kernel_mcp_cmd_capability_request(struct sk_buff *skb,
 	(void)skb;
 	if (!info)
 		return -EINVAL;
-	if (!info->attrs[KERNEL_MCP_ATTR_AGENT_ID] ||
-	    !info->attrs[KERNEL_MCP_ATTR_TOOL_ID] ||
+	if (!info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_ID] ||
+	    !info->attrs[KERNEL_MCP_ATTR_CAPABILITY_ID] ||
 	    !info->attrs[KERNEL_MCP_ATTR_REQ_ID])
 		return -EINVAL;
 
-	agent_id = nla_data(info->attrs[KERNEL_MCP_ATTR_AGENT_ID]);
-	tool_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_ID]);
+	participant_id = nla_data(info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_ID]);
+	capability_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_ID]);
 	req_id = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_REQ_ID]);
-	if (info->attrs[KERNEL_MCP_ATTR_TOOL_HASH])
-		requested_tool_hash =
-			nla_data(info->attrs[KERNEL_MCP_ATTR_TOOL_HASH]);
+	if (info->attrs[KERNEL_MCP_ATTR_CAPABILITY_HASH])
+		requested_capability_hash =
+			nla_data(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_HASH]);
 	if (info->attrs[KERNEL_MCP_ATTR_BROKER_ID])
 		broker_id = nla_data(info->attrs[KERNEL_MCP_ATTR_BROKER_ID]);
 	if (info->attrs[KERNEL_MCP_ATTR_PROVIDER_ID])
@@ -2742,20 +2753,18 @@ static int kernel_mcp_cmd_capability_request(struct sk_buff *skb,
 	if (info->attrs[KERNEL_MCP_ATTR_APPROVAL_TOKEN])
 		approval_token = nla_data(info->attrs[KERNEL_MCP_ATTR_APPROVAL_TOKEN]);
 	kernel_mcp_requests_gc();
-	ret = kernel_mcp_decide_request(agent_id, tool_id, req_id,
-						requested_tool_hash, broker_id,
-						provider_id, provider_instance_id,
-						executor_id, executor_instance_id,
-						request_flags, approval_token,
-						&result);
+	ret = kernel_mcp_decide_request(participant_id, capability_id, req_id,
+					requested_capability_hash, broker_id,
+					provider_id, provider_instance_id,
+					executor_id, executor_instance_id,
+					request_flags, approval_token, &result);
 	if (ret)
 		return ret;
 
-	return kernel_mcp_reply_tool_decision(info, agent_id, tool_id, req_id,
-					      result.decision, result.wait_ms,
-					      result.tokens_left,
-					      &result,
-					      kernel_mcp_reason_str(result.reason));
+	return kernel_mcp_reply_capability_decision(
+		info, participant_id, capability_id, req_id, result.decision,
+		result.wait_ms, result.tokens_left, &result,
+		kernel_mcp_reason_str(result.reason));
 }
 
 static int kernel_mcp_cmd_capability_complete(struct sk_buff *skb,
@@ -2785,16 +2794,16 @@ static int kernel_mcp_cmd_capability_complete(struct sk_buff *skb,
 	if (!info)
 		return -EINVAL;
 	if (!info->attrs[KERNEL_MCP_ATTR_REQ_ID] ||
-	    !info->attrs[KERNEL_MCP_ATTR_AGENT_ID] ||
-	    !info->attrs[KERNEL_MCP_ATTR_TOOL_ID] ||
+	    !info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_ID] ||
+	    !info->attrs[KERNEL_MCP_ATTR_CAPABILITY_ID] ||
 	    !info->attrs[KERNEL_MCP_ATTR_STATUS] ||
 	    !info->attrs[KERNEL_MCP_ATTR_EXEC_MS] ||
 	    !info->attrs[KERNEL_MCP_ATTR_BROKER_ID])
 		return -EINVAL;
 
 	req_id = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_REQ_ID]);
-	planner_participant_id = nla_data(info->attrs[KERNEL_MCP_ATTR_AGENT_ID]);
-	capability_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_ID]);
+	planner_participant_id = nla_data(info->attrs[KERNEL_MCP_ATTR_PARTICIPANT_ID]);
+	capability_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_ID]);
 	status = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_STATUS]);
 	exec_ms = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_EXEC_MS]);
 	broker_id = nla_data(info->attrs[KERNEL_MCP_ATTR_BROKER_ID]);
@@ -2965,15 +2974,16 @@ out_unlock:
 static int kernel_mcp_cmd_list_capabilities_dump(struct sk_buff *skb,
 						 struct netlink_callback *cb)
 {
-	struct kernel_mcp_capability *tool;
+	struct kernel_mcp_capability *capability;
 	unsigned long index = cb->args[0];
 	void *msg_hdr;
 	int ret = 0;
 
 	mutex_lock(&kernel_mcp_capabilities_lock);
 	for (;;) {
-		tool = xa_find(&kernel_mcp_capabilities, &index, ULONG_MAX, XA_PRESENT);
-		if (!tool)
+		capability = xa_find(&kernel_mcp_capabilities, &index, ULONG_MAX,
+				     XA_PRESENT);
+		if (!capability)
 			break;
 
 		msg_hdr = genlmsg_put(skb, NETLINK_CB(cb->skb).portid,
@@ -2984,25 +2994,29 @@ static int kernel_mcp_cmd_list_capabilities_dump(struct sk_buff *skb,
 			break;
 		}
 
-		ret = nla_put_u32(skb, KERNEL_MCP_ATTR_TOOL_ID, tool->id);
+		ret = nla_put_u32(skb, KERNEL_MCP_ATTR_CAPABILITY_ID,
+				  capability->id);
 		if (ret)
 			goto dump_nla_fail;
-		ret = nla_put_string(skb, KERNEL_MCP_ATTR_TOOL_NAME, tool->name);
+		ret = nla_put_string(skb, KERNEL_MCP_ATTR_CAPABILITY_NAME,
+				     capability->name);
 		if (ret)
 			goto dump_nla_fail;
-		ret = nla_put_u32(skb, KERNEL_MCP_ATTR_TOOL_PERM, tool->perm);
+		ret = nla_put_u32(skb, KERNEL_MCP_ATTR_CAPABILITY_PERM,
+				  capability->perm);
 		if (ret)
 			goto dump_nla_fail;
-		ret = nla_put_u32(skb, KERNEL_MCP_ATTR_TOOL_COST, tool->cost);
+		ret = nla_put_u32(skb, KERNEL_MCP_ATTR_CAPABILITY_COST,
+				  capability->cost);
 		if (ret)
 			goto dump_nla_fail;
 		ret = nla_put_u32(skb, KERNEL_MCP_ATTR_STATUS,
 				  KERNEL_MCP_CAPABILITY_STATUS_ACTIVE);
 		if (ret)
 			goto dump_nla_fail;
-		if (tool->hash[0] != '\0') {
-			ret = nla_put_string(skb, KERNEL_MCP_ATTR_TOOL_HASH,
-					     tool->hash);
+		if (capability->hash[0] != '\0') {
+			ret = nla_put_string(skb, KERNEL_MCP_ATTR_CAPABILITY_HASH,
+					     capability->hash);
 			if (ret)
 				goto dump_nla_fail;
 		}
@@ -3035,35 +3049,35 @@ static const struct genl_ops kernel_mcp_genl_ops[] = {
 		.doit = kernel_mcp_cmd_ping,
 	},
 	{
-		.cmd = KERNEL_MCP_CMD_TOOL_REGISTER,
+		.cmd = KERNEL_MCP_CMD_CAPABILITY_REGISTER,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
 		.doit = kernel_mcp_cmd_capability_register,
 	},
 	{
-		.cmd = KERNEL_MCP_CMD_LIST_TOOLS,
+		.cmd = KERNEL_MCP_CMD_LIST_CAPABILITIES,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
 		.dumpit = kernel_mcp_cmd_list_capabilities_dump,
 	},
 	{
-		.cmd = KERNEL_MCP_CMD_AGENT_REGISTER,
+		.cmd = KERNEL_MCP_CMD_PARTICIPANT_REGISTER,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
 		.doit = kernel_mcp_cmd_participant_register,
 	},
 	{
-		.cmd = KERNEL_MCP_CMD_TOOL_REQUEST,
+		.cmd = KERNEL_MCP_CMD_CAPABILITY_REQUEST,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
 		.doit = kernel_mcp_cmd_capability_request,
 	},
 	{
-		.cmd = KERNEL_MCP_CMD_TOOL_COMPLETE,
+		.cmd = KERNEL_MCP_CMD_CAPABILITY_COMPLETE,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
@@ -3094,11 +3108,11 @@ static int kernel_mcp_sysfs_init(void)
 	kernel_mcp_sysfs_participants = kobject_create_and_add("participants",
 							 kernel_mcp_sysfs_root);
 	if (!kernel_mcp_sysfs_participants)
-		goto fail_tools;
+		goto fail_capabilities;
 
 	return 0;
 
-fail_tools:
+fail_capabilities:
 	kobject_put(kernel_mcp_sysfs_capabilities);
 	kernel_mcp_sysfs_capabilities = NULL;
 fail_root:

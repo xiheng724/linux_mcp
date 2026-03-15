@@ -39,7 +39,13 @@ except Exception:
     print("Install guide: sudo apt-get install python3-pyside6  (or)  pip install PySide6", flush=True)
     raise SystemExit(2)
 
-from app_logic import DEFAULT_DEEPSEEK_MODEL, DEFAULT_DEEPSEEK_URL, SelectorConfig, select_capability_for_input
+from app_logic import (
+    DEFAULT_DEEPSEEK_MODEL,
+    DEFAULT_DEEPSEEK_URL,
+    CapabilityIntent,
+    SelectorConfig,
+    plan_capability_intent,
+)
 from rpc import mcpd_call
 
 DEFAULT_SOCK_PATH = "/tmp/mcpd.sock"
@@ -162,29 +168,43 @@ class ExecWorker(QObject):
 
             if self.req.manual_capability is not None:
                 capability = self.req.manual_capability
-                selector_source = "manual"
-                selector_reason = "manually selected in GUI"
+                intent = CapabilityIntent(
+                    capability_domain=str(capability.get("capability_domain", "")),
+                    capability_id=int(capability.get("capability_id", 0)),
+                    capability_hash=str(capability.get("hash", "") or ""),
+                    intent_text=self.req.user_text,
+                    preferred_provider_id=self.req.preferred_provider_id,
+                    hints={},
+                    selector_source="manual",
+                    selector_reason="manually selected in GUI",
+                )
             else:
-                capability, selector_source, selector_reason = select_capability_for_input(
+                intent = plan_capability_intent(
                     self.req.user_text,
                     catalog.capabilities,
                     self.req.selector_cfg,
                     warn_cb=lambda msg: warnings.append(msg),
                 )
-
-            capability_domain = str(capability.get("capability_domain", ""))
-            capability_id = int(capability.get("capability_id", 0))
-            capability_hash = str(capability.get("hash", "") or "")
+                capability = next(
+                    (
+                        item
+                        for item in catalog.capabilities
+                        if item.get("capability_domain") == intent.capability_domain
+                    ),
+                    None,
+                )
+                if capability is None:
+                    raise RuntimeError(
+                        f"selected capability missing from catalog: {intent.capability_domain}"
+                    )
 
             req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
             payload: Dict[str, Any] = {
                 "kind": "capability:exec",
                 "req_id": req_id,
                 "participant_id": self.req.participant_id,
-                "capability_domain": capability_domain,
-                "capability_id": capability_id,
-                "capability_hash": capability_hash,
-                "user_text": self.req.user_text,
+                "capability_domain": intent.capability_domain,
+                "intent_text": intent.intent_text,
             }
             if self.req.interactive:
                 payload["interactive"] = True
@@ -192,8 +212,13 @@ class ExecWorker(QObject):
                 payload["explicit_approval"] = True
             if self.req.approval_token:
                 payload["approval_token"] = self.req.approval_token
-            if self.req.preferred_provider_id:
-                payload["preferred_provider_id"] = self.req.preferred_provider_id
+            hints = dict(intent.hints)
+            hints["selector_source"] = intent.selector_source
+            hints["selector_reason"] = intent.selector_reason
+            if intent.preferred_provider_id:
+                hints.setdefault("preferred_provider_id", intent.preferred_provider_id)
+            if hints:
+                payload["hints"] = hints
 
             resp = mcpd_call(payload, sock_path=self.req.sock_path, timeout_s=30)
             self.finished.emit(
@@ -201,8 +226,8 @@ class ExecWorker(QObject):
                     "status": "ok",
                     "req_id": req_id,
                     "response": resp,
-                    "selector_source": selector_source,
-                    "selector_reason": selector_reason,
+                    "selector_source": intent.selector_source,
+                    "selector_reason": intent.selector_reason,
                     "selected_capability": capability,
                     "warnings": warnings,
                     "catalog": catalog,
@@ -255,7 +280,7 @@ class MainWindow(QMainWindow):
         self.agent_input = QLineEdit(self.participant_id, self)
         self.sock_input = QLineEdit(self.sock_path, self)
         self.selector_combo = QComboBox(self)
-        self.selector_combo.addItems(["auto", "heuristic", "deepseek"])
+        self.selector_combo.addItems(["auto", "catalog", "deepseek"])
         idx = self.selector_combo.findText(self.selector_cfg.mode)
         if idx >= 0:
             self.selector_combo.setCurrentIndex(idx)
@@ -626,10 +651,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sock", default=DEFAULT_SOCK_PATH)
     parser.add_argument("--participant-id", default="planner-main")
-    parser.add_argument("--agent-id", dest="participant_id_legacy", help=argparse.SUPPRESS)
     parser.add_argument(
         "--selector",
-        choices=["auto", "heuristic", "deepseek"],
+        choices=["auto", "catalog", "deepseek"],
         default="auto",
     )
     parser.add_argument("--deepseek-model", default=DEFAULT_DEEPSEEK_MODEL)
@@ -644,7 +668,7 @@ def main() -> int:
         has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
         if not has_display:
             print("No GUI display detected: DISPLAY/WAYLAND_DISPLAY are both unset.", flush=True)
-            print("Use CLI instead: python3 llm-app/cli.py --repl", flush=True)
+            print("Use CLI instead: python3 planner-app/cli.py --repl", flush=True)
             return 2
 
     app = QApplication(sys.argv)
@@ -654,8 +678,7 @@ def main() -> int:
         deepseek_model=args.deepseek_model,
         deepseek_timeout_sec=args.deepseek_timeout_sec,
     )
-    participant_id = args.participant_id_legacy or args.participant_id
-    win = MainWindow(sock_path=args.sock, participant_id=participant_id, selector_cfg=selector_cfg)
+    win = MainWindow(sock_path=args.sock, participant_id=args.participant_id, selector_cfg=selector_cfg)
     win.show()
     return app.exec()
 

@@ -1,18 +1,16 @@
 {
-  "app_id": "utility_app",
-  "app_name": "Utility App",
+  "display_name": "Utility Provider",
   "provider_id": "utility-provider",
   "provider_type": "utility",
   "trust_class": "local",
   "auth_mode": "local-process",
   "broker_domain": "info",
   "mode": "uds_service",
-  "endpoint": "/tmp/linux-mcp-apps/utility_app.sock",
-  "service_path": "tool-app/app_service.py",
-  "app_impl": "tool-app/apps/utility_app.py",
-  "tools": [
+  "endpoint": "/tmp/linux-mcp-providers/utility_provider.sock",
+  "provider_impl": "provider-app/providers/utility_provider.py",
+  "actions": [
     {
-      "tool_id": 1,
+      "action_id": 1,
       "name": "echo",
       "perm": 1,
       "cost": 1,
@@ -20,8 +18,13 @@
       "action_name": "echo_payload",
       "capability_domain": "info.lookup",
       "risk_level": 1,
+      "side_effect": false,
+      "auth_required": false,
+      "data_sensitivity": "low",
       "executor_type": "broker-uds",
       "validation_policy": "json_schema_v1",
+      "parameter_schema_id": "info.lookup:echo_payload:v1",
+      "selection_priority": 20,
       "description": "Echo tool that returns payload as-is for debugging and simple round-trip checks.",
       "input_schema": {
         "type": "object",
@@ -32,15 +35,36 @@
         },
         "additionalProperties": true
       },
+      "intent_tags": [
+        "echo",
+        "repeat",
+        "debug",
+        "roundtrip",
+        "message"
+      ],
+      "arg_hints": {
+        "message": {
+          "kind": "quoted_or_tail",
+          "after": [
+            "echo",
+            "message"
+          ],
+          "strip_prefixes": [
+            "echo"
+          ]
+        }
+      },
       "examples": [
         {
+          "intent": "echo hello",
           "payload": {
             "message": "hello"
           }
         },
         {
+          "intent": "echo 'legacy'",
           "payload": {
-            "echo": "legacy"
+            "message": "legacy"
           }
         }
       ]

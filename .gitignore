@@ -7,22 +7,10 @@ __pycache__/
 .DS_Store
 
 # Client build outputs
-client/bin/*
-!client/bin/.gitkeep
+client/bin/
 
 # Kernel module build outputs
-kernel-mcp/*.o
-kernel-mcp/*.ko
-kernel-mcp/*.mod
-kernel-mcp/*.mod.c
-kernel-mcp/*.mod.o
-kernel-mcp/Module.symvers
-kernel-mcp/modules.order
-kernel-mcp/*.cmd
-kernel-mcp/.*.cmd
-kernel-mcp/src/*.o
-kernel-mcp/src/*.cmd
-kernel-mcp/src/.*.cmd
+kernel-mcp/out/
 
 # Runtime temp files
 *.log

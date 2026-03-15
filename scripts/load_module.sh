@@ -9,7 +9,7 @@ if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   exit 1
 fi
 
-if [[ ! -f kernel-mcp/kernel_mcp.ko ]]; then
+if [[ ! -f kernel-mcp/out/kernel_mcp.ko ]]; then
   bash scripts/build_kernel.sh
 fi
 
@@ -18,6 +18,5 @@ if lsmod | awk '{print $1}' | grep -qx kernel_mcp; then
   exit 0
 fi
 
-insmod kernel-mcp/kernel_mcp.ko
+insmod kernel-mcp/out/kernel_mcp.ko
 echo "module kernel_mcp loaded"
-

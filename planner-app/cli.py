@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LLM-app CLI for capability-domain selection and execution."""
+"""Planner app CLI for capability-domain selection and execution."""
 
 from __future__ import annotations
 
@@ -14,8 +14,9 @@ from typing import Any, Dict, List
 from app_logic import (
     DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_DEEPSEEK_URL,
+    CapabilityIntent,
     SelectorConfig,
-    select_capability_for_input,
+    plan_capability_intent,
 )
 from rpc import mcpd_call
 
@@ -86,48 +87,48 @@ def _list_capabilities(sock_path: str) -> List[Dict[str, Any]]:
 
 
 def _print_providers(providers: List[Dict[str, Any]]) -> None:
-    print(f"[llm-app] providers ({len(providers)}):", flush=True)
+    print(f"[planner-app] providers ({len(providers)}):", flush=True)
     for provider in providers:
         print(
             (
-                f"[llm-app]   - id={provider.get('provider_id')} "
-                f"name={provider.get('app_name')} actions={provider.get('action_count')}"
+                f"[planner-app]   - id={provider.get('provider_id')} "
+                f"name={provider.get('display_name')} actions={provider.get('action_count')}"
             ),
             flush=True,
         )
         capability_domains = provider.get("capability_domains", [])
         if isinstance(capability_domains, list) and capability_domains:
             print(
-                f"[llm-app]     capability_domains={','.join(str(x) for x in capability_domains)}",
+                f"[planner-app]     capability_domains={','.join(str(x) for x in capability_domains)}",
                 flush=True,
             )
 
 
 def _print_actions(actions: List[Dict[str, Any]]) -> None:
-    print(f"[llm-app] provider actions ({len(actions)}):", flush=True)
+    print(f"[planner-app] provider actions ({len(actions)}):", flush=True)
     for action in actions:
         print(
             (
-                f"[llm-app]   - id={action.get('action_id')} "
+                f"[planner-app]   - id={action.get('action_id')} "
                 f"name={action.get('name')} capability={action.get('capability_domain', '-')}"
             ),
             flush=True,
         )
-        print(f"[llm-app]     desc={action.get('description')}", flush=True)
+        print(f"[planner-app]     desc={action.get('description')}", flush=True)
 
 
 def _print_capabilities(capabilities: List[Dict[str, Any]]) -> None:
-    print(f"[llm-app] capabilities ({len(capabilities)}):", flush=True)
+    print(f"[planner-app] capabilities ({len(capabilities)}):", flush=True)
     for capability in capabilities:
         print(
             (
-                f"[llm-app]   - id={capability.get('capability_id')} "
+                f"[planner-app]   - id={capability.get('capability_id')} "
                 f"domain={capability.get('capability_domain')} broker={capability.get('broker_id')}"
             ),
             flush=True,
         )
         print(
-            f"[llm-app]     risk={capability.get('risk_level')} providers={capability.get('provider_ids', [])}",
+            f"[planner-app]     risk={capability.get('risk_level')} providers={capability.get('provider_ids', [])}",
             flush=True,
         )
 
@@ -143,49 +144,45 @@ def _execute_once_with_capabilities(
         raise CliError("no capabilities returned by mcpd")
 
     warnings: List[str] = []
-    selected_capability, selector_source, selector_reason = select_capability_for_input(
+    intent: CapabilityIntent = plan_capability_intent(
         user_text,
         capabilities,
         cfg,
         warn_cb=lambda msg: warnings.append(msg),
     )
     for msg in warnings:
-        print(f"[llm-app] WARN: {msg}", flush=True)
-
-    capability_domain = str(selected_capability.get("capability_domain", ""))
-    capability_id = int(selected_capability.get("capability_id", 0))
-    capability_hash_raw = selected_capability.get("hash")
-    capability_hash = (
-        capability_hash_raw if isinstance(capability_hash_raw, str) and capability_hash_raw else ""
-    )
+        print(f"[planner-app] WARN: {msg}", flush=True)
 
     print(
-        f"[llm-app] selected capability={capability_domain} id={capability_id} hash={capability_hash or '-'}",
+        f"[planner-app] selected capability={intent.capability_domain} id={intent.capability_id} hash={intent.capability_hash or '-'}",
         flush=True,
     )
     print(
-        f"[llm-app] capability_selector={selector_source} reason={selector_reason}",
+        f"[planner-app] capability_selector={intent.selector_source} reason={intent.selector_reason}",
         flush=True,
     )
 
     req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
-    resp = mcpd_call(
-        {
-            "kind": "capability:exec",
-            "req_id": req_id,
-            "participant_id": participant_id,
-            "capability_domain": capability_domain,
-            "capability_id": capability_id,
-            "capability_hash": capability_hash,
-            "user_text": user_text,
-        },
-        sock_path=sock_path,
-        timeout_s=20,
-    )
-    print(f"[llm-app] req_id={req_id} status={resp.get('status')} t_ms={resp.get('t_ms')}", flush=True)
+    request: Dict[str, Any] = {
+        "kind": "capability:exec",
+        "req_id": req_id,
+        "participant_id": participant_id,
+        "capability_domain": intent.capability_domain,
+        "intent_text": intent.intent_text,
+    }
+    hints = dict(intent.hints)
+    hints["selector_source"] = intent.selector_source
+    hints["selector_reason"] = intent.selector_reason
+    if intent.preferred_provider_id:
+        hints.setdefault("preferred_provider_id", intent.preferred_provider_id)
+    if hints:
+        request["hints"] = hints
+
+    resp = mcpd_call(request, sock_path=sock_path, timeout_s=20)
+    print(f"[planner-app] req_id={req_id} status={resp.get('status')} t_ms={resp.get('t_ms')}", flush=True)
     if resp.get("status") == "ok":
         print(
-            "[llm-app] broker={} provider={} action={} executor={}".format(
+            "[planner-app] broker={} provider={} action={} executor={}".format(
                 resp.get("broker_id"),
                 resp.get("provider_id"),
                 resp.get("action_name"),
@@ -193,11 +190,11 @@ def _execute_once_with_capabilities(
             ),
             flush=True,
         )
-        print(f"[llm-app] result={json.dumps(resp.get('result', {}), ensure_ascii=True)}", flush=True)
-        print("[llm-app] done", flush=True)
+        print(f"[planner-app] result={json.dumps(resp.get('result', {}), ensure_ascii=True)}", flush=True)
+        print("[planner-app] done", flush=True)
         return 0
-    print(f"[llm-app] error={resp.get('error', 'unknown error')}", flush=True)
-    print("[llm-app] capability execution failed", flush=True)
+    print(f"[planner-app] error={resp.get('error', 'unknown error')}", flush=True)
+    print("[planner-app] capability execution failed", flush=True)
     return 3
 
 
@@ -212,12 +209,12 @@ def _run_once(user_text: str, participant_id: str, sock_path: str, cfg: Selector
 
 
 def _print_help() -> None:
-    print("[llm-app] commands:", flush=True)
-    print("[llm-app]   /help  show help", flush=True)
-    print("[llm-app]   /providers  force refresh and print providers", flush=True)
-    print("[llm-app]   /actions force refresh and print provider actions", flush=True)
-    print("[llm-app]   /caps  force refresh and print capability domains", flush=True)
-    print("[llm-app]   /exit  quit", flush=True)
+    print("[planner-app] commands:", flush=True)
+    print("[planner-app]   /help  show help", flush=True)
+    print("[planner-app]   /providers  force refresh and print providers", flush=True)
+    print("[planner-app]   /actions force refresh and print provider actions", flush=True)
+    print("[planner-app]   /caps  force refresh and print capability domains", flush=True)
+    print("[planner-app]   /exit  quit", flush=True)
 
 
 def _repl_loop(participant_id: str, sock_path: str, cfg: SelectorConfig, show_actions: bool) -> int:
@@ -227,7 +224,7 @@ def _repl_loop(participant_id: str, sock_path: str, cfg: SelectorConfig, show_ac
     if not providers:
         raise CliError("no providers returned by mcpd")
 
-    print("[llm-app] REPL mode started", flush=True)
+    print("[planner-app] REPL mode started", flush=True)
     _print_help()
     _print_providers(providers)
     _print_actions(actions)
@@ -239,7 +236,7 @@ def _repl_loop(participant_id: str, sock_path: str, cfg: SelectorConfig, show_ac
         try:
             line = input("user> ")
         except EOFError:
-            print("\n[llm-app] bye", flush=True)
+            print("\n[planner-app] bye", flush=True)
             return 0
         user_text = line.strip()
         if not user_text:
@@ -267,10 +264,10 @@ def _repl_loop(participant_id: str, sock_path: str, cfg: SelectorConfig, show_ac
         providers = _list_providers(sock_path)
         providers_sig = _providers_signature(providers)
         if providers_sig != last_providers_sig:
-            print("[llm-app] providers changed", flush=True)
+            print("[planner-app] providers changed", flush=True)
             _print_providers(providers)
         else:
-            print("[llm-app] providers unchanged", flush=True)
+            print("[planner-app] providers unchanged", flush=True)
         last_providers_sig = providers_sig
 
         actions = _list_actions(sock_path)
@@ -278,16 +275,16 @@ def _repl_loop(participant_id: str, sock_path: str, cfg: SelectorConfig, show_ac
         if show_actions:
             _print_actions(actions)
         elif sig != last_sig:
-            print("[llm-app] provider actions changed", flush=True)
+            print("[planner-app] provider actions changed", flush=True)
             _print_actions(actions)
         else:
-            print("[llm-app] provider actions unchanged", flush=True)
+            print("[planner-app] provider actions unchanged", flush=True)
         last_sig = sig
 
         capabilities = _list_capabilities(sock_path)
         rc = _execute_once_with_capabilities(user_text, participant_id, sock_path, cfg, capabilities)
         if rc != 0:
-            print(f"[llm-app] request failed rc={rc}", flush=True)
+            print(f"[planner-app] request failed rc={rc}", flush=True)
 
 
 def main() -> int:
@@ -296,7 +293,7 @@ def main() -> int:
     parser.add_argument("--repl", action="store_true", help="interactive loop mode")
     parser.add_argument(
         "--selector",
-        choices=["auto", "heuristic", "deepseek"],
+        choices=["auto", "catalog", "deepseek"],
         default="deepseek",
         help="capability selection strategy",
     )
@@ -309,10 +306,9 @@ def main() -> int:
     parser.add_argument("--participant-id", default="planner-main", help="planner participant id")
     parser.add_argument("--sock", default=SOCK_PATH, help="mcpd unix socket path")
     parser.add_argument("--show-actions", action="store_true", help="always print full action list in REPL")
-    parser.add_argument("--socket", dest="socket_legacy", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    sock_path = args.socket_legacy or args.sock
+    sock_path = args.sock
     cfg = SelectorConfig(
         mode=args.selector,
         deepseek_url=args.deepseek_url,
@@ -331,10 +327,10 @@ def main() -> int:
             raise CliError("no --once/--repl provided and stdin is not interactive")
         return _repl_loop(args.participant_id, sock_path, cfg, args.show_actions)
     except CliError as exc:
-        print(f"[llm-app] ERROR: {exc}", flush=True)
+        print(f"[planner-app] ERROR: {exc}", flush=True)
         return 1
     except Exception as exc:  # noqa: BLE001
-        print(f"[llm-app] ERROR: {exc}", flush=True)
+        print(f"[planner-app] ERROR: {exc}", flush=True)
         return 1
 
 

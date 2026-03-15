@@ -11,7 +11,7 @@ from architecture import build_capability_catalog, load_provider_manifest
 from netlink_client import KernelMcpNetlinkClient
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-MANIFESTS_DIR = ROOT_DIR / "tool-app" / "manifests"
+MANIFESTS_DIR = ROOT_DIR / "provider-app" / "manifests"
 SYSFS_CAPABILITIES_DIR = Path("/sys/kernel/mcp/capabilities")
 
 
@@ -41,7 +41,7 @@ def _load_capabilities() -> Dict[str, dict]:
             "risk_level": capability.risk_level,
             "approval_mode": capability.approval_mode,
             "audit_mode": capability.audit_mode,
-            "max_inflight_per_agent": capability.max_inflight_per_agent,
+            "max_inflight_per_participant": capability.max_inflight_per_participant,
             "rate_limit": dict(capability.rate_limit),
         }
     return out
@@ -62,14 +62,16 @@ def _register_capabilities(capabilities: Dict[str, dict]) -> None:
                 risk_level=int(capability["risk_level"]),
                 approval_mode=int(capability["approval_mode"]),
                 audit_mode=int(capability["audit_mode"]),
-                max_inflight_per_agent=int(capability["max_inflight_per_agent"]),
+                max_inflight_per_participant=int(
+                    capability["max_inflight_per_participant"]
+                ),
                 rl_enabled=bool(capability["rate_limit"].get("enabled", False)),
                 rl_burst=int(capability["rate_limit"].get("burst", 0)),
                 rl_refill_tokens=int(capability["rate_limit"].get("refill_tokens", 0)),
                 rl_refill_jiffies=int(capability["rate_limit"].get("refill_jiffies", 0)),
                 rl_default_cost=int(capability["rate_limit"].get("default_cost", 0)),
-                rl_max_inflight_per_agent=int(
-                    capability["rate_limit"].get("max_inflight_per_agent", 0)
+                rl_max_inflight_per_participant=int(
+                    capability["rate_limit"].get("max_inflight_per_participant", 0)
                 ),
                 rl_defer_wait_ms=int(capability["rate_limit"].get("defer_wait_ms", 0)),
             )

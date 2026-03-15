@@ -23,19 +23,6 @@ CMD: Final[dict[str, int]] = {
     "CAPABILITY_COMPLETE": 12,
 }
 
-# Deprecated compatibility aliases. Prefer canonical capability/participant keys.
-CMD.update(
-    {
-        "TOOL_REGISTER": CMD["CAPABILITY_REGISTER"],
-        "TOOL_UNREGISTER": CMD["CAPABILITY_UNREGISTER"],
-        "LIST_TOOLS": CMD["LIST_CAPABILITIES"],
-        "AGENT_REGISTER": CMD["PARTICIPANT_REGISTER"],
-        "TOOL_REQUEST": CMD["CAPABILITY_REQUEST"],
-        "TOOL_DECISION": CMD["CAPABILITY_DECISION"],
-        "TOOL_COMPLETE": CMD["CAPABILITY_COMPLETE"],
-    }
-)
-
 ATTR: Final[dict[str, int]] = {
     "UNSPEC": 0,
     "REQ_ID": 1,
@@ -67,7 +54,7 @@ ATTR: Final[dict[str, int]] = {
     "RL_REFILL_TOKENS": 27,
     "RL_REFILL_JIFFIES": 28,
     "RL_DEFAULT_COST": 29,
-    "RL_MAX_INFLIGHT_PER_AGENT": 30,
+    "RL_MAX_INFLIGHT_PER_PARTICIPANT": 30,
     "RL_DEFER_WAIT_MS": 31,
     "BROKER_ID": 32,
     "PROVIDER_ID": 33,
@@ -86,23 +73,3 @@ ATTR: Final[dict[str, int]] = {
     "APPROVAL_STATE": 46,
     "PARTICIPANT_TYPE": 47,
 }
-
-# Deprecated compatibility aliases. Prefer canonical capability/participant keys.
-ATTR.update(
-    {
-        "TOOL_ID": ATTR["CAPABILITY_ID"],
-        "TOOL_NAME": ATTR["CAPABILITY_NAME"],
-        "AGENT_ID": ATTR["PARTICIPANT_ID"],
-        "TOOL_PERM": ATTR["CAPABILITY_PERM"],
-        "TOOL_COST": ATTR["CAPABILITY_COST"],
-        "TOOL_HASH": ATTR["CAPABILITY_HASH"],
-        "TOOL_REQUIRED_CAPS": ATTR["CAPABILITY_REQUIRED_CAPS"],
-        "TOOL_RISK_LEVEL": ATTR["CAPABILITY_RISK_LEVEL"],
-        "AGENT_CAPS": ATTR["PARTICIPANT_CAPS"],
-        "AGENT_TRUST_LEVEL": ATTR["PARTICIPANT_TRUST_LEVEL"],
-        "TOOL_APPROVAL_MODE": ATTR["CAPABILITY_APPROVAL_MODE"],
-        "TOOL_AUDIT_MODE": ATTR["CAPABILITY_AUDIT_MODE"],
-        "TOOL_MAX_INFLIGHT_PER_AGENT": ATTR["CAPABILITY_MAX_INFLIGHT_PER_PARTICIPANT"],
-        "AGENT_FLAGS": ATTR["PARTICIPANT_FLAGS"],
-    }
-)

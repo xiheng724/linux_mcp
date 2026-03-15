@@ -274,13 +274,13 @@ class KernelMcpNetlinkClient:
         risk_level: int = 0,
         approval_mode: int = 0,
         audit_mode: int = 0,
-        max_inflight_per_agent: int = 0,
+        max_inflight_per_participant: int = 0,
         rl_enabled: bool = False,
         rl_burst: int = 0,
         rl_refill_tokens: int = 0,
         rl_refill_jiffies: int = 0,
         rl_default_cost: int = 0,
-        rl_max_inflight_per_agent: int = 0,
+        rl_max_inflight_per_participant: int = 0,
         rl_defer_wait_ms: int = 0,
     ) -> None:
         if capability_id <= 0:
@@ -303,11 +303,11 @@ class KernelMcpNetlinkClient:
             attrs.append((ATTR["CAPABILITY_APPROVAL_MODE"], struct.pack("=I", approval_mode)))
         if audit_mode:
             attrs.append((ATTR["CAPABILITY_AUDIT_MODE"], struct.pack("=I", audit_mode)))
-        if max_inflight_per_agent:
+        if max_inflight_per_participant:
             attrs.append(
                 (
                     ATTR["CAPABILITY_MAX_INFLIGHT_PER_PARTICIPANT"],
-                    struct.pack("=I", max_inflight_per_agent),
+                    struct.pack("=I", max_inflight_per_participant),
                 )
             )
         if rl_enabled:
@@ -320,11 +320,11 @@ class KernelMcpNetlinkClient:
             attrs.append((ATTR["RL_REFILL_JIFFIES"], struct.pack("=I", rl_refill_jiffies)))
         if rl_default_cost:
             attrs.append((ATTR["RL_DEFAULT_COST"], struct.pack("=I", rl_default_cost)))
-        if rl_max_inflight_per_agent:
+        if rl_max_inflight_per_participant:
             attrs.append(
                 (
-                    ATTR["RL_MAX_INFLIGHT_PER_AGENT"],
-                    struct.pack("=I", rl_max_inflight_per_agent),
+                    ATTR["RL_MAX_INFLIGHT_PER_PARTICIPANT"],
+                    struct.pack("=I", rl_max_inflight_per_participant),
                 )
             )
         if rl_defer_wait_ms:

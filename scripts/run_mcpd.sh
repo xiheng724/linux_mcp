@@ -14,20 +14,10 @@ SOCK_PATH="/tmp/mcpd.sock"
 RUNTIME_UID="$(id -u)"
 PID_PATH="/tmp/mcpd-${RUNTIME_UID}.pid"
 LOG_PATH="/tmp/mcpd-${RUNTIME_UID}.log"
-LEGACY_PID_PATH="/tmp/mcpd.pid"
 
 if ! lsmod | awk '{print $1}' | grep -qx kernel_mcp; then
   echo "kernel_mcp module is not loaded; run: sudo bash scripts/load_module.sh"
   exit 1
-fi
-
-if [[ -f "$LEGACY_PID_PATH" && ! -f "$PID_PATH" ]]; then
-  old_pid="$(cat "$LEGACY_PID_PATH" 2>/dev/null || true)"
-  if [[ -n "${old_pid}" ]] && kill -0 "$old_pid" 2>/dev/null; then
-    echo "mcpd already running pid=$old_pid (legacy pid file)"
-    exit 0
-  fi
-  rm -f "$LEGACY_PID_PATH"
 fi
 
 if [[ -f "$PID_PATH" ]]; then
@@ -42,7 +32,7 @@ fi
 missing_sockets="$("$PYTHON_BIN" - <<'PY'
 import glob,json,os,stat
 missing=[]
-for p in sorted(glob.glob("tool-app/manifests/*.json")):
+for p in sorted(glob.glob("provider-app/manifests/*.json")):
     raw=json.load(open(p,encoding="utf-8"))
     if raw.get("mode")!="uds_service":
         continue
@@ -63,9 +53,9 @@ PY
 )"
 
 if [[ -n "$missing_sockets" ]]; then
-  echo "app services are not ready. missing/non-socket endpoints:"
+  echo "provider services are not ready. missing/non-socket endpoints:"
   echo "$missing_sockets"
-  echo "run first: bash scripts/run_tool_services.sh"
+  echo "run first: bash scripts/run_provider_services.sh"
   exit 1
 fi
 
@@ -91,11 +81,11 @@ fi
 expected_actions="$("$PYTHON_BIN" - <<'PY'
 import glob,json
 count=0
-for p in sorted(glob.glob("tool-app/manifests/*.json")):
+for p in sorted(glob.glob("provider-app/manifests/*.json")):
     raw=json.load(open(p,encoding="utf-8"))
-    tools=raw.get("tools", [])
-    if isinstance(tools, list):
-        count += len(tools)
+    actions=raw.get("actions", [])
+    if isinstance(actions, list):
+        count += len(actions)
 print(count)
 PY
 )"
@@ -138,5 +128,5 @@ if [[ "$registered_actions" != "$expected_actions" ]]; then
   exit 1
 fi
 
-echo "reconciling tool-app manifests with kernel registry"
+echo "reconciling provider-app manifests with kernel registry"
 "$PYTHON_BIN" mcpd/reconcile_kernel.py

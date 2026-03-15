@@ -10,33 +10,32 @@ else
   PYTHON_BIN="python3"
 fi
 
-SOCK_DIR="/tmp/linux-mcp-apps"
+SOCK_DIR="/tmp/linux-mcp-providers"
 mkdir -p "$SOCK_DIR"
 
 found_manifest=0
-for manifest in "$ROOT_DIR"/tool-app/manifests/*.json; do
+for manifest in "$ROOT_DIR"/provider-app/manifests/*.json; do
   [[ -f "$manifest" ]] || continue
   found_manifest=1
-  IFS=$'\t' read -r app_id app_name service_path endpoint mode < <(
+  IFS=$'\t' read -r provider_id display_name endpoint mode < <(
     "$PYTHON_BIN" - "$manifest" <<'PY'
 import json,sys
 raw=json.load(open(sys.argv[1],encoding="utf-8"))
 print(
-    f"{raw.get('app_id','')}\t"
-    f"{raw.get('app_name','')}\t"
-    f"{raw.get('service_path','tool-app/app_service.py')}\t"
+    f"{raw.get('provider_id','')}\t"
+    f"{raw.get('display_name', raw.get('provider_name', raw.get('provider_id','')))}\t"
     f"{raw.get('endpoint','')}\t"
     f"{raw.get('mode','')}"
 )
 PY
   )
 
-  if [[ -z "$app_id" || -z "$app_name" ]]; then
-    echo "invalid manifest missing app id/name: $manifest"
+  if [[ -z "$provider_id" || -z "$display_name" ]]; then
+    echo "invalid manifest missing provider id/display name: $manifest"
     exit 1
   fi
   if [[ "$mode" != "uds_service" ]]; then
-    echo "skip app_id=$app_id app_name=$app_name mode=$mode"
+    echo "skip provider_id=$provider_id display_name=$display_name mode=$mode"
     continue
   fi
   if [[ -z "$endpoint" ]]; then
@@ -44,18 +43,18 @@ PY
     exit 1
   fi
 
-  pidfile="/tmp/linux-mcp-app-${app_id}.pid"
-  logfile="/tmp/linux-mcp-app-${app_id}.log"
-  service_file="$ROOT_DIR/$service_path"
+  pidfile="/tmp/linux-mcp-provider-${provider_id}.pid"
+  logfile="/tmp/linux-mcp-provider-${provider_id}.log"
+  service_file="$ROOT_DIR/provider-app/provider_service.py"
   if [[ ! -f "$service_file" ]]; then
-    echo "missing service file for app_id=$app_id: $service_file"
+    echo "missing provider service file: $service_file"
     exit 1
   fi
 
   if [[ -f "$pidfile" ]]; then
     old_pid="$(cat "$pidfile" 2>/dev/null || true)"
     if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null && [[ -S "$endpoint" ]]; then
-      echo "app service already running: id=$app_id name=$app_name pid=$old_pid endpoint=$endpoint"
+      echo "provider service already running: id=$provider_id name=$display_name pid=$old_pid endpoint=$endpoint"
       continue
     fi
     rm -f "$pidfile"
@@ -76,17 +75,17 @@ PY
   done
 
   if [[ "$ready" -ne 1 ]]; then
-    echo "failed to start app service: app_id=$app_id endpoint=$endpoint (see $logfile)"
+    echo "failed to start provider service: provider_id=$provider_id endpoint=$endpoint (see $logfile)"
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
     rm -f "$pidfile" "$endpoint"
     exit 1
   fi
 
-  echo "started app service: id=$app_id name=$app_name pid=$pid endpoint=$endpoint"
+  echo "started provider service: id=$provider_id name=$display_name pid=$pid endpoint=$endpoint"
 done
 
 if [[ "$found_manifest" -ne 1 ]]; then
-  echo "no manifests found in tool-app/manifests"
+  echo "no manifests found in provider-app/manifests"
   exit 1
 fi

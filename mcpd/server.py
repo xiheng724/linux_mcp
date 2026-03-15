@@ -9,6 +9,7 @@ import os
 import re
 import signal
 import socket
+import subprocess
 import struct
 import sys
 import threading
@@ -17,34 +18,37 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from architecture import (
-    HIGH_RISK_LEVEL,
     APPROVAL_STATE_APPROVED,
     APPROVAL_STATE_AUTO_APPROVED,
     APPROVAL_STATE_PENDING,
     CAPABILITY_REQUIRED_CAPS,
+    HIGH_RISK_LEVEL,
     BrokerDispatchPlan,
     BrokerDef,
     CapabilityDomain,
     ProviderAction,
     ProviderDef,
+    build_execution_payload,
     build_executor_binding,
     build_broker_catalog,
     build_capability_catalog,
     load_provider_manifest,
     plan_capability_execution,
+    validate_capability_request,
+    validate_action_payload,
+    validate_executor_binding_for_capability,
 )
 from netlink_client import KernelMcpNetlinkClient
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-LLM_APP_DIR = ROOT_DIR / "llm-app"
-if str(LLM_APP_DIR) not in sys.path:
-    sys.path.insert(0, str(LLM_APP_DIR))
-
-from app_logic import build_payload_for_action
+DEFAULT_MANIFEST_DIRS = (ROOT_DIR / "provider-app" / "manifests",)
+MANIFEST_DIRS_ENV = "MCPD_MANIFEST_DIRS"
 
 SOCK_PATH = "/tmp/mcpd.sock"
 MAX_MSG_SIZE = 16 * 1024 * 1024
 MAX_DEFER_RETRIES = 50
+EXECUTOR_RUNTIME_TIMEOUT_S = 30.0
+EXECUTOR_WORKDIR_ROOT = "/tmp/linux-mcp-executors"
 LOGGER = logging.getLogger("mcpd")
 HASH_RE = re.compile(r"^[0-9a-fA-F]{8}$")
 
@@ -54,9 +58,9 @@ PARTICIPANT_TYPE_PLANNER = 1
 PARTICIPANT_TYPE_BROKER = 2
 
 _stop_event = threading.Event()
-_agents_lock = threading.Lock()
+_participants_lock = threading.Lock()
 _registry_lock = threading.RLock()
-_registered_agents: set[str] = set()
+_registered_participants: set[str] = set()
 _provider_registry: Dict[str, ProviderDef] = {}
 _capability_registry: Dict[str, CapabilityDomain] = {}
 _broker_registry: Dict[str, BrokerDef] = {}
@@ -176,6 +180,12 @@ def _emit_audit_event(event_type: str, **fields: Any) -> None:
     LOGGER.info(json.dumps(entry, sort_keys=True, ensure_ascii=True))
 
 
+def _emit_structured_log(event_type: str, **fields: Any) -> None:
+    entry = {"event_type": event_type, "ts_ms": _now_ms()}
+    entry.update(fields)
+    LOGGER.info(json.dumps(entry, sort_keys=True, ensure_ascii=True))
+
+
 def _ensure_registered_participant(
     participant_id: str,
     *,
@@ -184,8 +194,8 @@ def _ensure_registered_participant(
     flags: int = 0,
     participant_type: int,
 ) -> None:
-    with _agents_lock:
-        if participant_id in _registered_agents:
+    with _participants_lock:
+        if participant_id in _registered_participants:
             return
 
     client = _get_kernel_client()
@@ -208,8 +218,8 @@ def _ensure_registered_participant(
         flags,
     )
 
-    with _agents_lock:
-        _registered_agents.add(participant_id)
+    with _participants_lock:
+        _registered_participants.add(participant_id)
 
 
 def _sync_capability_domains(capabilities: List[CapabilityDomain]) -> None:
@@ -226,13 +236,15 @@ def _sync_capability_domains(capabilities: List[CapabilityDomain]) -> None:
             risk_level=capability.risk_level,
             approval_mode=capability.approval_mode,
             audit_mode=capability.audit_mode,
-            max_inflight_per_agent=capability.max_inflight_per_agent,
+            max_inflight_per_participant=capability.max_inflight_per_participant,
             rl_enabled=bool(rate_limit.get("enabled", False)),
             rl_burst=int(rate_limit.get("burst", 0)),
             rl_refill_tokens=int(rate_limit.get("refill_tokens", 0)),
             rl_refill_jiffies=int(rate_limit.get("refill_jiffies", 0)),
             rl_default_cost=int(rate_limit.get("default_cost", 0)),
-            rl_max_inflight_per_agent=int(rate_limit.get("max_inflight_per_agent", 0)),
+            rl_max_inflight_per_participant=int(
+                rate_limit.get("max_inflight_per_participant", 0)
+            ),
             rl_defer_wait_ms=int(rate_limit.get("defer_wait_ms", 0)),
         )
         LOGGER.info(
@@ -262,43 +274,89 @@ def _rebuild_catalogs_locked() -> None:
     _broker_registry = build_broker_catalog(_provider_registry.values(), _capability_registry)
 
 
-def _register_manifest(raw: Any, source: str) -> Dict[str, Any]:
-    provider = load_provider_manifest(source, raw)
+def _configured_manifest_dirs() -> Tuple[Path, ...]:
+    raw = os.getenv(MANIFEST_DIRS_ENV, "")
+    dirs: List[Path] = []
+    if raw.strip():
+        for entry in raw.split(os.pathsep):
+            entry = entry.strip()
+            if not entry:
+                continue
+            dirs.append(Path(entry).expanduser())
+    else:
+        dirs.extend(DEFAULT_MANIFEST_DIRS)
+
+    resolved: List[Path] = []
+    seen: set[Path] = set()
+    for path in dirs:
+        try:
+            resolved_path = path.resolve()
+        except OSError:
+            resolved_path = path
+        if resolved_path in seen:
+            continue
+        seen.add(resolved_path)
+        resolved.append(resolved_path)
+    return tuple(resolved)
+
+
+def _autoload_manifests_on_startup() -> None:
+    manifest_paths: List[Path] = []
+    for manifest_dir in _configured_manifest_dirs():
+        if manifest_dir.is_file():
+            manifest_paths.append(manifest_dir)
+            continue
+        if not manifest_dir.exists():
+            LOGGER.info("manifest dir missing at startup: %s", manifest_dir)
+            continue
+        manifest_paths.extend(sorted(manifest_dir.glob("*.json")))
+
+    if not manifest_paths:
+        LOGGER.warning("no provider manifests discovered at startup")
+        return
+
+    loaded_providers: Dict[str, ProviderDef] = {}
+    for manifest_path in manifest_paths:
+        source = str(manifest_path)
+        try:
+            raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+            provider = load_provider_manifest(source, raw)
+        except Exception as exc:  # noqa: BLE001
+            _emit_structured_log("manifest_validation_error", source=source, error=str(exc))
+            raise
+        if provider.provider_id in loaded_providers:
+            raise ValueError(
+                f"duplicate provider_id during startup autoload: {provider.provider_id}"
+            )
+        loaded_providers[provider.provider_id] = provider
+        _emit_structured_log(
+            "manifest_registered",
+            source=source,
+            provider_id=provider.provider_id,
+            capability_domains=sorted({action.capability_domain for action in provider.actions.values()}),
+            registration_mode="startup_autoload",
+        )
+
     with _registry_lock:
-        _provider_registry[provider.provider_id] = provider
+        _provider_registry.clear()
+        _provider_registry.update(loaded_providers)
         _rebuild_catalogs_locked()
         capabilities = list(_capability_registry.values())
-        provider_capabilities = sorted(
-            {
-                action.capability_domain
-                for action in provider.actions.values()
-            }
-        )
 
     _sync_capability_domains(capabilities)
     LOGGER.info(
-        "registered provider source=%s provider_id=%s actions=%s capabilities=%s",
-        source,
-        provider.provider_id,
-        sorted(provider.actions.keys()),
-        provider_capabilities,
+        "startup manifest autoload complete providers=%d capabilities=%d brokers=%d",
+        len(_provider_registry),
+        len(_capability_registry),
+        len(_broker_registry),
     )
-    return {
-        "status": "ok",
-        "provider_id": provider.provider_id,
-        "app_name": provider.app_name,
-        "action_count": len(provider.actions),
-        "action_ids": sorted(provider.actions.keys()),
-        "capability_count": len(provider_capabilities),
-        "capability_domains": provider_capabilities,
-    }
 
 
 def _provider_to_public(provider: ProviderDef) -> Dict[str, Any]:
     actions = sorted(provider.actions.values(), key=lambda item: item.action_id)
     capability_domains = sorted({action.capability_domain for action in actions})
     return {
-        "app_name": provider.app_name,
+        "display_name": provider.display_name,
         "provider_id": provider.provider_id,
         "provider_instance_id": provider.instance_id,
         "provider_type": provider.provider_type,
@@ -307,7 +365,8 @@ def _provider_to_public(provider: ProviderDef) -> Dict[str, Any]:
         "broker_domain": provider.broker_domain,
         "action_count": len(actions),
         "action_ids": [action.action_id for action in actions],
-        "action_names": [action.name for action in actions],
+        "action_names": [action.action_name for action in actions],
+        "action_display_names": [action.name for action in actions],
         "capability_domains": capability_domains,
     }
 
@@ -316,7 +375,7 @@ def _action_to_public(provider: ProviderDef, action: ProviderAction) -> Dict[str
     return {
         "action_id": action.action_id,
         "name": action.name,
-        "app_name": provider.app_name,
+        "display_name": provider.display_name,
         "provider_id": provider.provider_id,
         "provider_type": provider.provider_type,
         "capability_domain": action.capability_domain,
@@ -329,10 +388,12 @@ def _action_to_public(provider: ProviderDef, action: ProviderAction) -> Dict[str
         "parameter_schema_id": action.parameter_schema_id,
         "description": action.description,
         "input_schema": action.input_schema,
+        "intent_tags": list(action.intent_tags),
         "examples": action.examples,
+        "arg_hints": dict(action.arg_hints),
+        "selection_priority": action.selection_priority,
         "perm": action.perm,
         "cost": action.cost,
-        "handler": action.handler,
         "action_name": action.action_name,
     }
 
@@ -342,6 +403,9 @@ def _capability_to_public(capability: CapabilityDomain) -> Dict[str, Any]:
         "capability_id": capability.capability_id,
         "capability_domain": capability.name,
         "name": capability.name,
+        "description": capability.description,
+        "intent_tags": list(capability.intent_tags),
+        "examples": capability.examples,
         "broker_id": capability.broker_id,
         "perm": capability.perm,
         "cost": capability.cost,
@@ -350,6 +414,9 @@ def _capability_to_public(capability: CapabilityDomain) -> Dict[str, Any]:
         "approval_mode": capability.approval_mode,
         "audit_mode": capability.audit_mode,
         "max_inflight_per_agent": capability.max_inflight_per_agent,
+        "max_inflight_per_participant": capability.max_inflight_per_participant,
+        "executor_policy": dict(capability.executor_policy),
+        "sandbox_profile": capability.sandbox_profile,
         "allows_side_effect": capability.allows_side_effect,
         "auth_mode": capability.auth_mode,
         "capability_class": capability.capability_class,
@@ -357,7 +424,6 @@ def _capability_to_public(capability: CapabilityDomain) -> Dict[str, Any]:
         "hash": capability.manifest_hash,
         "provider_ids": list(capability.provider_ids),
         "action_ids": list(capability.action_ids),
-        "description": f"Capability domain {capability.name} mediated by {capability.broker_id}.",
     }
 
 
@@ -419,7 +485,7 @@ def _approval_state_name(approval_state: int) -> str:
     return "REJECTED"
 
 
-def _build_request_flags(req: Dict[str, Any]) -> int:
+def _build_request_flags(req: Dict[str, Any], request_mode: str) -> int:
     flags = 0
     if bool(req.get("interactive", False)):
         flags |= REQUEST_FLAG_INTERACTIVE_SESSION
@@ -434,6 +500,14 @@ def _make_executor_instance_id(plan: BrokerDispatchPlan, req_id: int) -> str:
 
 def _ensure_executor_workdir(path: str) -> None:
     workdir = Path(path)
+    root = Path(EXECUTOR_WORKDIR_ROOT).resolve()
+    resolved = workdir.resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(
+            f"executor working_directory must stay under {EXECUTOR_WORKDIR_ROOT}: {resolved}"
+        ) from exc
     workdir.mkdir(parents=True, exist_ok=True)
 
 
@@ -448,6 +522,12 @@ def _validate_executor_contract(plan: BrokerDispatchPlan, payload: Dict[str, Any
                 raise ValueError(
                     f"free-form shell field '{forbidden_key}' is not allowed for executor payload"
                 )
+    validate_executor_binding_for_capability(
+        plan.capability,
+        plan.provider,
+        plan.action,
+        plan.executor,
+    )
 
 
 def _kernel_arbitrate(
@@ -595,7 +675,6 @@ def _call_provider_executor(
         "action": {
             "action_id": plan.action.action_id,
             "action_name": plan.action.action_name,
-            "handler": plan.action.handler,
             "capability_domain": plan.action.capability_domain,
             "validation_policy": plan.action.validation_policy,
             "parameter_schema_id": plan.action.parameter_schema_id,
@@ -606,36 +685,84 @@ def _call_provider_executor(
         "executor": _executor_binding_to_public(plan),
         "payload": payload,
     }
-    encoded = json.dumps(req, ensure_ascii=True).encode("utf-8")
+    runtime_job = {
+        "request": req,
+        "provider_endpoint": plan.provider.endpoint,
+        "provider_timeout_s": EXECUTOR_RUNTIME_TIMEOUT_S,
+        "allowed_workdir_root": EXECUTOR_WORKDIR_ROOT,
+        "executor": _executor_binding_to_public(plan),
+    }
+    runtime_env = {
+        key: os.environ[key]
+        for key in plan.executor.inherited_env_keys
+        if key in os.environ
+    }
+    runtime_env.setdefault("PATH", os.environ.get("PATH", "/usr/bin:/bin"))
+    runtime_env["PYTHONUNBUFFERED"] = "1"
+    runtime_script = ROOT_DIR / "mcpd" / "executor_runtime.py"
+    exec_start = time.perf_counter()
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
-            conn.settimeout(30)
-            conn.connect(plan.provider.endpoint)
-            _send_frame(conn, encoded)
-            raw = _recv_frame(conn)
-    except (FileNotFoundError, ConnectionRefusedError, TimeoutError, OSError) as exc:
-        raise ValueError(f"provider offline: {plan.provider.endpoint}") from exc
+        proc = subprocess.run(
+            [sys.executable, str(runtime_script)],
+            input=json.dumps(runtime_job, ensure_ascii=True).encode("utf-8"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=plan.executor.working_directory,
+            env=runtime_env,
+            timeout=EXECUTOR_RUNTIME_TIMEOUT_S,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError(f"executor timeout for provider={plan.provider.provider_id}") from exc
+    except OSError as exc:
+        raise ValueError(f"executor launch failed for provider={plan.provider.provider_id}") from exc
 
+    executor_runtime_ms = int((time.perf_counter() - exec_start) * 1000)
     try:
-        resp = json.loads(raw.decode("utf-8"))
+        resp = json.loads(proc.stdout.decode("utf-8"))
     except json.JSONDecodeError as exc:
-        raise ValueError(f"provider returned invalid JSON ({plan.provider.provider_id})") from exc
+        stderr = proc.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(
+            f"executor returned invalid JSON for provider={plan.provider.provider_id}: {stderr or '<empty>'}"
+        ) from exc
     if not isinstance(resp, dict):
-        raise ValueError(f"provider returned non-object response ({plan.provider.provider_id})")
+        raise ValueError(f"executor returned non-object response ({plan.provider.provider_id})")
     status = resp.get("status", "")
     if status not in ("ok", "error"):
-        raise ValueError(f"provider returned invalid status ({plan.provider.provider_id})")
+        raise ValueError(f"executor returned invalid status ({plan.provider.provider_id})")
+    executor_timing = resp.get("executor_timing")
+    if not isinstance(executor_timing, dict):
+        executor_timing = {}
+        resp["executor_timing"] = executor_timing
+    executor_timing.setdefault("broker_spawn_wall_ms", executor_runtime_ms)
+    _emit_structured_log(
+        "executor_runtime",
+        req_id=req_id,
+        participant_id=participant_id,
+        capability_domain=plan.capability.name,
+        provider_id=plan.provider.provider_id,
+        action_name=plan.action.action_name,
+        executor_type=plan.executor.executor_type,
+        sandbox_profile=plan.executor.sandbox_profile,
+        lease_id=lease_id,
+        executor_instance_id=executor_instance_id,
+        payload_fill_mode="schema_arg_hints",
+        runtime_status=status,
+        runtime_timings=dict(executor_timing),
+        sandbox=resp.get("sandbox", {}),
+    )
     return resp
 
 
-def _build_action_payload(action: ProviderAction, req: Dict[str, Any]) -> Dict[str, Any]:
-    payload = req.get("payload")
-    if payload is None:
-        user_text = str(req.get("user_text", ""))
-        payload = build_payload_for_action(action.name, user_text)
-    if not isinstance(payload, dict):
-        raise ValueError("payload must be object")
-    return payload
+def _build_execution_payload(action: ProviderAction, intent_text: str, req: Dict[str, Any]) -> Dict[str, Any]:
+    hints = req.get("hints")
+    if hints is not None and not isinstance(hints, dict):
+        raise ValueError("hints must be object")
+    return build_execution_payload(
+        action,
+        intent_text,
+        hints=hints if isinstance(hints, dict) else None,
+    )
 
 
 def _execute_plan(
@@ -645,14 +772,17 @@ def _execute_plan(
     *,
     request_mode: str,
     audit_markers: List[str] | None = None,
+    planning_timings: Dict[str, int] | None = None,
 ) -> Dict[str, Any]:
     req_id = _ensure_int("req_id", req.get("req_id", 0))
+    request_start = time.perf_counter()
     requested_hash = _resolve_requested_hash(req, plan.capability.manifest_hash)
     markers = list(audit_markers or [])
-    request_flags = _build_request_flags(req)
+    request_flags = _build_request_flags(req, request_mode)
     approval_token = str(req.get("approval_token", ""))
     provider_instance_id = plan.provider.instance_id
     executor_instance_id = _make_executor_instance_id(plan, req_id)
+    timings: Dict[str, int] = dict(planning_timings or {})
 
     _ensure_registered_participant(
         participant_id,
@@ -669,9 +799,13 @@ def _execute_plan(
         participant_type=PARTICIPANT_TYPE_BROKER,
     )
 
-    payload = _build_action_payload(plan.action, req)
-    _validate_payload(plan.action.input_schema, payload)
+    intent_text = _ensure_non_empty_str("intent_text", req.get("intent_text", ""))
+    markers.extend(plan.audit_markers)
+    payload_build_start = time.perf_counter()
+    payload = _build_execution_payload(plan.action, intent_text, req)
+    payload = validate_action_payload(plan.action, payload)
     _validate_executor_contract(plan, payload)
+    timings["payload_construction_ms"] = int((time.perf_counter() - payload_build_start) * 1000)
     _emit_audit_event(
         "capability_request",
         req_id=req_id,
@@ -688,11 +822,11 @@ def _execute_plan(
         approval_state=_approval_state_name(APPROVAL_STATE_PENDING),
         decision_reason="pending",
         expiry_time=0,
-        legacy_path_flag=False,
         audit_markers=markers,
         request_mode=request_mode,
     )
 
+    arbitration_start = time.perf_counter()
     (
         decision,
         wait_ms,
@@ -715,6 +849,7 @@ def _execute_plan(
         request_flags=request_flags,
         approval_token=approval_token,
     )
+    timings["kernel_arbitration_ms"] = int((time.perf_counter() - arbitration_start) * 1000)
     expiry_time = _now_ms() + lease_expires_ms if lease_expires_ms else 0
     if decision == "DENY":
         _emit_audit_event(
@@ -733,7 +868,6 @@ def _execute_plan(
             approval_state=_approval_state_name(approval_state),
             decision_reason=reason,
             expiry_time=expiry_time,
-            legacy_path_flag=False,
             audit_markers=markers,
             request_mode=request_mode,
         )
@@ -780,7 +914,6 @@ def _execute_plan(
             approval_state=_approval_state_name(approval_state),
             decision_reason=reason,
             expiry_time=expiry_time,
-            legacy_path_flag=False,
             audit_markers=markers,
             request_mode=request_mode,
         )
@@ -794,6 +927,14 @@ def _execute_plan(
             provider_instance_id=provider_instance_id,
             executor_instance_id=executor_instance_id,
         )
+        executor_timing = executor_resp.get("executor_timing", {})
+        if isinstance(executor_timing, dict):
+            if "executor_startup_ms" in executor_timing:
+                timings["executor_startup_ms"] = int(executor_timing["executor_startup_ms"])
+            if "provider_roundtrip_ms" in executor_timing:
+                timings["provider_roundtrip_ms"] = int(executor_timing["provider_roundtrip_ms"])
+            if "sandbox_setup_ms" in executor_timing:
+                timings["sandbox_setup_ms"] = int(executor_timing["sandbox_setup_ms"])
         status = executor_resp.get("status")
         result = executor_resp.get("result", {})
         err = executor_resp.get("error", "")
@@ -804,8 +945,22 @@ def _execute_plan(
             err = str(err)
         if not isinstance(exec_t_ms, int) or isinstance(exec_t_ms, bool) or exec_t_ms < 0:
             exec_t_ms = int((time.perf_counter() - exec_start) * 1000)
+        timings["request_total_ms"] = int((time.perf_counter() - request_start) * 1000)
         if status == "ok":
             status_code = 0
+        _emit_structured_log(
+            "request_timing",
+            req_id=req_id,
+            participant_id=participant_id,
+            capability_domain=plan.capability.name,
+            provider_id=plan.provider.provider_id,
+            action_name=plan.action.action_name,
+            executor_type=plan.executor.executor_type,
+            sandbox_profile=plan.executor.sandbox_profile,
+            lease_id=lease_id,
+            request_mode=request_mode,
+            timing_metrics=dict(timings),
+        )
         return {
             "req_id": req_id,
             "status": status,
@@ -840,6 +995,8 @@ def _execute_plan(
             "parameter_schema_id": plan.executor.parameter_schema_id,
             "runtime_identity_mode": plan.executor.runtime_identity_mode,
             "request_mode": request_mode,
+            "timing_metrics": dict(timings),
+            "sandbox": executor_resp.get("sandbox", {}),
         }
     finally:
         exec_ms = int((time.perf_counter() - exec_start) * 1000)
@@ -874,7 +1031,6 @@ def _execute_plan(
                 approval_state=_approval_state_name(approval_state),
                 decision_reason="ok" if status_code == 0 else "error",
                 expiry_time=expiry_time,
-                legacy_path_flag=False,
                 audit_markers=markers,
                 request_mode=request_mode,
             )
@@ -896,7 +1052,6 @@ def _execute_plan(
                 approval_state=_approval_state_name(approval_state),
                 decision_reason=str(exc),
                 expiry_time=expiry_time,
-                legacy_path_flag=False,
                 audit_markers=markers,
                 request_mode=request_mode,
             )
@@ -909,49 +1064,135 @@ def _execute_plan(
             )
 
 
-def _handle_capability_exec(req: Dict[str, Any]) -> Dict[str, Any]:
-    participant_id = _ensure_non_empty_str("participant_id", req.get("participant_id", ""))
-    user_text = _ensure_non_empty_str("user_text", req.get("user_text", ""))
-    preferred_provider_id = str(req.get("preferred_provider_id", ""))
-    audit_markers: List[str] = []
-
-    capability_name = req.get("capability_domain")
-    if capability_name in ("", None):
-        capability_id = _ensure_int("capability_id", req.get("capability_id", 0))
-        with _registry_lock:
-            matched = None
-            for capability in _capability_registry.values():
-                if capability.capability_id == capability_id:
-                    matched = capability.name
-                    break
-        if matched is None:
-            raise ValueError(f"unknown capability_id: {capability_id}")
-        capability_name = matched
-    capability_name = _ensure_non_empty_str("capability_domain", capability_name)
-
+def _execute_capability_request(
+    req: Dict[str, Any],
+    *,
+    participant_id: str,
+    capability_name: str,
+    intent_text: str,
+    hints: Dict[str, Any],
+    preferred_provider_id: str,
+    request_mode: str,
+    audit_markers: List[str] | None = None,
+) -> Dict[str, Any]:
+    audit_markers = list(audit_markers or [])
+    planning_timings: Dict[str, int] = {}
     with _registry_lock:
         capability = _capability_registry.get(capability_name)
         if capability is None:
             raise ValueError(f"unsupported capability_domain: {capability_name}")
+        try:
+            gating_start = time.perf_counter()
+            policy_markers = validate_capability_request(
+                {
+                    "participant_id": participant_id,
+                    "caps": PLANNER_CAPS,
+                    "trust_level": PLANNER_TRUST_LEVEL,
+                    "flags": PLANNER_FLAGS,
+                },
+                capability,
+                {
+                    "intent_text": intent_text,
+                    "interactive": bool(req.get("interactive", False)),
+                    "explicit_approval": bool(req.get("explicit_approval", False)),
+                    "approval_token": str(req.get("approval_token", "") or ""),
+                },
+            )
+            planning_timings["capability_gating_ms"] = int((time.perf_counter() - gating_start) * 1000)
+        except Exception as exc:  # noqa: BLE001
+            _emit_structured_log(
+                "capability_policy_result",
+                participant_id=participant_id,
+                capability_domain=capability.name,
+                required_caps=capability.required_caps,
+                risk_level=capability.risk_level,
+                approval_mode=capability.approval_mode,
+                audit_mode=capability.audit_mode,
+                max_inflight_per_agent=capability.max_inflight_per_agent,
+                capability_policy_result="deny",
+                error=str(exc),
+            )
+            raise
+        audit_markers.extend(policy_markers)
+        _emit_structured_log(
+            "capability_policy_result",
+            participant_id=participant_id,
+            capability_domain=capability.name,
+            required_caps=capability.required_caps,
+            risk_level=capability.risk_level,
+            approval_mode=capability.approval_mode,
+            audit_mode=capability.audit_mode,
+            max_inflight_per_agent=capability.max_inflight_per_agent,
+            capability_policy_result="allow",
+            policy_markers=list(policy_markers),
+        )
+        _emit_structured_log(
+            "capability_resolver",
+            participant_id=participant_id,
+            selector_source=str(hints.get("selector_source", "unknown")),
+            selector_reason=str(hints.get("selector_reason", "")),
+            capability_domain=capability.name,
+        )
         allow_preferred_provider = capability.risk_level < HIGH_RISK_LEVEL
         if preferred_provider_id and not allow_preferred_provider:
             audit_markers.append("provider_preference_ignored_high_risk")
             preferred_provider_id = ""
+        resolution_start = time.perf_counter()
         plan = plan_capability_execution(
             capability_name,
             providers=_provider_registry,
             capabilities=_capability_registry,
             brokers=_broker_registry,
-            user_text=user_text,
+            intent_text=intent_text,
             preferred_provider_id=preferred_provider_id,
             allow_preferred_provider=allow_preferred_provider,
+        )
+        planning_timings["action_resolution_ms"] = int((time.perf_counter() - resolution_start) * 1000)
+        _emit_structured_log(
+            "action_resolver",
+            participant_id=participant_id,
+            capability_domain=capability.name,
+            provider_id=plan.provider.provider_id,
+            provider_trust_class=plan.provider.trust_class,
+            action_name=plan.action.action_name,
+            risk_level=plan.action.risk_level,
+            selection_priority=plan.action.selection_priority,
+            resolver_markers=list(plan.audit_markers),
         )
     return _execute_plan(
         req,
         participant_id,
         plan,
-        request_mode="capability:exec",
+        request_mode=request_mode,
         audit_markers=audit_markers,
+        planning_timings=planning_timings,
+    )
+
+
+def _handle_capability_exec(req: Dict[str, Any]) -> Dict[str, Any]:
+    participant_id = _ensure_non_empty_str("participant_id", req.get("participant_id", ""))
+    if "payload" in req:
+        raise ValueError("canonical capability:exec does not accept payload")
+    if "planner_hints" in req or "preferred_provider_id" in req or "user_text" in req:
+        raise ValueError("canonical capability:exec accepts only capability_domain, intent_text, hints")
+
+    capability_name = _ensure_non_empty_str("capability_domain", req.get("capability_domain", ""))
+    intent_text = _ensure_non_empty_str("intent_text", req.get("intent_text", ""))
+    hints = req.get("hints", {})
+    if hints is not None and not isinstance(hints, dict):
+        raise ValueError("hints must be object")
+    canonical_hints = dict(hints or {})
+    if "payload_slots" in canonical_hints:
+        raise ValueError("canonical capability:exec does not accept hints.payload_slots")
+    preferred_provider_id = str(canonical_hints.get("preferred_provider_id", "") or "")
+    return _execute_capability_request(
+        req,
+        participant_id=participant_id,
+        capability_name=capability_name,
+        intent_text=intent_text,
+        hints=canonical_hints,
+        preferred_provider_id=preferred_provider_id,
+        request_mode="capability:exec",
     )
 
 
@@ -1013,19 +1254,12 @@ def _handle_connection(conn: socket.socket) -> None:
                     _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                     continue
 
-                if req.get("sys") == "register_manifest":
-                    req_kind = "sys:register_manifest"
-                    resp = _register_manifest(req.get("manifest"), "rpc:register_manifest")
-                    _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
-                    continue
-
                 req_id = _ensure_int("req_id", req.get("req_id", 0))
                 participant_id = _ensure_non_empty_str("participant_id", req.get("participant_id", ""))
                 req_kind = str(req.get("kind", "capability:exec"))
-                if req_kind == "capability:exec":
-                    resp = _handle_capability_exec(req)
-                else:
+                if req_kind != "capability:exec":
                     raise ValueError(f"unsupported request kind: {req_kind}")
+                resp = _handle_capability_exec(req)
 
                 _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
                 t_ms = int((time.perf_counter() - t0) * 1000)
@@ -1098,7 +1332,13 @@ def main() -> int:
         LOGGER.error("failed to initialize kernel netlink client: %s", exc)
         return 1
 
-    LOGGER.info("mcpd capability registry ready; waiting for provider manifest registration")
+    try:
+        _autoload_manifests_on_startup()
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.error("failed to autoload provider manifests: %s", exc)
+        return 1
+
+    LOGGER.info("mcpd capability registry ready; provider manifest autoload complete")
     _cleanup_socket(SOCK_PATH)
 
     try:

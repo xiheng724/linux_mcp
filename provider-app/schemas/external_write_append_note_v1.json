@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "required": [
+    "note",
+    "path"
+  ],
+  "properties": {
+    "note": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string"
+    },
+    "append": {
+      "type": "boolean"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}
