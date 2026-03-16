@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "properties": {
+    "apiVersion": {
+      "const": "mcpd/v1"
+    },
+    "kind": {
+      "const": "CapabilityPackage"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "deprecated": {
+          "type": "boolean"
+        },
+        "replaced_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "introduced_in": {
+          "type": "string"
+        },
+        "requires_mcpd_version": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "object"
+        },
+        "annotations": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "spec": {
+      "type": "object",
+      "required": [
+        "capability",
+        "broker_ref",
+        "policy_ref",
+        "executor_ref",
+        "provider_requirements",
+        "description"
+      ],
+      "properties": {
+        "capability": {
+          "type": "object",
+          "required": [
+            "required_caps",
+            "capability_class",
+            "allows_side_effect",
+            "auth_mode"
+          ],
+          "properties": {
+            "capability_id": {
+              "type": "integer"
+            },
+            "required_caps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            },
+            "capability_class": {
+              "type": "string"
+            },
+            "risk_level": {
+              "type": "integer"
+            },
+            "allows_side_effect": {
+              "type": "boolean"
+            },
+            "auth_mode": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "broker_ref": {
+          "type": "string"
+        },
+        "policy_ref": {
+          "type": "string"
+        },
+        "executor_ref": {
+          "type": "string"
+        },
+        "provider_requirements": {
+          "type": "object",
+          "required": [
+            "manifests"
+          ],
+          "properties": {
+            "manifests": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

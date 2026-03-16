@@ -1,0 +1,1630 @@
+{
+  "apiVersion": "mcpd/v1",
+  "broker_registry": {
+    "brokers": [
+      {
+        "broker_id": "browser-broker",
+        "capability_domains": [
+          "browser.automation"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "exec-broker",
+        "capability_domains": [
+          "exec.run"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "external-router-broker",
+        "capability_domains": [
+          "external.write"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "file-broker",
+        "capability_domains": [
+          "file.read",
+          "file.write"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "info-broker",
+        "capability_domains": [
+          "info.lookup",
+          "network.fetch.readonly"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "message-broker",
+        "capability_domains": [
+          "message.read",
+          "message.send"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      }
+    ],
+    "version": 1
+  },
+  "capability_registry": {
+    "capabilities": [
+      {
+        "allows_side_effect": true,
+        "approval_mode": "interactive",
+        "audit_mode": "detailed",
+        "auth_mode": "interactive-broker",
+        "broker_id": "browser-broker",
+        "capability_class": "automation",
+        "capability_domain": "browser.automation",
+        "capability_id": 107,
+        "description": "Interactive browser automation and remote UI manipulation.",
+        "executor_policy": {
+          "allowed_executor_types": [
+            "broker-isolated-uds",
+            "sandboxed-process"
+          ],
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 4,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "executor_ref": "sandbox-broker-isolated",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 2,
+        "max_inflight_per_participant": 2,
+        "policy_ref": "browser-interactive",
+        "provider_requirements": {
+          "manifests": []
+        },
+        "rate_limit": {
+          "burst": 2,
+          "default_cost": 1,
+          "defer_wait_ms": 500,
+          "enabled": true,
+          "max_inflight_per_participant": 2,
+          "refill_jiffies": 5,
+          "refill_tokens": 1
+        },
+        "required_caps": [
+          "CAP_BROWSER_AUTOMATION"
+        ],
+        "risk_level": 8,
+        "sandbox_profile": "sandbox-broker-isolated"
+      },
+      {
+        "allows_side_effect": true,
+        "approval_mode": "root-only",
+        "audit_mode": "strict",
+        "auth_mode": "trusted-exec",
+        "broker_id": "exec-broker",
+        "capability_class": "execution",
+        "capability_domain": "exec.run",
+        "capability_id": 109,
+        "description": "Host or sandboxed process execution.",
+        "executor_policy": {
+          "allowed_executor_types": [
+            "sandboxed-process"
+          ],
+          "deny_on_unenforced": true,
+          "min_planner_trust_level": 8,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "executor_ref": "sandbox-high-risk",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 1,
+        "max_inflight_per_participant": 1,
+        "policy_ref": "exec-rootonly",
+        "provider_requirements": {
+          "manifests": [
+            "settings-provider"
+          ]
+        },
+        "rate_limit": {
+          "burst": 1,
+          "default_cost": 1,
+          "defer_wait_ms": 1000,
+          "enabled": true,
+          "max_inflight_per_participant": 1,
+          "refill_jiffies": 10,
+          "refill_tokens": 1
+        },
+        "required_caps": [
+          "CAP_EXEC_RUN"
+        ],
+        "risk_level": 8,
+        "sandbox_profile": "sandbox-high-risk"
+      },
+      {
+        "allows_side_effect": true,
+        "approval_mode": "explicit",
+        "audit_mode": "detailed",
+        "auth_mode": "provider-auth",
+        "broker_id": "external-router-broker",
+        "capability_class": "external-write",
+        "capability_domain": "external.write",
+        "capability_id": 108,
+        "description": "Mutating external systems through provider-authenticated actions.",
+        "executor_policy": {
+          "allowed_executor_types": [
+            "broker-isolated-uds",
+            "sandboxed-process"
+          ],
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 4,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "executor_ref": "sandbox-broker-isolated",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 2,
+        "max_inflight_per_participant": 2,
+        "policy_ref": "write-mediumrisk",
+        "provider_requirements": {
+          "manifests": [
+            "settings-provider",
+            "notes-provider"
+          ]
+        },
+        "rate_limit": {
+          "burst": 2,
+          "default_cost": 1,
+          "defer_wait_ms": 500,
+          "enabled": true,
+          "max_inflight_per_participant": 2,
+          "refill_jiffies": 5,
+          "refill_tokens": 1
+        },
+        "required_caps": [
+          "CAP_EXTERNAL_WRITE"
+        ],
+        "risk_level": 8,
+        "sandbox_profile": "sandbox-broker-isolated"
+      },
+      {
+        "allows_side_effect": false,
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "auth_mode": "local-readonly",
+        "broker_id": "file-broker",
+        "capability_class": "read",
+        "capability_domain": "file.read",
+        "capability_id": 104,
+        "description": "Read-only file preview, listing, and inspection operations.",
+        "executor_policy": {
+          "allowed_executor_types": [
+            "broker-uds"
+          ],
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "executor_ref": "local-readonly",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 4,
+        "max_inflight_per_participant": 4,
+        "policy_ref": "readonly-mediumrisk",
+        "provider_requirements": {
+          "manifests": [
+            "file-manager-provider"
+          ]
+        },
+        "rate_limit": {
+          "burst": 8,
+          "default_cost": 1,
+          "defer_wait_ms": 250,
+          "enabled": true,
+          "max_inflight_per_participant": 4,
+          "refill_jiffies": 5,
+          "refill_tokens": 4
+        },
+        "required_caps": [
+          "CAP_FILE_READ"
+        ],
+        "risk_level": 3,
+        "sandbox_profile": "local-readonly"
+      },
+      {
+        "allows_side_effect": true,
+        "approval_mode": "explicit",
+        "audit_mode": "detailed",
+        "auth_mode": "trusted-write",
+        "broker_id": "file-broker",
+        "capability_class": "write",
+        "capability_domain": "file.write",
+        "capability_id": 105,
+        "description": "Filesystem mutation operations such as create, delete, copy, and rename.",
+        "executor_policy": {
+          "allowed_executor_types": [
+            "broker-isolated-uds",
+            "sandboxed-process"
+          ],
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 4,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "executor_ref": "sandbox-broker-isolated",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 2,
+        "max_inflight_per_participant": 2,
+        "policy_ref": "write-mediumrisk",
+        "provider_requirements": {
+          "manifests": [
+            "file-manager-provider"
+          ]
+        },
+        "rate_limit": {
+          "burst": 2,
+          "default_cost": 1,
+          "defer_wait_ms": 500,
+          "enabled": true,
+          "max_inflight_per_participant": 2,
+          "refill_jiffies": 5,
+          "refill_tokens": 1
+        },
+        "required_caps": [
+          "CAP_FILE_WRITE"
+        ],
+        "risk_level": 8,
+        "sandbox_profile": "sandbox-broker-isolated"
+      },
+      {
+        "allows_side_effect": false,
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "auth_mode": "local-readonly",
+        "broker_id": "info-broker",
+        "capability_class": "read",
+        "capability_domain": "info.lookup",
+        "capability_id": 101,
+        "description": "Read-only information lookup, diagnostics, calculation, and text utility operations.",
+        "executor_policy": {
+          "allowed_executor_types": [
+            "broker-uds"
+          ],
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "executor_ref": "local-readonly",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 8,
+        "max_inflight_per_participant": 8,
+        "policy_ref": "readonly-lowrisk",
+        "provider_requirements": {
+          "manifests": [
+            "settings-provider",
+            "file-manager-provider",
+            "calculator-provider",
+            "utility-provider"
+          ]
+        },
+        "rate_limit": {
+          "burst": 0,
+          "default_cost": 0,
+          "defer_wait_ms": 0,
+          "enabled": false,
+          "max_inflight_per_participant": 0,
+          "refill_jiffies": 0,
+          "refill_tokens": 0
+        },
+        "required_caps": [
+          "CAP_INFO_LOOKUP"
+        ],
+        "risk_level": 1,
+        "sandbox_profile": "local-readonly"
+      },
+      {
+        "allows_side_effect": false,
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "auth_mode": "session-auth",
+        "broker_id": "message-broker",
+        "capability_class": "read",
+        "capability_domain": "message.read",
+        "capability_id": 102,
+        "description": "Read-only access to inboxes, message history, or other message content.",
+        "executor_policy": {
+          "allowed_executor_types": [
+            "broker-uds"
+          ],
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "executor_ref": "local-readonly",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 4,
+        "max_inflight_per_participant": 4,
+        "policy_ref": "readonly-mediumrisk",
+        "provider_requirements": {
+          "manifests": []
+        },
+        "rate_limit": {
+          "burst": 8,
+          "default_cost": 1,
+          "defer_wait_ms": 250,
+          "enabled": true,
+          "max_inflight_per_participant": 4,
+          "refill_jiffies": 5,
+          "refill_tokens": 4
+        },
+        "required_caps": [
+          "CAP_MESSAGE_READ"
+        ],
+        "risk_level": 3,
+        "sandbox_profile": "local-readonly"
+      },
+      {
+        "allows_side_effect": true,
+        "approval_mode": "explicit",
+        "audit_mode": "detailed",
+        "auth_mode": "session-auth",
+        "broker_id": "message-broker",
+        "capability_class": "write",
+        "capability_domain": "message.send",
+        "capability_id": 103,
+        "description": "Outbound messaging and notification delivery with observable side effects.",
+        "executor_policy": {
+          "allowed_executor_types": [
+            "broker-isolated-uds",
+            "sandboxed-process"
+          ],
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 4,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "executor_ref": "sandbox-broker-isolated",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 2,
+        "max_inflight_per_participant": 2,
+        "policy_ref": "write-mediumrisk",
+        "provider_requirements": {
+          "manifests": []
+        },
+        "rate_limit": {
+          "burst": 2,
+          "default_cost": 1,
+          "defer_wait_ms": 500,
+          "enabled": true,
+          "max_inflight_per_participant": 2,
+          "refill_jiffies": 5,
+          "refill_tokens": 1
+        },
+        "required_caps": [
+          "CAP_MESSAGE_SEND"
+        ],
+        "risk_level": 8,
+        "sandbox_profile": "sandbox-broker-isolated"
+      },
+      {
+        "allows_side_effect": false,
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "auth_mode": "network-readonly",
+        "broker_id": "info-broker",
+        "capability_class": "network-read",
+        "capability_domain": "network.fetch.readonly",
+        "capability_id": 106,
+        "description": "Read-only network fetch and external information retrieval.",
+        "executor_policy": {
+          "allowed_executor_types": [
+            "broker-uds"
+          ],
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "executor_ref": "local-readonly",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 4,
+        "max_inflight_per_participant": 4,
+        "policy_ref": "network-readonly",
+        "provider_requirements": {
+          "manifests": []
+        },
+        "rate_limit": {
+          "burst": 4,
+          "default_cost": 1,
+          "defer_wait_ms": 250,
+          "enabled": true,
+          "max_inflight_per_participant": 4,
+          "refill_jiffies": 5,
+          "refill_tokens": 2
+        },
+        "required_caps": [
+          "CAP_NETWORK_FETCH_READONLY"
+        ],
+        "risk_level": 4,
+        "sandbox_profile": "local-readonly"
+      }
+    ],
+    "version": 1
+  },
+  "definitions": {
+    "brokers": [
+      {
+        "broker_id": "browser-broker",
+        "capability_domains": [
+          "browser.automation"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "exec-broker",
+        "capability_domains": [
+          "exec.run"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "external-router-broker",
+        "capability_domains": [
+          "external.write"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "file-broker",
+        "capability_domains": [
+          "file.read",
+          "file.write"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "info-broker",
+        "capability_domains": [
+          "info.lookup",
+          "network.fetch.readonly"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      },
+      {
+        "broker_id": "message-broker",
+        "capability_domains": [
+          "message.read",
+          "message.send"
+        ],
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_controlled": true,
+        "runtime_identity_mode": "registered-agent",
+        "selection_policy": {
+          "allow_preferred_provider_high_risk": false,
+          "prefer_example_matches": true,
+          "prefer_lower_risk_on_tie": true,
+          "prefer_manifest_priority": true,
+          "require_provider_availability": true
+        }
+      }
+    ],
+    "executors": [
+      {
+        "allowed_executor_types": [
+          "broker-uds"
+        ],
+        "executor_ref": "local-readonly",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "network_policies": [
+          "inherit"
+        ],
+        "profiles": [
+          {
+            "executor_type": "broker-uds",
+            "sandbox_profile": "local-readonly"
+          }
+        ],
+        "sandbox_profile": "local-readonly"
+      },
+      {
+        "allowed_executor_types": [
+          "broker-isolated-uds",
+          "sandboxed-process"
+        ],
+        "executor_ref": "sandbox-broker-isolated",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "network_policies": [
+          "broker-mediated"
+        ],
+        "profiles": [
+          {
+            "executor_type": "broker-isolated-uds",
+            "sandbox_profile": "sandbox-broker-isolated"
+          },
+          {
+            "executor_type": "sandboxed-process",
+            "sandbox_profile": "sandbox-broker-isolated"
+          }
+        ],
+        "sandbox_profile": "sandbox-broker-isolated"
+      },
+      {
+        "allowed_executor_types": [
+          "sandboxed-process"
+        ],
+        "executor_ref": "sandbox-high-risk",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "network_policies": [
+          "broker-mediated"
+        ],
+        "profiles": [
+          {
+            "executor_type": "sandboxed-process",
+            "sandbox_profile": "sandbox-high-risk"
+          }
+        ],
+        "sandbox_profile": "sandbox-high-risk"
+      }
+    ],
+    "policies": [
+      {
+        "approval_mode": "interactive",
+        "audit_mode": "detailed",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 4,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 2,
+        "max_inflight_per_participant": 2,
+        "policy_ref": "browser-interactive",
+        "rate_limit": {
+          "burst": 2,
+          "default_cost": 1,
+          "defer_wait_ms": 500,
+          "enabled": true,
+          "max_inflight_per_participant": 2,
+          "refill_jiffies": 5,
+          "refill_tokens": 1
+        },
+        "risk_level": 8
+      },
+      {
+        "approval_mode": "root-only",
+        "audit_mode": "strict",
+        "executor_policy": {
+          "deny_on_unenforced": true,
+          "min_planner_trust_level": 8,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 1,
+        "max_inflight_per_participant": 1,
+        "policy_ref": "exec-rootonly",
+        "rate_limit": {
+          "burst": 1,
+          "default_cost": 1,
+          "defer_wait_ms": 1000,
+          "enabled": true,
+          "max_inflight_per_participant": 1,
+          "refill_jiffies": 10,
+          "refill_tokens": 1
+        },
+        "risk_level": 8
+      },
+      {
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 4,
+        "max_inflight_per_participant": 4,
+        "policy_ref": "network-readonly",
+        "rate_limit": {
+          "burst": 4,
+          "default_cost": 1,
+          "defer_wait_ms": 250,
+          "enabled": true,
+          "max_inflight_per_participant": 4,
+          "refill_jiffies": 5,
+          "refill_tokens": 2
+        },
+        "risk_level": 4
+      },
+      {
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 8,
+        "max_inflight_per_participant": 8,
+        "policy_ref": "readonly-lowrisk",
+        "rate_limit": {
+          "burst": 0,
+          "default_cost": 0,
+          "defer_wait_ms": 0,
+          "enabled": false,
+          "max_inflight_per_participant": 0,
+          "refill_jiffies": 0,
+          "refill_tokens": 0
+        },
+        "risk_level": 1
+      },
+      {
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 4,
+        "max_inflight_per_participant": 4,
+        "policy_ref": "readonly-mediumrisk",
+        "rate_limit": {
+          "burst": 8,
+          "default_cost": 1,
+          "defer_wait_ms": 250,
+          "enabled": true,
+          "max_inflight_per_participant": 4,
+          "refill_jiffies": 5,
+          "refill_tokens": 4
+        },
+        "risk_level": 3
+      },
+      {
+        "approval_mode": "explicit",
+        "audit_mode": "detailed",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 4,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 2,
+        "max_inflight_per_participant": 2,
+        "policy_ref": "write-mediumrisk",
+        "rate_limit": {
+          "burst": 2,
+          "default_cost": 1,
+          "defer_wait_ms": 500,
+          "enabled": true,
+          "max_inflight_per_participant": 2,
+          "refill_jiffies": 5,
+          "refill_tokens": 1
+        },
+        "risk_level": 8
+      }
+    ],
+    "version": 1
+  },
+  "executor_profiles": {
+    "profiles": [
+      {
+        "command_schema_mode": "parameter_schema_id",
+        "definition_ref": "sandbox-broker-isolated",
+        "deny_on_unenforced": false,
+        "enforce_no_new_privs": true,
+        "executor_type": "broker-isolated-uds",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "inherited_env_keys": [
+          "LANG",
+          "LC_ALL",
+          "PATH"
+        ],
+        "network_policy": "broker-mediated",
+        "required_hooks": [
+          "no_new_privs"
+        ],
+        "resource_limits": {
+          "cpu_ms": 3000,
+          "memory_kb": 262144,
+          "nofile": 64
+        },
+        "runtime_identity_mode": "broker-bound",
+        "sandbox_profile": "sandbox-broker-isolated",
+        "sandbox_ready": true,
+        "short_lived": true,
+        "structured_payload_only": true
+      },
+      {
+        "command_schema_mode": "parameter_schema_id",
+        "definition_ref": "local-readonly",
+        "deny_on_unenforced": false,
+        "enforce_no_new_privs": true,
+        "executor_type": "broker-uds",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "inherited_env_keys": [
+          "LANG",
+          "LC_ALL",
+          "PATH"
+        ],
+        "network_policy": "inherit",
+        "required_hooks": [],
+        "resource_limits": {
+          "cpu_ms": 1000,
+          "memory_kb": 131072,
+          "nofile": 64
+        },
+        "runtime_identity_mode": "broker-bound",
+        "sandbox_profile": "local-readonly",
+        "sandbox_ready": true,
+        "short_lived": true,
+        "structured_payload_only": true
+      },
+      {
+        "command_schema_mode": "parameter_schema_id",
+        "definition_ref": "sandbox-broker-isolated",
+        "deny_on_unenforced": false,
+        "enforce_no_new_privs": true,
+        "executor_type": "sandboxed-process",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "inherited_env_keys": [
+          "LANG",
+          "LC_ALL",
+          "PATH"
+        ],
+        "network_policy": "broker-mediated",
+        "required_hooks": [
+          "no_new_privs"
+        ],
+        "resource_limits": {
+          "cpu_ms": 3000,
+          "memory_kb": 262144,
+          "nofile": 64
+        },
+        "runtime_identity_mode": "broker-bound",
+        "sandbox_profile": "sandbox-broker-isolated",
+        "sandbox_ready": true,
+        "short_lived": true,
+        "structured_payload_only": true
+      },
+      {
+        "command_schema_mode": "parameter_schema_id",
+        "definition_ref": "sandbox-high-risk",
+        "deny_on_unenforced": true,
+        "enforce_no_new_privs": true,
+        "executor_type": "sandboxed-process",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "inherited_env_keys": [
+          "LANG",
+          "LC_ALL",
+          "PATH"
+        ],
+        "network_policy": "broker-mediated",
+        "required_hooks": [
+          "no_new_privs",
+          "namespace"
+        ],
+        "resource_limits": {
+          "cpu_ms": 5000,
+          "memory_kb": 262144,
+          "nofile": 64
+        },
+        "runtime_identity_mode": "broker-bound",
+        "sandbox_profile": "sandbox-high-risk",
+        "sandbox_ready": true,
+        "short_lived": true,
+        "structured_payload_only": true
+      }
+    ],
+    "version": 1
+  },
+  "kind": "RuntimeRegistry",
+  "metadata": {
+    "controlplane_layout": "package-definitions-generated",
+    "registry_hash": "f800ce9b",
+    "requires_mcpd_version": ">=1.0.0",
+    "version": "1.0.0"
+  },
+  "packages": {
+    "items": [
+      {
+        "broker_ref": "browser-broker",
+        "capability_domain": "browser.automation",
+        "description": "Interactive browser automation and remote UI manipulation.",
+        "executor_ref": "sandbox-broker-isolated",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_ref": "browser-interactive",
+        "provider_requirements": {
+          "manifests": []
+        }
+      },
+      {
+        "broker_ref": "exec-broker",
+        "capability_domain": "exec.run",
+        "description": "Host or sandboxed process execution.",
+        "executor_ref": "sandbox-high-risk",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_ref": "exec-rootonly",
+        "provider_requirements": {
+          "manifests": [
+            "settings-provider"
+          ]
+        }
+      },
+      {
+        "broker_ref": "external-router-broker",
+        "capability_domain": "external.write",
+        "description": "Mutating external systems through provider-authenticated actions.",
+        "executor_ref": "sandbox-broker-isolated",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_ref": "write-mediumrisk",
+        "provider_requirements": {
+          "manifests": [
+            "settings-provider",
+            "notes-provider"
+          ]
+        }
+      },
+      {
+        "broker_ref": "file-broker",
+        "capability_domain": "file.read",
+        "description": "Read-only file preview, listing, and inspection operations.",
+        "executor_ref": "local-readonly",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_ref": "readonly-mediumrisk",
+        "provider_requirements": {
+          "manifests": [
+            "file-manager-provider"
+          ]
+        }
+      },
+      {
+        "broker_ref": "file-broker",
+        "capability_domain": "file.write",
+        "description": "Filesystem mutation operations such as create, delete, copy, and rename.",
+        "executor_ref": "sandbox-broker-isolated",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_ref": "write-mediumrisk",
+        "provider_requirements": {
+          "manifests": [
+            "file-manager-provider"
+          ]
+        }
+      },
+      {
+        "broker_ref": "info-broker",
+        "capability_domain": "info.lookup",
+        "description": "Read-only information lookup, diagnostics, calculation, and text utility operations.",
+        "executor_ref": "local-readonly",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_ref": "readonly-lowrisk",
+        "provider_requirements": {
+          "manifests": [
+            "settings-provider",
+            "file-manager-provider",
+            "calculator-provider",
+            "utility-provider"
+          ]
+        }
+      },
+      {
+        "broker_ref": "message-broker",
+        "capability_domain": "message.read",
+        "description": "Read-only access to inboxes, message history, or other message content.",
+        "executor_ref": "local-readonly",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_ref": "readonly-mediumrisk",
+        "provider_requirements": {
+          "manifests": []
+        }
+      },
+      {
+        "broker_ref": "message-broker",
+        "capability_domain": "message.send",
+        "description": "Outbound messaging and notification delivery with observable side effects.",
+        "executor_ref": "sandbox-broker-isolated",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_ref": "write-mediumrisk",
+        "provider_requirements": {
+          "manifests": []
+        }
+      },
+      {
+        "broker_ref": "info-broker",
+        "capability_domain": "network.fetch.readonly",
+        "description": "Read-only network fetch and external information retrieval.",
+        "executor_ref": "local-readonly",
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "policy_ref": "network-readonly",
+        "provider_requirements": {
+          "manifests": []
+        }
+      }
+    ],
+    "version": 1
+  },
+  "policy_registry": {
+    "policies": [
+      {
+        "approval_mode": "interactive",
+        "audit_mode": "detailed",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 4,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 2,
+        "max_inflight_per_participant": 2,
+        "policy_ref": "browser-interactive",
+        "rate_limit": {
+          "burst": 2,
+          "default_cost": 1,
+          "defer_wait_ms": 500,
+          "enabled": true,
+          "max_inflight_per_participant": 2,
+          "refill_jiffies": 5,
+          "refill_tokens": 1
+        },
+        "risk_level": 8
+      },
+      {
+        "approval_mode": "root-only",
+        "audit_mode": "strict",
+        "executor_policy": {
+          "deny_on_unenforced": true,
+          "min_planner_trust_level": 8,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 1,
+        "max_inflight_per_participant": 1,
+        "policy_ref": "exec-rootonly",
+        "rate_limit": {
+          "burst": 1,
+          "default_cost": 1,
+          "defer_wait_ms": 1000,
+          "enabled": true,
+          "max_inflight_per_participant": 1,
+          "refill_jiffies": 10,
+          "refill_tokens": 1
+        },
+        "risk_level": 8
+      },
+      {
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 4,
+        "max_inflight_per_participant": 4,
+        "policy_ref": "network-readonly",
+        "rate_limit": {
+          "burst": 4,
+          "default_cost": 1,
+          "defer_wait_ms": 250,
+          "enabled": true,
+          "max_inflight_per_participant": 4,
+          "refill_jiffies": 5,
+          "refill_tokens": 2
+        },
+        "risk_level": 4
+      },
+      {
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 8,
+        "max_inflight_per_participant": 8,
+        "policy_ref": "readonly-lowrisk",
+        "rate_limit": {
+          "burst": 0,
+          "default_cost": 0,
+          "defer_wait_ms": 0,
+          "enabled": false,
+          "max_inflight_per_participant": 0,
+          "refill_jiffies": 0,
+          "refill_tokens": 0
+        },
+        "risk_level": 1
+      },
+      {
+        "approval_mode": "auto",
+        "audit_mode": "basic",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 0,
+          "min_provider_trust_class": "local",
+          "network_policy": "inherit",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 4,
+        "max_inflight_per_participant": 4,
+        "policy_ref": "readonly-mediumrisk",
+        "rate_limit": {
+          "burst": 8,
+          "default_cost": 1,
+          "defer_wait_ms": 250,
+          "enabled": true,
+          "max_inflight_per_participant": 4,
+          "refill_jiffies": 5,
+          "refill_tokens": 4
+        },
+        "risk_level": 3
+      },
+      {
+        "approval_mode": "explicit",
+        "audit_mode": "detailed",
+        "executor_policy": {
+          "deny_on_unenforced": false,
+          "min_planner_trust_level": 4,
+          "min_provider_trust_class": "local",
+          "network_policy": "broker-mediated",
+          "require_short_lived": true
+        },
+        "governance": {
+          "compatibility_mode": "canonical",
+          "deprecated": false,
+          "introduced_in": "1.0.0",
+          "replaced_by": "",
+          "requires_mcpd_version": ">=1.0.0",
+          "version": "1.0.0"
+        },
+        "max_inflight_per_agent": 2,
+        "max_inflight_per_participant": 2,
+        "policy_ref": "write-mediumrisk",
+        "rate_limit": {
+          "burst": 2,
+          "default_cost": 1,
+          "defer_wait_ms": 500,
+          "enabled": true,
+          "max_inflight_per_participant": 2,
+          "refill_jiffies": 5,
+          "refill_tokens": 1
+        },
+        "risk_level": 8
+      }
+    ],
+    "version": 1
+  },
+  "provider_manifest_index": {
+    "providers": [
+      {
+        "capability_domains": [
+          "info.lookup"
+        ],
+        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/calculator-provider.json",
+        "provider_id": "calculator-provider"
+      },
+      {
+        "capability_domains": [
+          "file.read",
+          "file.write",
+          "info.lookup"
+        ],
+        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/file-manager-provider.json",
+        "provider_id": "file-manager-provider"
+      },
+      {
+        "capability_domains": [
+          "external.write"
+        ],
+        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/notes-provider.json",
+        "provider_id": "notes-provider"
+      },
+      {
+        "capability_domains": [
+          "exec.run",
+          "external.write",
+          "info.lookup"
+        ],
+        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/settings-provider.json",
+        "provider_id": "settings-provider"
+      },
+      {
+        "capability_domains": [
+          "info.lookup"
+        ],
+        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/utility-provider.json",
+        "provider_id": "utility-provider"
+      }
+    ],
+    "version": 1
+  },
+  "server_defaults": {
+    "broker_trust_level": 8,
+    "default_socket_paths": {
+      "mcpd": "/tmp/mcpd.sock"
+    },
+    "executor_workdir_root": "/tmp/linux-mcp-executors",
+    "governance": {
+      "compatibility_mode": "canonical",
+      "deprecated": false,
+      "introduced_in": "1.0.0",
+      "replaced_by": "",
+      "requires_mcpd_version": ">=1.0.0",
+      "version": "1.0.0"
+    },
+    "manifest_dirs": [
+      "provider-app/manifests"
+    ],
+    "planner_trust_level": 8,
+    "socket_path": "/tmp/mcpd.sock"
+  }
+}

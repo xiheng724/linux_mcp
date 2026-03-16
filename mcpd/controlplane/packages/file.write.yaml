@@ -1,0 +1,24 @@
+apiVersion: mcpd/v1
+kind: CapabilityPackage
+metadata:
+  name: file.write
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  capability:
+    capability_id: 105
+    required_caps: [CAP_FILE_WRITE]
+    capability_class: write
+    allows_side_effect: true
+    auth_mode: trusted-write
+  broker_ref: file-broker
+  policy_ref: write-mediumrisk
+  executor_ref: sandbox-broker-isolated
+  provider_requirements:
+    manifests: [file-manager-provider]
+  description: "Filesystem mutation operations such as create, delete, copy, and rename."

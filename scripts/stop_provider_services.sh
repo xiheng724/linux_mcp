@@ -4,7 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
+if [[ -x "$ROOT_DIR/.venv/bin/python" ]] && "$ROOT_DIR/.venv/bin/python" - <<'PY' >/dev/null 2>&1
+import yaml
+PY
+then
   PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
 else
   PYTHON_BIN="python3"

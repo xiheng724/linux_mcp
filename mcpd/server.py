@@ -32,23 +32,26 @@ from architecture import (
     build_executor_binding,
     build_broker_catalog,
     build_capability_catalog,
+    explain_capability_request,
     load_provider_manifest,
     plan_capability_execution,
     validate_capability_request,
     validate_action_payload,
     validate_executor_binding_for_capability,
 )
+from config_loader import load_server_defaults_config
+from explain import (
+    build_capability_selection_explain,
+    build_dispatch_explain,
+    build_payload_construction_explain,
+)
 from netlink_client import KernelMcpNetlinkClient
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_MANIFEST_DIRS = (ROOT_DIR / "provider-app" / "manifests",)
 MANIFEST_DIRS_ENV = "MCPD_MANIFEST_DIRS"
-
-SOCK_PATH = "/tmp/mcpd.sock"
 MAX_MSG_SIZE = 16 * 1024 * 1024
 MAX_DEFER_RETRIES = 50
 EXECUTOR_RUNTIME_TIMEOUT_S = 30.0
-EXECUTOR_WORKDIR_ROOT = "/tmp/linux-mcp-executors"
 LOGGER = logging.getLogger("mcpd")
 HASH_RE = re.compile(r"^[0-9a-fA-F]{8}$")
 
@@ -66,12 +69,71 @@ _capability_registry: Dict[str, CapabilityDomain] = {}
 _broker_registry: Dict[str, BrokerDef] = {}
 _kernel_client: KernelMcpNetlinkClient | None = None
 
+_SERVER_DEFAULT_FALLBACKS: Dict[str, Any] = {
+    "manifest_dirs": (ROOT_DIR / "provider-app" / "manifests",),
+    "planner_trust_level": 8,
+    "broker_trust_level": 8,
+    "executor_workdir_root": "/tmp/linux-mcp-executors",
+    "default_socket_paths": {"mcpd": "/tmp/mcpd.sock"},
+}
+_SERVER_DEFAULTS = load_server_defaults_config()
+
+
+def _server_default_str(env_name: str, config_value: Any, fallback_value: str) -> str:
+    env_value = os.getenv(env_name, "").strip()
+    if env_value:
+        return env_value
+    if isinstance(config_value, str) and config_value.strip():
+        return config_value.strip()
+    return fallback_value
+
+
+def _server_default_int(env_name: str, config_value: Any, fallback_value: int) -> int:
+    env_value = os.getenv(env_name, "").strip()
+    if env_value:
+        try:
+            return int(env_value)
+        except ValueError as exc:
+            raise ValueError(f"{env_name} must be an integer") from exc
+    if isinstance(config_value, int) and not isinstance(config_value, bool):
+        return config_value
+    return fallback_value
+
+
+DEFAULT_MANIFEST_DIRS = tuple(
+    ROOT_DIR / entry
+    if not Path(entry).expanduser().is_absolute()
+    else Path(entry).expanduser()
+    for entry in (
+        _SERVER_DEFAULTS.get("manifest_dirs")
+        or _SERVER_DEFAULT_FALLBACKS["manifest_dirs"]
+    )
+)
+SOCK_PATH = _server_default_str(
+    "MCPD_SOCKET_PATH",
+    _SERVER_DEFAULTS.get("default_socket_paths", {}).get("mcpd"),
+    _SERVER_DEFAULT_FALLBACKS["default_socket_paths"]["mcpd"],
+)
+EXECUTOR_WORKDIR_ROOT = _server_default_str(
+    "MCPD_EXECUTOR_WORKDIR_ROOT",
+    _SERVER_DEFAULTS.get("executor_workdir_root"),
+    _SERVER_DEFAULT_FALLBACKS["executor_workdir_root"],
+)
+
 PLANNER_CAPS = 0
 for _caps in CAPABILITY_REQUIRED_CAPS.values():
     PLANNER_CAPS |= _caps
-PLANNER_TRUST_LEVEL = 8
+PLANNER_TRUST_LEVEL = _server_default_int(
+    "MCPD_PLANNER_TRUST_LEVEL",
+    _SERVER_DEFAULTS.get("planner_trust_level"),
+    _SERVER_DEFAULT_FALLBACKS["planner_trust_level"],
+)
 PLANNER_FLAGS = 0
-BROKER_TRUST_LEVEL = 8
+BROKER_TRUST_LEVEL = _server_default_int(
+    "MCPD_BROKER_TRUST_LEVEL",
+    _SERVER_DEFAULTS.get("broker_trust_level"),
+    _SERVER_DEFAULT_FALLBACKS["broker_trust_level"],
+)
 BROKER_FLAGS = 0
 
 
@@ -646,6 +708,9 @@ def _executor_binding_to_public(plan: BrokerDispatchPlan) -> Dict[str, Any]:
         "sandbox_ready": plan.executor.sandbox_ready,
         "runtime_identity_mode": plan.executor.runtime_identity_mode,
         "short_lived": plan.executor.short_lived,
+        "required_hooks": list(plan.executor.required_hooks),
+        "deny_on_unenforced": plan.executor.deny_on_unenforced,
+        "enforce_no_new_privs": plan.executor.enforce_no_new_privs,
     }
 
 
@@ -773,6 +838,7 @@ def _execute_plan(
     request_mode: str,
     audit_markers: List[str] | None = None,
     planning_timings: Dict[str, int] | None = None,
+    request_explanation: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     req_id = _ensure_int("req_id", req.get("req_id", 0))
     request_start = time.perf_counter()
@@ -806,6 +872,20 @@ def _execute_plan(
     payload = validate_action_payload(plan.action, payload)
     _validate_executor_contract(plan, payload)
     timings["payload_construction_ms"] = int((time.perf_counter() - payload_build_start) * 1000)
+    payload_construction_explain = build_payload_construction_explain(
+        fill_mode="schema_arg_hints",
+        schema=plan.action.input_schema,
+        arg_hints=plan.action.arg_hints,
+        payload=payload,
+    )
+    explain_payload = build_dispatch_explain(
+        capability_request=dict((request_explanation or {}).get("capability_request", {})),
+        capability_selection=dict((request_explanation or {}).get("capability_selection", {})),
+        action_resolution=dict(plan.explanation.get("action_resolution", {})),
+        executor_binding=dict(plan.explanation.get("executor_binding", {})),
+        payload_construction=payload_construction_explain,
+        compatibility_path=False,
+    )
     _emit_audit_event(
         "capability_request",
         req_id=req_id,
@@ -893,6 +973,7 @@ def _execute_plan(
             "executor_id": plan.executor.executor_id,
             "executor_instance_id": executor_instance_id,
             "request_mode": request_mode,
+            "explain": explain_payload,
         }
 
     exec_start = time.perf_counter()
@@ -997,6 +1078,7 @@ def _execute_plan(
             "request_mode": request_mode,
             "timing_metrics": dict(timings),
             "sandbox": executor_resp.get("sandbox", {}),
+            "explain": explain_payload,
         }
     finally:
         exec_ms = int((time.perf_counter() - exec_start) * 1000)
@@ -1081,6 +1163,63 @@ def _execute_capability_request(
         capability = _capability_registry.get(capability_name)
         if capability is None:
             raise ValueError(f"unsupported capability_domain: {capability_name}")
+        capability_request_explain = explain_capability_request(
+            {
+                "participant_id": participant_id,
+                "caps": PLANNER_CAPS,
+                "trust_level": PLANNER_TRUST_LEVEL,
+                "flags": PLANNER_FLAGS,
+            },
+            capability,
+            {
+                "intent_text": intent_text,
+                "interactive": bool(req.get("interactive", False)),
+                "explicit_approval": bool(req.get("explicit_approval", False)),
+                "approval_token": str(req.get("approval_token", "") or ""),
+            },
+        )
+        if not capability_request_explain.get("allowed", False):
+            _emit_structured_log(
+                "capability_policy_result",
+                participant_id=participant_id,
+                capability_domain=capability.name,
+                required_caps=capability.required_caps,
+                risk_level=capability.risk_level,
+                approval_mode=capability.approval_mode,
+                audit_mode=capability.audit_mode,
+                max_inflight_per_agent=capability.max_inflight_per_agent,
+                capability_policy_result="deny",
+                reason_codes=list(capability_request_explain.get("reason_codes", [])),
+                policy_explain=capability_request_explain,
+                error=str(capability_request_explain.get("deny_reason", "capability policy denied")),
+            )
+            return {
+                "req_id": _ensure_int("req_id", req.get("req_id", 0)),
+                "status": "error",
+                "result": {},
+                "error": str(capability_request_explain.get("deny_reason", "capability policy denied")),
+                "t_ms": 0,
+                "participant_id": participant_id,
+                "capability_domain": capability.name,
+                "capability_id": capability.capability_id,
+                "broker_id": capability.broker_id,
+                "request_mode": request_mode,
+                "audit_markers": list(capability_request_explain.get("audit_markers", [])),
+                "explain": build_dispatch_explain(
+                    capability_request=capability_request_explain,
+                    capability_selection=build_capability_selection_explain(
+                        capability_name,
+                        selector_source=str(hints.get("selector_source", "unknown")),
+                        selector_reason=str(hints.get("selector_reason", "")),
+                        preferred_provider_id=preferred_provider_id,
+                        compatibility_path=False,
+                    ),
+                    action_resolution={},
+                    executor_binding={},
+                    payload_construction={},
+                    compatibility_path=False,
+                ),
+            }
         try:
             gating_start = time.perf_counter()
             policy_markers = validate_capability_request(
@@ -1110,6 +1249,8 @@ def _execute_capability_request(
                 audit_mode=capability.audit_mode,
                 max_inflight_per_agent=capability.max_inflight_per_agent,
                 capability_policy_result="deny",
+                reason_codes=list(capability_request_explain.get("reason_codes", [])),
+                policy_explain=capability_request_explain,
                 error=str(exc),
             )
             raise
@@ -1125,6 +1266,8 @@ def _execute_capability_request(
             max_inflight_per_agent=capability.max_inflight_per_agent,
             capability_policy_result="allow",
             policy_markers=list(policy_markers),
+            reason_codes=list(capability_request_explain.get("reason_codes", [])),
+            policy_explain=capability_request_explain,
         )
         _emit_structured_log(
             "capability_resolver",
@@ -1158,7 +1301,20 @@ def _execute_capability_request(
             risk_level=plan.action.risk_level,
             selection_priority=plan.action.selection_priority,
             resolver_markers=list(plan.audit_markers),
+            resolution_explain=plan.explanation.get("action_resolution", {}),
         )
+    request_explanation = {
+        "capability_request": capability_request_explain,
+        "capability_selection": build_capability_selection_explain(
+            capability_name,
+            selector_source=str(hints.get("selector_source", "unknown")),
+            selector_reason=str(hints.get("selector_reason", "")),
+            preferred_provider_id=preferred_provider_id,
+            compatibility_path=False,
+        ),
+        "action_resolution": dict(plan.explanation.get("action_resolution", {})),
+        "executor_binding": dict(plan.explanation.get("executor_binding", {})),
+    }
     return _execute_plan(
         req,
         participant_id,
@@ -1166,6 +1322,7 @@ def _execute_capability_request(
         request_mode=request_mode,
         audit_markers=audit_markers,
         planning_timings=planning_timings,
+        request_explanation=request_explanation,
     )
 
 

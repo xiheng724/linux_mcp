@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "properties": {
+    "apiVersion": {
+      "const": "mcpd/v1"
+    },
+    "kind": {
+      "const": "PolicyDefinition"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "spec": {
+      "type": "object",
+      "required": [
+        "risk_level",
+        "approval_mode",
+        "audit_mode",
+        "rate_limit",
+        "max_inflight_per_participant",
+        "max_inflight_per_agent",
+        "executor_policy"
+      ],
+      "properties": {
+        "risk_level": {
+          "type": "integer"
+        },
+        "approval_mode": {
+          "type": "string"
+        },
+        "audit_mode": {
+          "type": "string"
+        },
+        "rate_limit": {
+          "type": "object"
+        },
+        "max_inflight_per_participant": {
+          "type": "integer"
+        },
+        "max_inflight_per_agent": {
+          "type": "integer"
+        },
+        "executor_policy": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

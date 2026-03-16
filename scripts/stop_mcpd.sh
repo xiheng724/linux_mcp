@@ -1,10 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+if [[ -x "$ROOT_DIR/.venv/bin/python" ]] && "$ROOT_DIR/.venv/bin/python" - <<'PY' >/dev/null 2>&1
+import yaml
+PY
+then
+  PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
+else
+  PYTHON_BIN="python3"
+fi
+
 RUNTIME_UID="$(id -u)"
 PID_PATH="/tmp/mcpd-${RUNTIME_UID}.pid"
 LEGACY_PID_PATH="/tmp/mcpd.pid"
-SOCK_PATH="/tmp/mcpd.sock"
+SOCK_PATH="$("$PYTHON_BIN" - <<'PY'
+import os
+import sys
+from pathlib import Path
+
+root = Path.cwd()
+sys.path.insert(0, str(root / "mcpd"))
+from config_loader import load_server_defaults_config
+
+raw = load_server_defaults_config()
+sock_path = os.getenv("MCPD_SOCKET_PATH", "").strip() or raw.get("default_socket_paths", {}).get("mcpd", "/tmp/mcpd.sock")
+print(sock_path)
+PY
+)"
 LOG_PATH="/tmp/mcpd-${RUNTIME_UID}.log"
 LEGACY_LOG_PATH="/tmp/mcpd.log"
 

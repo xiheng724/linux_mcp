@@ -1,0 +1,24 @@
+apiVersion: mcpd/v1
+kind: CapabilityPackage
+metadata:
+  name: file.read
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  capability:
+    capability_id: 104
+    required_caps: [CAP_FILE_READ]
+    capability_class: read
+    allows_side_effect: false
+    auth_mode: local-readonly
+  broker_ref: file-broker
+  policy_ref: readonly-mediumrisk
+  executor_ref: local-readonly
+  provider_requirements:
+    manifests: [file-manager-provider]
+  description: "Read-only file preview, listing, and inspection operations."

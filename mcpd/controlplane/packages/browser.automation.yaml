@@ -1,0 +1,24 @@
+apiVersion: mcpd/v1
+kind: CapabilityPackage
+metadata:
+  name: browser.automation
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  capability:
+    capability_id: 107
+    required_caps: [CAP_BROWSER_AUTOMATION]
+    capability_class: automation
+    allows_side_effect: true
+    auth_mode: interactive-broker
+  broker_ref: browser-broker
+  policy_ref: browser-interactive
+  executor_ref: sandbox-broker-isolated
+  provider_requirements:
+    manifests: []
+  description: "Interactive browser automation and remote UI manipulation."

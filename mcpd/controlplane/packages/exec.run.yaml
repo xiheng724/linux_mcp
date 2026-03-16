@@ -1,0 +1,24 @@
+apiVersion: mcpd/v1
+kind: CapabilityPackage
+metadata:
+  name: exec.run
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  capability:
+    capability_id: 109
+    required_caps: [CAP_EXEC_RUN]
+    capability_class: execution
+    allows_side_effect: true
+    auth_mode: trusted-exec
+  broker_ref: exec-broker
+  policy_ref: exec-rootonly
+  executor_ref: sandbox-high-risk
+  provider_requirements:
+    manifests: [settings-provider]
+  description: "Host or sandboxed process execution."

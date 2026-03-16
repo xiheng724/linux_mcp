@@ -248,19 +248,33 @@ class KernelMcpNetlinkClient:
             (ATTR["PID"], struct.pack("=I", pid)),
             (ATTR["UID"], struct.pack("=I", uid)),
         ]
+        attrs_with_caps = list(attrs)
         if caps:
-            attrs.append((ATTR["PARTICIPANT_CAPS"], struct.pack("=Q", caps)))
+            attrs_with_caps.append((ATTR["PARTICIPANT_CAPS"], struct.pack("=Q", caps)))
         if trust_level:
             attrs.append((ATTR["PARTICIPANT_TRUST_LEVEL"], struct.pack("=I", trust_level)))
+            attrs_with_caps.append((ATTR["PARTICIPANT_TRUST_LEVEL"], struct.pack("=I", trust_level)))
         if flags:
             attrs.append((ATTR["PARTICIPANT_FLAGS"], struct.pack("=I", flags)))
+            attrs_with_caps.append((ATTR["PARTICIPANT_FLAGS"], struct.pack("=I", flags)))
         attrs.append((ATTR["PARTICIPANT_TYPE"], struct.pack("=I", participant_type)))
-        self._request(
-            msg_type=self._family_id,
-            cmd=CMD["PARTICIPANT_REGISTER"],
-            attrs=attrs,
-            need_ack=True,
-        )
+        attrs_with_caps.append((ATTR["PARTICIPANT_TYPE"], struct.pack("=I", participant_type)))
+        try:
+            self._request(
+                msg_type=self._family_id,
+                cmd=CMD["PARTICIPANT_REGISTER"],
+                attrs=attrs_with_caps,
+                need_ack=True,
+            )
+        except RuntimeError as exc:
+            if not caps or "NLMSG_ERROR=-22" not in str(exc):
+                raise
+            self._request(
+                msg_type=self._family_id,
+                cmd=CMD["PARTICIPANT_REGISTER"],
+                attrs=attrs,
+                need_ack=True,
+            )
 
     def register_capability(
         self,
@@ -295,14 +309,18 @@ class KernelMcpNetlinkClient:
         ]
         if capability_hash:
             attrs.append((ATTR["CAPABILITY_HASH"], capability_hash.encode("utf-8") + b"\x00"))
+        attrs_with_required_caps = list(attrs)
         if required_caps:
-            attrs.append((ATTR["CAPABILITY_REQUIRED_CAPS"], struct.pack("=Q", required_caps)))
+            attrs_with_required_caps.append((ATTR["CAPABILITY_REQUIRED_CAPS"], struct.pack("=Q", required_caps)))
         if risk_level:
             attrs.append((ATTR["CAPABILITY_RISK_LEVEL"], struct.pack("=I", risk_level)))
+            attrs_with_required_caps.append((ATTR["CAPABILITY_RISK_LEVEL"], struct.pack("=I", risk_level)))
         if approval_mode:
             attrs.append((ATTR["CAPABILITY_APPROVAL_MODE"], struct.pack("=I", approval_mode)))
+            attrs_with_required_caps.append((ATTR["CAPABILITY_APPROVAL_MODE"], struct.pack("=I", approval_mode)))
         if audit_mode:
             attrs.append((ATTR["CAPABILITY_AUDIT_MODE"], struct.pack("=I", audit_mode)))
+            attrs_with_required_caps.append((ATTR["CAPABILITY_AUDIT_MODE"], struct.pack("=I", audit_mode)))
         if max_inflight_per_participant:
             attrs.append(
                 (
@@ -310,16 +328,27 @@ class KernelMcpNetlinkClient:
                     struct.pack("=I", max_inflight_per_participant),
                 )
             )
+            attrs_with_required_caps.append(
+                (
+                    ATTR["CAPABILITY_MAX_INFLIGHT_PER_PARTICIPANT"],
+                    struct.pack("=I", max_inflight_per_participant),
+                )
+            )
         if rl_enabled:
             attrs.append((ATTR["RL_ENABLED"], struct.pack("=I", 1)))
+            attrs_with_required_caps.append((ATTR["RL_ENABLED"], struct.pack("=I", 1)))
         if rl_burst:
             attrs.append((ATTR["RL_BURST"], struct.pack("=I", rl_burst)))
+            attrs_with_required_caps.append((ATTR["RL_BURST"], struct.pack("=I", rl_burst)))
         if rl_refill_tokens:
             attrs.append((ATTR["RL_REFILL_TOKENS"], struct.pack("=I", rl_refill_tokens)))
+            attrs_with_required_caps.append((ATTR["RL_REFILL_TOKENS"], struct.pack("=I", rl_refill_tokens)))
         if rl_refill_jiffies:
             attrs.append((ATTR["RL_REFILL_JIFFIES"], struct.pack("=I", rl_refill_jiffies)))
+            attrs_with_required_caps.append((ATTR["RL_REFILL_JIFFIES"], struct.pack("=I", rl_refill_jiffies)))
         if rl_default_cost:
             attrs.append((ATTR["RL_DEFAULT_COST"], struct.pack("=I", rl_default_cost)))
+            attrs_with_required_caps.append((ATTR["RL_DEFAULT_COST"], struct.pack("=I", rl_default_cost)))
         if rl_max_inflight_per_participant:
             attrs.append(
                 (
@@ -327,14 +356,31 @@ class KernelMcpNetlinkClient:
                     struct.pack("=I", rl_max_inflight_per_participant),
                 )
             )
+            attrs_with_required_caps.append(
+                (
+                    ATTR["RL_MAX_INFLIGHT_PER_PARTICIPANT"],
+                    struct.pack("=I", rl_max_inflight_per_participant),
+                )
+            )
         if rl_defer_wait_ms:
             attrs.append((ATTR["RL_DEFER_WAIT_MS"], struct.pack("=I", rl_defer_wait_ms)))
-        self._request(
-            msg_type=self._family_id,
-            cmd=CMD["CAPABILITY_REGISTER"],
-            attrs=attrs,
-            need_ack=True,
-        )
+            attrs_with_required_caps.append((ATTR["RL_DEFER_WAIT_MS"], struct.pack("=I", rl_defer_wait_ms)))
+        try:
+            self._request(
+                msg_type=self._family_id,
+                cmd=CMD["CAPABILITY_REGISTER"],
+                attrs=attrs_with_required_caps,
+                need_ack=True,
+            )
+        except RuntimeError as exc:
+            if not required_caps or "NLMSG_ERROR=-22" not in str(exc):
+                raise
+            self._request(
+                msg_type=self._family_id,
+                cmd=CMD["CAPABILITY_REGISTER"],
+                attrs=attrs,
+                need_ack=True,
+            )
 
     def capability_request(
         self,

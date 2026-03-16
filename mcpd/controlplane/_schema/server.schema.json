@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "properties": {
+    "apiVersion": {
+      "const": "mcpd/v1"
+    },
+    "kind": {
+      "const": "ServerConfig"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "spec": {
+      "type": "object",
+      "required": [
+        "manifest_dirs",
+        "socket_path",
+        "planner_trust_level",
+        "broker_trust_level",
+        "executor_workdir"
+      ],
+      "properties": {
+        "manifest_dirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "socket_path": {
+          "type": "string"
+        },
+        "planner_trust_level": {
+          "type": "integer"
+        },
+        "broker_trust_level": {
+          "type": "integer"
+        },
+        "executor_workdir": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

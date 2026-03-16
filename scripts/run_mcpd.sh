@@ -4,13 +4,42 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
+if [[ -x "$ROOT_DIR/.venv/bin/python" ]] && "$ROOT_DIR/.venv/bin/python" - <<'PY' >/dev/null 2>&1
+import yaml
+PY
+then
   PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
 else
   PYTHON_BIN="python3"
 fi
 
-SOCK_PATH="/tmp/mcpd.sock"
+readarray -t SERVER_DEFAULTS < <("$PYTHON_BIN" - <<'PY'
+import os
+import sys
+from pathlib import Path
+
+root = Path.cwd()
+sys.path.insert(0, str(root / "mcpd"))
+from config_loader import load_server_defaults_config
+
+raw = load_server_defaults_config()
+manifest_dirs = list(raw.get("manifest_dirs", []))
+if os.getenv("MCPD_MANIFEST_DIRS", "").strip():
+    manifest_dirs = [entry for entry in os.getenv("MCPD_MANIFEST_DIRS", "").split(os.pathsep) if entry]
+sock_path = os.getenv("MCPD_SOCKET_PATH", "").strip() or raw.get("default_socket_paths", {}).get("mcpd", "/tmp/mcpd.sock")
+print(sock_path)
+for entry in manifest_dirs:
+    path = Path(entry).expanduser()
+    if not path.is_absolute():
+        path = root / path
+    print(path)
+PY
+)
+SOCK_PATH="${SERVER_DEFAULTS[0]}"
+MANIFEST_DIRS=("${SERVER_DEFAULTS[@]:1}")
+MCPD_SCRIPT_MANIFEST_DIRS="$(IFS=:; echo "${MANIFEST_DIRS[*]}")"
+export MCPD_SCRIPT_MANIFEST_DIRS
+export MCPD_SCRIPT_SOCKET_PATH="$SOCK_PATH"
 RUNTIME_UID="$(id -u)"
 PID_PATH="/tmp/mcpd-${RUNTIME_UID}.pid"
 LOG_PATH="/tmp/mcpd-${RUNTIME_UID}.log"
@@ -30,23 +59,32 @@ if [[ -f "$PID_PATH" ]]; then
 fi
 
 missing_sockets="$("$PYTHON_BIN" - <<'PY'
-import glob,json,os,stat
+import json,os,stat
+from pathlib import Path
 missing=[]
-for p in sorted(glob.glob("provider-app/manifests/*.json")):
-    raw=json.load(open(p,encoding="utf-8"))
-    if raw.get("mode")!="uds_service":
-        continue
-    ep=raw.get("endpoint","")
-    if not isinstance(ep,str) or not ep:
-        missing.append(f"{p}: <invalid-endpoint>")
-        continue
-    try:
-        st=os.stat(ep)
-    except FileNotFoundError:
-        missing.append(ep)
-        continue
-    if not stat.S_ISSOCK(st.st_mode):
-        missing.append(ep)
+dirs = [Path(entry) for entry in os.environ.get("MCPD_SCRIPT_MANIFEST_DIRS", "").split(os.pathsep) if entry]
+for manifest_dir in dirs:
+    if manifest_dir.is_file():
+        manifest_paths=[manifest_dir]
+    elif manifest_dir.exists():
+        manifest_paths=sorted(manifest_dir.glob("*.json"))
+    else:
+        manifest_paths=[]
+    for p in manifest_paths:
+        raw=json.load(open(p,encoding="utf-8"))
+        if raw.get("mode")!="uds_service":
+            continue
+        ep=raw.get("endpoint","")
+        if not isinstance(ep,str) or not ep:
+            missing.append(f"{p}: <invalid-endpoint>")
+            continue
+        try:
+            st=os.stat(ep)
+        except FileNotFoundError:
+            missing.append(ep)
+            continue
+        if not stat.S_ISSOCK(st.st_mode):
+            missing.append(ep)
 if missing:
     print("\n".join(missing))
 PY
@@ -79,13 +117,22 @@ if [[ ! -S "$SOCK_PATH" ]]; then
 fi
 
 expected_actions="$("$PYTHON_BIN" - <<'PY'
-import glob,json
+import json, os
+from pathlib import Path
 count=0
-for p in sorted(glob.glob("provider-app/manifests/*.json")):
-    raw=json.load(open(p,encoding="utf-8"))
-    actions=raw.get("actions", [])
-    if isinstance(actions, list):
-        count += len(actions)
+dirs = [Path(entry) for entry in os.environ.get("MCPD_SCRIPT_MANIFEST_DIRS", "").split(os.pathsep) if entry]
+for manifest_dir in dirs:
+    if manifest_dir.is_file():
+        manifest_paths=[manifest_dir]
+    elif manifest_dir.exists():
+        manifest_paths=sorted(manifest_dir.glob("*.json"))
+    else:
+        manifest_paths=[]
+    for p in manifest_paths:
+        raw=json.load(open(p,encoding="utf-8"))
+        actions=raw.get("actions", [])
+        if isinstance(actions, list):
+            count += len(actions)
 print(count)
 PY
 )"
@@ -93,7 +140,8 @@ PY
 for _ in $(seq 1 80); do
   registered_actions="$("$PYTHON_BIN" - <<'PY'
 import json,socket,struct
-sock_path="/tmp/mcpd.sock"
+import os
+sock_path=os.environ.get("MCPD_SCRIPT_SOCKET_PATH", "/tmp/mcpd.sock")
 req=json.dumps({"sys":"list_actions"}, ensure_ascii=True).encode("utf-8")
 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
     conn.settimeout(2.0)

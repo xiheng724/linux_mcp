@@ -4,7 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
+if [[ -x "$ROOT_DIR/.venv/bin/python" ]] && "$ROOT_DIR/.venv/bin/python" - <<'PY' >/dev/null 2>&1
+import yaml
+PY
+then
   PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
 else
   PYTHON_BIN="python3"
@@ -13,8 +16,34 @@ fi
 SOCK_DIR="/tmp/linux-mcp-providers"
 mkdir -p "$SOCK_DIR"
 
+readarray -t MANIFEST_PATHS < <("$PYTHON_BIN" - <<'PY'
+import os
+import sys
+from pathlib import Path
+
+root = Path.cwd()
+sys.path.insert(0, str(root / "mcpd"))
+from config_loader import load_server_defaults_config
+
+raw = load_server_defaults_config()
+manifest_dirs = list(raw.get("manifest_dirs", []))
+if os.getenv("MCPD_MANIFEST_DIRS", "").strip():
+    manifest_dirs = [entry for entry in os.getenv("MCPD_MANIFEST_DIRS", "").split(os.pathsep) if entry]
+for entry in manifest_dirs:
+    path = Path(entry).expanduser()
+    if not path.is_absolute():
+        path = root / path
+    if path.is_file():
+        print(path)
+        continue
+    if path.exists():
+        for manifest_path in sorted(path.glob("*.json")):
+            print(manifest_path)
+PY
+)
+
 found_manifest=0
-for manifest in "$ROOT_DIR"/provider-app/manifests/*.json; do
+for manifest in "${MANIFEST_PATHS[@]}"; do
   [[ -f "$manifest" ]] || continue
   found_manifest=1
   IFS=$'\t' read -r provider_id display_name endpoint mode < <(
@@ -86,6 +115,6 @@ PY
 done
 
 if [[ "$found_manifest" -ne 1 ]]; then
-  echo "no manifests found in provider-app/manifests"
+  echo "no manifests found in configured manifest directories"
   exit 1
 fi

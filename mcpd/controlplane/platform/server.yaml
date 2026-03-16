@@ -1,0 +1,17 @@
+apiVersion: mcpd/v1
+kind: ServerConfig
+metadata:
+  name: server
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  manifest_dirs: [provider-app/manifests]
+  socket_path: /tmp/mcpd.sock
+  planner_trust_level: 8
+  broker_trust_level: 8
+  executor_workdir: /tmp/linux-mcp-executors

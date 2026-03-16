@@ -11,6 +11,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Sequence, Tuple
 
+from config_loader import (
+    load_controlplane_artifact_store,
+    load_runtime_config_bundle,
+    load_server_defaults_config,
+)
+from policy_engine import evaluate_capability_request, evaluate_executor_binding
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +52,51 @@ TRUST_CLASS_RANKS: Dict[str, int] = {
     "system": 4,
 }
 
+REQUIRED_CAP_BITS: Dict[str, int] = {
+    "CAP_INFO_LOOKUP": 1 << 0,
+    "CAP_MESSAGE_READ": 1 << 1,
+    "CAP_MESSAGE_SEND": 1 << 2,
+    "CAP_FILE_READ": 1 << 3,
+    "CAP_FILE_WRITE": 1 << 4,
+    "CAP_NETWORK_FETCH_READONLY": 1 << 5,
+    "CAP_BROWSER_AUTOMATION": 1 << 6,
+    "CAP_EXTERNAL_WRITE": 1 << 7,
+    "CAP_EXEC_RUN": 1 << 8,
+}
+APPROVAL_MODE_NAMES: Dict[str, int] = {
+    "auto": APPROVAL_MODE_AUTO,
+    "trusted": APPROVAL_MODE_TRUSTED,
+    "root-only": APPROVAL_MODE_ROOT_ONLY,
+    "interactive": APPROVAL_MODE_INTERACTIVE,
+    "explicit": APPROVAL_MODE_EXPLICIT,
+}
+AUDIT_MODE_NAMES: Dict[str, int] = {
+    "basic": AUDIT_MODE_BASIC,
+    "detailed": AUDIT_MODE_DETAILED,
+    "strict": AUDIT_MODE_STRICT,
+}
+DEFAULT_METADATA_SCORE_POLICY: Dict[str, Any] = {
+    "require_provider_availability": True,
+    "prefer_manifest_priority": True,
+    "prefer_example_matches": True,
+    "prefer_lower_risk_on_tie": True,
+    "allow_preferred_provider_high_risk": False,
+}
+_RUNTIME_CONFIG_BUNDLE = load_runtime_config_bundle()
+ARTIFACT_STORE = load_controlplane_artifact_store()
+
+
+def _capability_registry_config() -> Dict[str, Any]:
+    return dict(_RUNTIME_CONFIG_BUNDLE["capability_registry"])
+
+
+def _broker_registry_config() -> Dict[str, Any]:
+    return dict(_RUNTIME_CONFIG_BUNDLE["broker_registry"])
+
+
+def _executor_profiles_config() -> Dict[str, Any]:
+    return dict(_RUNTIME_CONFIG_BUNDLE["executor_profiles"])
+
 
 def _log_structured(level: int, event_type: str, **fields: Any) -> None:
     payload = {"event_type": event_type}
@@ -53,199 +105,222 @@ def _log_structured(level: int, event_type: str, **fields: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# capability domain registry metadata
+def _normalize_required_caps(value: Any, source: str) -> int:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return int(value)
+    if not isinstance(value, list):
+        raise ValueError(f"{source}: required_caps must be int or list")
+    bitmask = 0
+    for idx, cap_name in enumerate(value):
+        if not isinstance(cap_name, str) or not cap_name.strip():
+            raise ValueError(f"{source}: required_caps[{idx}] must be non-empty string")
+        bit = REQUIRED_CAP_BITS.get(cap_name.strip())
+        if bit is None:
+            raise ValueError(f"{source}: unknown required_caps entry {cap_name!r}")
+        bitmask |= bit
+    return bitmask
 
-CAPABILITY_DOMAIN_REGISTRY: Dict[str, Dict[str, Any]] = {
-    "info.lookup": {
-        "capability_id": 101,
-        "required_caps": 1 << 0,
-        "broker_id": "info-broker",
-        "capability_class": "read",
-        "auth_mode": "local-readonly",
-        "allows_side_effect": False,
-        "baseline_risk_level": 1,
-        "approval_mode": APPROVAL_MODE_AUTO,
-        "audit_mode": AUDIT_MODE_BASIC,
-        "max_inflight_per_participant": 8,
-        "rate_limit": {
-            "enabled": False,
-            "burst": 0,
-            "refill_tokens": 0,
-            "refill_jiffies": 0,
-            "default_cost": 0,
-            "max_inflight_per_participant": 0,
-            "defer_wait_ms": 0,
-        },
-    },
-    "message.read": {
-        "capability_id": 102,
-        "required_caps": 1 << 1,
-        "broker_id": "message-broker",
-        "capability_class": "read",
-        "auth_mode": "session-auth",
-        "allows_side_effect": False,
-        "baseline_risk_level": 3,
-        "approval_mode": APPROVAL_MODE_AUTO,
-        "audit_mode": AUDIT_MODE_BASIC,
-        "max_inflight_per_participant": 4,
-        "rate_limit": {
-            "enabled": True,
-            "burst": 8,
-            "refill_tokens": 4,
-            "refill_jiffies": 5,
-            "default_cost": 1,
-            "max_inflight_per_participant": 4,
-            "defer_wait_ms": 250,
-        },
-    },
-    "message.send": {
-        "capability_id": 103,
-        "required_caps": 1 << 2,
-        "broker_id": "message-broker",
-        "capability_class": "write",
-        "auth_mode": "session-auth",
-        "allows_side_effect": True,
-        "baseline_risk_level": 8,
-        "approval_mode": APPROVAL_MODE_EXPLICIT,
-        "audit_mode": AUDIT_MODE_DETAILED,
-        "max_inflight_per_participant": 2,
-        "rate_limit": {
-            "enabled": True,
-            "burst": 2,
-            "refill_tokens": 1,
-            "refill_jiffies": 5,
-            "default_cost": 1,
-            "max_inflight_per_participant": 2,
-            "defer_wait_ms": 500,
-        },
-    },
-    "file.read": {
-        "capability_id": 104,
-        "required_caps": 1 << 3,
-        "broker_id": "file-broker",
-        "capability_class": "read",
-        "auth_mode": "local-readonly",
-        "allows_side_effect": False,
-        "baseline_risk_level": 3,
-        "approval_mode": APPROVAL_MODE_AUTO,
-        "audit_mode": AUDIT_MODE_BASIC,
-        "max_inflight_per_participant": 4,
-        "rate_limit": {
-            "enabled": True,
-            "burst": 8,
-            "refill_tokens": 4,
-            "refill_jiffies": 5,
-            "default_cost": 1,
-            "max_inflight_per_participant": 4,
-            "defer_wait_ms": 250,
-        },
-    },
-    "file.write": {
-        "capability_id": 105,
-        "required_caps": 1 << 4,
-        "broker_id": "file-broker",
-        "capability_class": "write",
-        "auth_mode": "trusted-write",
-        "allows_side_effect": True,
-        "baseline_risk_level": 8,
-        "approval_mode": APPROVAL_MODE_EXPLICIT,
-        "audit_mode": AUDIT_MODE_DETAILED,
-        "max_inflight_per_participant": 2,
-        "rate_limit": {
-            "enabled": True,
-            "burst": 2,
-            "refill_tokens": 1,
-            "refill_jiffies": 5,
-            "default_cost": 1,
-            "max_inflight_per_participant": 2,
-            "defer_wait_ms": 500,
-        },
-    },
-    "network.fetch.readonly": {
-        "capability_id": 106,
-        "required_caps": 1 << 5,
-        "broker_id": "info-broker",
-        "capability_class": "network-read",
-        "auth_mode": "network-readonly",
-        "allows_side_effect": False,
-        "baseline_risk_level": 4,
-        "approval_mode": APPROVAL_MODE_AUTO,
-        "audit_mode": AUDIT_MODE_BASIC,
-        "max_inflight_per_participant": 4,
-        "rate_limit": {
-            "enabled": True,
-            "burst": 4,
-            "refill_tokens": 2,
-            "refill_jiffies": 5,
-            "default_cost": 1,
-            "max_inflight_per_participant": 4,
-            "defer_wait_ms": 250,
-        },
-    },
-    "browser.automation": {
-        "capability_id": 107,
-        "required_caps": 1 << 6,
-        "broker_id": "browser-broker",
-        "capability_class": "automation",
-        "auth_mode": "interactive-broker",
-        "allows_side_effect": True,
-        "baseline_risk_level": 8,
-        "approval_mode": APPROVAL_MODE_INTERACTIVE,
-        "audit_mode": AUDIT_MODE_DETAILED,
-        "max_inflight_per_participant": 2,
-        "rate_limit": {
-            "enabled": True,
-            "burst": 2,
-            "refill_tokens": 1,
-            "refill_jiffies": 5,
-            "default_cost": 1,
-            "max_inflight_per_participant": 2,
-            "defer_wait_ms": 500,
-        },
-    },
-    "external.write": {
-        "capability_id": 108,
-        "required_caps": 1 << 7,
-        "broker_id": "external-router-broker",
-        "capability_class": "external-write",
-        "auth_mode": "provider-auth",
-        "allows_side_effect": True,
-        "baseline_risk_level": 8,
-        "approval_mode": APPROVAL_MODE_EXPLICIT,
-        "audit_mode": AUDIT_MODE_DETAILED,
-        "max_inflight_per_participant": 2,
-        "rate_limit": {
-            "enabled": True,
-            "burst": 2,
-            "refill_tokens": 1,
-            "refill_jiffies": 5,
-            "default_cost": 1,
-            "max_inflight_per_participant": 2,
-            "defer_wait_ms": 500,
-        },
-    },
-    "exec.run": {
-        "capability_id": 109,
-        "required_caps": 1 << 8,
-        "broker_id": "exec-broker",
-        "capability_class": "execution",
-        "auth_mode": "trusted-exec",
-        "allows_side_effect": True,
-        "baseline_risk_level": 8,
-        "approval_mode": APPROVAL_MODE_ROOT_ONLY,
-        "audit_mode": AUDIT_MODE_STRICT,
-        "max_inflight_per_participant": 1,
-        "rate_limit": {
-            "enabled": True,
-            "burst": 1,
-            "refill_tokens": 1,
-            "refill_jiffies": 10,
-            "default_cost": 1,
-            "max_inflight_per_participant": 1,
-            "defer_wait_ms": 1000,
-        },
-    },
-}
+
+def _normalize_mode_name(
+    field_name: str,
+    value: Any,
+    mapping: Mapping[str, int],
+    source: str,
+) -> int:
+    if isinstance(value, int) and not isinstance(value, bool):
+        if value not in mapping.values():
+            raise ValueError(f"{source}: unsupported {field_name} value {value}")
+        return int(value)
+    if not isinstance(value, str):
+        raise ValueError(f"{source}: {field_name} must be string or int")
+    normalized = value.strip().lower()
+    if normalized not in mapping:
+        raise ValueError(f"{source}: unsupported {field_name} value {value!r}")
+    return int(mapping[normalized])
+
+
+def _normalize_rate_limit(value: Any, source: str) -> Dict[str, int | bool]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{source}: rate_limit must be object")
+    normalized: Dict[str, int | bool] = {}
+    bool_keys = ("enabled",)
+    int_keys = (
+        "burst",
+        "refill_tokens",
+        "refill_jiffies",
+        "default_cost",
+        "max_inflight_per_participant",
+        "defer_wait_ms",
+    )
+    for key in bool_keys:
+        raw = value.get(key)
+        if not isinstance(raw, bool):
+            raise ValueError(f"{source}: rate_limit.{key} must be bool")
+        normalized[key] = raw
+    for key in int_keys:
+        raw = value.get(key)
+        if isinstance(raw, bool) or not isinstance(raw, int):
+            raise ValueError(f"{source}: rate_limit.{key} must be int")
+        normalized[key] = int(raw)
+    return normalized
+
+
+def _normalize_executor_policy(value: Any, source: str) -> Dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{source}: executor_policy must be object")
+    allowed_executor_types = value.get("allowed_executor_types")
+    if not isinstance(allowed_executor_types, list) or not allowed_executor_types:
+        raise ValueError(f"{source}: executor_policy.allowed_executor_types must be non-empty list")
+    normalized_types: List[str] = []
+    for idx, executor_type in enumerate(allowed_executor_types):
+        if not isinstance(executor_type, str) or executor_type not in STRUCTURED_EXECUTOR_TYPES:
+            raise ValueError(
+                f"{source}: executor_policy.allowed_executor_types[{idx}] is invalid"
+            )
+        normalized_types.append(executor_type)
+    network_policy = value.get("network_policy")
+    if not isinstance(network_policy, str) or not network_policy:
+        raise ValueError(f"{source}: executor_policy.network_policy must be string")
+    require_short_lived = value.get("require_short_lived")
+    if not isinstance(require_short_lived, bool):
+        raise ValueError(f"{source}: executor_policy.require_short_lived must be bool")
+    min_planner_trust_level = value.get("min_planner_trust_level", 0)
+    if isinstance(min_planner_trust_level, bool) or not isinstance(min_planner_trust_level, int):
+        raise ValueError(f"{source}: executor_policy.min_planner_trust_level must be int")
+    min_provider_trust_class = value.get("min_provider_trust_class", "anonymous")
+    if not isinstance(min_provider_trust_class, str) or not min_provider_trust_class:
+        raise ValueError(f"{source}: executor_policy.min_provider_trust_class must be string")
+    deny_on_unenforced = value.get("deny_on_unenforced", False)
+    if not isinstance(deny_on_unenforced, bool):
+        raise ValueError(f"{source}: executor_policy.deny_on_unenforced must be bool")
+    return {
+        "allowed_executor_types": tuple(normalized_types),
+        "network_policy": network_policy,
+        "require_short_lived": require_short_lived,
+        "min_planner_trust_level": int(min_planner_trust_level),
+        "min_provider_trust_class": min_provider_trust_class,
+        "deny_on_unenforced": deny_on_unenforced,
+    }
+
+
+def _load_capability_domain_registry() -> Dict[str, Dict[str, Any]]:
+    raw = _capability_registry_config()
+    registry: Dict[str, Dict[str, Any]] = {}
+    for entry in raw["capabilities"]:
+        capability_domain = str(entry["capability_domain"])
+        source = f"capability_registry:{capability_domain}"
+        risk_level = int(entry["risk_level"])
+        sandbox_profile = str(entry["sandbox_profile"])
+        executor_policy = _normalize_executor_policy(entry["executor_policy"], source)
+        registry[capability_domain] = {
+            "capability_id": int(entry["capability_id"]),
+            "description": str(entry["description"]),
+            "required_caps": _normalize_required_caps(entry["required_caps"], source),
+            "broker_id": str(entry["broker_id"]),
+            "capability_class": str(entry["capability_class"]),
+            "auth_mode": str(entry["auth_mode"]),
+            "allows_side_effect": bool(entry["allows_side_effect"]),
+            "baseline_risk_level": risk_level,
+            "approval_mode": _normalize_mode_name(
+                "approval_mode",
+                entry["approval_mode"],
+                APPROVAL_MODE_NAMES,
+                source,
+            ),
+            "audit_mode": _normalize_mode_name(
+                "audit_mode",
+                entry["audit_mode"],
+                AUDIT_MODE_NAMES,
+                source,
+            ),
+            "max_inflight_per_participant": int(entry["max_inflight_per_participant"]),
+            "max_inflight_per_agent": int(entry["max_inflight_per_agent"]),
+            "sandbox_profile": sandbox_profile,
+            "executor_policy": executor_policy,
+            "rate_limit": _normalize_rate_limit(entry["rate_limit"], source),
+        }
+        if risk_level >= HIGH_RISK_LEVEL and sandbox_profile != "sandbox-high-risk" and capability_domain == "exec.run":
+            raise ValueError(f"{source}: exec.run must use sandbox-high-risk profile")
+    return registry
+
+
+def _normalize_selection_policy(value: Any, source: str) -> Dict[str, Any]:
+    if isinstance(value, str):
+        if value != "metadata-score":
+            raise ValueError(f"{source}: unsupported selection_policy {value!r}")
+        return dict(DEFAULT_METADATA_SCORE_POLICY)
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{source}: selection_policy must be object or 'metadata-score'")
+    merged = dict(DEFAULT_METADATA_SCORE_POLICY)
+    for key, raw in value.items():
+        if key not in merged:
+            raise ValueError(f"{source}: unsupported selection_policy key {key!r}")
+        if not isinstance(raw, bool):
+            raise ValueError(f"{source}: selection_policy.{key} must be bool")
+        merged[key] = raw
+    return merged
+
+
+def _load_broker_registry(capability_registry: Mapping[str, Mapping[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    raw = _broker_registry_config()
+    registry: Dict[str, Dict[str, Any]] = {}
+    for entry in raw["brokers"]:
+        broker_id = str(entry["broker_id"])
+        source = f"broker_registry:{broker_id}"
+        capability_domains = tuple(str(value) for value in entry["capability_domains"])
+        for capability_domain in capability_domains:
+            if capability_domain not in capability_registry:
+                raise ValueError(
+                    f"{source}: unknown capability domain {capability_domain!r} in broker registry"
+                )
+        registry[broker_id] = {
+            "capability_domains": capability_domains,
+            "policy_controlled": bool(entry["policy_controlled"]),
+            "runtime_identity_mode": str(entry["runtime_identity_mode"]),
+            "selection_policy": _normalize_selection_policy(entry["selection_policy"], source),
+        }
+    for capability_domain, capability_meta in capability_registry.items():
+        broker_id = str(capability_meta["broker_id"])
+        broker_meta = registry.get(broker_id)
+        if broker_meta is None:
+            raise ValueError(
+                f"capability_registry:{capability_domain}: broker_id {broker_id!r} missing from broker registry"
+            )
+        if capability_domain not in broker_meta["capability_domains"]:
+            raise ValueError(
+                f"broker_registry:{broker_id}: missing capability_domain {capability_domain!r}"
+            )
+    return registry
+
+
+def _load_executor_profiles() -> Dict[Tuple[str, str], Dict[str, Any]]:
+    raw = _executor_profiles_config()
+    profiles: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for entry in raw["profiles"]:
+        key = (str(entry["executor_type"]), str(entry["sandbox_profile"]))
+        command_schema_mode = str(entry["command_schema_mode"])
+        if command_schema_mode != "parameter_schema_id":
+            raise ValueError(
+                f"executor_profiles:{key[0]}/{key[1]}: unsupported command_schema_mode {command_schema_mode!r}"
+            )
+        profiles[key] = {
+            "network_policy": str(entry["network_policy"]),
+            "resource_limits": dict(entry["resource_limits"]),
+            "short_lived": bool(entry["short_lived"]),
+            "inherited_env_keys": tuple(entry["inherited_env_keys"]),
+            "command_schema_mode": command_schema_mode,
+            "structured_payload_only": bool(entry["structured_payload_only"]),
+            "sandbox_ready": bool(entry["sandbox_ready"]),
+            "runtime_identity_mode": str(entry["runtime_identity_mode"]),
+            "required_hooks": tuple(entry.get("required_hooks", ())),
+            "deny_on_unenforced": bool(entry.get("deny_on_unenforced", False)),
+            "enforce_no_new_privs": bool(entry.get("enforce_no_new_privs", True)),
+        }
+    return profiles
+
+CAPABILITY_DOMAIN_REGISTRY = _load_capability_domain_registry()
+EXECUTOR_PROFILE_REGISTRY = _load_executor_profiles()
+BROKER_REGISTRY = _load_broker_registry(CAPABILITY_DOMAIN_REGISTRY)
 
 CAPABILITY_DOMAIN_IDS: Dict[str, int] = {
     name: int(meta["capability_id"]) for name, meta in CAPABILITY_DOMAIN_REGISTRY.items()
@@ -270,142 +345,6 @@ HIGH_RISK_DOMAINS = frozenset(
     for name, meta in CAPABILITY_DOMAIN_REGISTRY.items()
     if int(meta["baseline_risk_level"]) >= HIGH_RISK_LEVEL
 )
-
-
-def _capability_executor_policy(capability_domain: str, meta: Mapping[str, Any]) -> Dict[str, Any]:
-    capability_class = str(meta["capability_class"])
-    risk_level = int(meta["baseline_risk_level"])
-    if capability_domain == "exec.run":
-        return {
-            "allowed_executor_types": ("sandboxed-process",),
-            "network_policy": "broker-mediated",
-            "require_short_lived": True,
-            "min_planner_trust_level": 8,
-            "min_provider_trust_class": "local",
-        }
-    if capability_class in READ_ONLY_CAPABILITY_CLASSES:
-        return {
-            "allowed_executor_types": ("broker-uds",),
-            "network_policy": "inherit",
-            "require_short_lived": True,
-            "min_planner_trust_level": 0,
-            "min_provider_trust_class": "local",
-        }
-    return {
-        "allowed_executor_types": ("broker-isolated-uds", "sandboxed-process")
-        if risk_level >= HIGH_RISK_LEVEL
-        else ("broker-isolated-uds", "broker-uds"),
-        "network_policy": "broker-mediated" if risk_level >= HIGH_RISK_LEVEL else "inherit",
-        "require_short_lived": True,
-        "min_planner_trust_level": 4 if risk_level >= HIGH_RISK_LEVEL else 0,
-        "min_provider_trust_class": "local",
-    }
-
-
-def _capability_sandbox_profile(capability_domain: str, meta: Mapping[str, Any]) -> str:
-    capability_class = str(meta["capability_class"])
-    risk_level = int(meta["baseline_risk_level"])
-    if capability_domain == "exec.run":
-        return "sandbox-high-risk"
-    if capability_class in READ_ONLY_CAPABILITY_CLASSES:
-        return "local-readonly"
-    if risk_level >= HIGH_RISK_LEVEL:
-        return "sandbox-broker-isolated"
-    return "local-readonly"
-
-
-for _capability_name, _capability_meta in CAPABILITY_DOMAIN_REGISTRY.items():
-    _capability_meta.setdefault(
-        "max_inflight_per_agent",
-        int(_capability_meta["max_inflight_per_participant"]),
-    )
-    _capability_meta.setdefault(
-        "sandbox_profile",
-        _capability_sandbox_profile(_capability_name, _capability_meta),
-    )
-    _capability_meta.setdefault(
-        "executor_policy",
-        _capability_executor_policy(_capability_name, _capability_meta),
-    )
-
-
-# ---------------------------------------------------------------------------
-# broker registry metadata
-
-BROKER_REGISTRY: Dict[str, Dict[str, Any]] = {
-    "info-broker": {
-        "capability_domains": ("info.lookup", "network.fetch.readonly"),
-        "policy_controlled": True,
-        "runtime_identity_mode": "registered-agent",
-        "selection_policy": {
-            "require_provider_availability": True,
-            "prefer_manifest_priority": True,
-            "prefer_example_matches": True,
-            "prefer_lower_risk_on_tie": True,
-            "allow_preferred_provider_high_risk": False,
-        },
-    },
-    "message-broker": {
-        "capability_domains": ("message.read", "message.send"),
-        "policy_controlled": True,
-        "runtime_identity_mode": "registered-agent",
-        "selection_policy": {
-            "require_provider_availability": True,
-            "prefer_manifest_priority": True,
-            "prefer_example_matches": True,
-            "prefer_lower_risk_on_tie": True,
-            "allow_preferred_provider_high_risk": False,
-        },
-    },
-    "file-broker": {
-        "capability_domains": ("file.read", "file.write"),
-        "policy_controlled": True,
-        "runtime_identity_mode": "registered-agent",
-        "selection_policy": {
-            "require_provider_availability": True,
-            "prefer_manifest_priority": True,
-            "prefer_example_matches": True,
-            "prefer_lower_risk_on_tie": True,
-            "allow_preferred_provider_high_risk": False,
-        },
-    },
-    "browser-broker": {
-        "capability_domains": ("browser.automation",),
-        "policy_controlled": True,
-        "runtime_identity_mode": "registered-agent",
-        "selection_policy": {
-            "require_provider_availability": True,
-            "prefer_manifest_priority": True,
-            "prefer_example_matches": True,
-            "prefer_lower_risk_on_tie": True,
-            "allow_preferred_provider_high_risk": False,
-        },
-    },
-    "exec-broker": {
-        "capability_domains": ("exec.run",),
-        "policy_controlled": True,
-        "runtime_identity_mode": "registered-agent",
-        "selection_policy": {
-            "require_provider_availability": True,
-            "prefer_manifest_priority": True,
-            "prefer_example_matches": True,
-            "prefer_lower_risk_on_tie": True,
-            "allow_preferred_provider_high_risk": False,
-        },
-    },
-    "external-router-broker": {
-        "capability_domains": ("external.write",),
-        "policy_controlled": True,
-        "runtime_identity_mode": "registered-agent",
-        "selection_policy": {
-            "require_provider_availability": True,
-            "prefer_manifest_priority": True,
-            "prefer_example_matches": True,
-            "prefer_lower_risk_on_tie": True,
-            "allow_preferred_provider_high_risk": False,
-        },
-    },
-}
 
 BROKER_CAPABILITIES: Dict[str, Tuple[str, ...]] = {
     broker_id: tuple(meta["capability_domains"]) for broker_id, meta in BROKER_REGISTRY.items()
@@ -510,6 +449,9 @@ class ExecutorBinding:
     structured_payload_only: bool
     sandbox_ready: bool
     runtime_identity_mode: str
+    required_hooks: Tuple[str, ...]
+    deny_on_unenforced: bool
+    enforce_no_new_privs: bool
 
 
 @dataclass(frozen=True)
@@ -520,45 +462,67 @@ class BrokerDispatchPlan:
     action: ProviderAction
     executor: ExecutorBinding
     audit_markers: Tuple[str, ...] = ()
+    explanation: Dict[str, Any] = field(default_factory=dict)
 
 
 def build_executor_binding(provider: ProviderDef, action: ProviderAction) -> ExecutorBinding:
-    profile = {
-        "sandbox_profile": "local-readonly",
-        "network_policy": "inherit",
-        "resource_limits": {"cpu_ms": 1000, "memory_kb": 131072, "nofile": 64},
-    }
-    if action.executor_type == "broker-isolated-uds":
-        profile = {
-            "sandbox_profile": "sandbox-broker-isolated",
-            "network_policy": "broker-mediated",
-            "resource_limits": {"cpu_ms": 3000, "memory_kb": 262144, "nofile": 64},
-        }
-    elif action.executor_type == "sandboxed-process":
-        profile = {
-            "sandbox_profile": "sandbox-high-risk",
-            "network_policy": "broker-mediated",
-            "resource_limits": {"cpu_ms": 5000, "memory_kb": 262144, "nofile": 64},
-        }
+    capability_meta = CAPABILITY_DOMAIN_REGISTRY.get(action.capability_domain)
+    if capability_meta is None:
+        raise ValueError(f"unknown capability domain for executor binding: {action.capability_domain}")
+    sandbox_profile = str(capability_meta["sandbox_profile"])
+    executor_policy = dict(capability_meta["executor_policy"])
+    allowed_executor_types = tuple(executor_policy.get("allowed_executor_types", ()))
+    if allowed_executor_types and action.executor_type not in allowed_executor_types:
+        raise ValueError(
+            f"executor_type {action.executor_type!r} violates configured capability policy for {action.capability_domain}"
+        )
+    profile = EXECUTOR_PROFILE_REGISTRY.get((action.executor_type, sandbox_profile))
+    if profile is None:
+        raise ValueError(
+            "missing executor profile for "
+            f"executor_type={action.executor_type!r} sandbox_profile={sandbox_profile!r}"
+        )
+    server_defaults = load_server_defaults_config()
+    workdir_root = str(server_defaults["executor_workdir_root"]).rstrip("/")
+    if not workdir_root:
+        raise ValueError("server_defaults executor_workdir_root must be non-empty")
     return ExecutorBinding(
         executor_id=f"{provider.provider_id}:{action.action_name}:exec",
         executor_type=action.executor_type,
         parameter_schema_id=action.parameter_schema_id,
-        short_lived=True,
-        sandbox_profile=str(profile["sandbox_profile"]),
-        working_directory=f"/tmp/linux-mcp-executors/{provider.provider_id}",
+        short_lived=bool(profile["short_lived"]),
+        sandbox_profile=sandbox_profile,
+        working_directory=f"{workdir_root}/{provider.provider_id}",
         network_policy=str(profile["network_policy"]),
         resource_limits=dict(profile["resource_limits"]),
-        inherited_env_keys=("LANG", "LC_ALL", "PATH"),
+        inherited_env_keys=tuple(profile["inherited_env_keys"]),
         command_schema_id=action.parameter_schema_id,
-        structured_payload_only=action.executor_type in STRUCTURED_EXECUTOR_TYPES,
-        sandbox_ready=True,
-        runtime_identity_mode="broker-bound",
+        structured_payload_only=bool(profile["structured_payload_only"]),
+        sandbox_ready=bool(profile["sandbox_ready"]),
+        runtime_identity_mode=str(profile["runtime_identity_mode"]),
+        required_hooks=tuple(profile.get("required_hooks", ())),
+        deny_on_unenforced=bool(profile.get("deny_on_unenforced", False)),
+        enforce_no_new_privs=bool(profile.get("enforce_no_new_privs", True)),
     )
 
 
 def _trust_class_rank(trust_class: str) -> int:
     return TRUST_CLASS_RANKS.get(trust_class, 0)
+
+
+def explain_executor_binding_for_capability(
+    capability: CapabilityDomain,
+    provider: ProviderDef,
+    action: ProviderAction,
+    executor: ExecutorBinding,
+) -> Dict[str, Any]:
+    return evaluate_executor_binding(
+        capability,
+        provider,
+        action,
+        executor,
+        trust_class_ranks=TRUST_CLASS_RANKS,
+    ).as_dict()
 
 
 def validate_executor_binding_for_capability(
@@ -567,30 +531,31 @@ def validate_executor_binding_for_capability(
     action: ProviderAction,
     executor: ExecutorBinding,
 ) -> None:
-    executor_policy = dict(capability.executor_policy)
-    allowed_executor_types = tuple(executor_policy.get("allowed_executor_types", ()))
-    if allowed_executor_types and executor.executor_type not in allowed_executor_types:
+    explanation = explain_executor_binding_for_capability(capability, provider, action, executor)
+    if not explanation["allowed"]:
+        reason_codes = explanation.get("reason_codes", [])
+        details = explanation.get("details", {})
         raise ValueError(
-            f"executor_type {executor.executor_type!r} violates capability policy for {capability.name}"
+            f"executor binding rejected for {capability.name}: "
+            f"{','.join(reason_codes) or 'policy_violation'} details={details}"
         )
-    required_network_policy = str(executor_policy.get("network_policy", executor.network_policy))
-    if required_network_policy and executor.network_policy != required_network_policy:
-        raise ValueError(
-            f"executor network_policy {executor.network_policy!r} violates capability policy for {capability.name}"
-        )
-    if bool(executor_policy.get("require_short_lived", False)) and not executor.short_lived:
-        raise ValueError(f"executor for capability {capability.name} must be short-lived")
-    if capability.sandbox_profile and executor.sandbox_profile != capability.sandbox_profile:
-        raise ValueError(
-            f"executor sandbox_profile {executor.sandbox_profile!r} violates capability policy for {capability.name}"
-        )
-    min_provider_trust = str(executor_policy.get("min_provider_trust_class", "anonymous"))
-    if _trust_class_rank(provider.trust_class) < _trust_class_rank(min_provider_trust):
-        raise ValueError(
-            f"provider trust_class {provider.trust_class!r} violates capability policy for {capability.name}"
-        )
-    if action.executor_type != executor.executor_type:
-        raise ValueError("executor binding must use action executor_type")
+
+
+def explain_capability_request(
+    planner: Mapping[str, Any],
+    capability: CapabilityDomain,
+    intent: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return evaluate_capability_request(
+        planner,
+        capability,
+        intent,
+        high_risk_level=HIGH_RISK_LEVEL,
+        approval_mode_trusted=APPROVAL_MODE_TRUSTED,
+        approval_mode_root_only=APPROVAL_MODE_ROOT_ONLY,
+        approval_mode_interactive=APPROVAL_MODE_INTERACTIVE,
+        approval_mode_explicit=APPROVAL_MODE_EXPLICIT,
+    ).as_dict()
 
 
 def validate_capability_request(
@@ -598,40 +563,15 @@ def validate_capability_request(
     capability: CapabilityDomain,
     intent: Mapping[str, Any],
 ) -> Tuple[str, ...]:
-    participant_id = str(planner.get("participant_id", "unknown"))
-    caps = int(planner.get("caps", 0) or 0)
-    trust_level = int(planner.get("trust_level", 0) or 0)
-    interactive = bool(intent.get("interactive", False))
-    explicit_approval = bool(intent.get("explicit_approval", False))
-    approval_token = str(intent.get("approval_token", "") or "")
-    markers: List[str] = []
-
-    if (caps & capability.required_caps) != capability.required_caps:
+    explanation = explain_capability_request(planner, capability, intent)
+    if not explanation["allowed"]:
+        reason_codes = explanation.get("reason_codes", [])
+        details = explanation.get("details", {})
         raise ValueError(
-            f"participant {participant_id} missing required capability bits for {capability.name}"
+            f"capability request rejected for {capability.name}: "
+            f"{','.join(reason_codes) or 'policy_violation'} details={details}"
         )
-
-    min_planner_trust = int(capability.executor_policy.get("min_planner_trust_level", 0))
-    if trust_level < min_planner_trust:
-        raise ValueError(
-            f"participant {participant_id} trust_level={trust_level} below policy minimum for {capability.name}"
-        )
-
-    if capability.approval_mode == APPROVAL_MODE_INTERACTIVE and not interactive:
-        raise ValueError(f"capability {capability.name} requires interactive approval context")
-    if capability.approval_mode == APPROVAL_MODE_EXPLICIT:
-        if explicit_approval or approval_token:
-            markers.append("approval_mode_explicit_signaled")
-        else:
-            markers.append("approval_mode_explicit_kernel_pending")
-    if capability.approval_mode == APPROVAL_MODE_TRUSTED and trust_level < HIGH_RISK_LEVEL:
-        raise ValueError(f"capability {capability.name} requires trusted planner context")
-    if capability.approval_mode == APPROVAL_MODE_ROOT_ONLY and not (explicit_approval or approval_token):
-        markers.append("approval_mode_root_only_kernel_enforced")
-
-    if capability.risk_level >= HIGH_RISK_LEVEL:
-        markers.append("high_risk_capability")
-    return tuple(markers)
+    return tuple(str(marker) for marker in explanation.get("audit_markers", []))
 
 
 def fill_action_payload(
@@ -1409,18 +1349,6 @@ def load_provider_manifest(source: str, raw: Any) -> ProviderDef:
 # ---------------------------------------------------------------------------
 # capability catalog construction
 
-CAPABILITY_DESCRIPTIONS: Dict[str, str] = {
-    "info.lookup": "Read-only information lookup, diagnostics, calculation, and text utility operations.",
-    "message.read": "Read-only access to inboxes, message history, or other message content.",
-    "message.send": "Outbound messaging and notification delivery with observable side effects.",
-    "file.read": "Read-only file preview, listing, and inspection operations.",
-    "file.write": "Filesystem mutation operations such as create, delete, copy, and rename.",
-    "network.fetch.readonly": "Read-only network fetch and external information retrieval.",
-    "browser.automation": "Interactive browser automation and remote UI manipulation.",
-    "external.write": "Mutating external systems through provider-authenticated actions.",
-    "exec.run": "Host or sandboxed process execution.",
-}
-
 def build_capability_catalog(providers: Iterable[ProviderDef]) -> Dict[str, CapabilityDomain]:
     grouped: Dict[str, Dict[str, Any]] = {}
     for provider in providers:
@@ -1453,9 +1381,11 @@ def build_capability_catalog(providers: Iterable[ProviderDef]) -> Dict[str, Capa
     out: Dict[str, CapabilityDomain] = {}
     for capability_domain, entry in grouped.items():
         meta = CAPABILITY_DOMAIN_REGISTRY[capability_domain]
-        capability_description = CAPABILITY_DESCRIPTIONS.get(
-            capability_domain,
-            f"Capability domain {capability_domain} mediated by {meta['broker_id']}.",
+        capability_description = str(
+            meta.get(
+                "description",
+                f"Capability domain {capability_domain} mediated by {meta['broker_id']}.",
+            )
         )
         capability_intent_tags = tuple(
             sorted(str(tag) for tag in entry["intent_tags"] if isinstance(tag, str))
@@ -1704,7 +1634,8 @@ def resolve_action_for_capability(
     broker_policy: Mapping[str, Any] | None = None,
     preferred_provider_id: str = "",
     allow_preferred_provider: bool = True,
-) -> Tuple[ProviderDef, ProviderAction, Tuple[str, ...]]:
+) -> Tuple[ProviderDef, ProviderAction, Tuple[str, ...], Dict[str, Any]]:
+    candidate_pairs = list(candidate_actions)
     policy = dict(broker_policy or {})
     availability = provider_availability or {}
     require_provider_availability = bool(policy.get("require_provider_availability", True))
@@ -1714,9 +1645,23 @@ def resolve_action_for_capability(
     intent_tokens = _tokenize_text(intent_text)
     available_candidates: List[Tuple[ProviderDef, ProviderAction]] = []
     markers: List[str] = []
-    for provider, action in candidate_actions:
+    explanation_candidates: List[Dict[str, Any]] = []
+    for provider, action in candidate_pairs:
         is_available = availability.get(provider.provider_id, True)
         if require_provider_availability and not is_available:
+            explanation_candidates.append(
+                {
+                    "provider_id": provider.provider_id,
+                    "action_id": action.action_id,
+                    "action_name": action.action_name,
+                    "available": False,
+                    "eligible": False,
+                    "eligibility_reason": "provider_unavailable",
+                    "provider_trust_class": provider.trust_class,
+                    "risk_level": action.risk_level,
+                    "selection_priority": action.selection_priority,
+                }
+            )
             continue
         if capability is not None:
             try:
@@ -1726,9 +1671,36 @@ def resolve_action_for_capability(
                     action,
                     build_executor_binding(provider, action),
                 )
-            except ValueError:
+            except ValueError as exc:
+                explanation_candidates.append(
+                    {
+                        "provider_id": provider.provider_id,
+                        "action_id": action.action_id,
+                        "action_name": action.action_name,
+                        "available": is_available,
+                        "eligible": False,
+                        "eligibility_reason": "capability_policy_violation",
+                        "policy_error": str(exc),
+                        "provider_trust_class": provider.trust_class,
+                        "risk_level": action.risk_level,
+                        "selection_priority": action.selection_priority,
+                    }
+                )
                 continue
         available_candidates.append((provider, action))
+        explanation_candidates.append(
+            {
+                "provider_id": provider.provider_id,
+                "action_id": action.action_id,
+                "action_name": action.action_name,
+                "available": is_available,
+                "eligible": True,
+                "eligibility_reason": "eligible",
+                "provider_trust_class": provider.trust_class,
+                "risk_level": action.risk_level,
+                "selection_priority": action.selection_priority,
+            }
+        )
     if not available_candidates:
         raise ValueError("no available provider actions for capability")
 
@@ -1755,6 +1727,16 @@ def resolve_action_for_capability(
         tie_risk = -action.risk_level if prefer_lower_risk_on_tie else 0
         provider_trust = _trust_class_rank(provider.trust_class)
         rank = (score, tie_risk, provider_trust, provider.provider_id, -action.action_id)
+        for candidate in explanation_candidates:
+            if (
+                candidate.get("provider_id") == provider.provider_id
+                and candidate.get("action_id") == action.action_id
+            ):
+                candidate["score"] = score
+                candidate["tie_risk_rank"] = tie_risk
+                candidate["provider_trust_rank"] = provider_trust
+                candidate["rank_tuple"] = list(rank)
+                break
         if best is None or rank > best:
             best = rank
             selected_provider = provider
@@ -1773,7 +1755,32 @@ def resolve_action_for_capability(
         selection_priority=selected_action.selection_priority,
         resolver_markers=list(markers),
     )
-    return selected_provider, selected_action, tuple(markers)
+    explanation: Dict[str, Any] = {
+        "intent_text": intent_text,
+        "intent_tokens": list(intent_tokens),
+        "broker_policy": dict(policy),
+        "preferred_provider_id": preferred_provider_id,
+        "allow_preferred_provider": allow_preferred_provider,
+        "candidate_count": len(candidate_pairs),
+        "eligible_count": len(available_candidates),
+        "resolver_markers": list(markers),
+        "candidates": explanation_candidates,
+        "selected": {
+            "provider_id": selected_provider.provider_id,
+            "action_id": selected_action.action_id,
+            "action_name": selected_action.action_name,
+            "provider_trust_class": selected_provider.trust_class,
+            "risk_level": selected_action.risk_level,
+            "selection_priority": selected_action.selection_priority,
+            "score": best[0],
+        },
+    }
+    for candidate in explanation_candidates:
+        candidate["selected"] = (
+            candidate.get("provider_id") == selected_provider.provider_id
+            and candidate.get("action_id") == selected_action.action_id
+        )
+    return selected_provider, selected_action, tuple(markers), explanation
 
 
 def plan_capability_execution(
@@ -1805,7 +1812,7 @@ def plan_capability_execution(
     if not candidate_actions:
         raise ValueError(f"no provider action mapped to capability_domain: {capability_domain}")
 
-    provider, action, markers = resolve_action_for_capability(
+    provider, action, markers, action_resolution = resolve_action_for_capability(
         intent_text,
         candidate_actions,
         capability=capability,
@@ -1816,6 +1823,7 @@ def plan_capability_execution(
     )
     executor = build_executor_binding(provider, action)
     validate_executor_binding_for_capability(capability, provider, action, executor)
+    executor_binding = explain_executor_binding_for_capability(capability, provider, action, executor)
     return BrokerDispatchPlan(
         capability=capability,
         broker=broker,
@@ -1823,6 +1831,10 @@ def plan_capability_execution(
         action=action,
         executor=executor,
         audit_markers=markers,
+        explanation={
+            "action_resolution": action_resolution,
+            "executor_binding": executor_binding,
+        },
     )
 
 

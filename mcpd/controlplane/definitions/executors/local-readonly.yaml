@@ -1,0 +1,31 @@
+apiVersion: mcpd/v1
+kind: ExecutorDefinition
+metadata:
+  name: local-readonly
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  profiles:
+    - executor_type: broker-uds
+      sandbox_profile: local-readonly
+      network_policy: inherit
+      resource_limits:
+        cpu_ms: 1000
+        memory_kb: 131072
+        nofile: 64
+      environment_policy:
+        inherited_env_keys: [LANG, LC_ALL, PATH]
+        structured_payload_only: true
+        command_schema_mode: parameter_schema_id
+      enforcement_requirements:
+        short_lived: true
+        sandbox_ready: true
+        runtime_identity_mode: broker-bound
+        required_hooks: []
+        deny_on_unenforced: false
+        enforce_no_new_privs: true

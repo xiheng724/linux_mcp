@@ -1,0 +1,31 @@
+apiVersion: mcpd/v1
+kind: ExecutorDefinition
+metadata:
+  name: sandbox-high-risk
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  profiles:
+    - executor_type: sandboxed-process
+      sandbox_profile: sandbox-high-risk
+      network_policy: broker-mediated
+      resource_limits:
+        cpu_ms: 5000
+        memory_kb: 262144
+        nofile: 64
+      environment_policy:
+        inherited_env_keys: [LANG, LC_ALL, PATH]
+        structured_payload_only: true
+        command_schema_mode: parameter_schema_id
+      enforcement_requirements:
+        short_lived: true
+        sandbox_ready: true
+        runtime_identity_mode: broker-bound
+        required_hooks: [no_new_privs, namespace]
+        deny_on_unenforced: true
+        enforce_no_new_privs: true

@@ -1,0 +1,20 @@
+apiVersion: mcpd/v1
+kind: BrokerDefinition
+metadata:
+  name: browser-broker
+  version: 1.0.0
+  labels: {domain: browser}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  selection_policy:
+    require_provider_availability: true
+    prefer_manifest_priority: true
+    prefer_example_matches: true
+    prefer_lower_risk_on_tie: true
+    allow_preferred_provider_high_risk: false
+  runtime_identity_mode: registered-agent
+  policy_controlled: true

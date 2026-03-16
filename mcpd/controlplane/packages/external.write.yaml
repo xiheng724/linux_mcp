@@ -1,0 +1,24 @@
+apiVersion: mcpd/v1
+kind: CapabilityPackage
+metadata:
+  name: external.write
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  capability:
+    capability_id: 108
+    required_caps: [CAP_EXTERNAL_WRITE]
+    capability_class: external-write
+    allows_side_effect: true
+    auth_mode: provider-auth
+  broker_ref: external-router-broker
+  policy_ref: write-mediumrisk
+  executor_ref: sandbox-broker-isolated
+  provider_requirements:
+    manifests: [settings-provider, notes-provider]
+  description: "Mutating external systems through provider-authenticated actions."

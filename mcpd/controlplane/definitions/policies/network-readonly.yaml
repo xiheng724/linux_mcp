@@ -1,0 +1,31 @@
+apiVersion: mcpd/v1
+kind: PolicyDefinition
+metadata:
+  name: network-readonly
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  risk_level: 4
+  approval_mode: auto
+  audit_mode: basic
+  rate_limit:
+    enabled: true
+    burst: 4
+    refill_tokens: 2
+    refill_jiffies: 5
+    default_cost: 1
+    max_inflight_per_participant: 4
+    defer_wait_ms: 250
+  max_inflight_per_participant: 4
+  max_inflight_per_agent: 4
+  executor_policy:
+    network_policy: inherit
+    require_short_lived: true
+    min_planner_trust_level: 0
+    min_provider_trust_class: local
+    deny_on_unenforced: false

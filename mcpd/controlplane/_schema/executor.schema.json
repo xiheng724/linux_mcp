@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "properties": {
+    "apiVersion": {
+      "const": "mcpd/v1"
+    },
+    "kind": {
+      "const": "ExecutorDefinition"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "spec": {
+      "type": "object",
+      "required": [
+        "profiles"
+      ],
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "executor_type",
+              "sandbox_profile",
+              "network_policy",
+              "resource_limits",
+              "environment_policy",
+              "enforcement_requirements"
+            ],
+            "properties": {
+              "executor_type": {
+                "type": "string"
+              },
+              "sandbox_profile": {
+                "type": "string"
+              },
+              "network_policy": {
+                "type": "string"
+              },
+              "resource_limits": {
+                "type": "object"
+              },
+              "environment_policy": {
+                "type": "object"
+              },
+              "enforcement_requirements": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

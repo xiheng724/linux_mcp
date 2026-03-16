@@ -1,0 +1,24 @@
+apiVersion: mcpd/v1
+kind: CapabilityPackage
+metadata:
+  name: network.fetch.readonly
+  version: 1.0.0
+  labels: {}
+  annotations: {}
+  deprecated: false
+  replaced_by: null
+  introduced_in: 1.0.0
+  requires_mcpd_version: '>=1.0.0'
+spec:
+  capability:
+    capability_id: 106
+    required_caps: [CAP_NETWORK_FETCH_READONLY]
+    capability_class: network-read
+    allows_side_effect: false
+    auth_mode: network-readonly
+  broker_ref: info-broker
+  policy_ref: network-readonly
+  executor_ref: local-readonly
+  provider_requirements:
+    manifests: []
+  description: "Read-only network fetch and external information retrieval."
