@@ -38,6 +38,7 @@ def load_runtime_config_bundle() -> Dict[str, Any]:
         "executor_profiles": dict(runtime_registry["executor_profiles"]),
         "policy_registry": dict(runtime_registry["policy_registry"]),
         "server_defaults": dict(runtime_registry["server_defaults"]),
+        "platform_capabilities": dict(runtime_registry.get("platform_capabilities", {})),
         "reconciled": reconciled,
     }
 
@@ -56,6 +57,10 @@ def load_executor_profiles_config() -> Dict[str, Any]:
 
 def load_policy_registry_config() -> Dict[str, Any]:
     return dict(load_runtime_config_bundle()["policy_registry"])
+
+
+def load_platform_capabilities_config() -> Dict[str, Any]:
+    return dict(load_runtime_config_bundle()["platform_capabilities"])
 
 
 def load_server_defaults_config() -> Dict[str, Any]:

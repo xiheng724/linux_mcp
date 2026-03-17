@@ -25,6 +25,7 @@ spec:
   max_inflight_per_agent: 1
   executor_policy:
     network_policy: broker-mediated
+    requires_isolation: true
     require_short_lived: true
     min_planner_trust_level: 8
     min_provider_trust_class: local

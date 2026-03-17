@@ -15,6 +15,7 @@ from config_loader import (
     load_controlplane_artifact_store,
     load_runtime_config_bundle,
     load_server_defaults_config,
+    load_platform_capabilities_config,
 )
 from policy_engine import evaluate_capability_request, evaluate_executor_binding
 
@@ -38,31 +39,6 @@ AUDIT_MODE_BASIC = 0
 AUDIT_MODE_DETAILED = 1
 AUDIT_MODE_STRICT = 2
 
-READ_ONLY_CAPABILITY_CLASSES = {"read", "network-read"}
-LOW_TRUST_CAPABILITY_AUTH_MODES = {"anonymous", "local-readonly", "network-readonly"}
-LOW_TRUST_PROVIDER_AUTH_MODES = {"anonymous", "none"}
-STRUCTURED_EXECUTOR_TYPES = {"broker-uds", "broker-isolated-uds", "sandboxed-process"}
-HIGH_RISK_EXECUTOR_TYPES = {"broker-isolated-uds", "sandboxed-process"}
-TRUST_CLASS_RANKS: Dict[str, int] = {
-    "anonymous": 0,
-    "remote": 1,
-    "provider": 1,
-    "local": 2,
-    "trusted": 3,
-    "system": 4,
-}
-
-REQUIRED_CAP_BITS: Dict[str, int] = {
-    "CAP_INFO_LOOKUP": 1 << 0,
-    "CAP_MESSAGE_READ": 1 << 1,
-    "CAP_MESSAGE_SEND": 1 << 2,
-    "CAP_FILE_READ": 1 << 3,
-    "CAP_FILE_WRITE": 1 << 4,
-    "CAP_NETWORK_FETCH_READONLY": 1 << 5,
-    "CAP_BROWSER_AUTOMATION": 1 << 6,
-    "CAP_EXTERNAL_WRITE": 1 << 7,
-    "CAP_EXEC_RUN": 1 << 8,
-}
 APPROVAL_MODE_NAMES: Dict[str, int] = {
     "auto": APPROVAL_MODE_AUTO,
     "trusted": APPROVAL_MODE_TRUSTED,
@@ -110,14 +86,21 @@ def _normalize_required_caps(value: Any, source: str) -> int:
         return int(value)
     if not isinstance(value, list):
         raise ValueError(f"{source}: required_caps must be int or list")
+    
+    platform_caps = load_platform_capabilities_config()
+    
     bitmask = 0
     for idx, cap_name in enumerate(value):
         if not isinstance(cap_name, str) or not cap_name.strip():
             raise ValueError(f"{source}: required_caps[{idx}] must be non-empty string")
-        bit = REQUIRED_CAP_BITS.get(cap_name.strip())
-        if bit is None:
-            raise ValueError(f"{source}: unknown required_caps entry {cap_name!r}")
-        bitmask |= bit
+        
+        cap_val = cap_name.strip()
+        cap_def = platform_caps.get(cap_val)
+        
+        if cap_def is None:
+            raise ValueError(f"{source}: unknown required_caps entry {cap_val!r} (not declared in platform capabilities)")
+        
+        bitmask |= cap_def["bit"]
     return bitmask
 
 
@@ -173,7 +156,7 @@ def _normalize_executor_policy(value: Any, source: str) -> Dict[str, Any]:
         raise ValueError(f"{source}: executor_policy.allowed_executor_types must be non-empty list")
     normalized_types: List[str] = []
     for idx, executor_type in enumerate(allowed_executor_types):
-        if not isinstance(executor_type, str) or executor_type not in STRUCTURED_EXECUTOR_TYPES:
+        if not isinstance(executor_type, str) or executor_type not in get_runtime().STRUCTURED_EXECUTOR_TYPES:
             raise ValueError(
                 f"{source}: executor_policy.allowed_executor_types[{idx}] is invalid"
             )
@@ -239,8 +222,8 @@ def _load_capability_domain_registry() -> Dict[str, Dict[str, Any]]:
             "executor_policy": executor_policy,
             "rate_limit": _normalize_rate_limit(entry["rate_limit"], source),
         }
-        if risk_level >= HIGH_RISK_LEVEL and sandbox_profile != "sandbox-high-risk" and capability_domain == "exec.run":
-            raise ValueError(f"{source}: exec.run must use sandbox-high-risk profile")
+        if risk_level >= HIGH_RISK_LEVEL and sandbox_profile != "sandbox-high-risk" and executor_policy.get("requires_isolation"):
+            raise ValueError(f"{source}: capability requires high-risk sandbox isolation")
     return registry
 
 
@@ -310,6 +293,8 @@ def _load_executor_profiles() -> Dict[Tuple[str, str], Dict[str, Any]]:
             "inherited_env_keys": tuple(entry["inherited_env_keys"]),
             "command_schema_mode": command_schema_mode,
             "structured_payload_only": bool(entry["structured_payload_only"]),
+            "risk_tier": str(entry.get("risk_tier", "low")),
+            "forbidden_payload_keys": tuple(entry.get("forbidden_payload_keys", ())),
             "sandbox_ready": bool(entry["sandbox_ready"]),
             "runtime_identity_mode": str(entry["runtime_identity_mode"]),
             "required_hooks": tuple(entry.get("required_hooks", ())),
@@ -318,37 +303,80 @@ def _load_executor_profiles() -> Dict[Tuple[str, str], Dict[str, Any]]:
         }
     return profiles
 
-CAPABILITY_DOMAIN_REGISTRY = _load_capability_domain_registry()
-EXECUTOR_PROFILE_REGISTRY = _load_executor_profiles()
-BROKER_REGISTRY = _load_broker_registry(CAPABILITY_DOMAIN_REGISTRY)
 
-CAPABILITY_DOMAIN_IDS: Dict[str, int] = {
-    name: int(meta["capability_id"]) for name, meta in CAPABILITY_DOMAIN_REGISTRY.items()
-}
-CAPABILITY_REQUIRED_CAPS: Dict[str, int] = {
-    name: int(meta["required_caps"]) for name, meta in CAPABILITY_DOMAIN_REGISTRY.items()
-}
-DEFAULT_BROKERS: Dict[str, str] = {
-    name: str(meta["broker_id"]) for name, meta in CAPABILITY_DOMAIN_REGISTRY.items()
-}
-CAPABILITY_CLASSES: Dict[str, str] = {
-    name: str(meta["capability_class"]) for name, meta in CAPABILITY_DOMAIN_REGISTRY.items()
-}
-CAPABILITY_AUTH_MODES: Dict[str, str] = {
-    name: str(meta["auth_mode"]) for name, meta in CAPABILITY_DOMAIN_REGISTRY.items()
-}
-CAPABILITY_SIDE_EFFECTS: Dict[str, bool] = {
-    name: bool(meta["allows_side_effect"]) for name, meta in CAPABILITY_DOMAIN_REGISTRY.items()
-}
-HIGH_RISK_DOMAINS = frozenset(
-    name
-    for name, meta in CAPABILITY_DOMAIN_REGISTRY.items()
-    if int(meta["baseline_risk_level"]) >= HIGH_RISK_LEVEL
-)
+class ArchitectureRuntime:
+    def __init__(self):
+        self.CAPABILITY_DOMAIN_REGISTRY = _load_capability_domain_registry()
+        self.EXECUTOR_PROFILE_REGISTRY = _load_executor_profiles()
+        self.BROKER_REGISTRY = _load_broker_registry(self.CAPABILITY_DOMAIN_REGISTRY)
 
-BROKER_CAPABILITIES: Dict[str, Tuple[str, ...]] = {
-    broker_id: tuple(meta["capability_domains"]) for broker_id, meta in BROKER_REGISTRY.items()
-}
+        self.CAPABILITY_DOMAIN_IDS = {
+            name: int(meta["capability_id"]) for name, meta in self.CAPABILITY_DOMAIN_REGISTRY.items()
+        }
+        self.CAPABILITY_REQUIRED_CAPS = {
+            name: int(meta["required_caps"]) for name, meta in self.CAPABILITY_DOMAIN_REGISTRY.items()
+        }
+        self.DEFAULT_BROKERS = {
+            name: str(meta["broker_id"]) for name, meta in self.CAPABILITY_DOMAIN_REGISTRY.items()
+        }
+        self.CAPABILITY_CLASSES = {
+            name: str(meta["capability_class"]) for name, meta in self.CAPABILITY_DOMAIN_REGISTRY.items()
+        }
+        self.CAPABILITY_AUTH_MODES = {
+            name: str(meta["auth_mode"]) for name, meta in self.CAPABILITY_DOMAIN_REGISTRY.items()
+        }
+        self.CAPABILITY_SIDE_EFFECTS = {
+            name: bool(meta["allows_side_effect"]) for name, meta in self.CAPABILITY_DOMAIN_REGISTRY.items()
+        }
+        self.HIGH_RISK_DOMAINS = frozenset(
+            name
+            for name, meta in self.CAPABILITY_DOMAIN_REGISTRY.items()
+            if int(meta["baseline_risk_level"]) >= HIGH_RISK_LEVEL
+        )
+        
+        auth_modes = load_server_defaults_config().get("auth_modes", [])
+        self.AUTH_MODE_TRUST_LEVELS = {
+            m["name"]: int(m["trust_level"]) for m in auth_modes
+        }
+        self.LOW_TRUST_AUTH_MODES = {
+            m["name"] for m in auth_modes if m["trust_level"] < 2
+        }
+        self.STRUCTURED_EXECUTOR_TYPES = {
+            profile["executor_type"] for profile in self.EXECUTOR_PROFILE_REGISTRY.values() if profile.get("structured_payload_only")
+        }
+        self.HIGH_RISK_EXECUTOR_TYPES = {
+            profile["executor_type"] for profile in self.EXECUTOR_PROFILE_REGISTRY.values() if profile.get("risk_tier") == "high"
+        }
+        
+        self.BROKER_CAPABILITIES = {
+            broker_id: tuple(meta["capability_domains"]) for broker_id, meta in self.BROKER_REGISTRY.items()
+        }
+        # Assuming ALLOWABLE_RISK_THRESHOLDS existed or is calculated if used
+        self.ALLOWABLE_RISK_THRESHOLDS = {
+            name: int(meta.get("risk_threshold", 0)) for name, meta in self.BROKER_REGISTRY.items()
+        }
+
+_RUNTIME_INSTANCE = None
+
+def init_architecture_runtime():
+    global _RUNTIME_INSTANCE
+    if _RUNTIME_INSTANCE is None:
+        _RUNTIME_INSTANCE = ArchitectureRuntime()
+    return _RUNTIME_INSTANCE
+
+def get_runtime():
+    if _RUNTIME_INSTANCE is None:
+        init_architecture_runtime()  # Lazy initialization!
+    return _RUNTIME_INSTANCE
+
+def __getattr__(name):
+    if name in ["AUTH_MODE_TRUST_LEVELS", "LOW_TRUST_AUTH_MODES", "STRUCTURED_EXECUTOR_TYPES", "HIGH_RISK_EXECUTOR_TYPES", "CAPABILITY_DOMAIN_REGISTRY", "EXECUTOR_PROFILE_REGISTRY", "BROKER_REGISTRY", 
+                "CAPABILITY_DOMAIN_IDS", "CAPABILITY_REQUIRED_CAPS", "DEFAULT_BROKERS", 
+                "CAPABILITY_CLASSES", "CAPABILITY_AUTH_MODES", "CAPABILITY_SIDE_EFFECTS", 
+                "HIGH_RISK_DOMAINS", "BROKER_CAPABILITIES", "ALLOWABLE_RISK_THRESHOLDS"]:
+        return getattr(get_runtime(), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 
 # ---------------------------------------------------------------------------
@@ -447,6 +475,8 @@ class ExecutorBinding:
     inherited_env_keys: Tuple[str, ...]
     command_schema_id: str
     structured_payload_only: bool
+    risk_tier: str
+    forbidden_payload_keys: Tuple[str, ...]
     sandbox_ready: bool
     runtime_identity_mode: str
     required_hooks: Tuple[str, ...]
@@ -466,7 +496,7 @@ class BrokerDispatchPlan:
 
 
 def build_executor_binding(provider: ProviderDef, action: ProviderAction) -> ExecutorBinding:
-    capability_meta = CAPABILITY_DOMAIN_REGISTRY.get(action.capability_domain)
+    capability_meta = get_runtime().CAPABILITY_DOMAIN_REGISTRY.get(action.capability_domain)
     if capability_meta is None:
         raise ValueError(f"unknown capability domain for executor binding: {action.capability_domain}")
     sandbox_profile = str(capability_meta["sandbox_profile"])
@@ -476,7 +506,7 @@ def build_executor_binding(provider: ProviderDef, action: ProviderAction) -> Exe
         raise ValueError(
             f"executor_type {action.executor_type!r} violates configured capability policy for {action.capability_domain}"
         )
-    profile = EXECUTOR_PROFILE_REGISTRY.get((action.executor_type, sandbox_profile))
+    profile = get_runtime().EXECUTOR_PROFILE_REGISTRY.get((action.executor_type, sandbox_profile))
     if profile is None:
         raise ValueError(
             "missing executor profile for "
@@ -498,6 +528,8 @@ def build_executor_binding(provider: ProviderDef, action: ProviderAction) -> Exe
         inherited_env_keys=tuple(profile["inherited_env_keys"]),
         command_schema_id=action.parameter_schema_id,
         structured_payload_only=bool(profile["structured_payload_only"]),
+        risk_tier=str(profile.get("risk_tier", "low")),
+        forbidden_payload_keys=tuple(profile.get("forbidden_payload_keys", ())),
         sandbox_ready=bool(profile["sandbox_ready"]),
         runtime_identity_mode=str(profile["runtime_identity_mode"]),
         required_hooks=tuple(profile.get("required_hooks", ())),
@@ -507,7 +539,7 @@ def build_executor_binding(provider: ProviderDef, action: ProviderAction) -> Exe
 
 
 def _trust_class_rank(trust_class: str) -> int:
-    return TRUST_CLASS_RANKS.get(trust_class, 0)
+    return get_runtime().AUTH_MODE_TRUST_LEVELS.get(trust_class, 0)
 
 
 def explain_executor_binding_for_capability(
@@ -521,7 +553,7 @@ def explain_executor_binding_for_capability(
         provider,
         action,
         executor,
-        trust_class_ranks=TRUST_CLASS_RANKS,
+        trust_class_ranks=get_runtime().AUTH_MODE_TRUST_LEVELS,
     ).as_dict()
 
 
@@ -607,402 +639,6 @@ def validate_action_payload(action: ProviderAction, payload: Mapping[str, Any]) 
     merged = fill_action_payload(action, payload)
     _validate_payload_against_schema(action.input_schema, merged, source=action.action_name)
     return merged
-
-
-_PATH_TOKEN_RE = re.compile(
-    r"(?:\.\.?/)?[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*|[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+"
-)
-_INTEGER_RE = re.compile(r"(?<![A-Za-z0-9])(-?\d+)(?![A-Za-z0-9])")
-_FLOAT_RE = re.compile(r"(?<![A-Za-z0-9])(-?\d+(?:\.\d+)?)(?![A-Za-z0-9])")
-_QUOTED_RE = re.compile(r"['\"]([^'\"]+)['\"]")
-_MATH_RE = re.compile(r"([0-9(][0-9\s+\-*/().%]+)")
-
-
-def _collect_quoted_values(text: str) -> List[str]:
-    return [value.strip() for value in _QUOTED_RE.findall(text) if value.strip()]
-
-
-def _extract_after_keywords(
-    text: str,
-    keywords: Sequence[str],
-    *,
-    quoted_only: bool = False,
-) -> List[str]:
-    matches: List[str] = []
-    for keyword in keywords:
-        pattern = re.compile(
-            rf"\b{re.escape(keyword.lower())}\b\s+(?:['\"]([^'\"]+)['\"]|([^\s,;]+))",
-            flags=re.IGNORECASE,
-        )
-        for match in pattern.finditer(text):
-            quoted = match.group(1)
-            raw = quoted if quoted is not None else ("" if quoted_only else match.group(2) or "")
-            raw = raw.strip()
-            if raw:
-                matches.append(raw)
-    return matches
-
-
-def _extract_paths(text: str) -> List[str]:
-    values: List[str] = []
-    for raw in _collect_quoted_values(text):
-        if "/" in raw or "." in raw:
-            values.append(raw)
-    for raw in _PATH_TOKEN_RE.findall(text):
-        cleaned = raw.strip().rstrip(".,)")
-        if cleaned and ("/" in cleaned or "." in cleaned):
-            values.append(cleaned)
-    seen: set[str] = set()
-    out: List[str] = []
-    for value in values:
-        if value not in seen:
-            out.append(value)
-            seen.add(value)
-    return out
-
-
-def _extract_integers(text: str) -> List[int]:
-    out: List[int] = []
-    for match in _INTEGER_RE.findall(text):
-        try:
-            out.append(int(match))
-        except ValueError:
-            continue
-    return out
-
-
-def _extract_numbers(text: str) -> List[float]:
-    out: List[float] = []
-    for match in _FLOAT_RE.findall(text):
-        try:
-            out.append(float(match))
-        except ValueError:
-            continue
-    return out
-
-
-def _extract_enum_value(text: str, field_hints: Mapping[str, Any]) -> Any:
-    lower = text.lower()
-    aliases_by_choice = field_hints.get("aliases_by_choice", {})
-    if isinstance(aliases_by_choice, Mapping):
-        for choice, aliases in aliases_by_choice.items():
-            if isinstance(choice, str) and isinstance(aliases, Sequence):
-                for alias in aliases:
-                    if isinstance(alias, str) and alias.lower() in lower:
-                        return choice
-    choices = field_hints.get("choices", [])
-    if isinstance(choices, Sequence):
-        for choice in choices:
-            if isinstance(choice, str) and choice.lower() in lower:
-                return choice
-    default = field_hints.get("default")
-    return default
-
-
-def _extract_boolean_value(text: str, field_hints: Mapping[str, Any]) -> Any:
-    lower = text.lower()
-    false_tokens = field_hints.get("false_tokens", [])
-    if isinstance(false_tokens, Sequence):
-        for token in false_tokens:
-            if isinstance(token, str) and token.lower() in lower:
-                return False
-    true_tokens = field_hints.get("true_tokens", [])
-    if isinstance(true_tokens, Sequence):
-        for token in true_tokens:
-            if isinstance(token, str) and token.lower() in lower:
-                return True
-    return field_hints.get("default")
-
-
-def _extract_integer_value(text: str, field_hints: Mapping[str, Any]) -> Any:
-    lower = text.lower()
-    units = field_hints.get("units", [])
-    matched_context = False
-    if isinstance(units, Sequence):
-        for unit in units:
-            if not isinstance(unit, str):
-                continue
-            pattern = re.compile(rf"(-?\d+)\s*{re.escape(unit.lower())}\b")
-            match = pattern.search(lower)
-            if match:
-                matched_context = True
-                return int(match.group(1))
-    after = field_hints.get("after", [])
-    values = _extract_after_keywords(lower, [item for item in after if isinstance(item, str)])
-    for value in values:
-        numbers = _extract_integers(value)
-        if numbers:
-            matched_context = True
-            return numbers[0]
-    if (after or units) and not matched_context and not bool(field_hints.get("allow_global_search", False)):
-        return field_hints.get("default")
-    numbers = _extract_integers(lower)
-    if numbers:
-        position = field_hints.get("position")
-        if isinstance(position, int) and 0 <= position < len(numbers):
-            return numbers[position]
-        return numbers[0]
-    return field_hints.get("default")
-
-
-def _extract_number_value(text: str, field_hints: Mapping[str, Any]) -> Any:
-    lower = text.lower()
-    after = field_hints.get("after", [])
-    values = _extract_after_keywords(lower, [item for item in after if isinstance(item, str)])
-    for value in values:
-        numbers = _extract_numbers(value)
-        if numbers:
-            return numbers[0]
-    numbers = _extract_numbers(lower)
-    if numbers:
-        return numbers[0]
-    return field_hints.get("default")
-
-
-def _extract_path_value(text: str, field_hints: Mapping[str, Any]) -> Any:
-    after = [item for item in field_hints.get("after", []) if isinstance(item, str)]
-    values = _extract_after_keywords(text, after)
-    for value in values:
-        return value
-    paths = _extract_paths(text)
-    position = field_hints.get("position")
-    if isinstance(position, int) and 0 <= position < len(paths):
-        return paths[position]
-    if paths:
-        return paths[0]
-    return field_hints.get("default")
-
-
-def _extract_list_value(
-    text: str,
-    field_hints: Mapping[str, Any],
-    item_schema: Mapping[str, Any],
-) -> List[Any] | None:
-    after = [item for item in field_hints.get("after", []) if isinstance(item, str)]
-    raw_value = ""
-    if after:
-        values = _extract_after_keywords(text, after)
-        if values:
-            raw_value = values[0]
-    if not raw_value:
-        quoted = _collect_quoted_values(text)
-        if quoted:
-            raw_value = quoted[0]
-    if not raw_value:
-        raw_value = field_hints.get("default", "")
-    if raw_value in ("", None):
-        return None
-
-    item_type = str(item_schema.get("type", "string"))
-    if isinstance(raw_value, list):
-        raw_items = raw_value
-    else:
-        raw_items = [item.strip() for item in re.split(r"[,|]", str(raw_value)) if item.strip()]
-        if len(raw_items) == 1 and " and " in str(raw_value):
-            raw_items = [item.strip() for item in str(raw_value).split(" and ") if item.strip()]
-
-    out: List[Any] = []
-    for raw_item in raw_items:
-        try:
-            out.append(_coerce_schema_value(raw_item, {"type": item_type}, "list_item", "build_execution_payload"))
-        except Exception:
-            continue
-    return out or None
-
-
-def _extract_expression_value(text: str, field_hints: Mapping[str, Any]) -> Any:
-    quoted = _collect_quoted_values(text)
-    for value in quoted:
-        if any(ch in value for ch in "+-*/()%"):
-            return value
-    match = _MATH_RE.search(text)
-    if match:
-        candidate = match.group(1).strip()
-        if any(ch in candidate for ch in "+-*/()%"):
-            return candidate
-    return field_hints.get("default")
-
-
-def _strip_known_prefixes(text: str, prefixes: Sequence[str]) -> str:
-    out = text.strip()
-    for prefix in prefixes:
-        if isinstance(prefix, str) and out.lower().startswith(prefix.lower() + " "):
-            out = out[len(prefix) + 1 :].strip()
-    return out
-
-
-def _extract_tail_text_value(text: str, field_hints: Mapping[str, Any]) -> Any:
-    quoted = _collect_quoted_values(text)
-    if quoted:
-        position = field_hints.get("position")
-        if isinstance(position, int) and 0 <= position < len(quoted):
-            return quoted[position]
-        return quoted[0]
-    after = [item for item in field_hints.get("after", []) if isinstance(item, str)]
-    for keyword in after:
-        match = re.search(rf"\b{re.escape(keyword)}\b\s+(.+)$", text, flags=re.IGNORECASE)
-        if match:
-            return match.group(1).strip()
-    stripped = _strip_known_prefixes(text, field_hints.get("strip_prefixes", []))
-    return stripped or field_hints.get("default")
-
-
-def _extract_string_value(
-    field_name: str,
-    text: str,
-    field_hints: Mapping[str, Any],
-) -> Any:
-    kind = str(field_hints.get("kind", "string"))
-    if kind == "enum":
-        return _extract_enum_value(text, field_hints)
-    if kind == "path":
-        return _extract_path_value(text, field_hints)
-    if kind == "expression":
-        return _extract_expression_value(text, field_hints)
-    if kind == "quoted_string":
-        quoted = _collect_quoted_values(text)
-        if quoted:
-            position = field_hints.get("position")
-            if isinstance(position, int) and 0 <= position < len(quoted):
-                return quoted[position]
-            return quoted[0]
-        return field_hints.get("default")
-    if kind in {"quoted_or_tail", "tail_text"}:
-        after = [item for item in field_hints.get("after", []) if isinstance(item, str)]
-        if after:
-            values = _extract_after_keywords(text, after)
-            if values:
-                position = field_hints.get("position")
-                if isinstance(position, int) and 0 <= position < len(values):
-                    return values[position]
-                return values[0]
-        return _extract_tail_text_value(text, field_hints)
-
-    after = [item for item in field_hints.get("after", []) if isinstance(item, str)]
-    if after:
-        values = _extract_after_keywords(text, after)
-        if values:
-            position = field_hints.get("position")
-            if isinstance(position, int) and 0 <= position < len(values):
-                return values[position]
-            return values[0]
-
-    aliases = [item for item in field_hints.get("aliases", []) if isinstance(item, str)]
-    if aliases:
-        values = _extract_after_keywords(text, aliases)
-        if values:
-            return values[0]
-
-    if field_name in {"message", "text", "content"}:
-        return _extract_tail_text_value(text, field_hints)
-    return field_hints.get("default")
-
-
-def _coerce_schema_value(value: Any, schema: Mapping[str, Any], field_name: str, source: str) -> Any:
-    expected_type = schema.get("type")
-    if not isinstance(expected_type, str):
-        return value
-    if expected_type == "string":
-        if isinstance(value, str):
-            return value
-        return str(value)
-    if expected_type == "integer":
-        if isinstance(value, bool):
-            raise ValueError(f"{source}: field {field_name!r} must be integer")
-        if isinstance(value, int):
-            return value
-        return int(value)
-    if expected_type == "number":
-        if isinstance(value, bool):
-            raise ValueError(f"{source}: field {field_name!r} must be number")
-        if isinstance(value, (int, float)):
-            return value
-        return float(value)
-    if expected_type == "boolean":
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            lower = value.lower().strip()
-            if lower in {"true", "yes", "1", "on"}:
-                return True
-            if lower in {"false", "no", "0", "off"}:
-                return False
-        raise ValueError(f"{source}: field {field_name!r} must be boolean")
-    return value
-
-
-def _infer_field_value_from_intent(
-    field_name: str,
-    field_schema: Mapping[str, Any],
-    field_hints: Mapping[str, Any],
-    intent_text: str,
-) -> Any:
-    expected_type = str(field_schema.get("type", "string"))
-    if expected_type == "boolean":
-        value = _extract_boolean_value(intent_text, field_hints)
-    elif expected_type == "integer":
-        value = _extract_integer_value(intent_text, field_hints)
-    elif expected_type == "number":
-        value = _extract_number_value(intent_text, field_hints)
-    elif expected_type == "array":
-        item_schema = field_schema.get("items", {})
-        if not isinstance(item_schema, Mapping):
-            item_schema = {}
-        value = _extract_list_value(intent_text, field_hints, item_schema)
-    elif expected_type == "string":
-        value = _extract_string_value(field_name, intent_text, field_hints)
-    else:
-        value = field_hints.get("default")
-    if value is None:
-        return None
-    return _coerce_schema_value(value, field_schema, field_name, "build_execution_payload")
-
-
-def _infer_payload_from_schema(
-    action: ProviderAction,
-    intent_text: str,
-    *,
-    hints: Mapping[str, Any] | None = None,
-) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {}
-    properties = action.input_schema.get("properties", {})
-    if not isinstance(properties, Mapping):
-        return payload
-
-    for field_name, field_schema in properties.items():
-        if not isinstance(field_schema, Mapping):
-            continue
-        field_hints = action.arg_hints.get(field_name, {})
-        if not isinstance(field_hints, Mapping):
-            field_hints = {}
-        value = _infer_field_value_from_intent(field_name, field_schema, field_hints, intent_text)
-        if value is not None:
-            payload[field_name] = value
-    return payload
-
-
-def build_execution_payload(
-    action: ProviderAction,
-    intent_text: str,
-    *,
-    provided_payload: Mapping[str, Any] | None = None,
-    hints: Mapping[str, Any] | None = None,
-) -> Dict[str, Any]:
-    defaults = _infer_payload_from_schema(action, intent_text, hints=hints)
-    payload = fill_action_payload(action, provided_payload, defaults=defaults)
-    validated = validate_action_payload(action, payload)
-    _log_structured(
-        logging.INFO,
-        "payload_fill_mode",
-        action_name=action.action_name,
-        capability_domain=action.capability_domain,
-        fill_mode="schema_arg_hints",
-        inferred_fields=sorted(defaults.keys()),
-        provided_fields=sorted(list(provided_payload.keys())) if isinstance(provided_payload, Mapping) else [],
-        used_planner_payload_slots=False,
-    )
-    return validated
-
 
 # ---------------------------------------------------------------------------
 # manifest loading + validation
@@ -1142,9 +778,9 @@ def _looks_like_write_or_exec(*values: str) -> bool:
 
 
 def _validate_executor_type(capability_domain: str, risk_level: int, executor_type: str, source: str) -> None:
-    if executor_type not in STRUCTURED_EXECUTOR_TYPES:
+    if executor_type not in get_runtime().STRUCTURED_EXECUTOR_TYPES:
         raise ValueError(f"{source}: unsupported executor_type {executor_type!r}")
-    if risk_level >= HIGH_RISK_LEVEL and executor_type not in HIGH_RISK_EXECUTOR_TYPES:
+    if risk_level >= HIGH_RISK_LEVEL and executor_type not in get_runtime().HIGH_RISK_EXECUTOR_TYPES:
         raise ValueError(
             f"{source}: executor_type {executor_type!r} incompatible with high-risk capability {capability_domain}"
         )
@@ -1164,31 +800,27 @@ def _validate_action_schema_contract(
         raise ValueError(
             f"{source}: action {action.action_name} side_effect cannot map to {action.capability_domain}"
         )
-    if action.auth_required and capability_auth_mode in LOW_TRUST_CAPABILITY_AUTH_MODES:
+    if action.auth_required and capability_auth_mode in get_runtime().LOW_TRUST_AUTH_MODES:
         raise ValueError(
             f"{source}: auth-required action {action.action_name} cannot map to low-trust capability {action.capability_domain}"
         )
-    if capability_class in READ_ONLY_CAPABILITY_CLASSES and action.side_effect:
+    if not allows_side_effect and action.side_effect:
         raise ValueError(
             f"{source}: side-effect action {action.action_name} cannot map to read-only capability {action.capability_domain}"
         )
-    if capability_class in READ_ONLY_CAPABILITY_CLASSES and _looks_like_write_or_exec(
+    if not allows_side_effect and _looks_like_write_or_exec(
         action.action_name, action.handler, action.name, action.description
     ):
         raise ValueError(
-            f"{source}: write/exec-like action {action.action_name} cannot map to read-only capability {action.capability_domain}"
+            f"{source}: write/exec-like action {action.action_name} mapped to read-only capability {action.capability_domain}"
         )
-    if action.capability_domain == "info.lookup" and _looks_like_write_or_exec(
-        action.action_name, action.handler, action.name, action.description
-    ):
-        raise ValueError(
-            f"{source}: write/exec-like action {action.action_name} cannot map to info.lookup"
-        )
-    if provider.auth_mode in LOW_TRUST_PROVIDER_AUTH_MODES and action.auth_required:
+
+    # Note: info.lookup specific hardcoded check has been removed as per user request
+    if provider.auth_mode in get_runtime().LOW_TRUST_AUTH_MODES and action.auth_required:
         raise ValueError(
             f"{source}: provider {provider.provider_id} auth_mode incompatible with auth-required action {action.action_name}"
         )
-    if action.executor_type in STRUCTURED_EXECUTOR_TYPES and not action.parameter_schema_id:
+    if action.executor_type in get_runtime().STRUCTURED_EXECUTOR_TYPES and not action.parameter_schema_id:
         raise ValueError(
             f"{source}: structured execution requires parameter_schema_id for {action.action_name}"
         )
@@ -1275,9 +907,9 @@ def load_provider_manifest(source: str, raw: Any) -> ProviderDef:
         cost = _ensure_int("cost", action_raw.get("cost", 1), source)
         action_source = f"{source}:action[{action_id}]"
         capability_domain = _ensure_non_empty_str("capability_domain", action_raw["capability_domain"], action_source)
-        if capability_domain not in CAPABILITY_DOMAIN_REGISTRY:
+        if capability_domain not in get_runtime().CAPABILITY_DOMAIN_REGISTRY:
             raise ValueError(f"{action_source}: unknown capability_domain {capability_domain!r}")
-        capability_meta = CAPABILITY_DOMAIN_REGISTRY[capability_domain]
+        capability_meta = get_runtime().CAPABILITY_DOMAIN_REGISTRY[capability_domain]
         risk_level = _ensure_int("risk_level", action_raw["risk_level"], action_source)
         side_effect = _ensure_bool("side_effect", action_raw["side_effect"], action_source)
         auth_required = _ensure_bool("auth_required", action_raw["auth_required"], action_source)
@@ -1291,7 +923,7 @@ def load_provider_manifest(source: str, raw: Any) -> ProviderDef:
                 "input_schema_path",
             )
         input_schema = _validate_json_schema_object(raw_input_schema, action_source)
-        if executor_type in STRUCTURED_EXECUTOR_TYPES and not input_schema:
+        if executor_type in get_runtime().STRUCTURED_EXECUTOR_TYPES and not input_schema:
             raise ValueError(
                 f"{action_source}: parameter schema is required for structured execution"
             )
@@ -1342,7 +974,7 @@ def load_provider_manifest(source: str, raw: Any) -> ProviderDef:
         manifest_source=source,
     )
     for action in provider.actions.values():
-        _validate_action_schema_contract(action, CAPABILITY_DOMAIN_REGISTRY[action.capability_domain], provider, source)
+        _validate_action_schema_contract(action, get_runtime().CAPABILITY_DOMAIN_REGISTRY[action.capability_domain], provider, source)
     return provider
 
 
@@ -1354,7 +986,7 @@ def build_capability_catalog(providers: Iterable[ProviderDef]) -> Dict[str, Capa
     for provider in providers:
         for action in provider.actions.values():
             capability_domain = action.capability_domain
-            if capability_domain not in CAPABILITY_DOMAIN_REGISTRY:
+            if capability_domain not in get_runtime().CAPABILITY_DOMAIN_REGISTRY:
                 raise ValueError(f"unknown capability_domain in provider catalog: {capability_domain}")
             entry = grouped.setdefault(
                 capability_domain,
@@ -1363,7 +995,7 @@ def build_capability_catalog(providers: Iterable[ProviderDef]) -> Dict[str, Capa
                     "action_ids": set(),
                     "perm": 0,
                     "cost": 0,
-                    "risk_level": int(CAPABILITY_DOMAIN_REGISTRY[capability_domain]["baseline_risk_level"]),
+                    "risk_level": int(get_runtime().CAPABILITY_DOMAIN_REGISTRY[capability_domain]["baseline_risk_level"]),
                     "actions": [],
                     "intent_tags": set(),
                     "examples": [],
@@ -1380,7 +1012,7 @@ def build_capability_catalog(providers: Iterable[ProviderDef]) -> Dict[str, Capa
 
     out: Dict[str, CapabilityDomain] = {}
     for capability_domain, entry in grouped.items():
-        meta = CAPABILITY_DOMAIN_REGISTRY[capability_domain]
+        meta = get_runtime().CAPABILITY_DOMAIN_REGISTRY[capability_domain]
         capability_description = str(
             meta.get(
                 "description",
@@ -1457,7 +1089,7 @@ def build_broker_catalog(
     providers: Iterable[ProviderDef], capabilities: Mapping[str, CapabilityDomain]
 ) -> Dict[str, BrokerDef]:
     provider_ids_by_broker: Dict[str, set[str]] = {
-        broker_id: set() for broker_id in BROKER_REGISTRY
+        broker_id: set() for broker_id in get_runtime().BROKER_REGISTRY
     }
     for provider in providers:
         for action in provider.actions.values():
@@ -1467,7 +1099,7 @@ def build_broker_catalog(
             provider_ids_by_broker.setdefault(capability.broker_id, set()).add(provider.provider_id)
 
     out: Dict[str, BrokerDef] = {}
-    for broker_id, broker_meta in BROKER_REGISTRY.items():
+    for broker_id, broker_meta in get_runtime().BROKER_REGISTRY.items():
         capability_domains = tuple(
             domain
             for domain in broker_meta["capability_domains"]

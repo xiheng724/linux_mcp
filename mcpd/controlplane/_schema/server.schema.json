@@ -57,6 +57,16 @@
         },
         "executor_workdir": {
           "type": "string"
+        },
+        "auth_modes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "trust_level": {"type": "integer"}
+            }
+          }
         }
       },
       "additionalProperties": true

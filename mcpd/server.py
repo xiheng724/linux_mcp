@@ -17,18 +17,20 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from payload_inference import build_execution_payload
+
 from architecture import (
     APPROVAL_STATE_APPROVED,
     APPROVAL_STATE_AUTO_APPROVED,
     APPROVAL_STATE_PENDING,
-    CAPABILITY_REQUIRED_CAPS,
+    get_runtime,
     HIGH_RISK_LEVEL,
     BrokerDispatchPlan,
     BrokerDef,
     CapabilityDomain,
     ProviderAction,
     ProviderDef,
-    build_execution_payload,
+    fill_action_payload,
     build_executor_binding,
     build_broker_catalog,
     build_capability_catalog,
@@ -121,7 +123,7 @@ EXECUTOR_WORKDIR_ROOT = _server_default_str(
 )
 
 PLANNER_CAPS = 0
-for _caps in CAPABILITY_REQUIRED_CAPS.values():
+for _caps in get_runtime().CAPABILITY_REQUIRED_CAPS.values():
     PLANNER_CAPS |= _caps
 PLANNER_TRUST_LEVEL = _server_default_int(
     "MCPD_PLANNER_TRUST_LEVEL",
@@ -578,8 +580,8 @@ def _validate_executor_contract(plan: BrokerDispatchPlan, payload: Dict[str, Any
         raise ValueError("executor payload must be structured object")
     if not plan.executor.structured_payload_only:
         raise ValueError("executor must require structured payloads")
-    if plan.executor.executor_type == "sandboxed-process":
-        for forbidden_key in ("command", "cmd", "shell", "shell_command"):
+    if plan.executor.forbidden_payload_keys:
+        for forbidden_key in plan.executor.forbidden_payload_keys:
             if forbidden_key in payload:
                 raise ValueError(
                     f"free-form shell field '{forbidden_key}' is not allowed for executor payload"

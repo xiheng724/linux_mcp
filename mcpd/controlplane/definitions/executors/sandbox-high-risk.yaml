@@ -21,6 +21,8 @@ spec:
       environment_policy:
         inherited_env_keys: [LANG, LC_ALL, PATH]
         structured_payload_only: true
+        risk_tier: high
+        forbidden_payload_keys: ["command", "cmd", "shell", "shell_command"]
         command_schema_mode: parameter_schema_id
       enforcement_requirements:
         short_lived: true

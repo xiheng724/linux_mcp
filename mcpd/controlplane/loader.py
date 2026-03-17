@@ -25,6 +25,7 @@ KIND_SUBDIRS = {
     "ExecutorDefinition": "definitions/executors",
     "PolicyDefinition": "definitions/policies",
     "ServerConfig": "platform",
+    "PlatformCapabilities": "platform",
 }
 KIND_SCHEMAS = {
     "CapabilityPackage": "package.schema.json",
@@ -32,6 +33,7 @@ KIND_SCHEMAS = {
     "ExecutorDefinition": "executor.schema.json",
     "PolicyDefinition": "policy.schema.json",
     "ServerConfig": "server.schema.json",
+    "PlatformCapabilities": "capabilities.schema.json",
 }
 
 
@@ -64,6 +66,7 @@ class ArtifactStore:
     executors: Dict[str, Artifact]
     policies: Dict[str, Artifact]
     platform: Dict[str, Artifact]
+    platform_capabilities: Dict[str, Artifact]
 
     @property
     def server_config(self) -> Artifact:
@@ -515,9 +518,10 @@ def _load_kind_dir(base_dir: Path, kind: str) -> Dict[str, Artifact]:
         raise ValueError(f"controlplane: missing directory for kind={kind}: {artifact_dir}")
     artifacts: Dict[str, Artifact] = {}
     for path in sorted(artifact_dir.glob("*.yaml")):
-        artifact = _validate_artifact(_load_yaml(path), base_dir, str(path))
-        if artifact.kind != kind:
-            raise ValueError(f"{path}: expected kind {kind!r}, found {artifact.kind!r}")
+        doc = _load_yaml(path)
+        if doc.get("kind") != kind:
+            continue
+        artifact = _validate_artifact(doc, base_dir, str(path))
         if artifact.metadata.name in artifacts:
             raise ValueError(f"{path}: duplicate artifact name {artifact.metadata.name!r}")
         artifacts[artifact.metadata.name] = artifact
@@ -531,6 +535,7 @@ def load_artifact_store(base_dir: Path = CONTROLPLANE_DIR) -> ArtifactStore:
     executors = _load_kind_dir(base_dir, "ExecutorDefinition")
     policies = _load_kind_dir(base_dir, "PolicyDefinition")
     platform = _load_kind_dir(base_dir, "ServerConfig")
+    platform_caps = _load_kind_dir(base_dir, "PlatformCapabilities")
     return ArtifactStore(
         base_dir=base_dir,
         packages=packages,
@@ -538,4 +543,5 @@ def load_artifact_store(base_dir: Path = CONTROLPLANE_DIR) -> ArtifactStore:
         executors=executors,
         policies=policies,
         platform=platform,
+        platform_capabilities=platform_caps,
     )

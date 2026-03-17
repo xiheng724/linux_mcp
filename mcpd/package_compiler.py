@@ -120,6 +120,7 @@ def compile_runtime_registry(
 ) -> Dict[str, Any]:
     server_artifact = store.server_config
     server_defaults = {
+        "auth_modes": list(server_artifact.spec.get("auth_modes", [])),
         "governance": _governance_entry(server_artifact),
         "manifest_dirs": list(server_artifact.spec["manifest_dirs"]),
         "planner_trust_level": int(server_artifact.spec["planner_trust_level"]),
@@ -130,6 +131,16 @@ def compile_runtime_registry(
     }
     if provider_manifests is None:
         provider_manifests = _load_provider_manifests(server_defaults)
+
+    compiled_platform_caps: Dict[str, Dict[str, Any]] = {}
+    for name, artifact in store.platform_capabilities.items():
+        for cap in artifact.spec.get("capabilities", []):
+            compiled_platform_caps[cap["name"]] = {
+                "name": cap["name"],
+                "bit": cap["bit"],
+                "stability": cap["stability"],
+                "allowed_risk_classes": cap.get("allowed_risk_classes", []),
+            }
 
     compiled_brokers: Dict[str, Dict[str, Any]] = {}
     for broker_id, artifact in store.brokers.items():
@@ -167,6 +178,8 @@ def compile_runtime_registry(
                 "inherited_env_keys": list(env_policy["inherited_env_keys"]),
                 "command_schema_mode": str(env_policy["command_schema_mode"]),
                 "structured_payload_only": bool(env_policy["structured_payload_only"]),
+                "risk_tier": str(env_policy.get("risk_tier", "low")),
+                "forbidden_payload_keys": list(env_policy.get("forbidden_payload_keys", [])),
                 "short_lived": bool(enforcement["short_lived"]),
                 "sandbox_ready": bool(enforcement["sandbox_ready"]),
                 "runtime_identity_mode": str(enforcement["runtime_identity_mode"]),
@@ -286,6 +299,7 @@ def compile_runtime_registry(
                 "min_planner_trust_level": int(policy["executor_policy"]["min_planner_trust_level"]),
                 "min_provider_trust_class": str(policy["executor_policy"]["min_provider_trust_class"]),
                 "deny_on_unenforced": bool(policy["executor_policy"]["deny_on_unenforced"]),
+                "requires_isolation": bool(policy["executor_policy"].get("requires_isolation", False)),
             },
             "provider_requirements": {"manifests": required_manifests},
             "policy_ref": policy_ref,
@@ -342,6 +356,7 @@ def compile_runtime_registry(
             "version": 1,
             "policies": [compiled_policies[name] for name in sorted(compiled_policies)],
         },
+        "platform_capabilities": compiled_platform_caps,
         "server_defaults": server_defaults,
         "provider_manifest_index": {
             "version": 1,

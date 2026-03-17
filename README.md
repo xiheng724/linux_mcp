@@ -73,18 +73,18 @@ planner 不做这些事：
 
 ### 3. mcpd
 
-`mcpd` 是整个系统的执行中枢。
+`mcpd` 是整个系统的执行中枢，它也是**数据驱动安全（Data-driven Security）**的核心承载层。
 
 它负责：
 
 - 按配置自动加载 provider manifests
 - 构建 provider catalog / capability catalog / broker catalog
 - 校验 planner capability request
-- 通过独立 policy engine 评估 capability gating 和 executor policy
+- 通过独立 policy engine 和 **Schema 层面派生的动态安全配置**（如自动防范 `forbidden_payload_keys` 等提权风险），进行严格评估
 - 根据 capability intent 解析 provider 和 action
-- 根据 manifest + schema 构建结构化 payload
-- 做 schema 校验
-- 绑定短生命周期 executor
+- 根据 manifest + schema 使用 `payload_inference` 引擎构建结构化 payload
+- 做 schema 校验，并对具有 `requires_isolation` 的 capability 采取隔离
+- 绑定短生命周期 executor（如 sandbox）
 - 请求 kernel lease
 - 调用 provider endpoint
 - 向 kernel 回报 completion

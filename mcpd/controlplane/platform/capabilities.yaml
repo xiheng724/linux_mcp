@@ -1,0 +1,37 @@
+apiVersion: mcpd/v1
+kind: PlatformCapabilities
+metadata:
+  name: core-capabilities
+  version: 1.0.0
+spec:
+  capabilities:
+    - name: CAP_INFO_LOOKUP
+      bit: 1
+      stability: core
+    - name: CAP_MESSAGE_READ
+      bit: 2
+      stability: core
+    - name: CAP_MESSAGE_SEND
+      bit: 4
+      stability: core
+    - name: CAP_FILE_READ
+      bit: 8
+      stability: core
+    - name: CAP_FILE_WRITE
+      bit: 16
+      stability: core
+    - name: CAP_NETWORK_FETCH_READONLY
+      bit: 32
+      stability: core
+    - name: CAP_BROWSER_AUTOMATION
+      bit: 64
+      stability: core
+    - name: CAP_EXTERNAL_WRITE
+      bit: 128
+      stability: core
+    - name: CAP_EXEC_RUN
+      bit: 256
+      stability: core
+    - name: CAP_RESERVED_1
+      bit: 512
+      stability: reserved
