@@ -281,7 +281,6 @@ class KernelMcpNetlinkClient:
         *,
         capability_id: int,
         name: str,
-        perm: int,
         cost: int,
         capability_hash: str = "",
         required_caps: int = 0,
@@ -304,7 +303,6 @@ class KernelMcpNetlinkClient:
         attrs = [
             (ATTR["CAPABILITY_ID"], struct.pack("=I", capability_id)),
             (ATTR["CAPABILITY_NAME"], name.encode("utf-8") + b"\x00"),
-            (ATTR["CAPABILITY_PERM"], struct.pack("=I", perm)),
             (ATTR["CAPABILITY_COST"], struct.pack("=I", cost)),
         ]
         if capability_hash:

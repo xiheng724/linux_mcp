@@ -94,7 +94,6 @@ static int parse_args(int argc, char **argv, struct capability_args *args)
 	int i;
 	int seen_capability_id = 0;
 	int seen_capability_name = 0;
-	int seen_perm = 0;
 	int seen_cost = 0;
 
 	memset(args, 0, sizeof(*args));
@@ -312,10 +311,6 @@ static int register_capability(int fd, uint16_t family_id,
 		return ret;
 	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_CAPABILITY_NAME,
 		       args->capability_name, strlen(args->capability_name) + 1);
-	if (ret)
-		return ret;
-	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_CAPABILITY_PERM,
-		       &args->perm, sizeof(args->perm));
 	if (ret)
 		return ret;
 	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_CAPABILITY_COST,

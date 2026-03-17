@@ -34,7 +34,6 @@ def _load_capabilities() -> Dict[str, dict]:
         out[capability_name] = {
             "capability_id": capability.capability_id,
             "name": capability.name,
-            "perm": capability.perm,
             "cost": capability.cost,
             "hash": capability.manifest_hash,
             "required_caps": capability.required_caps,
@@ -55,7 +54,6 @@ def _register_capabilities(capabilities: Dict[str, dict]) -> None:
             client.register_capability(
                 capability_id=int(capability["capability_id"]),
                 name=str(capability["name"]),
-                perm=int(capability["perm"]),
                 cost=int(capability["cost"]),
                 capability_hash=str(capability["hash"]),
                 required_caps=int(capability["required_caps"]),
@@ -76,10 +74,9 @@ def _register_capabilities(capabilities: Dict[str, dict]) -> None:
                 rl_defer_wait_ms=int(capability["rate_limit"].get("defer_wait_ms", 0)),
             )
             print(
-                "[reconcile] registered capability id={} name={} perm={} cost={} hash={} required_caps={} risk_level={} approval_mode={} audit_mode={}".format(
+                "[reconcile] registered capability id={} name={} cost={} hash={} required_caps={} risk_level={} approval_mode={} audit_mode={}".format(
                     capability["capability_id"],
                     capability["name"],
-                    capability["perm"],
                     capability["cost"],
                     capability["hash"],
                     capability["required_caps"],
@@ -108,7 +105,6 @@ def _list_kernel_capabilities() -> Dict[int, Dict[str, str]]:
         capabilities[capability_id] = {
             "capability_id": capability_id,
             "name": _read_sysfs_text(item / "name"),
-            "perm": int(_read_sysfs_text(item / "perm")),
             "cost": int(_read_sysfs_text(item / "cost")),
             "hash": _read_sysfs_text(item / "hash"),
         }
@@ -135,19 +131,16 @@ def _verify(capabilities: Dict[str, dict], kernel_capabilities: Dict[int, Dict[s
             continue
         if (
             actual["name"] != capability["name"]
-            or actual["perm"] != capability["perm"]
             or actual["cost"] != capability["cost"]
             or actual["hash"] != capability["hash"]
         ):
             print(
-                "[reconcile] mismatch id={}: expected name={} perm={} cost={} hash={}, got name={} perm={} cost={} hash={}".format(
+                "[reconcile] mismatch id={}: expected name={} cost={} hash={}, got name={} cost={} hash={}".format(
                     capability["capability_id"],
                     capability["name"],
-                    capability["perm"],
                     capability["cost"],
                     capability["hash"],
                     actual["name"],
-                    actual["perm"],
                     actual["cost"],
                     actual["hash"],
                 ),

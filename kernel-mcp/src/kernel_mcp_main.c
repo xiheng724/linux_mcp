@@ -113,7 +113,6 @@ struct kernel_mcp_capability {
 	/* Top-level kernel registry entry: stable capability domain. */
 	char name[KERNEL_MCP_CAPABILITY_NAME_MAX];
 	char hash[KERNEL_MCP_CAPABILITY_HASH_MAX];
-	u32 perm;
 	u32 cost;
 	u64 required_caps;
 	u32 risk_level;
@@ -135,7 +134,6 @@ struct kernel_mcp_capability {
 struct kernel_mcp_capability_snapshot {
 	char name[KERNEL_MCP_CAPABILITY_NAME_MAX];
 	char hash[KERNEL_MCP_CAPABILITY_HASH_MAX];
-	u32 perm;
 	u32 cost;
 	u64 required_caps;
 	u32 risk_level;
@@ -291,15 +289,12 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_PARTICIPANT_TYP
 		.type = NLA_NUL_STRING,
 		.len = KERNEL_MCP_PARTICIPANT_ID_MAX - 1,
 	},
-	[KERNEL_MCP_ATTR_TOKEN_COST] = { .type = NLA_U32 },
-	[KERNEL_MCP_ATTR_TOKENS_LEFT] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_STATUS] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_MESSAGE] = { .type = NLA_NUL_STRING, .len = 256 },
 	[KERNEL_MCP_ATTR_UNIX_SOCK_PATH] = { .type = NLA_NUL_STRING, .len = 108 },
 	[KERNEL_MCP_ATTR_PAYLOAD_LEN] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_AUDIT_SEQ] = { .type = NLA_U64 },
 	[KERNEL_MCP_ATTR_TS_NS] = { .type = NLA_U64 },
-	[KERNEL_MCP_ATTR_CAPABILITY_PERM] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_CAPABILITY_COST] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_PID] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_UID] = { .type = NLA_U32 },
@@ -651,7 +646,6 @@ kernel_mcp_copy_capability_snapshot_locked(
 	memset(out, 0, sizeof(*out));
 	strscpy(out->name, capability->name, sizeof(out->name));
 	strscpy(out->hash, capability->hash, sizeof(out->hash));
-	out->perm = capability->perm;
 	out->cost = capability->cost;
 	out->required_caps = capability->required_caps;
 	out->risk_level = capability->risk_level;
@@ -821,18 +815,7 @@ static ssize_t kernel_mcp_capability_name_show(struct kobject *kobj,
 	return sysfs_emit(buf, "%s\n", snapshot.name);
 }
 
-static ssize_t kernel_mcp_capability_perm_show(struct kobject *kobj,
-					 struct kobj_attribute *attr, char *buf)
-{
-	struct kernel_mcp_capability_snapshot snapshot;
-	int ret;
 
-	(void)attr;
-	ret = kernel_mcp_lookup_capability_snapshot(kobj, &snapshot);
-	if (ret)
-		return ret;
-	return sysfs_emit(buf, "%u\n", snapshot.perm);
-}
 
 static ssize_t kernel_mcp_capability_hash_show(struct kobject *kobj,
 					 struct kobj_attribute *attr, char *buf)
@@ -1455,8 +1438,7 @@ static ssize_t kernel_mcp_participant_timeout_show(struct kobject *kobj,
 
 static struct kobj_attribute kernel_mcp_name_attr =
 	__ATTR(name, 0444, kernel_mcp_capability_name_show, NULL);
-static struct kobj_attribute kernel_mcp_perm_attr =
-	__ATTR(perm, 0444, kernel_mcp_capability_perm_show, NULL);
+
 static struct kobj_attribute kernel_mcp_hash_attr =
 	__ATTR(hash, 0444, kernel_mcp_capability_hash_show, NULL);
 static struct kobj_attribute kernel_mcp_cost_attr =
@@ -1519,7 +1501,6 @@ static struct kobj_attribute kernel_mcp_capability_rl_defer_wait_ms_attr =
 
 static struct attribute *kernel_mcp_capability_attrs[] = {
 	&kernel_mcp_name_attr.attr,
-	&kernel_mcp_perm_attr.attr,
 	&kernel_mcp_hash_attr.attr,
 	&kernel_mcp_cost_attr.attr,
 	&kernel_mcp_capability_status_attr.attr,
@@ -1688,7 +1669,7 @@ static void kernel_mcp_capabilities_destroy_all(void)
 }
 
 static int kernel_mcp_register_capability(u32 capability_id, const char *name,
-					  u32 perm, u32 cost, const char *hash,
+					  u32 cost, const char *hash,
 					  u64 required_caps, u32 risk_level,
 					  u32 approval_mode, u32 audit_mode,
 					  u32 max_inflight_per_participant,
@@ -1726,7 +1707,6 @@ static int kernel_mcp_register_capability(u32 capability_id, const char *name,
 		strscpy(capability->name, name, sizeof(capability->name));
 		if (hash)
 			strscpy(capability->hash, hash, sizeof(capability->hash));
-		capability->perm = perm;
 		capability->cost = cost;
 		capability->required_caps = required_caps;
 		capability->risk_level = risk_level;
@@ -1746,7 +1726,6 @@ static int kernel_mcp_register_capability(u32 capability_id, const char *name,
 	}
 
 	capability->id = capability_id;
-	capability->perm = perm;
 	capability->cost = cost;
 	capability->required_caps = required_caps;
 	capability->risk_level = risk_level;
@@ -2594,7 +2573,6 @@ static int kernel_mcp_cmd_capability_register(struct sk_buff *skb,
 					      struct genl_info *info)
 {
 	u32 capability_id;
-	u32 perm;
 	u32 cost;
 	u32 risk_level = 0;
 	u32 approval_mode = 0;
@@ -2610,13 +2588,11 @@ static int kernel_mcp_cmd_capability_register(struct sk_buff *skb,
 		return -EINVAL;
 	if (!info->attrs[KERNEL_MCP_ATTR_CAPABILITY_ID] ||
 	    !info->attrs[KERNEL_MCP_ATTR_CAPABILITY_NAME] ||
-	    !info->attrs[KERNEL_MCP_ATTR_CAPABILITY_PERM] ||
 	    !info->attrs[KERNEL_MCP_ATTR_CAPABILITY_COST])
 		return -EINVAL;
 
 	capability_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_ID]);
 	capability_name = nla_data(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_NAME]);
-	perm = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_PERM]);
 	cost = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_CAPABILITY_COST]);
 	if (info->attrs[KERNEL_MCP_ATTR_CAPABILITY_HASH])
 		capability_hash =
@@ -3000,10 +2976,6 @@ static int kernel_mcp_cmd_list_capabilities_dump(struct sk_buff *skb,
 			goto dump_nla_fail;
 		ret = nla_put_string(skb, KERNEL_MCP_ATTR_CAPABILITY_NAME,
 				     capability->name);
-		if (ret)
-			goto dump_nla_fail;
-		ret = nla_put_u32(skb, KERNEL_MCP_ATTR_CAPABILITY_PERM,
-				  capability->perm);
 		if (ret)
 			goto dump_nla_fail;
 		ret = nla_put_u32(skb, KERNEL_MCP_ATTR_CAPABILITY_COST,
