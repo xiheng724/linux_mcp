@@ -278,7 +278,7 @@ static struct kobject *kernel_mcp_sysfs_capabilities;
 static struct kobject *kernel_mcp_sysfs_participants;
 static struct genl_family kernel_mcp_genl_family;
 
-static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_PARTICIPANT_TYPE + 1] = {
+static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_TOKENS_LEFT + 1] = {
 	[KERNEL_MCP_ATTR_REQ_ID] = { .type = NLA_U64 },
 	[KERNEL_MCP_ATTR_CAPABILITY_ID] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_CAPABILITY_NAME] = {
@@ -350,6 +350,7 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_PARTICIPANT_TYP
 	},
 	[KERNEL_MCP_ATTR_APPROVAL_STATE] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_PARTICIPANT_TYPE] = { .type = NLA_U32 },
+	[KERNEL_MCP_ATTR_TOKENS_LEFT] = { .type = NLA_U32 },
 };
 
 /* Centralized reason string mapping for canonical capability/participant paths. */
@@ -2633,7 +2634,7 @@ static int kernel_mcp_cmd_capability_register(struct sk_buff *skb,
 		rl.defer_wait_ms =
 			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_RL_DEFER_WAIT_MS]);
 
-	return kernel_mcp_register_capability(capability_id, capability_name, perm,
+	return kernel_mcp_register_capability(capability_id, capability_name,
 					      cost, capability_hash, required_caps,
 					      risk_level, approval_mode,
 					      audit_mode,
@@ -3017,42 +3018,42 @@ static const struct genl_ops kernel_mcp_genl_ops[] = {
 		.cmd = KERNEL_MCP_CMD_PING,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
+		.maxattr = KERNEL_MCP_ATTR_TOKENS_LEFT,
 		.doit = kernel_mcp_cmd_ping,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_CAPABILITY_REGISTER,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
+		.maxattr = KERNEL_MCP_ATTR_TOKENS_LEFT,
 		.doit = kernel_mcp_cmd_capability_register,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_LIST_CAPABILITIES,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
+		.maxattr = KERNEL_MCP_ATTR_TOKENS_LEFT,
 		.dumpit = kernel_mcp_cmd_list_capabilities_dump,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_PARTICIPANT_REGISTER,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
+		.maxattr = KERNEL_MCP_ATTR_TOKENS_LEFT,
 		.doit = kernel_mcp_cmd_participant_register,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_CAPABILITY_REQUEST,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
+		.maxattr = KERNEL_MCP_ATTR_TOKENS_LEFT,
 		.doit = kernel_mcp_cmd_capability_request,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_CAPABILITY_COMPLETE,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
+		.maxattr = KERNEL_MCP_ATTR_TOKENS_LEFT,
 		.doit = kernel_mcp_cmd_capability_complete,
 	},
 };
@@ -3060,7 +3061,7 @@ static const struct genl_ops kernel_mcp_genl_ops[] = {
 static struct genl_family kernel_mcp_genl_family = {
 	.name = KERNEL_MCP_GENL_FAMILY_NAME,
 	.version = KERNEL_MCP_GENL_FAMILY_VERSION,
-	.maxattr = KERNEL_MCP_ATTR_PARTICIPANT_TYPE,
+	.maxattr = KERNEL_MCP_ATTR_TOKENS_LEFT,
 	.module = THIS_MODULE,
 	.ops = kernel_mcp_genl_ops,
 	.n_ops = ARRAY_SIZE(kernel_mcp_genl_ops),

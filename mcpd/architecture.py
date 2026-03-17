@@ -74,6 +74,15 @@ def _executor_profiles_config() -> Dict[str, Any]:
     return dict(_RUNTIME_CONFIG_BUNDLE["executor_profiles"])
 
 
+def _structured_executor_types_from_config() -> set[str]:
+    raw = _executor_profiles_config()
+    return {
+        str(entry["executor_type"])
+        for entry in raw.get("profiles", [])
+        if bool(entry.get("structured_payload_only"))
+    }
+
+
 def _log_structured(level: int, event_type: str, **fields: Any) -> None:
     payload = {"event_type": event_type}
     payload.update(fields)
@@ -154,9 +163,10 @@ def _normalize_executor_policy(value: Any, source: str) -> Dict[str, Any]:
     allowed_executor_types = value.get("allowed_executor_types")
     if not isinstance(allowed_executor_types, list) or not allowed_executor_types:
         raise ValueError(f"{source}: executor_policy.allowed_executor_types must be non-empty list")
+    valid_executor_types = _structured_executor_types_from_config()
     normalized_types: List[str] = []
     for idx, executor_type in enumerate(allowed_executor_types):
-        if not isinstance(executor_type, str) or executor_type not in get_runtime().STRUCTURED_EXECUTOR_TYPES:
+        if not isinstance(executor_type, str) or executor_type not in valid_executor_types:
             raise ValueError(
                 f"{source}: executor_policy.allowed_executor_types[{idx}] is invalid"
             )
@@ -287,6 +297,8 @@ def _load_executor_profiles() -> Dict[Tuple[str, str], Dict[str, Any]]:
                 f"executor_profiles:{key[0]}/{key[1]}: unsupported command_schema_mode {command_schema_mode!r}"
             )
         profiles[key] = {
+            "executor_type": key[0],
+            "sandbox_profile": key[1],
             "network_policy": str(entry["network_policy"]),
             "resource_limits": dict(entry["resource_limits"]),
             "short_lived": bool(entry["short_lived"]),

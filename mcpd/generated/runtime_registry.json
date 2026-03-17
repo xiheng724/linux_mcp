@@ -167,7 +167,8 @@
           "min_planner_trust_level": 4,
           "min_provider_trust_class": "local",
           "network_policy": "broker-mediated",
-          "require_short_lived": true
+          "require_short_lived": true,
+          "requires_isolation": false
         },
         "executor_ref": "sandbox-broker-isolated",
         "governance": {
@@ -217,7 +218,8 @@
           "min_planner_trust_level": 8,
           "min_provider_trust_class": "local",
           "network_policy": "broker-mediated",
-          "require_short_lived": true
+          "require_short_lived": true,
+          "requires_isolation": false
         },
         "executor_ref": "sandbox-high-risk",
         "governance": {
@@ -270,7 +272,8 @@
           "min_planner_trust_level": 4,
           "min_provider_trust_class": "local",
           "network_policy": "broker-mediated",
-          "require_short_lived": true
+          "require_short_lived": true,
+          "requires_isolation": false
         },
         "executor_ref": "sandbox-broker-isolated",
         "governance": {
@@ -323,7 +326,8 @@
           "min_planner_trust_level": 0,
           "min_provider_trust_class": "local",
           "network_policy": "inherit",
-          "require_short_lived": true
+          "require_short_lived": true,
+          "requires_isolation": false
         },
         "executor_ref": "local-readonly",
         "governance": {
@@ -376,7 +380,8 @@
           "min_planner_trust_level": 4,
           "min_provider_trust_class": "local",
           "network_policy": "broker-mediated",
-          "require_short_lived": true
+          "require_short_lived": true,
+          "requires_isolation": false
         },
         "executor_ref": "sandbox-broker-isolated",
         "governance": {
@@ -428,7 +433,8 @@
           "min_planner_trust_level": 0,
           "min_provider_trust_class": "local",
           "network_policy": "inherit",
-          "require_short_lived": true
+          "require_short_lived": true,
+          "requires_isolation": false
         },
         "executor_ref": "local-readonly",
         "governance": {
@@ -483,7 +489,8 @@
           "min_planner_trust_level": 0,
           "min_provider_trust_class": "local",
           "network_policy": "inherit",
-          "require_short_lived": true
+          "require_short_lived": true,
+          "requires_isolation": false
         },
         "executor_ref": "local-readonly",
         "governance": {
@@ -534,7 +541,8 @@
           "min_planner_trust_level": 4,
           "min_provider_trust_class": "local",
           "network_policy": "broker-mediated",
-          "require_short_lived": true
+          "require_short_lived": true,
+          "requires_isolation": false
         },
         "executor_ref": "sandbox-broker-isolated",
         "governance": {
@@ -584,7 +592,8 @@
           "min_planner_trust_level": 0,
           "min_provider_trust_class": "local",
           "network_policy": "inherit",
-          "require_short_lived": true
+          "require_short_lived": true,
+          "requires_isolation": false
         },
         "executor_ref": "local-readonly",
         "governance": {
@@ -1046,6 +1055,7 @@
         "deny_on_unenforced": false,
         "enforce_no_new_privs": true,
         "executor_type": "broker-isolated-uds",
+        "forbidden_payload_keys": [],
         "governance": {
           "compatibility_mode": "canonical",
           "deprecated": false,
@@ -1068,6 +1078,7 @@
           "memory_kb": 262144,
           "nofile": 64
         },
+        "risk_tier": "low",
         "runtime_identity_mode": "broker-bound",
         "sandbox_profile": "sandbox-broker-isolated",
         "sandbox_ready": true,
@@ -1080,6 +1091,7 @@
         "deny_on_unenforced": false,
         "enforce_no_new_privs": true,
         "executor_type": "broker-uds",
+        "forbidden_payload_keys": [],
         "governance": {
           "compatibility_mode": "canonical",
           "deprecated": false,
@@ -1100,6 +1112,7 @@
           "memory_kb": 131072,
           "nofile": 64
         },
+        "risk_tier": "low",
         "runtime_identity_mode": "broker-bound",
         "sandbox_profile": "local-readonly",
         "sandbox_ready": true,
@@ -1112,6 +1125,7 @@
         "deny_on_unenforced": false,
         "enforce_no_new_privs": true,
         "executor_type": "sandboxed-process",
+        "forbidden_payload_keys": [],
         "governance": {
           "compatibility_mode": "canonical",
           "deprecated": false,
@@ -1134,6 +1148,7 @@
           "memory_kb": 262144,
           "nofile": 64
         },
+        "risk_tier": "low",
         "runtime_identity_mode": "broker-bound",
         "sandbox_profile": "sandbox-broker-isolated",
         "sandbox_ready": true,
@@ -1146,6 +1161,7 @@
         "deny_on_unenforced": true,
         "enforce_no_new_privs": true,
         "executor_type": "sandboxed-process",
+        "forbidden_payload_keys": [],
         "governance": {
           "compatibility_mode": "canonical",
           "deprecated": false,
@@ -1169,6 +1185,7 @@
           "memory_kb": 262144,
           "nofile": 64
         },
+        "risk_tier": "low",
         "runtime_identity_mode": "broker-bound",
         "sandbox_profile": "sandbox-high-risk",
         "sandbox_ready": true,
@@ -1181,7 +1198,7 @@
   "kind": "RuntimeRegistry",
   "metadata": {
     "controlplane_layout": "package-definitions-generated",
-    "registry_hash": "f800ce9b",
+    "registry_hash": "e60b4362",
     "requires_mcpd_version": ">=1.0.0",
     "version": "1.0.0"
   },
@@ -1365,6 +1382,68 @@
       }
     ],
     "version": 1
+  },
+  "platform_capabilities": {
+    "CAP_BROWSER_AUTOMATION": {
+      "allowed_risk_classes": [],
+      "bit": 64,
+      "name": "CAP_BROWSER_AUTOMATION",
+      "stability": "core"
+    },
+    "CAP_EXEC_RUN": {
+      "allowed_risk_classes": [],
+      "bit": 256,
+      "name": "CAP_EXEC_RUN",
+      "stability": "core"
+    },
+    "CAP_EXTERNAL_WRITE": {
+      "allowed_risk_classes": [],
+      "bit": 128,
+      "name": "CAP_EXTERNAL_WRITE",
+      "stability": "core"
+    },
+    "CAP_FILE_READ": {
+      "allowed_risk_classes": [],
+      "bit": 8,
+      "name": "CAP_FILE_READ",
+      "stability": "core"
+    },
+    "CAP_FILE_WRITE": {
+      "allowed_risk_classes": [],
+      "bit": 16,
+      "name": "CAP_FILE_WRITE",
+      "stability": "core"
+    },
+    "CAP_INFO_LOOKUP": {
+      "allowed_risk_classes": [],
+      "bit": 1,
+      "name": "CAP_INFO_LOOKUP",
+      "stability": "core"
+    },
+    "CAP_MESSAGE_READ": {
+      "allowed_risk_classes": [],
+      "bit": 2,
+      "name": "CAP_MESSAGE_READ",
+      "stability": "core"
+    },
+    "CAP_MESSAGE_SEND": {
+      "allowed_risk_classes": [],
+      "bit": 4,
+      "name": "CAP_MESSAGE_SEND",
+      "stability": "core"
+    },
+    "CAP_NETWORK_FETCH_READONLY": {
+      "allowed_risk_classes": [],
+      "bit": 32,
+      "name": "CAP_NETWORK_FETCH_READONLY",
+      "stability": "core"
+    },
+    "CAP_RESERVED_1": {
+      "allowed_risk_classes": [],
+      "bit": 512,
+      "name": "CAP_RESERVED_1",
+      "stability": "reserved"
+    }
   },
   "policy_registry": {
     "policies": [
@@ -1608,6 +1687,44 @@
     "version": 1
   },
   "server_defaults": {
+    "auth_modes": [
+      {
+        "name": "system",
+        "trust_level": 4
+      },
+      {
+        "name": "trusted",
+        "trust_level": 3
+      },
+      {
+        "name": "local",
+        "trust_level": 2
+      },
+      {
+        "name": "remote",
+        "trust_level": 1
+      },
+      {
+        "name": "provider",
+        "trust_level": 1
+      },
+      {
+        "name": "local-readonly",
+        "trust_level": 0
+      },
+      {
+        "name": "network-readonly",
+        "trust_level": 0
+      },
+      {
+        "name": "none",
+        "trust_level": 0
+      },
+      {
+        "name": "anonymous",
+        "trust_level": 0
+      }
+    ],
     "broker_trust_level": 8,
     "default_socket_paths": {
       "mcpd": "/tmp/mcpd.sock"

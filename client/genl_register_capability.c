@@ -52,7 +52,7 @@ struct capability_args {
 static void usage(const char *prog)
 {
 	fprintf(stderr,
-		"Usage: %s --capability-id <u32> --capability-name <str> --perm <u32> --cost <u32> [--capability-hash <8hex>]\n",
+		"Usage: %s --capability-id <u32> --capability-name <str> --cost <u32> [--capability-hash <8hex>] [--perm <u32>]\n",
 		prog);
 }
 
@@ -115,7 +115,6 @@ static int parse_args(int argc, char **argv, struct capability_args *args)
 		if (strcmp(argv[i], "--perm") == 0 && i + 1 < argc) {
 			if (parse_u32(argv[++i], &args->perm))
 				return -EINVAL;
-			seen_perm = 1;
 			continue;
 		}
 		if (strcmp(argv[i], "--capability-hash") == 0 && i + 1 < argc) {
@@ -134,7 +133,7 @@ static int parse_args(int argc, char **argv, struct capability_args *args)
 		return -EINVAL;
 	}
 
-	if (!seen_capability_id || !seen_capability_name || !seen_perm || !seen_cost)
+	if (!seen_capability_id || !seen_capability_name || !seen_cost)
 		return -EINVAL;
 	return 0;
 }
@@ -373,8 +372,8 @@ int main(int argc, char **argv)
 		return 4;
 	}
 
-	printf("registered capability id=%u name=%s perm=%u cost=%u",
-	       args.capability_id, args.capability_name, args.perm, args.cost);
+	printf("registered capability id=%u name=%s cost=%u",
+	       args.capability_id, args.capability_name, args.cost);
 	if (args.has_capability_hash)
 		printf(" hash=%s", args.capability_hash);
 	printf("\n");

@@ -474,13 +474,52 @@ def _validate_policy_spec(spec: Any, source: str) -> Dict[str, Any]:
 
 def _validate_server_spec(spec: Any, source: str) -> Dict[str, Any]:
     data = _ensure_object("spec", spec, source)
+    auth_modes: list[Dict[str, Any]] = []
+    for idx, raw_mode in enumerate(_ensure_list("spec.auth_modes", data.get("auth_modes", []), source)):
+        item = _ensure_object(f"spec.auth_modes[{idx}]", raw_mode, source)
+        auth_modes.append(
+            {
+                "name": _ensure_str(f"spec.auth_modes[{idx}].name", item.get("name"), source),
+                "trust_level": _ensure_int(
+                    f"spec.auth_modes[{idx}].trust_level",
+                    item.get("trust_level"),
+                    source,
+                ),
+            }
+        )
     return {
         "manifest_dirs": _ensure_string_list("spec.manifest_dirs", data.get("manifest_dirs"), source),
         "socket_path": _ensure_str("spec.socket_path", data.get("socket_path"), source),
         "planner_trust_level": _ensure_int("spec.planner_trust_level", data.get("planner_trust_level"), source),
         "broker_trust_level": _ensure_int("spec.broker_trust_level", data.get("broker_trust_level"), source),
         "executor_workdir": _ensure_str("spec.executor_workdir", data.get("executor_workdir"), source),
+        "auth_modes": auth_modes,
     }
+
+
+def _validate_platform_capabilities_spec(spec: Any, source: str) -> Dict[str, Any]:
+    data = _ensure_object("spec", spec, source)
+    capabilities: list[Dict[str, Any]] = []
+    for idx, raw_capability in enumerate(_ensure_list("spec.capabilities", data.get("capabilities"), source)):
+        item = _ensure_object(f"spec.capabilities[{idx}]", raw_capability, source)
+        allowed_risk_classes = item.get("allowed_risk_classes", [])
+        capabilities.append(
+            {
+                "name": _ensure_str(f"spec.capabilities[{idx}].name", item.get("name"), source),
+                "bit": _ensure_int(f"spec.capabilities[{idx}].bit", item.get("bit"), source),
+                "stability": _ensure_str(
+                    f"spec.capabilities[{idx}].stability",
+                    item.get("stability"),
+                    source,
+                ),
+                "allowed_risk_classes": _ensure_string_list(
+                    f"spec.capabilities[{idx}].allowed_risk_classes",
+                    allowed_risk_classes,
+                    source,
+                ) if allowed_risk_classes is not None else [],
+            }
+        )
+    return {"capabilities": capabilities}
 
 
 def _validate_artifact(document: Mapping[str, Any], base_dir: Path, source: str) -> Artifact:
@@ -501,6 +540,8 @@ def _validate_artifact(document: Mapping[str, Any], base_dir: Path, source: str)
         spec = _validate_executor_spec(raw_spec, source)
     elif kind == "PolicyDefinition":
         spec = _validate_policy_spec(raw_spec, source)
+    elif kind == "PlatformCapabilities":
+        spec = _validate_platform_capabilities_spec(raw_spec, source)
     else:
         spec = _validate_server_spec(raw_spec, source)
     return Artifact(
