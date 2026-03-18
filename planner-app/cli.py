@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from typing import Any, Dict, List
@@ -25,6 +26,49 @@ SOCK_PATH = "/tmp/mcpd.sock"
 
 class CliError(Exception):
     """User-facing CLI error."""
+
+
+_ENTITY_RE = re.compile(r"(?:\.\.?/)?[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*")
+
+
+def _collect_entities(value: Any, out: List[str]) -> None:
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return
+        if "/" in text or "." in text:
+            out.append(text)
+        for match in _ENTITY_RE.findall(text):
+            if "/" in match or "." in match:
+                out.append(match)
+        return
+    if isinstance(value, dict):
+        for item in value.values():
+            _collect_entities(item, out)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _collect_entities(item, out)
+
+
+def _update_context_state(context: Dict[str, Any], user_text: str, resp: Dict[str, Any]) -> None:
+    dialog_window = context.setdefault("dialog_window", [])
+    if isinstance(dialog_window, list):
+        dialog_window.append(user_text)
+        context["dialog_window"] = dialog_window[-3:]
+    if resp.get("status") != "ok":
+        return
+    entities: List[str] = []
+    _collect_entities(resp.get("result", {}), entities)
+    unique_entities: List[str] = []
+    seen: set[str] = set()
+    for item in entities:
+        if item not in seen:
+            unique_entities.append(item)
+            seen.add(item)
+    if unique_entities:
+        context["recent_entities"] = unique_entities[-8:]
+        context["last_result_refs"] = unique_entities[-4:]
 
 
 def _actions_signature(actions: List[Dict[str, Any]]) -> str:
@@ -139,6 +183,9 @@ def _execute_once_with_capabilities(
     sock_path: str,
     cfg: SelectorConfig,
     capabilities: List[Dict[str, Any]],
+    *,
+    context: Dict[str, Any] | None = None,
+    allow_followup: bool = False,
 ) -> int:
     if not capabilities:
         raise CliError("no capabilities returned by mcpd")
@@ -177,8 +224,16 @@ def _execute_once_with_capabilities(
         hints.setdefault("preferred_provider_id", intent.preferred_provider_id)
     if hints:
         request["hints"] = hints
+    if isinstance(context, dict) and context:
+        request["context"] = {
+            "dialog_window": list(context.get("dialog_window", []))[-3:],
+            "recent_entities": list(context.get("recent_entities", []))[-8:],
+            "last_result_refs": list(context.get("last_result_refs", []))[-4:],
+        }
 
     resp = mcpd_call(request, sock_path=sock_path, timeout_s=20)
+    if isinstance(context, dict):
+        _update_context_state(context, user_text, resp)
     print(f"[planner-app] req_id={req_id} status={resp.get('status')} t_ms={resp.get('t_ms')}", flush=True)
     if resp.get("status") == "ok":
         print(
@@ -193,7 +248,34 @@ def _execute_once_with_capabilities(
         print(f"[planner-app] result={json.dumps(resp.get('result', {}), ensure_ascii=True)}", flush=True)
         print("[planner-app] done", flush=True)
         return 0
+    error_code = str(resp.get("error_code", "execution_error"))
+    missing_fields = resp.get("missing_fields", [])
+    repairable = bool(resp.get("repairable", False))
     print(f"[planner-app] error={resp.get('error', 'unknown error')}", flush=True)
+    print(
+        f"[planner-app] error_code={error_code} repairable={repairable} missing_fields={missing_fields}",
+        flush=True,
+    )
+    if allow_followup and repairable and isinstance(missing_fields, list) and missing_fields:
+        missing_text = ", ".join(str(item) for item in missing_fields if str(item).strip())
+        clarify_prompt = (
+            "[planner-app] provide a natural-language clarification"
+            + (f" (missing: {missing_text})" if missing_text else "")
+            + ": "
+        )
+        clarification = input(clarify_prompt).strip()
+        if clarification:
+            followup_text = f"{user_text}\nclarification: {clarification}"
+            print(f"[planner-app] retry with follow-up intent: {followup_text}", flush=True)
+            return _execute_once_with_capabilities(
+                followup_text,
+                participant_id,
+                sock_path,
+                cfg,
+                capabilities,
+                context=context,
+                allow_followup=False,
+            )
     print("[planner-app] capability execution failed", flush=True)
     return 3
 
@@ -205,7 +287,15 @@ def _run_once(user_text: str, participant_id: str, sock_path: str, cfg: Selector
     _print_providers(providers)
     _print_actions(actions)
     _print_capabilities(capabilities)
-    return _execute_once_with_capabilities(user_text, participant_id, sock_path, cfg, capabilities)
+    return _execute_once_with_capabilities(
+        user_text,
+        participant_id,
+        sock_path,
+        cfg,
+        capabilities,
+        context={},
+        allow_followup=False,
+    )
 
 
 def _print_help() -> None:
@@ -231,6 +321,11 @@ def _repl_loop(participant_id: str, sock_path: str, cfg: SelectorConfig, show_ac
     _print_capabilities(capabilities)
     last_providers_sig = _providers_signature(providers)
     last_sig = _actions_signature(actions)
+    context_state: Dict[str, Any] = {
+        "dialog_window": [],
+        "recent_entities": [],
+        "last_result_refs": [],
+    }
 
     while True:
         try:
@@ -282,7 +377,15 @@ def _repl_loop(participant_id: str, sock_path: str, cfg: SelectorConfig, show_ac
         last_sig = sig
 
         capabilities = _list_capabilities(sock_path)
-        rc = _execute_once_with_capabilities(user_text, participant_id, sock_path, cfg, capabilities)
+        rc = _execute_once_with_capabilities(
+            user_text,
+            participant_id,
+            sock_path,
+            cfg,
+            capabilities,
+            context=context_state,
+            allow_followup=True,
+        )
         if rc != 0:
             print(f"[planner-app] request failed rc={rc}", flush=True)
 

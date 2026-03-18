@@ -1,6 +1,9 @@
 import json
 import logging
+import os
 import re
+import urllib.error
+import urllib.request
 from typing import Any, Dict, List, Mapping, Sequence
 
 from architecture import ProviderAction, fill_action_payload, validate_action_payload
@@ -20,6 +23,11 @@ _INTEGER_RE = re.compile(r"(?<![A-Za-z0-9])(-?\d+)(?![A-Za-z0-9])")
 _FLOAT_RE = re.compile(r"(?<![A-Za-z0-9])(-?\d+(?:\.\d+)?)(?![A-Za-z0-9])")
 _QUOTED_RE = re.compile(r"['\"]([^'\"]+)['\"]")
 _MATH_RE = re.compile(r"([0-9(][0-9\s+\-*/().%]+)")
+_JSON_OBJECT_RE = re.compile(r"\{.*\}", flags=re.DOTALL)
+
+INFERENCE_MODE_SCHEMA = "schema_arg_hints"
+INFERENCE_MODE_LLM_STRICT = "llm_strict"
+INFERENCE_MODE_HYBRID = "hybrid"
 
 
 def _collect_quoted_values(text: str) -> List[str]:
@@ -302,6 +310,164 @@ def _extract_string_value(
     return field_hints.get("default")
 
 
+def _resolve_inference_mode(hints: Mapping[str, Any] | None) -> str:
+    if isinstance(hints, Mapping):
+        mode = hints.get("payload_inference_mode")
+        if isinstance(mode, str):
+            normalized = mode.strip().lower()
+            if normalized in {INFERENCE_MODE_SCHEMA, INFERENCE_MODE_LLM_STRICT, INFERENCE_MODE_HYBRID}:
+                return normalized
+    raw = os.getenv("MCPD_PAYLOAD_INFERENCE_MODE", INFERENCE_MODE_SCHEMA).strip().lower()
+    if raw in {INFERENCE_MODE_SCHEMA, INFERENCE_MODE_LLM_STRICT, INFERENCE_MODE_HYBRID}:
+        return raw
+    return INFERENCE_MODE_SCHEMA
+
+
+def _extract_json_object(raw: str) -> Dict[str, Any]:
+    text = (raw or "").strip()
+    if not text:
+        raise ValueError("empty LLM response")
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        match = _JSON_OBJECT_RE.search(text)
+        if not match:
+            raise ValueError("LLM response is not valid JSON object")
+        parsed = json.loads(match.group(0))
+    if not isinstance(parsed, dict):
+        raise ValueError("LLM response must be JSON object")
+    return parsed
+
+
+def _request_llm_payload(
+    action: ProviderAction,
+    intent_text: str,
+    *,
+    context: Mapping[str, Any] | None = None,
+    previous_payload: Mapping[str, Any] | None = None,
+    previous_error: str = "",
+    timeout_s: float = 8.0,
+) -> Dict[str, Any]:
+    endpoint = os.getenv("MCPD_LLM_ENDPOINT", "").strip()
+    if not endpoint:
+        raise ValueError("LLM endpoint not configured")
+    model = os.getenv("MCPD_LLM_MODEL", "").strip()
+    api_key = os.getenv("MCPD_LLM_API_KEY", "").strip()
+    system_prompt = (
+        "You are a strict JSON payload generator. Return ONLY a JSON object that matches the given JSON schema. "
+        "Do not add comments or markdown."
+    )
+    user_parts = [
+        f"Intent text:\n{intent_text}",
+        "Action schema (JSON Schema):",
+        json.dumps(action.input_schema, ensure_ascii=True, sort_keys=True),
+    ]
+    if isinstance(context, Mapping) and context:
+        user_parts.append("Context (JSON):")
+        user_parts.append(json.dumps(dict(context), ensure_ascii=True, sort_keys=True))
+    if previous_payload is not None:
+        user_parts.append("Previous invalid payload:")
+        user_parts.append(json.dumps(dict(previous_payload), ensure_ascii=True, sort_keys=True))
+    if previous_error:
+        user_parts.append(f"Validation error: {previous_error}")
+    request_body: Dict[str, Any] = {
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": "\n\n".join(user_parts)},
+        ],
+        "temperature": 0,
+    }
+    if model:
+        request_body["model"] = model
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    req = urllib.request.Request(
+        endpoint,
+        data=json.dumps(request_body, ensure_ascii=True).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.URLError as exc:
+        raise ValueError(f"LLM request failed: {exc}") from exc
+    payload = _extract_json_object(raw)
+    if "choices" in payload and isinstance(payload["choices"], list):
+        choices = payload["choices"]
+        if choices and isinstance(choices[0], Mapping):
+            message = choices[0].get("message", {})
+            if isinstance(message, Mapping):
+                content = message.get("content")
+                if isinstance(content, str):
+                    return _extract_json_object(content)
+                if isinstance(content, list):
+                    merged = " ".join(
+                        str(item.get("text", ""))
+                        for item in content
+                        if isinstance(item, Mapping) and item.get("type") == "text"
+                    )
+                    return _extract_json_object(merged)
+    return payload
+
+
+def _validate_candidate_payload(
+    action: ProviderAction,
+    candidate_defaults: Mapping[str, Any],
+    provided_payload: Mapping[str, Any] | None,
+) -> Dict[str, Any]:
+    merged = fill_action_payload(action, provided_payload, defaults=candidate_defaults)
+    return validate_action_payload(action, merged)
+
+
+def _infer_payload_with_llm(
+    action: ProviderAction,
+    intent_text: str,
+    *,
+    provided_payload: Mapping[str, Any] | None = None,
+    hints: Mapping[str, Any] | None = None,
+    context: Mapping[str, Any] | None = None,
+) -> Dict[str, Any]:
+    max_repairs = 1
+    timeout_s = 8.0
+    if isinstance(hints, Mapping):
+        raw_repairs = hints.get("llm_repair_attempts")
+        if isinstance(raw_repairs, int) and raw_repairs >= 0:
+            max_repairs = raw_repairs
+        raw_timeout = hints.get("llm_timeout_s")
+        if isinstance(raw_timeout, (int, float)) and not isinstance(raw_timeout, bool) and raw_timeout > 0:
+            timeout_s = float(raw_timeout)
+    last_error = ""
+    previous_payload: Mapping[str, Any] | None = None
+    attempts = max_repairs + 1
+    for attempt in range(1, attempts + 1):
+        raw_candidate = _request_llm_payload(
+            action,
+            intent_text,
+            context=context,
+            previous_payload=previous_payload,
+            previous_error=last_error,
+            timeout_s=timeout_s,
+        )
+        previous_payload = dict(raw_candidate)
+        try:
+            validated = _validate_candidate_payload(action, raw_candidate, provided_payload)
+            return {
+                "validated": validated,
+                "attempts": attempt,
+                "repairs_used": max(0, attempt - 1),
+            }
+        except Exception as exc:  # noqa: BLE001
+            last_error = str(exc)
+            if attempt >= attempts:
+                raise ValueError(f"LLM payload validation failed: {last_error}") from exc
+    raise ValueError("LLM payload inference exhausted without result")
+
+
 def _coerce_schema_value(value: Any, schema: Mapping[str, Any], field_name: str, source: str) -> Any:
     expected_type = schema.get("type")
     if not isinstance(expected_type, str):
@@ -385,14 +551,71 @@ def _infer_payload_from_schema(
     return payload
 
 
-def build_execution_payload(
+def build_execution_payload_with_explain(
     action: ProviderAction,
     intent_text: str,
     *,
     provided_payload: Mapping[str, Any] | None = None,
     hints: Mapping[str, Any] | None = None,
-) -> Dict[str, Any]:
+    context: Mapping[str, Any] | None = None,
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    mode = _resolve_inference_mode(hints)
+    provided_fields = sorted(list(provided_payload.keys())) if isinstance(provided_payload, Mapping) else []
+    llm_backend = "none"
+    llm_attempts = 0
+    llm_repairs_used = 0
+    inferred_fields: List[str] = []
+    fill_mode = INFERENCE_MODE_SCHEMA
+    if mode in {INFERENCE_MODE_LLM_STRICT, INFERENCE_MODE_HYBRID}:
+        llm_backend = os.getenv("MCPD_LLM_ENDPOINT", "").strip() or "unconfigured"
+        try:
+            llm_result = _infer_payload_with_llm(
+                action,
+                intent_text,
+                provided_payload=provided_payload,
+                hints=hints,
+                context=context,
+            )
+            validated = dict(llm_result["validated"])
+            llm_attempts = int(llm_result["attempts"])
+            llm_repairs_used = int(llm_result["repairs_used"])
+            fill_mode = INFERENCE_MODE_LLM_STRICT
+            _log_structured(
+                logging.INFO,
+                "payload_fill_mode",
+                action_name=action.action_name,
+                capability_domain=action.capability_domain,
+                fill_mode=fill_mode,
+                inferred_fields=sorted(validated.keys()),
+                provided_fields=provided_fields,
+                llm_backend=llm_backend,
+                llm_attempts=llm_attempts,
+                llm_repairs_used=llm_repairs_used,
+                used_planner_payload_slots=False,
+            )
+            return validated, {
+                "fill_mode": fill_mode,
+                "inferred_fields": sorted(validated.keys()),
+                "provided_fields": provided_fields,
+                "llm_backend": llm_backend,
+                "llm_attempts": llm_attempts,
+                "llm_repairs_used": llm_repairs_used,
+            }
+        except Exception as exc:  # noqa: BLE001
+            if mode == INFERENCE_MODE_LLM_STRICT:
+                raise
+            _log_structured(
+                logging.WARNING,
+                "payload_fill_mode_fallback",
+                action_name=action.action_name,
+                capability_domain=action.capability_domain,
+                fill_mode=INFERENCE_MODE_SCHEMA,
+                llm_backend=llm_backend,
+                llm_error=str(exc),
+            )
+
     defaults = _infer_payload_from_schema(action, intent_text, hints=hints)
+    inferred_fields = sorted(defaults.keys())
     payload = fill_action_payload(action, provided_payload, defaults=defaults)
     validated = validate_action_payload(action, payload)
     _log_structured(
@@ -400,9 +623,37 @@ def build_execution_payload(
         "payload_fill_mode",
         action_name=action.action_name,
         capability_domain=action.capability_domain,
-        fill_mode="schema_arg_hints",
-        inferred_fields=sorted(defaults.keys()),
-        provided_fields=sorted(list(provided_payload.keys())) if isinstance(provided_payload, Mapping) else [],
+        fill_mode=INFERENCE_MODE_SCHEMA,
+        inferred_fields=inferred_fields,
+        provided_fields=provided_fields,
+        llm_backend=llm_backend,
+        llm_attempts=llm_attempts,
+        llm_repairs_used=llm_repairs_used,
         used_planner_payload_slots=False,
     )
-    return validated
+    return validated, {
+        "fill_mode": INFERENCE_MODE_SCHEMA,
+        "inferred_fields": inferred_fields,
+        "provided_fields": provided_fields,
+        "llm_backend": llm_backend,
+        "llm_attempts": llm_attempts,
+        "llm_repairs_used": llm_repairs_used,
+    }
+
+
+def build_execution_payload(
+    action: ProviderAction,
+    intent_text: str,
+    *,
+    provided_payload: Mapping[str, Any] | None = None,
+    hints: Mapping[str, Any] | None = None,
+    context: Mapping[str, Any] | None = None,
+) -> Dict[str, Any]:
+    payload, _explain = build_execution_payload_with_explain(
+        action,
+        intent_text,
+        provided_payload=provided_payload,
+        hints=hints,
+        context=context,
+    )
+    return payload

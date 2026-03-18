@@ -282,6 +282,31 @@ def _validate_broker_spec(spec: Any, source: str) -> Dict[str, Any]:
             "allow_preferred_provider_high_risk",
         )
     }
+    if "enable_semantic_rerank" in selection:
+        selection_policy["enable_semantic_rerank"] = _ensure_bool(
+            "spec.selection_policy.enable_semantic_rerank",
+            selection.get("enable_semantic_rerank"),
+            source,
+        )
+    if "semantic_ambiguity_threshold" in selection:
+        threshold = _ensure_int(
+            "spec.selection_policy.semantic_ambiguity_threshold",
+            selection.get("semantic_ambiguity_threshold"),
+            source,
+        )
+        if threshold < 0:
+            raise ValueError(
+                f"{source}: spec.selection_policy.semantic_ambiguity_threshold must be >= 0"
+            )
+        selection_policy["semantic_ambiguity_threshold"] = threshold
+    if "semantic_score_weight" in selection:
+        raw_weight = selection.get("semantic_score_weight")
+        if isinstance(raw_weight, bool) or not isinstance(raw_weight, (int, float)):
+            raise ValueError(f"{source}: spec.selection_policy.semantic_score_weight must be number")
+        weight = float(raw_weight)
+        if weight < 0:
+            raise ValueError(f"{source}: spec.selection_policy.semantic_score_weight must be >= 0")
+        selection_policy["semantic_score_weight"] = weight
     return {
         "selection_policy": selection_policy,
         "runtime_identity_mode": _ensure_str(
@@ -348,6 +373,16 @@ def _validate_executor_spec(spec: Any, source: str) -> Dict[str, Any]:
                     "structured_payload_only": _ensure_bool(
                         f"spec.profiles[{idx}].environment_policy.structured_payload_only",
                         env_policy.get("structured_payload_only"),
+                        source,
+                    ),
+                    "risk_tier": _ensure_str(
+                        f"spec.profiles[{idx}].environment_policy.risk_tier",
+                        env_policy.get("risk_tier"),
+                        source,
+                    ),
+                    "forbidden_payload_keys": _ensure_string_list(
+                        f"spec.profiles[{idx}].environment_policy.forbidden_payload_keys",
+                        env_policy.get("forbidden_payload_keys", []),
                         source,
                     ),
                     "command_schema_mode": _ensure_str(
@@ -557,11 +592,14 @@ def _load_kind_dir(base_dir: Path, kind: str) -> Dict[str, Artifact]:
     artifact_dir = base_dir / KIND_SUBDIRS[kind]
     if not artifact_dir.is_dir():
         raise ValueError(f"controlplane: missing directory for kind={kind}: {artifact_dir}")
+    shared_subdir = list(KIND_SUBDIRS.values()).count(KIND_SUBDIRS[kind]) > 1
     artifacts: Dict[str, Artifact] = {}
     for path in sorted(artifact_dir.glob("*.yaml")):
         doc = _load_yaml(path)
         if doc.get("kind") != kind:
-            continue
+            if shared_subdir:
+                continue
+            raise ValueError(f"{path}: expected kind {kind!r}, found {doc.get('kind')!r}")
         artifact = _validate_artifact(doc, base_dir, str(path))
         if artifact.metadata.name in artifacts:
             raise ValueError(f"{path}: duplicate artifact name {artifact.metadata.name!r}")

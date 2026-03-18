@@ -113,10 +113,13 @@
         "runtime_identity_mode": "registered-agent",
         "selection_policy": {
           "allow_preferred_provider_high_risk": false,
+          "enable_semantic_rerank": false,
           "prefer_example_matches": true,
           "prefer_lower_risk_on_tie": true,
           "prefer_manifest_priority": true,
-          "require_provider_availability": true
+          "require_provider_availability": true,
+          "semantic_ambiguity_threshold": 15,
+          "semantic_score_weight": 1.5
         }
       },
       {
@@ -741,10 +744,13 @@
         "runtime_identity_mode": "registered-agent",
         "selection_policy": {
           "allow_preferred_provider_high_risk": false,
+          "enable_semantic_rerank": false,
           "prefer_example_matches": true,
           "prefer_lower_risk_on_tie": true,
           "prefer_manifest_priority": true,
-          "require_provider_availability": true
+          "require_provider_availability": true,
+          "semantic_ambiguity_threshold": 15,
+          "semantic_score_weight": 1.5
         }
       },
       {
@@ -1055,7 +1061,12 @@
         "deny_on_unenforced": false,
         "enforce_no_new_privs": true,
         "executor_type": "broker-isolated-uds",
-        "forbidden_payload_keys": [],
+        "forbidden_payload_keys": [
+          "command",
+          "cmd",
+          "shell",
+          "shell_command"
+        ],
         "governance": {
           "compatibility_mode": "canonical",
           "deprecated": false,
@@ -1078,7 +1089,7 @@
           "memory_kb": 262144,
           "nofile": 64
         },
-        "risk_tier": "low",
+        "risk_tier": "high",
         "runtime_identity_mode": "broker-bound",
         "sandbox_profile": "sandbox-broker-isolated",
         "sandbox_ready": true,
@@ -1125,7 +1136,12 @@
         "deny_on_unenforced": false,
         "enforce_no_new_privs": true,
         "executor_type": "sandboxed-process",
-        "forbidden_payload_keys": [],
+        "forbidden_payload_keys": [
+          "command",
+          "cmd",
+          "shell",
+          "shell_command"
+        ],
         "governance": {
           "compatibility_mode": "canonical",
           "deprecated": false,
@@ -1148,7 +1164,7 @@
           "memory_kb": 262144,
           "nofile": 64
         },
-        "risk_tier": "low",
+        "risk_tier": "high",
         "runtime_identity_mode": "broker-bound",
         "sandbox_profile": "sandbox-broker-isolated",
         "sandbox_ready": true,
@@ -1161,7 +1177,12 @@
         "deny_on_unenforced": true,
         "enforce_no_new_privs": true,
         "executor_type": "sandboxed-process",
-        "forbidden_payload_keys": [],
+        "forbidden_payload_keys": [
+          "command",
+          "cmd",
+          "shell",
+          "shell_command"
+        ],
         "governance": {
           "compatibility_mode": "canonical",
           "deprecated": false,
@@ -1185,7 +1206,7 @@
           "memory_kb": 262144,
           "nofile": 64
         },
-        "risk_tier": "low",
+        "risk_tier": "high",
         "runtime_identity_mode": "broker-bound",
         "sandbox_profile": "sandbox-high-risk",
         "sandbox_ready": true,
@@ -1648,7 +1669,7 @@
         "capability_domains": [
           "info.lookup"
         ],
-        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/calculator-provider.json",
+        "manifest_source": "/Users/lixiheng/Code/linux_mcp/provider-app/manifests/calculator-provider.json",
         "provider_id": "calculator-provider"
       },
       {
@@ -1657,14 +1678,14 @@
           "file.write",
           "info.lookup"
         ],
-        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/file-manager-provider.json",
+        "manifest_source": "/Users/lixiheng/Code/linux_mcp/provider-app/manifests/file-manager-provider.json",
         "provider_id": "file-manager-provider"
       },
       {
         "capability_domains": [
           "external.write"
         ],
-        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/notes-provider.json",
+        "manifest_source": "/Users/lixiheng/Code/linux_mcp/provider-app/manifests/notes-provider.json",
         "provider_id": "notes-provider"
       },
       {
@@ -1673,14 +1694,14 @@
           "external.write",
           "info.lookup"
         ],
-        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/settings-provider.json",
+        "manifest_source": "/Users/lixiheng/Code/linux_mcp/provider-app/manifests/settings-provider.json",
         "provider_id": "settings-provider"
       },
       {
         "capability_domains": [
           "info.lookup"
         ],
-        "manifest_source": "/home/lxh/Code/linux-mcp/provider-app/manifests/utility-provider.json",
+        "manifest_source": "/Users/lixiheng/Code/linux_mcp/provider-app/manifests/utility-provider.json",
         "provider_id": "utility-provider"
       }
     ],

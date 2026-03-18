@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -27,6 +28,7 @@ try:
         QListWidgetItem,
         QMainWindow,
         QMessageBox,
+        QInputDialog,
         QPushButton,
         QPlainTextEdit,
         QSizePolicy,
@@ -50,6 +52,7 @@ from rpc import mcpd_call
 
 DEFAULT_SOCK_PATH = "/tmp/mcpd.sock"
 CATALOG_TTL_S = 10.0
+_ENTITY_RE = re.compile(r"(?:\.\.?/)?[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*")
 
 
 def _json_pretty(data: Any) -> str:
@@ -66,6 +69,46 @@ def _ensure_list(resp: Dict[str, Any], key: str, label: str) -> List[Dict[str, A
     if not isinstance(raw, list):
         raise RuntimeError(f"{label} response missing {key} list")
     return [item for item in raw if isinstance(item, dict)]
+
+
+def _collect_entities(value: Any, out: List[str]) -> None:
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return
+        if "/" in text or "." in text:
+            out.append(text)
+        for match in _ENTITY_RE.findall(text):
+            if "/" in match or "." in match:
+                out.append(match)
+        return
+    if isinstance(value, dict):
+        for item in value.values():
+            _collect_entities(item, out)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _collect_entities(item, out)
+
+
+def _update_context_state(context: Dict[str, Any], user_text: str, resp: Dict[str, Any]) -> None:
+    dialog_window = context.setdefault("dialog_window", [])
+    if isinstance(dialog_window, list):
+        dialog_window.append(user_text)
+        context["dialog_window"] = dialog_window[-3:]
+    if resp.get("status") != "ok":
+        return
+    entities: List[str] = []
+    _collect_entities(resp.get("result", {}), entities)
+    unique_entities: List[str] = []
+    seen: set[str] = set()
+    for item in entities:
+        if item not in seen:
+            unique_entities.append(item)
+            seen.add(item)
+    if unique_entities:
+        context["recent_entities"] = unique_entities[-8:]
+        context["last_result_refs"] = unique_entities[-4:]
 
 
 def _list_providers(sock_path: str) -> List[Dict[str, Any]]:
@@ -112,6 +155,8 @@ class ExecRequest:
     preferred_provider_id: str
     manual_capability: Optional[Dict[str, Any]]
     catalog: Optional[CatalogSnapshot]
+    context: Dict[str, Any]
+    allow_followup: bool
 
 
 class CatalogWorker(QObject):
@@ -219,11 +264,19 @@ class ExecWorker(QObject):
                 hints.setdefault("preferred_provider_id", intent.preferred_provider_id)
             if hints:
                 payload["hints"] = hints
+            if self.req.context:
+                payload["context"] = {
+                    "dialog_window": list(self.req.context.get("dialog_window", []))[-3:],
+                    "recent_entities": list(self.req.context.get("recent_entities", []))[-8:],
+                    "last_result_refs": list(self.req.context.get("last_result_refs", []))[-4:],
+                }
 
             resp = mcpd_call(payload, sock_path=self.req.sock_path, timeout_s=30)
             self.finished.emit(
                 {
                     "status": "ok",
+                    "user_text": self.req.user_text,
+                    "allow_followup": self.req.allow_followup,
                     "req_id": req_id,
                     "response": resp,
                     "selector_source": intent.selector_source,
@@ -244,6 +297,11 @@ class MainWindow(QMainWindow):
         self.participant_id = participant_id
         self.selector_cfg = selector_cfg
         self.catalog: Optional[CatalogSnapshot] = None
+        self.context_state: Dict[str, Any] = {
+            "dialog_window": [],
+            "recent_entities": [],
+            "last_result_refs": [],
+        }
         self._thread: Optional[QThread] = None
         self._worker: Optional[QObject] = None
 
@@ -547,6 +605,9 @@ class MainWindow(QMainWindow):
         if not user_text:
             QMessageBox.warning(self, "Missing Intent", "Enter an intent before executing.")
             return
+        self._submit_exec_request(user_text, allow_followup=True)
+
+    def _submit_exec_request(self, user_text: str, *, allow_followup: bool) -> None:
         if self._thread is not None:
             self._append_log("request ignored while another operation is running")
             return
@@ -568,6 +629,8 @@ class MainWindow(QMainWindow):
             preferred_provider_id=self._selected_provider_id(),
             manual_capability=self._current_manual_capability(),
             catalog=self.catalog,
+            context=dict(self.context_state),
+            allow_followup=allow_followup,
         )
         self._set_busy(True)
         thread = QThread(self)
@@ -618,6 +681,9 @@ class MainWindow(QMainWindow):
 
         selected_capability = payload.get("selected_capability", {})
         resp = payload.get("response", {})
+        user_text = str(payload.get("user_text", ""))
+        if isinstance(resp, dict):
+            _update_context_state(self.context_state, user_text, resp)
         selector_source = payload.get("selector_source", "unknown")
         selector_reason = payload.get("selector_reason", "")
         req_id = payload.get("req_id", 0)
@@ -642,9 +708,33 @@ class MainWindow(QMainWindow):
                 )
             )
         else:
+            error_code = str(resp.get("error_code", "execution_error")) if isinstance(resp, dict) else "execution_error"
+            missing_fields = resp.get("missing_fields", []) if isinstance(resp, dict) else []
+            repairable = bool(resp.get("repairable", False)) if isinstance(resp, dict) else False
             self._append_log(
                 f"request error req_id={req_id} err={resp.get('error', 'unknown error') if isinstance(resp, dict) else resp}"
             )
+            self._append_log(
+                f"error_code={error_code} repairable={repairable} missing_fields={missing_fields}"
+            )
+            if bool(payload.get("allow_followup", False)) and repairable and isinstance(missing_fields, list) and missing_fields:
+                missing_text = ", ".join(str(item) for item in missing_fields if str(item).strip())
+                prompt = "Provide a natural-language clarification to continue."
+                if missing_text:
+                    prompt += f"\nMissing fields: {missing_text}"
+                clarification, ok = QInputDialog.getMultiLineText(
+                    self,
+                    "Clarification Needed",
+                    prompt,
+                )
+                if not ok:
+                    return
+                value = clarification.strip()
+                if value:
+                    followup_text = f"{user_text}\nclarification: {value}"
+                    self.prompt_input.setPlainText(followup_text)
+                    self._append_log(f"retry with follow-up intent: {followup_text}")
+                    self._submit_exec_request(followup_text, allow_followup=False)
 
 
 def main() -> int:

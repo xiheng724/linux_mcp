@@ -1,12 +1,14 @@
 # client
 
-`client/` contains low-level Generic Netlink debug utilities.
+`client/` contains shared protocol constants for Kernel MCP.
 
-These tools are not part of the canonical planner/broker/provider runtime path, but they are still useful for:
+This directory is not the canonical planner/broker/provider runtime path.
 
-- kernel protocol debugging
-- manual participant/capability registration checks
-- direct lease/request experiments
+The active component is:
+
+- `kernel_mcp/schema.py` (shared Generic Netlink command/attribute constants)
+
+There are currently no standalone C debug binaries in this directory.
 
 Build:
 
@@ -15,12 +17,4 @@ make -C client clean
 make -C client
 ```
 
-Compiled binaries are not kept in the repository. They are rebuilt into `client/bin/` when needed.
-
-Current debug utilities:
-
-- `genl_ping`
-- `genl_register_participant`
-- `genl_register_capability`
-- `genl_capability_request`
-- `genl_capability_complete`
+The Makefile is kept for compatibility and cleanup helpers.

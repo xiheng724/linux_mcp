@@ -16,5 +16,8 @@ spec:
     prefer_example_matches: true
     prefer_lower_risk_on_tie: true
     allow_preferred_provider_high_risk: false
+    enable_semantic_rerank: false
+    semantic_ambiguity_threshold: 15
+    semantic_score_weight: 1.5
   runtime_identity_mode: registered-agent
   policy_controlled: true

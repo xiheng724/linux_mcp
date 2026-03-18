@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from payload_inference import build_execution_payload
+from payload_inference import build_execution_payload_with_explain
 
 from architecture import (
     APPROVAL_STATE_APPROVED,
@@ -56,6 +56,7 @@ MAX_DEFER_RETRIES = 50
 EXECUTOR_RUNTIME_TIMEOUT_S = 30.0
 LOGGER = logging.getLogger("mcpd")
 HASH_RE = re.compile(r"^[0-9a-fA-F]{8}$")
+MISSING_FIELD_RE = re.compile(r"missing required payload field '([^']+)'")
 
 REQUEST_FLAG_INTERACTIVE_SESSION = 1 << 0
 REQUEST_FLAG_EXPLICIT_APPROVED = 1 << 1
@@ -721,6 +722,7 @@ def _call_provider_executor(
     req_id: int,
     participant_id: str,
     payload: Dict[str, Any],
+    payload_fill_mode: str,
     lease_id: int,
     approval_state: int,
     provider_instance_id: str,
@@ -813,7 +815,7 @@ def _call_provider_executor(
         sandbox_profile=plan.executor.sandbox_profile,
         lease_id=lease_id,
         executor_instance_id=executor_instance_id,
-        payload_fill_mode="schema_arg_hints",
+        payload_fill_mode=payload_fill_mode,
         runtime_status=status,
         runtime_timings=dict(executor_timing),
         sandbox=resp.get("sandbox", {}),
@@ -821,14 +823,22 @@ def _call_provider_executor(
     return resp
 
 
-def _build_execution_payload(action: ProviderAction, intent_text: str, req: Dict[str, Any]) -> Dict[str, Any]:
+def _build_execution_payload(
+    action: ProviderAction,
+    intent_text: str,
+    req: Dict[str, Any],
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     hints = req.get("hints")
     if hints is not None and not isinstance(hints, dict):
         raise ValueError("hints must be object")
-    return build_execution_payload(
+    context = req.get("context")
+    if context is not None and not isinstance(context, dict):
+        raise ValueError("context must be object")
+    return build_execution_payload_with_explain(
         action,
         intent_text,
         hints=hints if isinstance(hints, dict) else None,
+        context=context if isinstance(context, dict) else None,
     )
 
 
@@ -870,16 +880,17 @@ def _execute_plan(
     intent_text = _ensure_non_empty_str("intent_text", req.get("intent_text", ""))
     markers.extend(plan.audit_markers)
     payload_build_start = time.perf_counter()
-    payload = _build_execution_payload(plan.action, intent_text, req)
+    payload, payload_inference_explain = _build_execution_payload(plan.action, intent_text, req)
     payload = validate_action_payload(plan.action, payload)
     _validate_executor_contract(plan, payload)
     timings["payload_construction_ms"] = int((time.perf_counter() - payload_build_start) * 1000)
     payload_construction_explain = build_payload_construction_explain(
-        fill_mode="schema_arg_hints",
+        fill_mode=str(payload_inference_explain.get("fill_mode", "schema_arg_hints")),
         schema=plan.action.input_schema,
         arg_hints=plan.action.arg_hints,
         payload=payload,
     )
+    payload_construction_explain["inference"] = dict(payload_inference_explain)
     explain_payload = build_dispatch_explain(
         capability_request=dict((request_explanation or {}).get("capability_request", {})),
         capability_selection=dict((request_explanation or {}).get("capability_selection", {})),
@@ -1005,6 +1016,7 @@ def _execute_plan(
             req_id=req_id,
             participant_id=participant_id,
             payload=payload,
+            payload_fill_mode=str(payload_inference_explain.get("fill_mode", "schema_arg_hints")),
             lease_id=lease_id,
             approval_state=approval_state,
             provider_instance_id=provider_instance_id,
@@ -1200,6 +1212,9 @@ def _execute_capability_request(
                 "status": "error",
                 "result": {},
                 "error": str(capability_request_explain.get("deny_reason", "capability policy denied")),
+                "error_code": "capability_policy_denied",
+                "missing_fields": [],
+                "repairable": False,
                 "t_ms": 0,
                 "participant_id": participant_id,
                 "capability_domain": capability.name,
@@ -1355,14 +1370,37 @@ def _handle_capability_exec(req: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
-def _build_error(req_id: int, err: str, t_ms: int) -> Dict[str, Any]:
+def _classify_error(err: str) -> Dict[str, Any]:
+    missing_fields = MISSING_FIELD_RE.findall(err)
+    if missing_fields:
+        return {
+            "error_code": "missing_required_field",
+            "missing_fields": sorted(list(set(missing_fields))),
+            "repairable": True,
+        }
+    if "payload type mismatch" in err or "payload field" in err:
+        return {
+            "error_code": "schema_validation_failed",
+            "missing_fields": [],
+            "repairable": False,
+        }
     return {
+        "error_code": "execution_error",
+        "missing_fields": [],
+        "repairable": False,
+    }
+
+
+def _build_error(req_id: int, err: str, t_ms: int) -> Dict[str, Any]:
+    payload = {
         "req_id": req_id,
         "status": "error",
         "result": {},
         "error": err,
         "t_ms": t_ms,
     }
+    payload.update(_classify_error(err))
+    return payload
 
 
 def _handle_connection(conn: socket.socket) -> None:

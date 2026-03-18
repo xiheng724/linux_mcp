@@ -39,7 +39,45 @@
       ],
       "properties": {
         "selection_policy": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "require_provider_availability",
+            "prefer_manifest_priority",
+            "prefer_example_matches",
+            "prefer_lower_risk_on_tie",
+            "allow_preferred_provider_high_risk"
+          ],
+          "properties": {
+            "require_provider_availability": {
+              "type": "boolean"
+            },
+            "prefer_manifest_priority": {
+              "type": "boolean"
+            },
+            "prefer_example_matches": {
+              "type": "boolean"
+            },
+            "prefer_lower_risk_on_tie": {
+              "type": "boolean"
+            },
+            "allow_preferred_provider_high_risk": {
+              "type": "boolean"
+            },
+            "enable_semantic_rerank": {
+              "type": "boolean"
+            },
+            "semantic_ambiguity_threshold": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "semantic_score_weight": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "additionalProperties": false
         },
         "runtime_identity_mode": {
           "type": "string"

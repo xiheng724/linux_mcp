@@ -17,6 +17,12 @@ from config_loader import (
     load_server_defaults_config,
     load_platform_capabilities_config,
 )
+from intent_router import (
+    register_candidate_semantic_embeddings,
+    semantic_document_for_action,
+    semantic_document_for_capability,
+    semantic_scores_for_candidates,
+)
 from policy_engine import evaluate_capability_request, evaluate_executor_binding
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -57,6 +63,15 @@ DEFAULT_METADATA_SCORE_POLICY: Dict[str, Any] = {
     "prefer_example_matches": True,
     "prefer_lower_risk_on_tie": True,
     "allow_preferred_provider_high_risk": False,
+    # Conservative defaults: lexical routing remains primary unless explicitly enabled.
+    "enable_semantic_rerank": False,
+    "semantic_ambiguity_threshold": 8,
+    "semantic_score_weight": 1.0,
+}
+DEFAULT_CAPABILITY_SELECTION_POLICY: Dict[str, Any] = {
+    "enable_semantic_rerank": False,
+    "semantic_ambiguity_threshold": 8,
+    "semantic_score_weight": 1.0,
 }
 _RUNTIME_CONFIG_BUNDLE = load_runtime_config_bundle()
 ARTIFACT_STORE = load_controlplane_artifact_store()
@@ -245,12 +260,40 @@ def _normalize_selection_policy(value: Any, source: str) -> Dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{source}: selection_policy must be object or 'metadata-score'")
     merged = dict(DEFAULT_METADATA_SCORE_POLICY)
+    bool_keys = {
+        "require_provider_availability",
+        "prefer_manifest_priority",
+        "prefer_example_matches",
+        "prefer_lower_risk_on_tie",
+        "allow_preferred_provider_high_risk",
+        "enable_semantic_rerank",
+    }
+    int_keys = {"semantic_ambiguity_threshold"}
+    float_keys = {"semantic_score_weight"}
     for key, raw in value.items():
         if key not in merged:
             raise ValueError(f"{source}: unsupported selection_policy key {key!r}")
-        if not isinstance(raw, bool):
-            raise ValueError(f"{source}: selection_policy.{key} must be bool")
-        merged[key] = raw
+        if key in bool_keys:
+            if not isinstance(raw, bool):
+                raise ValueError(f"{source}: selection_policy.{key} must be bool")
+            merged[key] = raw
+            continue
+        if key in int_keys:
+            if isinstance(raw, bool) or not isinstance(raw, int):
+                raise ValueError(f"{source}: selection_policy.{key} must be int")
+            if raw < 0:
+                raise ValueError(f"{source}: selection_policy.{key} must be >= 0")
+            merged[key] = int(raw)
+            continue
+        if key in float_keys:
+            if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+                raise ValueError(f"{source}: selection_policy.{key} must be number")
+            score_weight = float(raw)
+            if score_weight < 0:
+                raise ValueError(f"{source}: selection_policy.{key} must be >= 0")
+            merged[key] = score_weight
+            continue
+        raise ValueError(f"{source}: unsupported selection_policy key {key!r}")
     return merged
 
 
@@ -985,6 +1028,22 @@ def load_provider_manifest(source: str, raw: Any) -> ProviderDef:
         actions=actions,
         manifest_source=source,
     )
+    backend, registered = register_candidate_semantic_embeddings(
+        (
+            provider.provider_id,
+            action.action_id,
+            semantic_document_for_action(action),
+        )
+        for action in provider.actions.values()
+    )
+    _log_structured(
+        logging.DEBUG,
+        "semantic_embedding_preload",
+        provider_id=provider.provider_id,
+        backend=backend,
+        action_count=len(provider.actions),
+        registered=registered,
+    )
     for action in provider.actions.values():
         _validate_action_schema_contract(action, get_runtime().CAPABILITY_DOMAIN_REGISTRY[action.capability_domain], provider, source)
     return provider
@@ -1091,6 +1150,22 @@ def build_capability_catalog(providers: Iterable[ProviderDef]) -> Dict[str, Capa
             provider_ids=tuple(sorted(entry["provider_ids"])),
             action_ids=tuple(sorted(entry["action_ids"])),
         )
+    backend, registered = register_candidate_semantic_embeddings(
+        (
+            capability.name,
+            capability.capability_id,
+            semantic_document_for_capability(capability),
+        )
+        for capability in out.values()
+    )
+    _log_structured(
+        logging.DEBUG,
+        "semantic_embedding_preload",
+        scope="capability_catalog",
+        backend=backend,
+        capability_count=len(out),
+        registered=registered,
+    )
     return out
 
 
@@ -1214,6 +1289,51 @@ def _score_manifest_match(action: ProviderAction, intent_tokens: Sequence[str]) 
     return score
 
 
+def _flatten_example_text(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip().lower()
+        return [text] if text else []
+    if isinstance(value, Mapping):
+        out: List[str] = []
+        for key, item in value.items():
+            out.extend(_flatten_example_text(key))
+            out.extend(_flatten_example_text(item))
+        return out
+    if isinstance(value, (list, tuple, set)):
+        out: List[str] = []
+        for item in value:
+            out.extend(_flatten_example_text(item))
+        return out
+    return [str(value).strip().lower()]
+
+
+def _has_exact_example_match(action: ProviderAction, intent_text: str) -> bool:
+    normalized_intent = " ".join(intent_text.lower().split())
+    if not normalized_intent:
+        return False
+    for sample in _flatten_example_text(action.examples):
+        if " ".join(sample.split()) == normalized_intent:
+            return True
+    return False
+
+
+def _is_lexical_ranking_ambiguous(rows: Sequence[Dict[str, Any]]) -> bool:
+    return _is_lexical_ranking_ambiguous_with_threshold(rows, 12)
+
+
+def _is_lexical_ranking_ambiguous_with_threshold(
+    rows: Sequence[Dict[str, Any]],
+    threshold: int,
+) -> bool:
+    if len(rows) < 2:
+        return False
+    ranked = sorted(rows, key=lambda item: item["lexical_score"], reverse=True)
+    gap = int(ranked[0]["lexical_score"]) - int(ranked[1]["lexical_score"])
+    return gap <= threshold
+
+
 def _score_capability_match(capability: CapabilityDomain, intent_tokens: Sequence[str]) -> int:
     if not intent_tokens:
         return 0
@@ -1244,29 +1364,116 @@ def _score_capability_match(capability: CapabilityDomain, intent_tokens: Sequenc
 def select_capability_from_catalog(
     user_text: str,
     capability_catalog: Iterable[CapabilityDomain],
+    *,
+    selection_policy: Mapping[str, Any] | None = None,
 ) -> Tuple[CapabilityDomain, str]:
     intent_tokens = _tokenize_text(user_text)
     capabilities = list(capability_catalog)
     if not capabilities:
         raise ValueError("capability catalog is empty")
-    best: Tuple[int, int, str] | None = None
-    selected: CapabilityDomain | None = None
+    policy = dict(DEFAULT_CAPABILITY_SELECTION_POLICY)
+    raw_policy = dict(selection_policy or {})
+    if "enable_semantic_rerank" in raw_policy:
+        if not isinstance(raw_policy["enable_semantic_rerank"], bool):
+            raise ValueError("selection_policy.enable_semantic_rerank must be bool")
+        policy["enable_semantic_rerank"] = bool(raw_policy["enable_semantic_rerank"])
+    if "semantic_ambiguity_threshold" in raw_policy:
+        threshold = raw_policy["semantic_ambiguity_threshold"]
+        if isinstance(threshold, bool) or not isinstance(threshold, int) or threshold < 0:
+            raise ValueError("selection_policy.semantic_ambiguity_threshold must be int >= 0")
+        policy["semantic_ambiguity_threshold"] = int(threshold)
+    if "semantic_score_weight" in raw_policy:
+        weight = raw_policy["semantic_score_weight"]
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or float(weight) < 0:
+            raise ValueError("selection_policy.semantic_score_weight must be number >= 0")
+        policy["semantic_score_weight"] = float(weight)
+
+    ranking_rows: List[Dict[str, Any]] = []
     for capability in capabilities:
         score = _score_capability_match(capability, intent_tokens)
-        rank = (score, -capability.risk_level, capability.name)
+        ranking_rows.append(
+            {
+                "capability": capability,
+                "capability_id": capability.capability_id,
+                "capability_domain": capability.name,
+                "lexical_score": score,
+                "semantic_score": 0.0,
+                "semantic_bonus": 0,
+                "combined_score": score,
+            }
+        )
+
+    lexical_ambiguous = _is_lexical_ranking_ambiguous_with_threshold(
+        ranking_rows,
+        int(policy["semantic_ambiguity_threshold"]),
+    )
+    semantic_backend = "not-used"
+    semantic_applied = False
+    markers: List[str] = []
+    if bool(policy["enable_semantic_rerank"]) and lexical_ambiguous:
+        semantic_backend, semantic_scores = semantic_scores_for_candidates(
+            user_text,
+            [
+                (
+                    str(row["capability_domain"]),
+                    int(row["capability_id"]),
+                    semantic_document_for_capability(row["capability"]),
+                )
+                for row in ranking_rows
+            ],
+        )
+        if semantic_backend not in {"disabled", "unavailable"}:
+            semantic_applied = True
+            markers.append("semantic_rerank")
+            markers.append(f"semantic_backend:{semantic_backend}")
+            for row in ranking_rows:
+                semantic = float(
+                    semantic_scores.get(
+                        (str(row["capability_domain"]), int(row["capability_id"])),
+                        0.0,
+                    )
+                )
+                semantic_bonus = int(round(semantic * 30.0 * float(policy["semantic_score_weight"])))
+                row["semantic_score"] = semantic
+                row["semantic_bonus"] = semantic_bonus
+                row["combined_score"] = int(row["lexical_score"]) + semantic_bonus
+        else:
+            markers.append(f"semantic_backend:{semantic_backend}")
+    elif bool(policy["enable_semantic_rerank"]):
+        markers.append("semantic_skipped_not_ambiguous")
+
+    best: Tuple[int, float, int, str] | None = None
+    selected: CapabilityDomain | None = None
+    for row in ranking_rows:
+        capability = row["capability"]
+        rank = (
+            int(row["combined_score"]),
+            float(row["semantic_score"]),
+            -capability.risk_level,
+            capability.name,
+        )
         if best is None or rank > best:
             best = rank
             selected = capability
     if selected is None or best is None:
         raise ValueError("no capability selected from catalog")
+    selector_reason = f"catalog_score={best[0]}"
+    if semantic_applied:
+        selector_reason = f"{selector_reason};semantic_backend={semantic_backend}"
+    elif markers:
+        selector_reason = f"{selector_reason};{markers[-1]}"
     _log_structured(
         logging.INFO,
         "capability_resolver",
         selector_source="catalog",
         capability_domain=selected.name,
-        selector_reason=f"catalog_score={best[0]}",
+        selector_reason=selector_reason,
+        lexical_ambiguous=lexical_ambiguous,
+        semantic_applied=semantic_applied,
+        semantic_backend=semantic_backend,
+        resolver_markers=markers,
     )
-    return selected, f"catalog_score={best[0]}"
+    return selected, selector_reason
 
 
 def resolve_action_for_capability(
@@ -1285,6 +1492,10 @@ def resolve_action_for_capability(
     require_provider_availability = bool(policy.get("require_provider_availability", True))
     prefer_lower_risk_on_tie = bool(policy.get("prefer_lower_risk_on_tie", True))
     allow_preferred_high_risk = bool(policy.get("allow_preferred_provider_high_risk", False))
+    enable_semantic_rerank = bool(policy.get("enable_semantic_rerank", False))
+    semantic_ambiguity_threshold = int(policy.get("semantic_ambiguity_threshold", 8))
+    semantic_score_weight = float(policy.get("semantic_score_weight", 1.0))
+    prefer_example_matches = bool(policy.get("prefer_example_matches", True))
 
     intent_tokens = _tokenize_text(intent_text)
     available_candidates: List[Tuple[ProviderDef, ProviderAction]] = []
@@ -1363,28 +1574,100 @@ def resolve_action_for_capability(
         markers.append("preferred_provider_ignored_by_broker_policy")
 
     ranked = preferred_candidates or available_candidates
-    best: Tuple[int, int, int, str, int] | None = None
+    ranking_rows: List[Dict[str, Any]] = []
+    best: Tuple[int, float, int, int, str, int] | None = None
     selected_provider: ProviderDef | None = None
     selected_action: ProviderAction | None = None
+    semantic_backend = "not-used"
+    semantic_applied = False
     for provider, action in ranked:
         score = _score_manifest_match(action, intent_tokens)
         tie_risk = -action.risk_level if prefer_lower_risk_on_tie else 0
         provider_trust = _trust_class_rank(provider.trust_class)
-        rank = (score, tie_risk, provider_trust, provider.provider_id, -action.action_id)
+        row = {
+            "provider": provider,
+            "action": action,
+            "provider_id": provider.provider_id,
+            "action_id": action.action_id,
+            "lexical_score": score,
+            "semantic_score": 0.0,
+            "semantic_bonus": 0,
+            "combined_score": score,
+            "tie_risk_rank": tie_risk,
+            "provider_trust_rank": provider_trust,
+            "exact_example_match": _has_exact_example_match(action, intent_text),
+        }
+        ranking_rows.append(row)
+
+    if prefer_example_matches:
+        exact_rows = [row for row in ranking_rows if row["exact_example_match"]]
+        if exact_rows:
+            markers.append("exact_example_match")
+            ranking_rows = exact_rows
+
+    lexical_ambiguous = _is_lexical_ranking_ambiguous_with_threshold(
+        ranking_rows,
+        semantic_ambiguity_threshold,
+    )
+    should_apply_semantic = bool(enable_semantic_rerank and lexical_ambiguous)
+
+    if should_apply_semantic and ranking_rows:
+        semantic_backend, semantic_scores = semantic_scores_for_candidates(
+            intent_text,
+            [
+                (
+                    str(row["provider_id"]),
+                    int(row["action_id"]),
+                    semantic_document_for_action(row["action"]),
+                )
+                for row in ranking_rows
+            ],
+        )
+        if semantic_backend not in {"disabled", "unavailable"}:
+            semantic_applied = True
+            markers.append("semantic_rerank")
+            markers.append(f"semantic_backend:{semantic_backend}")
+            for row in ranking_rows:
+                semantic = float(
+                    semantic_scores.get((str(row["provider_id"]), int(row["action_id"])), 0.0)
+                )
+                semantic_bonus = int(round(semantic * 30.0 * semantic_score_weight))
+                row["semantic_score"] = semantic
+                row["semantic_bonus"] = semantic_bonus
+                row["combined_score"] = int(row["lexical_score"]) + semantic_bonus
+        else:
+            markers.append(f"semantic_backend:{semantic_backend}")
+    elif enable_semantic_rerank:
+        markers.append("semantic_skipped_not_ambiguous")
+
+    for row in ranking_rows:
+        rank = (
+            int(row["combined_score"]),
+            float(row["semantic_score"]),
+            int(row["tie_risk_rank"]),
+            int(row["provider_trust_rank"]),
+            str(row["provider_id"]),
+            -int(row["action_id"]),
+        )
+        row["rank_tuple"] = list(rank)
         for candidate in explanation_candidates:
             if (
-                candidate.get("provider_id") == provider.provider_id
-                and candidate.get("action_id") == action.action_id
+                candidate.get("provider_id") == row["provider_id"]
+                and candidate.get("action_id") == row["action_id"]
             ):
-                candidate["score"] = score
-                candidate["tie_risk_rank"] = tie_risk
-                candidate["provider_trust_rank"] = provider_trust
+                candidate["score"] = int(row["lexical_score"])
+                candidate["semantic_score"] = float(row["semantic_score"])
+                candidate["semantic_bonus"] = int(row["semantic_bonus"])
+                candidate["combined_score"] = int(row["combined_score"])
+                candidate["exact_example_match"] = bool(row["exact_example_match"])
+                candidate["tie_risk_rank"] = int(row["tie_risk_rank"])
+                candidate["provider_trust_rank"] = int(row["provider_trust_rank"])
                 candidate["rank_tuple"] = list(rank)
                 break
         if best is None or rank > best:
             best = rank
-            selected_provider = provider
-            selected_action = action
+            selected_provider = row["provider"]
+            selected_action = row["action"]
     if best is None or selected_provider is None or selected_action is None:
         raise ValueError("no provider action selected for capability")
 
@@ -1405,6 +1688,11 @@ def resolve_action_for_capability(
         "broker_policy": dict(policy),
         "preferred_provider_id": preferred_provider_id,
         "allow_preferred_provider": allow_preferred_provider,
+        "semantic_backend": semantic_backend,
+        "semantic_applied": semantic_applied,
+        "lexical_ambiguous": lexical_ambiguous,
+        "semantic_ambiguity_threshold": semantic_ambiguity_threshold,
+        "semantic_score_weight": semantic_score_weight,
         "candidate_count": len(candidate_pairs),
         "eligible_count": len(available_candidates),
         "resolver_markers": list(markers),
