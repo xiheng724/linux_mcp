@@ -357,11 +357,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sock", default=DEFAULT_SOCK_PATH)
     parser.add_argument("--agent-id", default="a1")
-    parser.add_argument(
-        "--selector",
-        choices=["deepseek"],
-        default="deepseek",
-    )
     parser.add_argument("--deepseek-model", default=DEFAULT_DEEPSEEK_MODEL)
     parser.add_argument("--deepseek-url", default=os.getenv("DEEPSEEK_API_URL", DEFAULT_DEEPSEEK_URL))
     parser.add_argument("--deepseek-timeout-sec", type=int, default=20)
@@ -378,7 +373,6 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     selector_cfg = SelectorConfig(
-        mode=args.selector,
         deepseek_url=args.deepseek_url,
         deepseek_model=args.deepseek_model,
         deepseek_timeout_sec=args.deepseek_timeout_sec,

@@ -1,27 +1,24 @@
 # client
 
-`client/` 提供底层 Generic Netlink 调试/注册工具（C 版本）。
+`client/` 提供与当前主链路对应的两个底层 Generic Netlink 调试工具：
 
-## 是否必要
+- `client/bin/genl_register_tool`
+- `client/bin/genl_list_tools`
 
-- 对主链路来说：**当前必要**。  
-  `mcpd/reconcile_kernel.py` 会调用：
-  - `client/bin/genl_register_tool`
-  - `client/bin/genl_list_tools`
-- 其他二进制（如 `genl_register_agent`、`genl_tool_request`）主要用于基准测试与独立验证。
+这两个工具主要用于：
+- `mcpd/reconcile_kernel.py`
+- 独立排查 kernel/user ABI 是否一致
 
-## 编译
+## 构建
 
 ```bash
 make -C client clean
 make -C client
 ```
 
-## 常用命令
+## 手动检查
 
 ```bash
-./client/bin/genl_register_tool --id 1 --name echo --perm 1 --cost 1
+./client/bin/genl_register_tool --id 1 --name echo --perm 1 --cost 1 --hash 12345678
 ./client/bin/genl_list_tools
-./client/bin/genl_register_agent --id a1
-./client/bin/genl_tool_request --agent a1 --tool 2 --n 5
 ```

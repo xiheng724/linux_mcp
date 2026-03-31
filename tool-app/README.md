@@ -1,21 +1,43 @@
 # tool-app
 
-App-level tool implementations executed by `mcpd`.
+Demo tool providers and manifest definitions.
 
 ## Structure
 
-- `tool-app/app_service.py`: generic resident UDS server.
-- `tool-app/apps/*.py`: app modules, each exposing:
-  - `HANDLERS: Dict[str, Callable[[Any], Dict[str, Any]]]`
-- `tool-app/manifests/*.json`:
-  - app-level fields (`app_id`, `app_impl`, `endpoint`, ...)
-  - tool entries use `handler` key to reference `HANDLERS`.
+- `tool-app/manifests/*.json`
+  - declarative app/tool metadata
+  - runtime fields describe interface transport and endpoint
+  - demo-only field `demo_entrypoint` is used by `scripts/run_tool_services.sh`
+- `tool-app/demo_apps/*.py`
+  - standalone demo services that expose app capabilities over UDS RPC
+- `tool-app/demo_rpc.py`
+  - shared framed-JSON helper used by demo services
 
-`mcpd` dispatches requests by app `endpoint` and `tool_id`; `app_service.py` resolves `tool_id -> handler` and periodically registers the manifest to `mcpd`.
+`mcpd` no longer imports app Python modules. It loads manifests directly, publishes tool semantics to the rest of the system, and invokes each app through its declared interface (`transport=uds_rpc`, `endpoint`, `tools[].operation`).
 
-## Current App Modules
+## Manifest Shape
 
-- `apps/settings_app.py`
-- `apps/file_manager_app.py`
-- `apps/calculator_app.py`
-- `apps/utility_app.py`
+App-level fields:
+- `app_id`
+- `app_name`
+- `transport`
+- `endpoint`
+- optional `demo_entrypoint`
+
+Tool-level fields:
+- `tool_id`
+- `name`
+- `perm`
+- `cost`
+- `operation`
+- optional `timeout_ms`
+- `description`
+- `input_schema`
+- `examples`
+
+## Current Demo Apps
+
+- `demo_apps/settings_app.py`
+- `demo_apps/file_manager_app.py`
+- `demo_apps/calculator_app.py`
+- `demo_apps/utility_app.py`

@@ -247,12 +247,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", help="single prompt to run")
     parser.add_argument("--repl", action="store_true", help="interactive loop mode")
-    parser.add_argument(
-        "--selector",
-        choices=["deepseek"],
-        default="deepseek",
-        help="tool selection strategy",
-    )
     parser.add_argument("--deepseek-model", default=DEFAULT_DEEPSEEK_MODEL)
     parser.add_argument(
         "--deepseek-url",
@@ -269,7 +263,6 @@ def main() -> int:
     agent_id = args.agent_legacy or args.agent_id
     sock_path = args.socket_legacy or args.sock
     cfg = SelectorConfig(
-        mode=args.selector,
         deepseek_url=args.deepseek_url,
         deepseek_model=args.deepseek_model,
         deepseek_timeout_sec=args.deepseek_timeout_sec,

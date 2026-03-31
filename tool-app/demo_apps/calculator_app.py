@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""Calculator App handlers."""
+"""Demo Calculator App exposed over UDS RPC."""
 
 from __future__ import annotations
 
 import ast
 import re
-from typing import Any, Callable, Dict, Union
+import sys
+from pathlib import Path
+from typing import Any, Dict, Union
+
+TOOL_APP_DIR = Path(__file__).resolve().parent.parent
+if str(TOOL_APP_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOL_APP_DIR))
+
+from demo_rpc import parse_args, serve
 
 Number = Union[int, float]
 
@@ -53,14 +61,12 @@ def _extract_expression(payload: Dict[str, Any]) -> str:
             break
     else:
         raise ValueError("calc payload requires non-empty expression/message")
-
     quoted = re.search(r"`([^`]+)`|\"([^\"]+)\"|'([^']+)'", text)
     if quoted:
         for idx in (1, 2, 3):
             part = quoted.group(idx)
             if part:
                 return part.strip()
-
     candidates = re.findall(r"[0-9\.\+\-\*\/\(\)\s]{3,}", text)
     for cand in sorted(candidates, key=len, reverse=True):
         expr = " ".join(cand.split())
@@ -69,20 +75,18 @@ def _extract_expression(payload: Dict[str, Any]) -> str:
     return text
 
 
-def calc(payload: Any) -> Dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise ValueError("calc payload must be object")
-
+def calc(payload: Dict[str, Any]) -> Dict[str, Any]:
     expr = _extract_expression(payload)
     if len(expr) > 200:
         raise ValueError("expression too long (max 200 chars)")
-
     tree = ast.parse(expr, mode="eval")
-    result = _eval_node(tree)
-    return {"expression": expr, "result": result}
+    return {"expression": expr, "result": _eval_node(tree)}
 
 
-HANDLERS: Dict[str, Callable[[Any], Dict[str, Any]]] = {
-    "calc": calc,
-}
+def main() -> int:
+    args = parse_args()
+    return serve(args.manifest, {"calc": calc})
 
+
+if __name__ == "__main__":
+    raise SystemExit(main())

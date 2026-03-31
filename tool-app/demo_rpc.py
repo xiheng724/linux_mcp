@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Shared Unix domain socket service helpers for tool resident services."""
+"""Shared UDS RPC helpers for demo tool apps."""
 
 from __future__ import annotations
 
+import argparse
 import json
 import signal
 import socket
@@ -10,7 +11,7 @@ import struct
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Dict
 
 MAX_MSG_SIZE = 16 * 1024 * 1024
 
@@ -26,7 +27,6 @@ def _recv_exact(sock: socket.socket, n: int) -> bytes:
 
 
 def recv_msg(sock: socket.socket) -> Any:
-    """Receive one framed JSON message."""
     header = _recv_exact(sock, 4)
     (length,) = struct.unpack(">I", header)
     if length == 0 or length > MAX_MSG_SIZE:
@@ -36,7 +36,6 @@ def recv_msg(sock: socket.socket) -> Any:
 
 
 def send_msg(sock: socket.socket, obj: Any) -> None:
-    """Send one framed JSON message."""
     payload = json.dumps(obj, ensure_ascii=True).encode("utf-8")
     if len(payload) > MAX_MSG_SIZE:
         raise ValueError("payload too large")
@@ -44,30 +43,33 @@ def send_msg(sock: socket.socket, obj: Any) -> None:
     sock.sendall(payload)
 
 
-def _parse_handler_output(out: Any) -> Tuple[str, Any, str]:
-    if isinstance(out, tuple) and len(out) == 2 and isinstance(out[0], str):
-        status = out[0].lower()
-        if status == "ok":
-            return "ok", out[1], ""
-        if status == "error":
-            err = out[1]
-            return "error", {}, str(err)
-        raise ValueError("handler tuple status must be 'ok' or 'error'")
-    return "ok", out, ""
+def load_manifest(manifest_path: str) -> Dict[str, Any]:
+    raw = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"{manifest_path}: manifest must be object")
+    return raw
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--manifest", required=True, type=str)
+    return parser.parse_args()
 
 
 def serve(
-    endpoint_path: str,
-    handler_fn: Callable[[dict[str, Any]], Any],
-    *,
-    tool_id: int,
-    tool_name: str,
+    manifest_path: str,
+    operations: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]],
 ) -> int:
-    """Run a resident tool service with framed JSON protocol."""
-    endpoint = Path(endpoint_path)
-    endpoint.parent.mkdir(parents=True, exist_ok=True)
-    if endpoint.exists():
-        endpoint.unlink()
+    raw = load_manifest(manifest_path)
+    endpoint = raw.get("endpoint", "")
+    app_id = raw.get("app_id", "unknown")
+    if not isinstance(endpoint, str) or not endpoint:
+        raise ValueError(f"{manifest_path}: endpoint must be non-empty string")
+
+    endpoint_path = Path(endpoint)
+    endpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    if endpoint_path.exists():
+        endpoint_path.unlink()
 
     stop_event = threading.Event()
 
@@ -86,23 +88,27 @@ def serve(
             try:
                 req = recv_msg(conn)
                 if not isinstance(req, dict):
-                    raise ValueError("request must be JSON object")
+                    raise ValueError("request must be object")
                 req_id_raw = req.get("req_id", 0)
                 if isinstance(req_id_raw, int) and not isinstance(req_id_raw, bool):
                     req_id = req_id_raw
+                operation = req.get("operation", "")
+                if not isinstance(operation, str) or not operation:
+                    raise ValueError("operation must be non-empty string")
+                handler = operations.get(operation)
+                if handler is None:
+                    raise ValueError(f"unsupported operation: {operation}")
                 payload = req.get("payload", {})
                 if not isinstance(payload, dict):
                     raise ValueError("payload must be object")
-
-                out = handler_fn(payload)
-                status, result, err = _parse_handler_output(out)
+                result = handler(payload)
                 send_msg(
                     conn,
                     {
                         "req_id": req_id,
-                        "status": status,
-                        "result": result if status == "ok" else {},
-                        "error": err if status == "error" else "",
+                        "status": "ok",
+                        "result": result,
+                        "error": "",
                         "t_ms": int((time.perf_counter() - t0) * 1000),
                     },
                 )
@@ -124,10 +130,13 @@ def serve(
     server: socket.socket | None = None
     try:
         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        server.bind(str(endpoint))
+        server.bind(str(endpoint_path))
         server.listen(128)
         server.settimeout(0.5)
-
+        print(
+            f"[demo_app] serving app_id={app_id} endpoint={endpoint} operations={sorted(operations.keys())}",
+            flush=True,
+        )
         while not stop_event.is_set():
             try:
                 conn, _ = server.accept()
@@ -146,8 +155,7 @@ def serve(
                 server.close()
             except Exception:  # noqa: BLE001
                 pass
-        if endpoint.exists():
-            endpoint.unlink()
+        if endpoint_path.exists():
+            endpoint_path.unlink()
         signal.signal(signal.SIGINT, prev_int)
         signal.signal(signal.SIGTERM, prev_term)
-

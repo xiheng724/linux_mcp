@@ -9,7 +9,7 @@ REQUIRED_DIRS=(
   kernel-mcp
   mcpd
   tool-app
-  tool-app/apps
+  tool-app/demo_apps
   tool-app/manifests
   llm-app
   client
@@ -17,7 +17,6 @@ REQUIRED_DIRS=(
 )
 
 OPTIONAL_DIRS=(
-  bench
   results
   plots
 )

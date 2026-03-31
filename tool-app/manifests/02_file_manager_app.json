@@ -1,17 +1,17 @@
 {
   "app_id": "file_manager_app",
   "app_name": "File Manager App",
-  "mode": "uds_service",
+  "transport": "uds_rpc",
   "endpoint": "/tmp/linux-mcp-apps/file_manager_app.sock",
-  "service_path": "tool-app/app_service.py",
-  "app_impl": "tool-app/apps/file_manager_app.py",
+  "demo_entrypoint": "tool-app/demo_apps/file_manager_app.py",
   "tools": [
     {
       "tool_id": 3,
       "name": "text_stats",
       "perm": 1,
       "cost": 1,
-      "handler": "text_stats",
+      "operation": "text_stats",
+      "timeout_ms": 30000,
       "description": "Compute text statistics (chars/words/lines) from payload text.",
       "input_schema": {
         "type": "object",
@@ -43,7 +43,8 @@
       "name": "file_preview",
       "perm": 1,
       "cost": 1,
-      "handler": "file_preview",
+      "operation": "file_preview",
+      "timeout_ms": 30000,
       "description": "Preview text files from this repository with line limits and safe path checks.",
       "input_schema": {
         "type": "object",
@@ -80,7 +81,8 @@
       "name": "hash_text",
       "perm": 1,
       "cost": 1,
-      "handler": "hash_text",
+      "operation": "hash_text",
+      "timeout_ms": 30000,
       "description": "Generate SHA-256/SHA-1/MD5 digests for text content.",
       "input_schema": {
         "type": "object",
@@ -117,7 +119,8 @@
       "name": "file_create",
       "perm": 1,
       "cost": 1,
-      "handler": "file_create",
+      "operation": "file_create",
+      "timeout_ms": 30000,
       "description": "Create or overwrite a text file under repository root with safe path checks.",
       "input_schema": {
         "type": "object",
@@ -161,7 +164,8 @@
       "name": "file_list",
       "perm": 1,
       "cost": 1,
-      "handler": "file_list",
+      "operation": "file_list",
+      "timeout_ms": 30000,
       "description": "List directory entries or inspect a file under repository root with safe path checks.",
       "input_schema": {
         "type": "object",
@@ -194,7 +198,8 @@
       "name": "file_delete",
       "perm": 1,
       "cost": 1,
-      "handler": "file_delete",
+      "operation": "file_delete",
+      "timeout_ms": 30000,
       "description": "Delete a file (or directory with recursive=true) under repository root with safety checks.",
       "input_schema": {
         "type": "object",
@@ -233,7 +238,8 @@
       "name": "file_copy",
       "perm": 1,
       "cost": 1,
-      "handler": "file_copy",
+      "operation": "file_copy",
+      "timeout_ms": 30000,
       "description": "Copy a file under repository root with safe path checks.",
       "input_schema": {
         "type": "object",
@@ -278,7 +284,8 @@
       "name": "file_rename",
       "perm": 1,
       "cost": 1,
-      "handler": "file_rename",
+      "operation": "file_rename",
+      "timeout_ms": 30000,
       "description": "Rename or move a file under repository root with safe path checks.",
       "input_schema": {
         "type": "object",

@@ -3,15 +3,15 @@
 Simple CLI demo that:
 
 1. fetches app catalog via `{"sys":"list_apps"}` from `mcpd`
-2. chooses an app first (DeepSeek or local heuristic)
+2. chooses an app first with DeepSeek
 3. fetches app-scoped tools via `{"sys":"list_tools","app_id":"..."}` and chooses one tool
 4. sends `{"kind":"tool:exec","app_id":"...", ...}` to `mcpd` only
 5. `mcpd` performs kernel arbitration + tool execution + completion report
 
 Tool semantics source:
 - `tool-app/manifests/*.json` (`tools[].description`, `tools[].input_schema`, `tools[].examples`)
-- semantics are pushed to `mcpd` by `tool-app/app_service.py` over UDS registration
-- llm-app only sees semantic fields and hash (no runtime endpoint/handler fields)
+- manifests are auto-loaded by `mcpd` at startup
+- llm-app only sees semantic fields and hash (no runtime endpoint/operation fields)
 
 Prerequisites:
 - `kernel_mcp` loaded
@@ -62,7 +62,6 @@ python3 llm-app/gui_app.py
 ```
 
 GUI uses the same tool-selection logic as CLI (shared code):
-- `--selector auto|heuristic|deepseek`
 - `--deepseek-model ...`
 - `--deepseek-url ...`
 - `--deepseek-timeout-sec ...`
@@ -87,7 +86,7 @@ DeepSeek selection:
 
 ```bash
 export DEEPSEEK_API_KEY="your_key"
-python3 llm-app/cli.py --selector deepseek --once "please burn cpu for 100ms"
+python3 llm-app/cli.py --once "please burn cpu for 100ms"
 ```
 
 Example REPL output:
@@ -125,7 +124,4 @@ user> hello
 5. Stop gateway:
    - `bash scripts/stop_mcpd.sh`
 
-Selector modes:
-- `--selector deepseek` (default): require DeepSeek and fail if unavailable.
-- `--selector auto`: use DeepSeek when key exists, otherwise heuristic.
-- `--selector heuristic`: local keyword routing only.
+If `DEEPSEEK_API_KEY` is not set, CLI/GUI routing will fail fast.

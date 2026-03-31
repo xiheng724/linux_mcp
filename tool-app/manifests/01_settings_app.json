@@ -1,17 +1,17 @@
 {
   "app_id": "settings_app",
   "app_name": "Settings App",
-  "mode": "uds_service",
+  "transport": "uds_rpc",
   "endpoint": "/tmp/linux-mcp-apps/settings_app.sock",
-  "service_path": "tool-app/app_service.py",
-  "app_impl": "tool-app/apps/settings_app.py",
+  "demo_entrypoint": "tool-app/demo_apps/settings_app.py",
   "tools": [
     {
       "tool_id": 2,
       "name": "cpu_burn",
       "perm": 1,
       "cost": 3,
-      "handler": "cpu_burn",
+      "operation": "cpu_burn",
+      "timeout_ms": 30000,
       "description": "Burn CPU in user-space for a bounded duration in milliseconds.",
       "input_schema": {
         "type": "object",
@@ -43,7 +43,8 @@
       "name": "sys_info",
       "perm": 1,
       "cost": 1,
-      "handler": "sys_info",
+      "operation": "sys_info",
+      "timeout_ms": 30000,
       "description": "Get practical host diagnostics: hostname, kernel/platform, load average, memory, disk usage, and uptime.",
       "input_schema": {
         "type": "object",
@@ -70,7 +71,8 @@
       "name": "time_now",
       "perm": 1,
       "cost": 1,
-      "handler": "time_now",
+      "operation": "time_now",
+      "timeout_ms": 30000,
       "description": "Return current local/UTC date-time and epoch timestamp.",
       "input_schema": {
         "type": "object",
@@ -99,7 +101,8 @@
       "name": "volume_control",
       "perm": 1,
       "cost": 1,
-      "handler": "volume_control",
+      "operation": "volume_control",
+      "timeout_ms": 30000,
       "description": "Get or adjust system output volume using local audio backend (pactl/amixer).",
       "input_schema": {
         "type": "object",

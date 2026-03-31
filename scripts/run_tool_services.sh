@@ -17,16 +17,16 @@ found_manifest=0
 for manifest in "$ROOT_DIR"/tool-app/manifests/*.json; do
   [[ -f "$manifest" ]] || continue
   found_manifest=1
-  IFS=$'\t' read -r app_id app_name service_path endpoint mode < <(
+  IFS=$'\t' read -r app_id app_name demo_entrypoint endpoint transport < <(
     "$PYTHON_BIN" - "$manifest" <<'PY'
 import json,sys
 raw=json.load(open(sys.argv[1],encoding="utf-8"))
 print(
     f"{raw.get('app_id','')}\t"
     f"{raw.get('app_name','')}\t"
-    f"{raw.get('service_path','tool-app/app_service.py')}\t"
+    f"{raw.get('demo_entrypoint','')}\t"
     f"{raw.get('endpoint','')}\t"
-    f"{raw.get('mode','')}"
+    f"{raw.get('transport','')}"
 )
 PY
   )
@@ -35,18 +35,22 @@ PY
     echo "invalid manifest missing app id/name: $manifest"
     exit 1
   fi
-  if [[ "$mode" != "uds_service" ]]; then
-    echo "skip app_id=$app_id app_name=$app_name mode=$mode"
+  if [[ "$transport" != "uds_rpc" ]]; then
+    echo "skip app_id=$app_id app_name=$app_name transport=$transport"
     continue
   fi
   if [[ -z "$endpoint" ]]; then
     echo "invalid manifest missing endpoint: $manifest"
     exit 1
   fi
+  if [[ -z "$demo_entrypoint" ]]; then
+    echo "skip app_id=$app_id app_name=$app_name (no demo_entrypoint configured)"
+    continue
+  fi
 
   pidfile="/tmp/linux-mcp-app-${app_id}.pid"
   logfile="/tmp/linux-mcp-app-${app_id}.log"
-  service_file="$ROOT_DIR/$service_path"
+  service_file="$ROOT_DIR/$demo_entrypoint"
   if [[ ! -f "$service_file" ]]; then
     echo "missing service file for app_id=$app_id: $service_file"
     exit 1
@@ -62,7 +66,7 @@ PY
   fi
 
   rm -f "$endpoint"
-  "$PYTHON_BIN" "$service_file" --manifest "$manifest" --serve "$endpoint" >"$logfile" 2>&1 &
+  nohup setsid "$PYTHON_BIN" -u "$service_file" --manifest "$manifest" >"$logfile" 2>&1 </dev/null &
   pid=$!
   echo "$pid" >"$pidfile"
 

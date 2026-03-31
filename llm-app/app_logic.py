@@ -18,7 +18,6 @@ DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
 
 @dataclasses.dataclass(frozen=True)
 class SelectorConfig:
-    mode: str
     deepseek_url: str
     deepseek_model: str
     deepseek_timeout_sec: int
@@ -193,7 +192,7 @@ def select_app_for_input(user_text: str, apps: List[Dict[str, Any]], cfg: Select
         raise RuntimeError("no valid apps discovered from mcpd")
     api_key = os.getenv("DEEPSEEK_API_KEY", "")
     if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not set; app routing is model-only")
+        raise RuntimeError("DEEPSEEK_API_KEY not set")
     app_id, reason = _call_app_selector(user_text, apps, api_key, cfg)
     selected = by_id.get(app_id)
     if selected is None:
@@ -207,7 +206,7 @@ def select_tool_for_input(user_text: str, tools: List[Dict[str, Any]], cfg: Sele
         raise RuntimeError("no valid tools discovered from mcpd")
     api_key = os.getenv("DEEPSEEK_API_KEY", "")
     if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not set; tool routing is model-only")
+        raise RuntimeError("DEEPSEEK_API_KEY not set")
     tool_id, reason = _call_tool_selector(user_text, tools, api_key, cfg)
     selected = by_id.get(tool_id)
     if selected is None:
@@ -313,11 +312,11 @@ def _call_payload_builder(user_text: str, tool: Dict[str, Any], api_key: str, cf
 
 def build_payload_for_tool(tool: Dict[str, Any], user_text: str, cfg: SelectorConfig) -> Dict[str, Any]:
     api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not set; payload formatting is model-only")
     input_schema = tool.get("input_schema", {})
     if not isinstance(input_schema, dict):
         raise RuntimeError("selected tool missing valid input_schema")
+    if not api_key:
+        raise RuntimeError("DEEPSEEK_API_KEY not set")
     payload = _call_payload_builder(user_text, tool, api_key, cfg)
     validate_payload_against_schema(input_schema, payload)
     return payload

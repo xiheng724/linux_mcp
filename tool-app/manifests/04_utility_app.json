@@ -1,17 +1,17 @@
 {
   "app_id": "utility_app",
   "app_name": "Utility App",
-  "mode": "uds_service",
+  "transport": "uds_rpc",
   "endpoint": "/tmp/linux-mcp-apps/utility_app.sock",
-  "service_path": "tool-app/app_service.py",
-  "app_impl": "tool-app/apps/utility_app.py",
+  "demo_entrypoint": "tool-app/demo_apps/utility_app.py",
   "tools": [
     {
       "tool_id": 1,
       "name": "echo",
       "perm": 1,
       "cost": 1,
-      "handler": "echo",
+      "operation": "echo",
+      "timeout_ms": 30000,
       "description": "Echo tool that returns payload as-is for debugging and simple round-trip checks.",
       "input_schema": {
         "type": "object",

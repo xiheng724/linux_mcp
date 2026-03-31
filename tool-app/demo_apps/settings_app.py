@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Settings App handlers."""
+"""Demo Settings App exposed over UDS RPC."""
 
 from __future__ import annotations
 
@@ -8,21 +8,28 @@ import platform
 import re
 import shutil
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Dict, Tuple
+
+TOOL_APP_DIR = Path(__file__).resolve().parent.parent
+if str(TOOL_APP_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOL_APP_DIR))
+
+from demo_rpc import parse_args, serve
 
 MAX_BURN_MS = 10_000
 MIN_LEVEL = 0
 MAX_LEVEL = 100
 
 
-def _cpu_burn(ms: int) -> Dict[str, Any]:
-    if ms < 0:
-        ms = 0
-    if ms > MAX_BURN_MS:
-        ms = MAX_BURN_MS
+def cpu_burn(payload: Dict[str, Any]) -> Dict[str, Any]:
+    ms_raw = payload.get("ms")
+    if isinstance(ms_raw, bool) or not isinstance(ms_raw, int):
+        raise ValueError("cpu_burn payload.ms must be integer")
+    ms = max(0, min(MAX_BURN_MS, ms_raw))
     start = time.perf_counter()
     target = start + (ms / 1000.0)
     x = 0
@@ -33,22 +40,10 @@ def _cpu_burn(ms: int) -> Dict[str, Any]:
     return {"burned_ms": ms, "actual_ms": actual_ms}
 
 
-def cpu_burn(payload: Any) -> Dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise ValueError("cpu_burn payload must be object")
-    if "ms" not in payload:
-        raise ValueError("cpu_burn payload requires field: ms")
-    ms_raw = payload.get("ms")
-    if isinstance(ms_raw, bool) or not isinstance(ms_raw, int):
-        raise ValueError("cpu_burn payload.ms must be integer")
-    return _cpu_burn(ms_raw)
-
-
 def _read_uptime_seconds() -> float:
     try:
         raw = Path("/proc/uptime").read_text(encoding="utf-8").strip()
-        first = raw.split()[0]
-        return float(first)
+        return float(raw.split()[0])
     except Exception:
         return 0.0
 
@@ -61,19 +56,15 @@ def _read_meminfo_mb() -> Dict[str, float]:
         for line in lines:
             parts = line.split()
             if len(parts) >= 2 and parts[1].isdigit():
-                key = parts[0].rstrip(":")
-                kv[key] = int(parts[1])
+                kv[parts[0].rstrip(":")] = int(parts[1])
         out["total_mb"] = round(kv.get("MemTotal", 0) / 1024.0, 2)
         out["available_mb"] = round(kv.get("MemAvailable", 0) / 1024.0, 2)
-        return out
     except Exception:
         return out
+    return out
 
 
-def sys_info(payload: Any) -> Dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise ValueError("sys_info payload must be object")
-
+def sys_info(payload: Dict[str, Any]) -> Dict[str, Any]:
     raw_path = payload.get("path", "")
     if raw_path in ("", None):
         target = Path.cwd()
@@ -81,22 +72,18 @@ def sys_info(payload: Any) -> Dict[str, Any]:
         target = Path(raw_path).expanduser()
     else:
         raise ValueError("sys_info payload.path must be string when provided")
-
     if target.is_file():
         target = target.parent
     target = target.resolve()
-
     if not target.exists():
         raise ValueError(f"path does not exist: {target}")
 
     disk = shutil.disk_usage(target)
     mem = _read_meminfo_mb()
-    load_avg = (0.0, 0.0, 0.0)
     try:
         load_avg = os.getloadavg()
     except Exception:
-        pass
-
+        load_avg = (0.0, 0.0, 0.0)
     return {
         "hostname": platform.node(),
         "kernel": platform.release(),
@@ -117,20 +104,15 @@ def sys_info(payload: Any) -> Dict[str, Any]:
     }
 
 
-def time_now(payload: Any) -> Dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise ValueError("time_now payload must be object")
-
-    now_local = datetime.now().astimezone()
-    now_utc = datetime.now(timezone.utc)
-
+def time_now(payload: Dict[str, Any]) -> Dict[str, Any]:
     timezone_hint = payload.get("timezone", "local")
     if not isinstance(timezone_hint, str):
         raise ValueError("time_now payload.timezone must be string")
     timezone_hint = timezone_hint.lower().strip()
     if timezone_hint not in {"local", "utc"}:
         raise ValueError("timezone must be one of: local, utc")
-
+    now_local = datetime.now().astimezone()
+    now_utc = datetime.now(timezone.utc)
     selected = now_local if timezone_hint == "local" else now_utc
     return {
         "requested_timezone": timezone_hint,
@@ -168,10 +150,8 @@ def _backend() -> str:
 
 def _get_volume(backend: str) -> int:
     if backend == "pactl":
-        out = _run_cmd(["pactl", "get-sink-volume", "@DEFAULT_SINK@"])
-        return _parse_percent(out)
-    out = _run_cmd(["amixer", "sget", "Master"])
-    return _parse_percent(out)
+        return _parse_percent(_run_cmd(["pactl", "get-sink-volume", "@DEFAULT_SINK@"]))
+    return _parse_percent(_run_cmd(["amixer", "sget", "Master"]))
 
 
 def _set_volume(backend: str, level: int) -> None:
@@ -198,35 +178,25 @@ def _set_mute(backend: str, mute: bool) -> None:
     _run_cmd(["amixer", "set", "Master", "mute" if mute else "unmute"])
 
 
-def _normalize_action(payload: Dict[str, Any]) -> Tuple[str, int, int]:
+def _normalize_volume(payload: Dict[str, Any]) -> Tuple[str, int, int]:
     action = payload.get("action", "get")
     if not isinstance(action, str):
         raise ValueError("volume_control payload.action must be string")
     action = action.lower().strip()
     if action not in {"get", "set", "change", "mute", "unmute"}:
         raise ValueError("action must be one of: get,set,change,mute,unmute")
-
     level = payload.get("level", 50)
     step = payload.get("step", 10)
     if isinstance(level, bool) or not isinstance(level, int):
         raise ValueError("volume_control payload.level must be integer")
     if isinstance(step, bool) or not isinstance(step, int):
         raise ValueError("volume_control payload.step must be integer")
-    level = max(MIN_LEVEL, min(MAX_LEVEL, level))
-    if step < -100:
-        step = -100
-    if step > 100:
-        step = 100
-    return action, level, step
+    return action, max(MIN_LEVEL, min(MAX_LEVEL, level)), max(-100, min(100, step))
 
 
-def volume_control(payload: Any) -> Dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise ValueError("volume_control payload must be object")
-
-    action, level, step = _normalize_action(payload)
+def volume_control(payload: Dict[str, Any]) -> Dict[str, Any]:
+    action, level, step = _normalize_volume(payload)
     backend = _backend()
-
     if action == "set":
         _set_volume(backend, level)
     elif action == "change":
@@ -235,19 +205,21 @@ def volume_control(payload: Any) -> Dict[str, Any]:
         _set_mute(backend, True)
     elif action == "unmute":
         _set_mute(backend, False)
-
-    current = _get_volume(backend)
-    return {
-        "backend": backend,
-        "action": action,
-        "current_level": current,
-    }
+    return {"backend": backend, "action": action, "current_level": _get_volume(backend)}
 
 
-HANDLERS: Dict[str, Callable[[Any], Dict[str, Any]]] = {
+OPERATIONS = {
     "cpu_burn": cpu_burn,
     "sys_info": sys_info,
     "time_now": time_now,
     "volume_control": volume_control,
 }
 
+
+def main() -> int:
+    args = parse_args()
+    return serve(args.manifest, OPERATIONS)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

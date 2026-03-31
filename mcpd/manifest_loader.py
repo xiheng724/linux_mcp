@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+"""Shared manifest loading for mcpd runtime and kernel reconciliation."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_MANIFEST_DIR = ROOT_DIR / "tool-app" / "manifests"
+SEMANTIC_HASH_FIELDS = (
+    "tool_id",
+    "name",
+    "app_id",
+    "app_name",
+    "perm",
+    "cost",
+    "description",
+    "input_schema",
+    "examples",
+)
+
+
+@dataclass(frozen=True)
+class ToolManifest:
+    tool_id: int
+    name: str
+    app_id: str
+    app_name: str
+    perm: int
+    cost: int
+    description: str
+    input_schema: Dict[str, Any]
+    examples: List[Any]
+    transport: str
+    endpoint: str
+    operation: str
+    timeout_ms: int
+    manifest_hash: str
+
+
+@dataclass(frozen=True)
+class AppManifest:
+    app_id: str
+    app_name: str
+    transport: str
+    endpoint: str
+    tools: List[ToolManifest]
+    source: str
+
+
+def _canonical_json_bytes(obj: Any) -> bytes:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
+        "utf-8"
+    )
+
+
+def _semantic_hash(tool: Dict[str, Any], path: Path) -> str:
+    semantic: Dict[str, Any] = {}
+    for field in SEMANTIC_HASH_FIELDS:
+        if field not in tool:
+            raise ValueError(f"{path}: missing semantic hash field '{field}'")
+        semantic[field] = tool[field]
+    return hashlib.sha256(_canonical_json_bytes(semantic)).hexdigest()[:8]
+
+
+def _ensure_non_empty_str(name: str, value: Any, path: Path) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{path}: {name} must be non-empty string")
+    return value
+
+
+def _ensure_int(name: str, value: Any, path: Path) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{path}: {name} must be int")
+    return value
+
+
+def _ensure_rel_tool_path(name: str, value: Any, path: Path) -> str:
+    text = _ensure_non_empty_str(name, value, path)
+    if text.startswith("/"):
+        raise ValueError(f"{path}: {name} must be relative to repo root")
+    return text
+
+
+def _load_tool(
+    raw: Dict[str, Any],
+    *,
+    app_id: str,
+    app_name: str,
+    transport: str,
+    endpoint: str,
+    path: Path,
+) -> ToolManifest:
+    required = ("tool_id", "name", "perm", "cost", "operation", "description", "input_schema", "examples")
+    for field in required:
+        if field not in raw:
+            raise ValueError(f"{path}: tool missing field '{field}'")
+
+    tool_id = _ensure_int("tool_id", raw["tool_id"], path)
+    perm = _ensure_int("perm", raw["perm"], path)
+    cost = _ensure_int("cost", raw["cost"], path)
+    timeout_ms = _ensure_int("timeout_ms", raw.get("timeout_ms", 30_000), path)
+    if timeout_ms <= 0:
+        raise ValueError(f"{path}: timeout_ms must be positive")
+
+    name = _ensure_non_empty_str("name", raw["name"], path)
+    operation = _ensure_non_empty_str("operation", raw["operation"], path)
+    description = _ensure_non_empty_str("description", raw["description"], path)
+    input_schema = raw["input_schema"]
+    examples = raw["examples"]
+    if not isinstance(input_schema, dict):
+        raise ValueError(f"{path}: input_schema must be object")
+    if not isinstance(examples, list):
+        raise ValueError(f"{path}: examples must be list")
+
+    semantic_raw: Dict[str, Any] = {
+        "tool_id": tool_id,
+        "name": name,
+        "app_id": app_id,
+        "app_name": app_name,
+        "perm": perm,
+        "cost": cost,
+        "description": description,
+        "input_schema": input_schema,
+        "examples": examples,
+    }
+
+    return ToolManifest(
+        tool_id=tool_id,
+        name=name,
+        app_id=app_id,
+        app_name=app_name,
+        perm=perm,
+        cost=cost,
+        description=description,
+        input_schema=input_schema,
+        examples=examples,
+        transport=transport,
+        endpoint=endpoint,
+        operation=operation,
+        timeout_ms=timeout_ms,
+        manifest_hash=_semantic_hash(semantic_raw, path),
+    )
+
+
+def load_app_manifest(path: Path) -> AppManifest:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path}: manifest must be JSON object")
+
+    required = ("app_id", "app_name", "transport", "endpoint", "tools")
+    for field in required:
+        if field not in raw:
+            raise ValueError(f"{path}: missing field '{field}'")
+
+    app_id = _ensure_non_empty_str("app_id", raw["app_id"], path)
+    app_name = _ensure_non_empty_str("app_name", raw["app_name"], path)
+    transport = _ensure_non_empty_str("transport", raw["transport"], path)
+    endpoint = _ensure_non_empty_str("endpoint", raw["endpoint"], path)
+
+    if transport != "uds_rpc":
+        raise ValueError(f"{path}: unsupported transport {transport!r}")
+    if not endpoint.startswith("/tmp/linux-mcp-apps/"):
+        raise ValueError(f"{path}: endpoint must start with /tmp/linux-mcp-apps/")
+
+    demo_entrypoint = raw.get("demo_entrypoint")
+    if demo_entrypoint not in ("", None):
+        _ensure_rel_tool_path("demo_entrypoint", demo_entrypoint, path)
+
+    tools_raw = raw["tools"]
+    if not isinstance(tools_raw, list) or not tools_raw:
+        raise ValueError(f"{path}: tools must be non-empty list")
+
+    tools: List[ToolManifest] = []
+    seen_ids: set[int] = set()
+    seen_names: set[str] = set()
+    for item in tools_raw:
+        if not isinstance(item, dict):
+            raise ValueError(f"{path}: tool item must be object")
+        tool = _load_tool(
+            item,
+            app_id=app_id,
+            app_name=app_name,
+            transport=transport,
+            endpoint=endpoint,
+            path=path,
+        )
+        if tool.tool_id in seen_ids:
+            raise ValueError(f"{path}: duplicate tool_id {tool.tool_id}")
+        if tool.name in seen_names:
+            raise ValueError(f"{path}: duplicate tool name {tool.name!r}")
+        seen_ids.add(tool.tool_id)
+        seen_names.add(tool.name)
+        tools.append(tool)
+
+    return AppManifest(
+        app_id=app_id,
+        app_name=app_name,
+        transport=transport,
+        endpoint=endpoint,
+        tools=tools,
+        source=str(path),
+    )
+
+
+def load_all_manifests(manifest_dir: Path = DEFAULT_MANIFEST_DIR) -> List[AppManifest]:
+    if not manifest_dir.is_dir():
+        raise ValueError(f"manifest directory missing: {manifest_dir}")
+
+    apps: List[AppManifest] = []
+    seen_app_ids: set[str] = set()
+    seen_tool_ids: set[int] = set()
+
+    for path in sorted(manifest_dir.glob("*.json")):
+        app = load_app_manifest(path)
+        if app.app_id in seen_app_ids:
+            raise ValueError(f"duplicate app_id in manifests: {app.app_id}")
+        seen_app_ids.add(app.app_id)
+        for tool in app.tools:
+            if tool.tool_id in seen_tool_ids:
+                raise ValueError(f"duplicate tool_id in manifests: {tool.tool_id}")
+            seen_tool_ids.add(tool.tool_id)
+        apps.append(app)
+
+    if not apps:
+        raise ValueError(f"no manifests found in {manifest_dir}")
+    return apps
