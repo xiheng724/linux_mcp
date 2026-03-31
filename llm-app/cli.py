@@ -16,8 +16,7 @@ from app_logic import (
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
     build_payload_for_tool,
-    select_app_for_input,
-    select_tool_for_input,
+    select_route_for_request,
 )
 from rpc import mcpd_call
 
@@ -111,44 +110,35 @@ def _execute_once_with_apps(
     if not apps:
         raise CliError("no apps returned by mcpd")
 
-    warnings: List[str] = []
-    selected_app, app_selector_source, app_selector_reason = select_app_for_input(
-        user_text,
-        apps,
-        cfg,
-        warn_cb=lambda msg: warnings.append(msg),
-    )
-    app_id = str(selected_app.get("app_id", ""))
-    app_name = str(selected_app.get("app_name", app_id))
-    if not app_id:
-        raise CliError("selected app has empty app_id")
-
-    tools = _list_tools(sock_path, app_id=app_id)
-    if not tools:
-        raise CliError(f"selected app has no tools: {app_id}")
-
-    selected_tool, tool_selector_source, tool_selector_reason = select_tool_for_input(
-        user_text,
+    (
+        selected_app,
+        selected_tool,
+        app_selector_source,
+        app_selector_reason,
+        tool_selector_source,
+        tool_selector_reason,
+        _apps_catalog,
         tools,
+    ) = select_route_for_request(
+        user_text,
+        sock_path,
         cfg,
-        warn_cb=lambda msg: warnings.append(msg),
     )
-    for msg in warnings:
-        print(f"[llm-app] WARN: {msg}", flush=True)
 
     tool_id = int(selected_tool["tool_id"])
     tool_name = str(selected_tool.get("name", "unknown"))
     tool_hash_raw = selected_tool.get("hash")
     tool_hash = tool_hash_raw if isinstance(tool_hash_raw, str) and tool_hash_raw else ""
-    payload = build_payload_for_tool(tool_name, user_text)
+    app_id = str(selected_app.get("app_id", ""))
+    app_name = str(selected_app.get("app_name", app_id))
+    if not app_id:
+        raise CliError("selected app missing app_id")
+    payload = build_payload_for_tool(selected_tool, user_text, cfg)
 
     print(f"[llm-app] selected app={app_name} id={app_id}", flush=True)
     print(f"[llm-app] selected tool={tool_name} id={tool_id} hash={tool_hash or '-'}", flush=True)
     print(f"[llm-app] app_selector={app_selector_source} reason={app_selector_reason}", flush=True)
-    print(
-        f"[llm-app] tool_selector={tool_selector_source} reason={tool_selector_reason}",
-        flush=True,
-    )
+    print(f"[llm-app] tool_selector={tool_selector_source} reason={tool_selector_reason}", flush=True)
 
     req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
     resp = mcpd_call(
@@ -259,7 +249,7 @@ def main() -> int:
     parser.add_argument("--repl", action="store_true", help="interactive loop mode")
     parser.add_argument(
         "--selector",
-        choices=["auto", "heuristic", "deepseek"],
+        choices=["deepseek"],
         default="deepseek",
         help="tool selection strategy",
     )

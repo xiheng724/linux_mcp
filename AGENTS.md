@@ -39,6 +39,11 @@ Phase 4: daemon + client
 Phase 5: benchmark
 Phase 6: cgroup (optional)
 
+## Saved Follow-up Plan
+- Add manual approval flow for high-permission or high-cost tool requests.
+- Add conversation/context compaction at the llm-app layer instead of expanding unbounded chat state.
+- Add async job mode in mcpd/llm-app for long-running tools, with queryable job status/history.
+
 ## Kernel danger zones (must comply)
 - sysfs/kobject lifecycle: every created kobject must be released; module exit must remove sysfs tree cleanly; repeated insmod/rmmod must not leak or crash.
 - Concurrency: token accounting must be atomic or protected by spinlock; never update shared counters without protection.

@@ -466,13 +466,6 @@ def _app_to_public(app_id: str, app_name: str, tools: List[ToolMeta]) -> Dict[st
     }
 
 
-def _build_app_map(registry: Dict[int, ToolMeta]) -> Dict[str, List[ToolMeta]]:
-    out: Dict[str, List[ToolMeta]] = {}
-    for tool in registry.values():
-        out.setdefault(tool.app_id, []).append(tool)
-    return out
-
-
 def _list_tools_public(registry: Dict[int, ToolMeta], app_id: str = "") -> List[Dict[str, Any]]:
     tools: List[ToolMeta] = []
     if app_id:

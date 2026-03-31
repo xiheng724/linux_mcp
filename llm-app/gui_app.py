@@ -40,8 +40,7 @@ from app_logic import (
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
     build_payload_for_tool,
-    select_app_for_input,
-    select_tool_for_input,
+    select_route_for_request,
 )
 from rpc import mcpd_call
 
@@ -90,53 +89,29 @@ class ExecWorker(QObject):
             raw_apps = resp.get("apps", [])
             apps = raw_apps if isinstance(raw_apps, list) else []
 
-        warnings: List[str] = []
         try:
-            selected_app, app_selector_source, app_selector_reason = select_app_for_input(
-                self.req.user_text,
+            (
+                selected_app,
+                selected_tool,
+                app_selector_source,
+                app_selector_reason,
+                tool_selector_source,
+                tool_selector_reason,
                 apps,
+                tools,
+            ) = select_route_for_request(
+                self.req.user_text,
+                self.req.sock_path,
                 self.req.selector_cfg,
-                warn_cb=lambda msg: warnings.append(msg),
             )
         except Exception as exc:  # noqa: BLE001
-            self.finished.emit({"status": "error", "error": str(exc), "warnings": warnings})
+            self.finished.emit({"status": "error", "error": str(exc), "warnings": []})
             return
 
         app_id = selected_app.get("app_id")
         app_name = selected_app.get("app_name", "")
         if not isinstance(app_id, str) or not app_id:
             self.finished.emit({"status": "error", "error": "selected app missing app_id"})
-            return
-
-        tools_resp = mcpd_call(
-            {"sys": "list_tools", "app_id": app_id},
-            sock_path=self.req.sock_path,
-            timeout_s=5,
-        )
-        if tools_resp.get("status") != "ok":
-            self.finished.emit(
-                {
-                    "status": "error",
-                    "error": tools_resp.get("error", "list_tools failed"),
-                    "warnings": warnings,
-                }
-            )
-            return
-        raw_tools = tools_resp.get("tools", [])
-        tools = raw_tools if isinstance(raw_tools, list) else []
-        if not tools:
-            self.finished.emit({"status": "error", "error": f"app has no tools: {app_id}"})
-            return
-
-        try:
-            selected_tool, tool_selector_source, tool_selector_reason = select_tool_for_input(
-                self.req.user_text,
-                tools,
-                self.req.selector_cfg,
-                warn_cb=lambda msg: warnings.append(msg),
-            )
-        except Exception as exc:  # noqa: BLE001
-            self.finished.emit({"status": "error", "error": str(exc), "warnings": warnings})
             return
 
         tool_id = selected_tool.get("tool_id")
@@ -153,7 +128,7 @@ class ExecWorker(QObject):
             app_name = str(app_name)
 
         req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
-        payload = build_payload_for_tool(tool_name, self.req.user_text)
+        payload = build_payload_for_tool(selected_tool, self.req.user_text, self.req.selector_cfg)
         exec_resp = mcpd_call(
             {
                 "kind": "tool:exec",
@@ -181,7 +156,7 @@ class ExecWorker(QObject):
                 "app_selector_reason": app_selector_reason,
                 "tool_selector_source": tool_selector_source,
                 "tool_selector_reason": tool_selector_reason,
-                "warnings": warnings,
+                "warnings": [],
                 "req_id": req_id,
                 "response": exec_resp,
                 "apps": apps,
@@ -384,7 +359,7 @@ def main() -> int:
     parser.add_argument("--agent-id", default="a1")
     parser.add_argument(
         "--selector",
-        choices=["auto", "heuristic", "deepseek"],
+        choices=["deepseek"],
         default="deepseek",
     )
     parser.add_argument("--deepseek-model", default=DEFAULT_DEEPSEEK_MODEL)
