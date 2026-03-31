@@ -1,72 +1,124 @@
 # llm-app
 
-Simple CLI demo that:
+`llm-app` 是当前仓库里的 LLM 客户端层，提供 CLI 和 GUI 两种入口。
 
-1. fetches app catalog via `{"sys":"list_apps"}` from `mcpd`
-2. chooses an app first with DeepSeek
-3. fetches app-scoped tools via `{"sys":"list_tools","app_id":"..."}` and chooses one tool
-4. sends `{"kind":"tool:exec","app_id":"...", ...}` to `mcpd` only
-5. `mcpd` performs kernel arbitration + tool execution + completion report
+它的职责不是直接执行工具，而是：
 
-Tool semantics source:
-- `tool-app/manifests/*.json` (`tools[].description`, `tools[].input_schema`, `tools[].examples`)
-- manifests are auto-loaded by `mcpd` at startup
-- llm-app only sees semantic fields and hash (no runtime endpoint/operation fields)
+1. 从 `mcpd` 获取 app/tool 语义目录
+2. 用 DeepSeek 选择 app
+3. 用 DeepSeek 选择 tool
+4. 用 DeepSeek 按 `input_schema` 生成 payload
+5. 把最终 `tool:exec` 请求发给 `mcpd`
 
-Prerequisites:
-- `kernel_mcp` loaded
-- `mcpd` running (`bash scripts/run_mcpd.sh`)
-- client binaries built (`make -C client clean && make -C client`)
+## 当前真实链路
 
-Run:
+```text
+llm-app
+  -> /tmp/mcpd.sock
+  -> mcpd
+     -> kernel arbitration
+     -> tool app UDS RPC
+  -> llm-app
+```
+
+`llm-app` 不会：
+
+- 直接访问 tool app 的 socket
+- 直接执行工具逻辑
+- 直接和 Generic Netlink 打交道
+
+## 当前行为模型
+
+共享逻辑在 [app_logic.py](/home/lxh/Code/linux-mcp/llm-app/app_logic.py)。
+
+当前流程是：
+
+1. 调 `{"sys":"list_apps"}`
+2. 用 DeepSeek 从 app 列表里选一个 `app_id`
+3. 调 `{"sys":"list_tools","app_id":"..."}`
+4. 用 DeepSeek 从 tool 列表里选一个 `tool_id`
+5. 用 DeepSeek 生成 payload JSON
+6. 本地按 `input_schema` 再校验一次 payload
+7. 发 `{"kind":"tool:exec", ...}` 给 `mcpd`
+
+这意味着当前 `llm-app` 强依赖：
+
+- `DEEPSEEK_API_KEY`
+- `mcpd` 正常返回 catalog
+
+如果没配置 `DEEPSEEK_API_KEY`，CLI 和 GUI 都会直接失败，不存在本地 fallback 路由。
+
+## 可见字段
+
+`llm-app` 只能看到 `mcpd` 暴露出来的语义字段：
+
+- `tool_id`
+- `name`
+- `app_id`
+- `app_name`
+- `description`
+- `input_schema`
+- `examples`
+- `perm`
+- `cost`
+- `hash`
+
+它看不到：
+
+- app endpoint
+- transport runtime 细节
+- operation 名称
+
+## CLI
+
+CLI 入口在 [cli.py](/home/lxh/Code/linux-mcp/llm-app/cli.py)。
+
+单次执行：
 
 ```bash
 python3 llm-app/cli.py --once "hello"
 python3 llm-app/cli.py --once "burn cpu for 200ms"
-python3 llm-app/cli.py --once "count words in this sentence"
 python3 llm-app/cli.py --once "show system info"
-python3 llm-app/cli.py --once "calculate (21+7)*3"
+python3 llm-app/cli.py --once "calculate (21 + 7) * 3"
 python3 llm-app/cli.py --once "preview README.md 20 lines"
 python3 llm-app/cli.py --once "hash text hello with sha256"
-python3 llm-app/cli.py --once "what time is it now"
-python3 llm-app/cli.py --once "set volume to 30"
-python3 llm-app/cli.py --once "create file tmp/demo.txt with content 'hello'"
-python3 llm-app/cli.py --once "list files in tool-app"
-python3 llm-app/cli.py --once "delete file tmp/demo.txt"
-python3 llm-app/cli.py --once "copy file README.md to tmp/README.copy.md"
-python3 llm-app/cli.py --once "rename file tmp/README.copy.md to tmp/README.renamed.md"
+python3 llm-app/cli.py --once "create file tmp/demo.txt with content hello"
 ```
 
-REPL mode:
+REPL：
 
 ```bash
 python3 llm-app/cli.py --repl
 ```
 
-REPL commands:
-- `/help` show commands
-- `/apps` refresh and print app list
-- `/tools` refresh and print tool list
-- `/exit` quit
-- `Ctrl-D` quit
+REPL 内置命令：
 
-REPL options:
-- `--agent-id a1` (default: `a1`)
-- `--sock /tmp/mcpd.sock` (default: `/tmp/mcpd.sock`)
-- `--show-tools` print full tool list every turn (default only print on first/changes; otherwise prints `tools unchanged`)
+- `/help`
+- `/apps`
+- `/tools`
+- `/exit`
 
-GUI mode (PySide6):
+常用参数：
+
+- `--agent-id a1`
+- `--sock /tmp/mcpd.sock`
+- `--show-tools`
+- `--show-reasons`
+- `--deepseek-model ...`
+- `--deepseek-url ...`
+- `--deepseek-timeout-sec ...`
+
+## GUI
+
+GUI 入口在 [gui_app.py](/home/lxh/Code/linux-mcp/llm-app/gui_app.py)。
+
+启动方式：
 
 ```bash
 python3 llm-app/gui_app.py
 ```
 
-GUI uses the same tool-selection logic as CLI (shared code):
-- `--deepseek-model ...`
-- `--deepseek-url ...`
-- `--deepseek-timeout-sec ...`
-
-Recommended dev workflow (venv):
+仓库当前推荐的 GUI 开发/运行方式：
 
 ```bash
 cd ~/Code/linux-mcp
@@ -74,54 +126,46 @@ source .venv/bin/activate
 python llm-app/gui_app.py
 ```
 
-If missing dependency:
+GUI 和 CLI 使用同一套共享选择逻辑，不是两套不同实现。
+
+## 运行前提
+
+启动 `llm-app` 之前，通常要先确保：
+
+```bash
+bash scripts/run_tool_services.sh
+bash scripts/run_mcpd.sh
+export DEEPSEEK_API_KEY="your_key"
+```
+
+如果跑 GUI，还需要 `PySide6`：
 
 ```bash
 sudo apt-get install python3-pyside6
-# or
+```
+
+或者：
+
+```bash
 pip install PySide6
 ```
 
-DeepSeek selection:
+## 典型输出
 
-```bash
-export DEEPSEEK_API_KEY="your_key"
-python3 llm-app/cli.py --once "please burn cpu for 100ms"
-```
+CLI 单次执行时，通常会输出：
 
-Example REPL output:
+- 当前 catalog 里的 app/tool 数量
+- 选中的 `app_name/app_id`
+- 选中的 `tool_name/tool_id/hash`
+- 执行状态和耗时
+- 最终结果或错误
 
-```text
-[llm-app] REPL mode started
-[llm-app] commands:
-[llm-app]   /help  show help
-[llm-app]   /tools force refresh and print tools
-[llm-app]   /exit  quit
-user> hello
-[llm-app] tools unchanged
-[llm-app] selected tool=echo id=1 hash=...
-[llm-app] req_id=... status=ok t_ms=...
-[llm-app] result={"message":"hello"}
-```
+启用 `--show-reasons` 时，还会输出模型的 app/tool 选择理由。
 
-## Recommended Demo Flow (GUI)
+## 当前限制
 
-1. Optional baseline:
-   - `sudo bash scripts/demo_acceptance.sh`
-2. Start gateway:
-   - `bash scripts/run_mcpd.sh`
-3. Start GUI:
-   - `python3 llm-app/gui_app.py`
-4. Try inputs:
-   - `hello`
-   - `burn cpu for a bit`
-   - `统计这段文字：linux mcp demo`
-   - `show system info`
-   - `calculate 123 * (45 + 6)`
-   - `preview llm-app/cli.py 20 lines`
-   - `hash "linux-mcp" with md5`
-   - `what time is it now`
-5. Stop gateway:
-   - `bash scripts/stop_mcpd.sh`
-
-If `DEEPSEEK_API_KEY` is not set, CLI/GUI routing will fail fast.
+- app 选择、tool 选择、payload 构造都依赖 DeepSeek
+- 没有离线 fallback
+- 没有对话记忆压缩或 job 模式
+- GUI 只是 demo UI，不是完整产品界面
+- 真正的仲裁和执行都发生在 `mcpd` 侧，`llm-app` 只负责语义路由

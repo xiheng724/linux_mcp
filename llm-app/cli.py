@@ -100,12 +100,19 @@ def _print_tools(tools: List[Dict[str, Any]]) -> None:
         print(f"[llm-app]     desc={tool.get('description')}", flush=True)
 
 
+def _print_repl_banner(apps: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> None:
+    print("[llm-app] REPL ready", flush=True)
+    print(f"[llm-app] catalog: apps={len(apps)} tools={len(tools)}", flush=True)
+    print("[llm-app] tip: /apps and /tools show full catalogs", flush=True)
+
+
 def _execute_once_with_apps(
     user_text: str,
     agent_id: str,
     sock_path: str,
     cfg: SelectorConfig,
     apps: List[Dict[str, Any]],
+    show_reasons: bool = False,
 ) -> int:
     if not apps:
         raise CliError("no apps returned by mcpd")
@@ -135,12 +142,17 @@ def _execute_once_with_apps(
         raise CliError("selected app missing app_id")
     payload = build_payload_for_tool(selected_tool, user_text, cfg)
 
-    print(f"[llm-app] selected app={app_name} id={app_id}", flush=True)
-    print(f"[llm-app] selected tool={tool_name} id={tool_id} hash={tool_hash or '-'}", flush=True)
-    print(f"[llm-app] app_selector={app_selector_source} reason={app_selector_reason}", flush=True)
-    print(f"[llm-app] tool_selector={tool_selector_source} reason={tool_selector_reason}", flush=True)
-
     req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
+    print(
+        (
+            f"[llm-app] route: {app_name} ({app_id})"
+            f" -> {tool_name} #{tool_id} [{tool_hash or '-'}]"
+        ),
+        flush=True,
+    )
+    if show_reasons:
+        print(f"[llm-app] why(app): {app_selector_source} | {app_selector_reason}", flush=True)
+        print(f"[llm-app] why(tool): {tool_selector_source} | {tool_selector_reason}", flush=True)
     resp = mcpd_call(
         {
             "kind": "tool:exec",
@@ -154,22 +166,38 @@ def _execute_once_with_apps(
         sock_path=sock_path,
         timeout_s=20,
     )
-    print(f"[llm-app] req_id={req_id} status={resp.get('status')} t_ms={resp.get('t_ms')}", flush=True)
+    print(
+        f"[llm-app] exec: req_id={req_id} status={resp.get('status')} t_ms={resp.get('t_ms')}",
+        flush=True,
+    )
     if resp.get("status") == "ok":
-        print(f"[llm-app] result={json.dumps(resp.get('result', {}), ensure_ascii=True)}", flush=True)
-        print("[llm-app] done", flush=True)
+        print(
+            f"[llm-app] result: {json.dumps(resp.get('result', {}), ensure_ascii=True)}",
+            flush=True,
+        )
         return 0
-    print(f"[llm-app] error={resp.get('error', 'unknown error')}", flush=True)
-    print("[llm-app] tool execution failed", flush=True)
+    print(f"[llm-app] error: {resp.get('error', 'unknown error')}", flush=True)
     return 3
 
 
-def _run_once(user_text: str, agent_id: str, sock_path: str, cfg: SelectorConfig) -> int:
+def _run_once(
+    user_text: str,
+    agent_id: str,
+    sock_path: str,
+    cfg: SelectorConfig,
+    show_reasons: bool,
+) -> int:
     apps = _list_apps(sock_path)
     tools = _list_tools(sock_path)
-    _print_apps(apps)
-    _print_tools(tools)
-    return _execute_once_with_apps(user_text, agent_id, sock_path, cfg, apps)
+    print(f"[llm-app] catalog: apps={len(apps)} tools={len(tools)}", flush=True)
+    return _execute_once_with_apps(
+        user_text,
+        agent_id,
+        sock_path,
+        cfg,
+        apps,
+        show_reasons=show_reasons,
+    )
 
 
 def _print_help() -> None:
@@ -180,16 +208,20 @@ def _print_help() -> None:
     print("[llm-app]   /exit  quit", flush=True)
 
 
-def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: bool) -> int:
+def _repl_loop(
+    agent_id: str,
+    sock_path: str,
+    cfg: SelectorConfig,
+    show_tools: bool,
+    show_reasons: bool,
+) -> int:
     apps = _list_apps(sock_path)
     tools = _list_tools(sock_path)
     if not apps:
         raise CliError("no apps returned by mcpd")
 
-    print("[llm-app] REPL mode started", flush=True)
+    _print_repl_banner(apps, tools)
     _print_help()
-    _print_apps(apps)
-    _print_tools(tools)
     last_apps_sig = _apps_signature(apps)
     last_sig = _tools_signature(tools)
 
@@ -221,10 +253,8 @@ def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: b
         apps = _list_apps(sock_path)
         app_sig = _apps_signature(apps)
         if app_sig != last_apps_sig:
-            print("[llm-app] apps changed", flush=True)
+            print(f"[llm-app] catalog updated: apps={len(apps)}", flush=True)
             _print_apps(apps)
-        else:
-            print("[llm-app] apps unchanged", flush=True)
         last_apps_sig = app_sig
 
         tools = _list_tools(sock_path)
@@ -232,13 +262,18 @@ def _repl_loop(agent_id: str, sock_path: str, cfg: SelectorConfig, show_tools: b
         if show_tools:
             _print_tools(tools)
         elif sig != last_sig:
-            print("[llm-app] tools changed", flush=True)
+            print(f"[llm-app] catalog updated: tools={len(tools)}", flush=True)
             _print_tools(tools)
-        else:
-            print("[llm-app] tools unchanged", flush=True)
         last_sig = sig
 
-        rc = _execute_once_with_apps(user_text, agent_id, sock_path, cfg, apps)
+        rc = _execute_once_with_apps(
+            user_text,
+            agent_id,
+            sock_path,
+            cfg,
+            apps,
+            show_reasons=show_reasons,
+        )
         if rc != 0:
             print(f"[llm-app] request failed rc={rc}", flush=True)
 
@@ -256,6 +291,11 @@ def main() -> int:
     parser.add_argument("--agent-id", default="a1", help="agent id for tool execution")
     parser.add_argument("--sock", default=SOCK_PATH, help="mcpd unix socket path")
     parser.add_argument("--show-tools", action="store_true", help="always print full tool list in REPL")
+    parser.add_argument(
+        "--show-reasons",
+        action="store_true",
+        help="print selector reasoning details for each request",
+    )
     parser.add_argument("--agent", dest="agent_legacy", help=argparse.SUPPRESS)
     parser.add_argument("--socket", dest="socket_legacy", help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -272,12 +312,12 @@ def main() -> int:
         if args.once and args.repl:
             raise CliError("use either --once or --repl, not both")
         if args.once:
-            return _run_once(args.once, agent_id, sock_path, cfg)
+            return _run_once(args.once, agent_id, sock_path, cfg, args.show_reasons)
         if args.repl:
-            return _repl_loop(agent_id, sock_path, cfg, args.show_tools)
+            return _repl_loop(agent_id, sock_path, cfg, args.show_tools, args.show_reasons)
         if not sys.stdin.isatty():
             raise CliError("no --once/--repl provided and stdin is not interactive")
-        return _repl_loop(agent_id, sock_path, cfg, args.show_tools)
+        return _repl_loop(agent_id, sock_path, cfg, args.show_tools, args.show_reasons)
     except CliError as exc:
         print(f"[llm-app] ERROR: {exc}", flush=True)
         return 1
