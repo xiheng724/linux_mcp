@@ -44,8 +44,10 @@
 	 KERNEL_MCP_RISK_EXTERNAL_NETWORK | KERNEL_MCP_RISK_PRIVILEGED |          \
 	 KERNEL_MCP_RISK_IRREVERSIBLE)
 
-#define KERNEL_MCP_APPROVAL_REQUIRED_FLAGS                                        \
-	(KERNEL_MCP_RISK_FILESYSTEM_WRITE | KERNEL_MCP_HIGH_RISK_FLAGS)
+/* Keep approval for obviously high-risk categories. More detailed,
+ * payload-aware gating should be added in user space later if needed.
+ */
+#define KERNEL_MCP_APPROVAL_REQUIRED_FLAGS KERNEL_MCP_HIGH_RISK_FLAGS
 
 struct kernel_mcp_tool {
 	u32 id;
