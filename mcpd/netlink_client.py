@@ -110,7 +110,6 @@ class ToolDecision:
     decision: str
     reason: str
     ticket_id: int
-    policy_id: str
 
 
 class KernelMcpNetlinkClient:
@@ -297,9 +296,6 @@ class KernelMcpNetlinkClient:
             ticket_id=struct.unpack("=Q", _attr_first(resp_attrs, ATTR["TICKET_ID"]))[0]
             if ATTR["TICKET_ID"] in resp_attrs
             else 0,
-            policy_id=_attr_string(resp_attrs, ATTR["POLICY_ID"])
-            if ATTR["POLICY_ID"] in resp_attrs
-            else "",
         )
 
     def approval_decide(

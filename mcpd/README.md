@@ -113,8 +113,10 @@ netlink client 在 [netlink_client.py](/home/lxh/Code/linux-mcp/mcpd/netlink_cli
 
 当前 `mcpd` 对 `DEFER` 的处理方式是：
 
-- 直接把 `ticket_id` / `policy_id` 返回给调用方
+- 直接把 `ticket_id` 返回给调用方
 - 由用户态审批端再调用 `{"sys":"approval_decide",...}` 完成放行或拒绝
+
+当前仓库约定里，rate limiting 和重试策略应由 `mcpd` 在用户空间完成，不在内核协议或 agent 内核状态里维护 token bucket。
 
 ## 与 manifest 的关系
 

@@ -77,15 +77,10 @@ llm-app
 
 - 未注册 agent：`DENY`
 - `tool_hash` 不匹配：`DENY`
-- `cpu_burn`（tool_id `2`）启用按 agent 的 lazy refill token bucket
+- 带高风险标签的工具会返回 `DEFER` 并创建 approval ticket
 - 其他工具默认 `ALLOW`
 
-`cpu_burn` 的当前限流参数：
-
-- 最大 token：2
-- refill 周期：5 秒
-- 无 token 时返回 `DEFER`
-- `mcpd` 对审批型 `DEFER` 不做本地重试，而是把 `ticket_id` 返回给用户态审批流程
+内核只负责 control-plane 仲裁、tool registry 对齐和 approval ticket 生命周期；限流、重试和更复杂的执行策略应由 `mcpd` 在用户空间完成。
 
 ### 2. mcpd
 
@@ -375,7 +370,7 @@ ls /tmp/linux-mcp-app-*.log
 ## 当前限制
 
 - app/tool/payload 选择完全依赖 DeepSeek API，不提供离线 fallback
-- 内核仲裁目前只有一个 demo 级策略，主要覆盖 `cpu_burn`
+- 内核仲裁目前只有 demo 级规则：未注册 agent、hash 校验，以及基于风险标签的 approval gate
 - `mcpd` 只支持 `uds_rpc`
 - 结果传输仍然是 JSON framed RPC，尚未实现“大输出单独走数据通道”的完整数据面
 - 还没有成体系的自动化测试目录；当前主要依赖 smoke、acceptance、手工 sysfs 验证

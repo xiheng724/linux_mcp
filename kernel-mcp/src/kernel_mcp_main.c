@@ -8,7 +8,7 @@
 #include <linux/netlink.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
-#include <linux/spinlock.h>
+#include <linux/timer.h>
 #include <linux/xarray.h>
 #include <net/genetlink.h>
 
@@ -17,7 +17,7 @@
 #define KERNEL_MCP_TOOL_NAME_MAX 128
 #define KERNEL_MCP_TOOL_HASH_MAX 17
 #define KERNEL_MCP_AGENT_ID_MAX 64
-#define KERNEL_MCP_REASON_MAX 64
+#define KERNEL_MCP_REASON_MAX 256
 #define KERNEL_MCP_APPROVER_MAX 64
 
 #define KERNEL_MCP_TOOL_STATUS_ACTIVE 1U
@@ -34,6 +34,7 @@
 #define KERNEL_MCP_COMPLETE_STATUS_ERR 1U
 
 #define KERNEL_MCP_DEFAULT_APPROVAL_TTL_MS 300000U
+#define KERNEL_MCP_TICKET_CLEANUP_INTERVAL_MS 300000U
 
 #define KERNEL_MCP_AGENT_HASH_BITS 8
 #define KERNEL_MCP_APPROVAL_HASH_BITS 8
@@ -65,6 +66,7 @@ struct kernel_mcp_agent {
 	u32 pid;
 	u32 uid;
 	bool uid_set;
+	/* Rate limiting is handled in mcpd user space, not in the kernel agent state. */
 	u64 allow_count;
 	u64 deny_count;
 	u64 defer_count;
@@ -111,6 +113,7 @@ static DEFINE_MUTEX(kernel_mcp_agents_lock);
 static DEFINE_HASHTABLE(kernel_mcp_approval_tickets, KERNEL_MCP_APPROVAL_HASH_BITS);
 static DEFINE_MUTEX(kernel_mcp_approval_lock);
 static u64 kernel_mcp_next_ticket_id = 1;
+static struct timer_list kernel_mcp_ticket_cleanup_timer;
 
 static struct kobject *kernel_mcp_sysfs_root;
 static struct kobject *kernel_mcp_sysfs_tools;
@@ -627,6 +630,19 @@ static void kernel_mcp_purge_expired_tickets_locked(void)
 	}
 }
 
+static void kernel_mcp_ticket_cleanup_timer_fn(struct timer_list *timer)
+{
+	(void)timer;
+
+	mutex_lock(&kernel_mcp_approval_lock);
+	kernel_mcp_purge_expired_tickets_locked();
+	mutex_unlock(&kernel_mcp_approval_lock);
+
+	mod_timer(&kernel_mcp_ticket_cleanup_timer,
+		  jiffies +
+			  msecs_to_jiffies(KERNEL_MCP_TICKET_CLEANUP_INTERVAL_MS));
+}
+
 static int kernel_mcp_issue_approval_ticket(const char *agent_id, u32 tool_id,
 					    u64 req_id, const char *tool_hash,
 					    u64 *ticket_id_out)
@@ -716,8 +732,7 @@ out:
 static int kernel_mcp_reply_tool_decision(struct genl_info *info,
 					  const char *agent_id, u32 tool_id,
 					  u64 req_id, u32 decision,
-					  const char *reason, u64 ticket_id,
-					  const char *policy_id)
+					  const char *reason, u64 ticket_id)
 {
 	struct sk_buff *reply_skb;
 	void *reply_hdr;
@@ -753,12 +768,6 @@ static int kernel_mcp_reply_tool_decision(struct genl_info *info,
 	if (ticket_id > 0) {
 		ret = nla_put_u64_64bit(reply_skb, KERNEL_MCP_ATTR_TICKET_ID,
 					ticket_id, KERNEL_MCP_ATTR_UNSPEC);
-		if (ret)
-			goto nla_fail;
-	}
-	if (policy_id && policy_id[0] != '\0') {
-		ret = nla_put_string(reply_skb, KERNEL_MCP_ATTR_POLICY_ID,
-				     policy_id);
 		if (ret)
 			goto nla_fail;
 	}
@@ -828,7 +837,6 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	struct kernel_mcp_tool *tool;
 	const char *agent_id;
 	const char *requested_tool_hash = NULL;
-	const char *policy_id = "allow_default";
 	const char *reason = "allow";
 	const char *ticket_reason = "approval_missing";
 	u32 tool_id;
@@ -874,17 +882,14 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	if (!agent) {
 		decision = KERNEL_MCP_DECISION_DENY;
 		reason = "deny_unknown_agent";
-		policy_id = "agent_registration";
 		mutex_unlock(&kernel_mcp_agents_lock);
 		return kernel_mcp_reply_tool_decision(info, agent_id, tool_id, req_id,
-						      decision, reason,
-						      ticket_id, policy_id);
+						      decision, reason, ticket_id);
 	}
 
 	if (hash_mismatch) {
 		decision = KERNEL_MCP_DECISION_DENY;
 		reason = "hash_mismatch";
-		policy_id = "tool_registry_integrity";
 		goto out_accounting;
 	}
 
@@ -895,13 +900,11 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 						      &ticket_reason)) {
 			decision = KERNEL_MCP_DECISION_ALLOW;
 			reason = "allow_approved";
-			policy_id = "approval_gate";
 			goto out_accounting;
 		}
 
 		decision = KERNEL_MCP_DECISION_DEFER;
 		reason = ticket_reason;
-		policy_id = "approval_gate";
 		if (ticket_id == 0) {
 			if (kernel_mcp_issue_approval_ticket(agent_id, tool_id,
 							     req_id,
@@ -916,7 +919,6 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 
 	decision = KERNEL_MCP_DECISION_ALLOW;
 	reason = "allow";
-	policy_id = "allow_default";
 
 out_accounting:
 	if (decision == KERNEL_MCP_DECISION_ALLOW)
@@ -929,8 +931,7 @@ out_accounting:
 	mutex_unlock(&kernel_mcp_agents_lock);
 
 	return kernel_mcp_reply_tool_decision(info, agent_id, tool_id, req_id,
-					      decision, reason, ticket_id,
-					      policy_id);
+					      decision, reason, ticket_id);
 }
 
 static int kernel_mcp_cmd_tool_complete(struct sk_buff *skb, struct genl_info *info)
@@ -1199,8 +1200,15 @@ static int __init kernel_mcp_init(void)
 {
 	int ret;
 
+	timer_setup(&kernel_mcp_ticket_cleanup_timer,
+		    kernel_mcp_ticket_cleanup_timer_fn, 0);
+	mod_timer(&kernel_mcp_ticket_cleanup_timer,
+		  jiffies +
+			  msecs_to_jiffies(KERNEL_MCP_TICKET_CLEANUP_INTERVAL_MS));
+
 	ret = kernel_mcp_sysfs_init();
 	if (ret) {
+		del_timer_sync(&kernel_mcp_ticket_cleanup_timer);
 		pr_err("kernel_mcp: sysfs init failed: %d\n", ret);
 		return ret;
 	}
@@ -1209,6 +1217,7 @@ static int __init kernel_mcp_init(void)
 	if (ret) {
 		pr_err("kernel_mcp: genl_register_family failed: %d\n", ret);
 		kernel_mcp_sysfs_exit();
+		del_timer_sync(&kernel_mcp_ticket_cleanup_timer);
 		return ret;
 	}
 
@@ -1220,6 +1229,8 @@ static int __init kernel_mcp_init(void)
 static void __exit kernel_mcp_exit(void)
 {
 	int ret;
+
+	del_timer_sync(&kernel_mcp_ticket_cleanup_timer);
 
 	ret = genl_unregister_family(&kernel_mcp_genl_family);
 	if (ret)

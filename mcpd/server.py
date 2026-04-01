@@ -106,7 +106,7 @@ def _kernel_arbitrate(
     tool_id: int,
     tool_hash: str,
     ticket_id: int = 0,
-) -> Tuple[str, str, int, str]:
+) -> Tuple[str, str, int]:
     client = _get_kernel_client()
     decision_reply = client.tool_request(
         req_id=req_id,
@@ -116,20 +116,18 @@ def _kernel_arbitrate(
         ticket_id=ticket_id,
     )
     LOGGER.info(
-        "arb req_id=%d agent=%s tool=%d decision=%s reason=%s ticket_id=%d policy_id=%s",
+        "arb req_id=%d agent=%s tool=%d decision=%s reason=%s ticket_id=%d",
         req_id,
         agent_id,
         tool_id,
         decision_reply.decision,
         decision_reply.reason,
         decision_reply.ticket_id,
-        decision_reply.policy_id or "-",
     )
     return (
         decision_reply.decision,
         decision_reply.reason,
         decision_reply.ticket_id,
-        decision_reply.policy_id,
     )
 
 
@@ -287,7 +285,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
     tool_hash = _resolve_tool_hash(req, tool)
     _ensure_agent_registered(agent_id)
     approval_ticket_id = ensure_int("approval_ticket_id", req.get("approval_ticket_id", 0))
-    decision, reason, ticket_id, policy_id = _kernel_arbitrate(
+    decision, reason, ticket_id = _kernel_arbitrate(
         req_id=req_id,
         agent_id=agent_id,
         tool_id=tool_id,
@@ -304,7 +302,6 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "decision": decision,
             "reason": reason,
             "ticket_id": ticket_id,
-            "policy_id": policy_id,
         }
     if decision == "DEFER":
         return {
@@ -316,7 +313,6 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "decision": decision,
             "reason": reason,
             "ticket_id": ticket_id,
-            "policy_id": policy_id,
         }
 
     exec_start = time.perf_counter()
@@ -345,7 +341,6 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "decision": decision,
             "reason": reason,
             "ticket_id": ticket_id,
-            "policy_id": policy_id,
         }
     finally:
         exec_ms = int((time.perf_counter() - exec_start) * 1000)
