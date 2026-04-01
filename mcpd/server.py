@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -15,12 +16,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 try:
-    from manifest_loader import AppManifest, ToolManifest, load_all_manifests
+    from manifest_loader import DEFAULT_MANIFEST_DIR, AppManifest, ToolManifest, load_all_manifests
     from netlink_client import KernelMcpNetlinkClient
     from rpc_framing import recv_frame, send_frame
     from schema_utils import ensure_int, ensure_non_empty_str, validate_payload
 except ModuleNotFoundError:  # pragma: no cover - package import fallback
-    from .manifest_loader import AppManifest, ToolManifest, load_all_manifests
+    from .manifest_loader import DEFAULT_MANIFEST_DIR, AppManifest, ToolManifest, load_all_manifests
     from .netlink_client import KernelMcpNetlinkClient
     from .rpc_framing import recv_frame, send_frame
     from .schema_utils import ensure_int, ensure_non_empty_str, validate_payload
@@ -43,6 +44,8 @@ _registered_agents: set[str] = set()
 _app_registry: Dict[str, AppManifest] = {}
 _tool_registry: Dict[int, ToolManifest] = {}
 _kernel_client: KernelMcpNetlinkClient | None = None
+_manifest_reload_lock = threading.Lock()
+_manifest_signature = ""
 
 
 def _get_kernel_client() -> KernelMcpNetlinkClient:
@@ -61,10 +64,26 @@ def _register_tool_with_kernel(tool: ToolManifest) -> None:
     )
 
 
-def _load_runtime_registry() -> None:
+def _compute_manifest_signature() -> str:
+    digest = hashlib.sha256()
+    paths = sorted(DEFAULT_MANIFEST_DIR.glob("*.json"))
+    if not paths:
+        raise ValueError(f"no manifests found in {DEFAULT_MANIFEST_DIR}")
+    for path in paths:
+        digest.update(str(path.relative_to(DEFAULT_MANIFEST_DIR)).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _load_runtime_registry() -> str:
     apps = load_all_manifests()
     app_registry: Dict[str, AppManifest] = {}
     tool_registry: Dict[int, ToolManifest] = {}
+    client = _get_kernel_client()
+
+    client.reset_tools()
 
     for app in apps:
         app_registry[app.app_id] = app
@@ -84,6 +103,23 @@ def _load_runtime_registry() -> None:
         len(tool_registry),
         sorted(app_registry.keys()),
     )
+    return _compute_manifest_signature()
+
+
+def _ensure_runtime_registry_current(*, force: bool = False) -> None:
+    global _manifest_signature
+
+    current_signature = _compute_manifest_signature()
+    if not force and current_signature == _manifest_signature:
+        return
+
+    with _manifest_reload_lock:
+        current_signature = _compute_manifest_signature()
+        if not force and current_signature == _manifest_signature:
+            return
+        loaded_signature = _load_runtime_registry()
+        _manifest_signature = loaded_signature
+        LOGGER.info("manifest catalog refreshed signature=%s", loaded_signature[:12])
 
 
 def _ensure_agent_registered(agent_id: str) -> None:
@@ -265,6 +301,7 @@ def _resolve_tool_hash(req: Dict[str, Any], tool: ToolManifest) -> str:
 
 
 def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
+    _ensure_runtime_registry_current()
     req_id = ensure_int("req_id", req.get("req_id", 0))
     agent_id = ensure_non_empty_str("agent_id", req.get("agent_id", ""))
     app_id = ensure_non_empty_str("app_id", req.get("app_id", ""))
@@ -379,6 +416,7 @@ def _handle_connection(conn: socket.socket) -> None:
 
                 if req.get("sys") == "list_apps":
                     req_kind = "sys:list_apps"
+                    _ensure_runtime_registry_current()
                     apps_public = _list_apps_public()
                     resp = {"status": "ok", "apps": apps_public}
                     send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
@@ -388,6 +426,7 @@ def _handle_connection(conn: socket.socket) -> None:
 
                 if req.get("sys") == "list_tools":
                     req_kind = "sys:list_tools"
+                    _ensure_runtime_registry_current()
                     app_id_req = req.get("app_id", "")
                     if app_id_req not in ("", None) and not isinstance(app_id_req, str):
                         raise ValueError("app_id must be string when provided")
@@ -509,7 +548,7 @@ def main() -> int:
 
     try:
         _kernel_client = KernelMcpNetlinkClient()
-        _load_runtime_registry()
+        _ensure_runtime_registry_current(force=True)
     except Exception as exc:  # noqa: BLE001
         LOGGER.error("failed to initialize mcpd runtime: %s", exc)
         if _kernel_client is not None:

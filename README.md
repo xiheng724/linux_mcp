@@ -104,6 +104,8 @@ llm-app
 
 manifest 加载逻辑在 [mcpd/manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_loader.py)，同步核对工具表的脚本在 [mcpd/reconcile_kernel.py](/home/lxh/Code/linux-mcp/mcpd/reconcile_kernel.py)。
 
+`mcpd` 运行期间会自动检查 `tool-app/manifests/*.json` 是否有新增、删除或修改；一旦发现 catalog 变化，会刷新用户态 registry，并把当前 manifest tools 重新同步到内核 registry。也就是说，更新 tool app 后不需要靠重启 `mcpd` 才能让 `llm-app` 看到新 app/tool。
+
 ### 3. tool-app
 
 manifest 目录：`tool-app/manifests/*.json`

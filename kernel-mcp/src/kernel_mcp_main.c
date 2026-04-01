@@ -1039,6 +1039,15 @@ static int kernel_mcp_cmd_approval_decide(struct sk_buff *skb,
 	return 0;
 }
 
+static int kernel_mcp_cmd_reset_tools(struct sk_buff *skb,
+				      struct genl_info *info)
+{
+	(void)skb;
+	(void)info;
+	kernel_mcp_tools_destroy_all();
+	return 0;
+}
+
 static int kernel_mcp_cmd_list_tools_dump(struct sk_buff *skb,
 					  struct netlink_callback *cb)
 {
@@ -1143,6 +1152,13 @@ static const struct genl_ops kernel_mcp_genl_ops[] = {
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
 		.doit = kernel_mcp_cmd_approval_decide,
+	},
+	{
+		.cmd = KERNEL_MCP_CMD_RESET_TOOLS,
+		.flags = 0,
+		.policy = kernel_mcp_policy,
+		.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
+		.doit = kernel_mcp_cmd_reset_tools,
 	},
 };
 

@@ -118,6 +118,8 @@ netlink client 在 [netlink_client.py](/home/lxh/Code/linux-mcp/mcpd/netlink_cli
 
 当前仓库约定里，rate limiting 和重试策略应由 `mcpd` 在用户空间完成，不在内核协议或 agent 内核状态里维护 token bucket。
 
+另外，`mcpd` 运行期间会在处理 `list_apps`、`list_tools` 和 `tool:exec` 前检查 manifest 目录是否变化；如果 `tool-app/manifests/*.json` 有新增、删除或修改，它会自动刷新内存 registry 并重新把当前 manifest tools 同步到内核 registry，无需手动重启 `mcpd`。
+
 ## 与 manifest 的关系
 
 manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_loader.py)。

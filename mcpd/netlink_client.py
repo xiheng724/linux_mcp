@@ -260,6 +260,14 @@ class KernelMcpNetlinkClient:
             need_ack=True,
         )
 
+    def reset_tools(self) -> None:
+        self._request(
+            msg_type=self._family_id,
+            cmd=CMD["RESET_TOOLS"],
+            attrs=[],
+            need_ack=True,
+        )
+
     def tool_request(
         self,
         *,

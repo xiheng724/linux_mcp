@@ -13,6 +13,7 @@
 #define KERNEL_MCP_CMD_TOOL_DECISION 11
 #define KERNEL_MCP_CMD_TOOL_COMPLETE 12
 #define KERNEL_MCP_CMD_APPROVAL_DECIDE 13
+#define KERNEL_MCP_CMD_RESET_TOOLS 14
 
 /* Attributes: stable numeric IDs, append-only. */
 #define KERNEL_MCP_ATTR_UNSPEC 0

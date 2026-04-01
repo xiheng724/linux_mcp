@@ -16,6 +16,7 @@ CMD: Final[dict[str, int]] = {
     "TOOL_DECISION": 11,
     "TOOL_COMPLETE": 12,
     "APPROVAL_DECIDE": 13,
+    "RESET_TOOLS": 14,
 }
 
 ATTR: Final[dict[str, int]] = {

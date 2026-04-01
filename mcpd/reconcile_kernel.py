@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict
 
 from manifest_loader import DEFAULT_MANIFEST_DIR, ToolManifest, load_all_manifests
+from netlink_client import KernelMcpNetlinkClient
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 REGISTER_BIN = ROOT_DIR / "client" / "bin" / "genl_register_tool"
@@ -52,24 +53,29 @@ def _check_prerequisites() -> None:
 
 
 def _register_manifest_tools(manifests: Dict[int, ToolManifest]) -> None:
-    for tool_id in sorted(manifests.keys()):
-        tool = manifests[tool_id]
-        cmd = [
-            str(REGISTER_BIN),
-            "--id",
-            str(tool.tool_id),
-            "--name",
-            str(tool.name),
-            "--risk-flags",
-            str(tool.risk_flags),
-            "--hash",
-            str(tool.manifest_hash),
-        ]
-        _run_cmd(cmd)
-        print(
-            f"[reconcile] registered tool id={tool.tool_id} name={tool.name} risk_flags=0x{tool.risk_flags:08x} hash={tool.manifest_hash}",
-            flush=True,
-        )
+    client = KernelMcpNetlinkClient()
+    try:
+        client.reset_tools()
+        for tool_id in sorted(manifests.keys()):
+            tool = manifests[tool_id]
+            cmd = [
+                str(REGISTER_BIN),
+                "--id",
+                str(tool.tool_id),
+                "--name",
+                str(tool.name),
+                "--risk-flags",
+                str(tool.risk_flags),
+                "--hash",
+                str(tool.manifest_hash),
+            ]
+            _run_cmd(cmd)
+            print(
+                f"[reconcile] registered tool id={tool.tool_id} name={tool.name} risk_flags=0x{tool.risk_flags:08x} hash={tool.manifest_hash}",
+                flush=True,
+            )
+    finally:
+        client.close()
 
 
 def _list_kernel_tools() -> Dict[int, Dict[str, object]]:
