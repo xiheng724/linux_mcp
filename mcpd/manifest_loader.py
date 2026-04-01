@@ -9,6 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
 
+try:
+    from risk import normalize_risk_tags, risk_flags_from_tags
+except ModuleNotFoundError:  # pragma: no cover - package import fallback
+    from .risk import normalize_risk_tags, risk_flags_from_tags
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST_DIR = ROOT_DIR / "tool-app" / "manifests"
 SEMANTIC_HASH_FIELDS = (
@@ -16,8 +21,7 @@ SEMANTIC_HASH_FIELDS = (
     "name",
     "app_id",
     "app_name",
-    "perm",
-    "cost",
+    "risk_tags",
     "description",
     "input_schema",
     "examples",
@@ -30,8 +34,8 @@ class ToolManifest:
     name: str
     app_id: str
     app_name: str
-    perm: int
-    cost: int
+    risk_tags: List[str]
+    risk_flags: int
     description: str
     input_schema: Dict[str, Any]
     examples: List[Any]
@@ -95,19 +99,26 @@ def _load_tool(
     endpoint: str,
     path: Path,
 ) -> ToolManifest:
-    required = ("tool_id", "name", "perm", "cost", "operation", "description", "input_schema", "examples")
+    required = (
+        "tool_id",
+        "name",
+        "risk_tags",
+        "operation",
+        "description",
+        "input_schema",
+        "examples",
+    )
     for field in required:
         if field not in raw:
             raise ValueError(f"{path}: tool missing field '{field}'")
 
     tool_id = _ensure_int("tool_id", raw["tool_id"], path)
-    perm = _ensure_int("perm", raw["perm"], path)
-    cost = _ensure_int("cost", raw["cost"], path)
     timeout_ms = _ensure_int("timeout_ms", raw.get("timeout_ms", 30_000), path)
     if timeout_ms <= 0:
         raise ValueError(f"{path}: timeout_ms must be positive")
 
     name = _ensure_non_empty_str("name", raw["name"], path)
+    risk_tags = normalize_risk_tags(raw["risk_tags"], source=str(path))
     operation = _ensure_non_empty_str("operation", raw["operation"], path)
     description = _ensure_non_empty_str("description", raw["description"], path)
     input_schema = raw["input_schema"]
@@ -122,8 +133,7 @@ def _load_tool(
         "name": name,
         "app_id": app_id,
         "app_name": app_name,
-        "perm": perm,
-        "cost": cost,
+        "risk_tags": risk_tags,
         "description": description,
         "input_schema": input_schema,
         "examples": examples,
@@ -134,8 +144,8 @@ def _load_tool(
         name=name,
         app_id=app_id,
         app_name=app_name,
-        perm=perm,
-        cost=cost,
+        risk_tags=risk_tags,
+        risk_flags=risk_flags_from_tags(risk_tags),
         description=description,
         input_schema=input_schema,
         examples=examples,

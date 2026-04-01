@@ -59,8 +59,8 @@ llm-app
 - `description`
 - `input_schema`
 - `examples`
-- `perm`
-- `cost`
+- `risk_tags`
+- `risk_flags`
 - `hash`
 
 它看不到：

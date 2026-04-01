@@ -19,6 +19,6 @@ make -C client
 ## 手动检查
 
 ```bash
-./client/bin/genl_register_tool --id 1 --name echo --perm 1 --cost 1 --hash 12345678
+./client/bin/genl_register_tool --id 1 --name echo --risk-flags 0 --hash 12345678
 ./client/bin/genl_list_tools
 ```

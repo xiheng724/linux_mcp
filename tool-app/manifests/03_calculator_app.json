@@ -8,8 +8,7 @@
     {
       "tool_id": 5,
       "name": "calc",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [],
       "operation": "calc",
       "timeout_ms": 30000,
       "description": "Evaluate arithmetic expressions for quick calculations.",

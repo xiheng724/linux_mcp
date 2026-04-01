@@ -85,7 +85,7 @@ llm-app
 - 最大 token：2
 - refill 周期：5 秒
 - 无 token 时返回 `DEFER`
-- `mcpd` 最多重试 50 次，每次按内核返回的 `wait_ms` 休眠
+- `mcpd` 对审批型 `DEFER` 不做本地重试，而是把 `ticket_id` 返回给用户态审批流程
 
 ### 2. mcpd
 
@@ -401,4 +401,3 @@ sudo bash scripts/demo_acceptance.sh
 - 停止服务
 - 卸载模块
 - 连续装卸模块 10 次
-

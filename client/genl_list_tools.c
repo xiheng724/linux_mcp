@@ -176,15 +176,13 @@ static void print_one_tool(const struct genlmsghdr *ghdr, int payload_len)
 {
 	struct nlattr *attr;
 	uint32_t tool_id = 0;
-	uint32_t perm = 0;
-	uint32_t cost = 0;
+	uint32_t risk_flags = 0;
 	uint32_t status = 0;
 	char name[128] = "";
 	char hash[32] = "";
 	bool seen_id = false;
 	bool seen_name = false;
-	bool seen_perm = false;
-	bool seen_cost = false;
+	bool seen_risk_flags = false;
 	bool seen_hash = false;
 
 	attr = (struct nlattr *)((char *)ghdr + GENL_HDRLEN);
@@ -205,16 +203,11 @@ static void print_one_tool(const struct genlmsghdr *ghdr, int payload_len)
 			seen_name = true;
 			break;
 		}
-		case KERNEL_MCP_ATTR_TOOL_PERM:
+		case KERNEL_MCP_ATTR_TOOL_RISK_FLAGS:
 			if (attr->nla_len >= NLA_HDRLEN + sizeof(uint32_t)) {
-				memcpy(&perm, NLA_DATA(attr), sizeof(perm));
-				seen_perm = true;
-			}
-			break;
-		case KERNEL_MCP_ATTR_TOOL_COST:
-			if (attr->nla_len >= NLA_HDRLEN + sizeof(uint32_t)) {
-				memcpy(&cost, NLA_DATA(attr), sizeof(cost));
-				seen_cost = true;
+				memcpy(&risk_flags, NLA_DATA(attr),
+				       sizeof(risk_flags));
+				seen_risk_flags = true;
 			}
 			break;
 		case KERNEL_MCP_ATTR_STATUS:
@@ -236,11 +229,11 @@ static void print_one_tool(const struct genlmsghdr *ghdr, int payload_len)
 		attr = NLA_NEXT(attr, payload_len);
 	}
 
-	if (!seen_id || !seen_name || !seen_perm || !seen_cost)
+	if (!seen_id || !seen_name || !seen_risk_flags)
 		return;
 
-	printf("id=%u name=%s perm=%u cost=%u status=%s", tool_id, name, perm,
-	       cost, status == 1 ? "active" : "unknown");
+	printf("id=%u name=%s risk_flags=0x%08x status=%s", tool_id, name,
+	       risk_flags, status == 1 ? "active" : "unknown");
 	if (seen_hash)
 		printf(" hash=%s", hash);
 	printf("\n");

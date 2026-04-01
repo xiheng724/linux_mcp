@@ -8,8 +8,9 @@
     {
       "tool_id": 2,
       "name": "cpu_burn",
-      "perm": 1,
-      "cost": 3,
+      "risk_tags": [
+        "resource_intensive"
+      ],
       "operation": "cpu_burn",
       "timeout_ms": 30000,
       "description": "Burn CPU in user-space for a bounded duration in milliseconds.",
@@ -41,8 +42,7 @@
     {
       "tool_id": 4,
       "name": "sys_info",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [],
       "operation": "sys_info",
       "timeout_ms": 30000,
       "description": "Get practical host diagnostics: hostname, kernel/platform, load average, memory, disk usage, and uptime.",
@@ -69,8 +69,7 @@
     {
       "tool_id": 8,
       "name": "time_now",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [],
       "operation": "time_now",
       "timeout_ms": 30000,
       "description": "Return current local/UTC date-time and epoch timestamp.",
@@ -99,8 +98,10 @@
     {
       "tool_id": 9,
       "name": "volume_control",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [
+        "device_control",
+        "system_mutation"
+      ],
       "operation": "volume_control",
       "timeout_ms": 30000,
       "description": "Get or adjust system output volume using local audio backend (pactl/amixer).",

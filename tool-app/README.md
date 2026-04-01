@@ -56,8 +56,7 @@ tool 级字段：
 
 - `tool_id`
 - `name`
-- `perm`
-- `cost`
+- `risk_tags`
 - `operation`
 - `timeout_ms`
 - `description`
@@ -91,7 +90,7 @@ manifest：
 
 说明：
 
-- `cpu_burn` 是当前唯一会触发内核 token bucket / defer 行为的工具
+- `cpu_burn` 当前带有 `resource_intensive` 静态风险标签，供内核在请求时结合上下文做动态决策
 - `volume_control` 依赖宿主机 `pactl` 或 `amixer`
 
 ### file_manager_app
@@ -221,4 +220,3 @@ bash scripts/stop_tool_services.sh
 - 返回结果仍然是 JSON object
 - 还没有单独的大输出数据面
 - manifest 变更会影响 `mcpd` registry 和内核里的 `tool_hash`
-

@@ -9,18 +9,30 @@ import os
 import re
 import signal
 import socket
-import struct
 import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from manifest_loader import AppManifest, ToolManifest, load_all_manifests
-from netlink_client import KernelMcpNetlinkClient
+try:
+    from manifest_loader import AppManifest, ToolManifest, load_all_manifests
+    from netlink_client import KernelMcpNetlinkClient
+    from rpc_framing import recv_frame, send_frame
+    from schema_utils import ensure_int, ensure_non_empty_str, validate_payload
+except ModuleNotFoundError:  # pragma: no cover - package import fallback
+    from .manifest_loader import AppManifest, ToolManifest, load_all_manifests
+    from .netlink_client import KernelMcpNetlinkClient
+    from .rpc_framing import recv_frame, send_frame
+    from .schema_utils import ensure_int, ensure_non_empty_str, validate_payload
 
 SOCK_PATH = "/tmp/mcpd.sock"
 MAX_MSG_SIZE = 16 * 1024 * 1024
-MAX_DEFER_RETRIES = 50
+DEFAULT_APPROVAL_TTL_MS = 5 * 60 * 1000
+APPROVAL_DECISION_MAP = {
+    "approve": 1,
+    "deny": 2,
+    "revoke": 3,
+}
 LOGGER = logging.getLogger("mcpd")
 HASH_RE = re.compile(r"^[0-9a-fA-F]{8}$")
 
@@ -31,95 +43,6 @@ _registered_agents: set[str] = set()
 _app_registry: Dict[str, AppManifest] = {}
 _tool_registry: Dict[int, ToolManifest] = {}
 _kernel_client: KernelMcpNetlinkClient | None = None
-
-
-def _recv_exact(conn: socket.socket, n: int) -> bytes:
-    buf = bytearray()
-    while len(buf) < n:
-        chunk = conn.recv(n - len(buf))
-        if not chunk:
-            raise ConnectionError("peer closed")
-        buf.extend(chunk)
-    return bytes(buf)
-
-
-def _recv_frame(conn: socket.socket) -> bytes:
-    header = _recv_exact(conn, 4)
-    (length,) = struct.unpack(">I", header)
-    if length == 0 or length > MAX_MSG_SIZE:
-        raise ValueError(f"invalid frame length: {length}")
-    return _recv_exact(conn, length)
-
-
-def _send_frame(conn: socket.socket, payload: bytes) -> None:
-    if len(payload) > MAX_MSG_SIZE:
-        raise ValueError("payload too large")
-    conn.sendall(struct.pack(">I", len(payload)))
-    conn.sendall(payload)
-
-
-def _ensure_int(name: str, value: Any) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{name} must be int")
-    return value
-
-
-def _ensure_non_empty_str(name: str, value: Any) -> str:
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"{name} must be non-empty string")
-    return value
-
-
-def _matches_primitive(expected: str, value: Any) -> bool:
-    if expected == "string":
-        return isinstance(value, str)
-    if expected == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if expected == "number":
-        return (isinstance(value, int) or isinstance(value, float)) and not isinstance(value, bool)
-    if expected == "boolean":
-        return isinstance(value, bool)
-    if expected == "object":
-        return isinstance(value, dict)
-    if expected == "array":
-        return isinstance(value, list)
-    if expected == "null":
-        return value is None
-    return True
-
-
-def _validate_payload(input_schema: Dict[str, Any], payload: Any) -> None:
-    schema_type = input_schema.get("type")
-    if isinstance(schema_type, str) and not _matches_primitive(schema_type, payload):
-        raise ValueError(f"payload type mismatch: expected {schema_type}")
-
-    if schema_type != "object":
-        return
-    if not isinstance(payload, dict):
-        raise ValueError("payload must be object")
-
-    required = input_schema.get("required", [])
-    if isinstance(required, list):
-        for field in required:
-            if isinstance(field, str) and field not in payload:
-                raise ValueError(f"payload missing required field: {field}")
-
-    properties = input_schema.get("properties", {})
-    if not isinstance(properties, dict):
-        return
-
-    additional_properties = input_schema.get("additionalProperties", True)
-    for key, value in payload.items():
-        prop_schema = properties.get(key)
-        if prop_schema is None:
-            if additional_properties is False:
-                raise ValueError(f"payload has unknown field: {key}")
-            continue
-        if not isinstance(prop_schema, dict):
-            continue
-        expected_type = prop_schema.get("type")
-        if isinstance(expected_type, str) and not _matches_primitive(expected_type, value):
-            raise ValueError(f"field '{key}' type mismatch: expected {expected_type}")
 
 
 def _get_kernel_client() -> KernelMcpNetlinkClient:
@@ -133,8 +56,7 @@ def _register_tool_with_kernel(tool: ToolManifest) -> None:
     client.register_tool(
         tool_id=tool.tool_id,
         name=tool.name,
-        perm=tool.perm,
-        cost=tool.cost,
+        risk_flags=tool.risk_flags,
         tool_hash=tool.manifest_hash,
     )
 
@@ -183,36 +105,32 @@ def _kernel_arbitrate(
     agent_id: str,
     tool_id: int,
     tool_hash: str,
-) -> Tuple[str, int, int, str, int]:
+    ticket_id: int = 0,
+) -> Tuple[str, str, int, str]:
     client = _get_kernel_client()
-    for attempt in range(1, MAX_DEFER_RETRIES + 1):
-        decision_reply = client.tool_request(
-            req_id=req_id,
-            agent_id=agent_id,
-            tool_id=tool_id,
-            tool_hash=tool_hash,
-        )
-        decision = decision_reply.decision
-        wait_ms = decision_reply.wait_ms
-        tokens_left = decision_reply.tokens_left
-        reason = decision_reply.reason
-        LOGGER.info(
-            "arb req_id=%d agent=%s tool=%d attempt=%d decision=%s wait_ms=%d tokens_left=%d reason=%s",
-            req_id,
-            agent_id,
-            tool_id,
-            attempt,
-            decision,
-            wait_ms,
-            tokens_left,
-            reason,
-        )
-        if decision in ("ALLOW", "DENY"):
-            return decision, wait_ms, tokens_left, reason, attempt
-        if decision != "DEFER":
-            raise RuntimeError(f"unknown arbitration decision: {decision}")
-        time.sleep(wait_ms / 1000.0)
-    raise RuntimeError(f"defer retries exceeded max={MAX_DEFER_RETRIES}")
+    decision_reply = client.tool_request(
+        req_id=req_id,
+        agent_id=agent_id,
+        tool_id=tool_id,
+        tool_hash=tool_hash,
+        ticket_id=ticket_id,
+    )
+    LOGGER.info(
+        "arb req_id=%d agent=%s tool=%d decision=%s reason=%s ticket_id=%d policy_id=%s",
+        req_id,
+        agent_id,
+        tool_id,
+        decision_reply.decision,
+        decision_reply.reason,
+        decision_reply.ticket_id,
+        decision_reply.policy_id or "-",
+    )
+    return (
+        decision_reply.decision,
+        decision_reply.reason,
+        decision_reply.ticket_id,
+        decision_reply.policy_id,
+    )
 
 
 def _kernel_report_complete(
@@ -246,8 +164,8 @@ def _call_uds_tool(tool: ToolManifest, req_id: int, agent_id: str, payload: Any)
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
             conn.settimeout(timeout_s)
             conn.connect(tool.endpoint)
-            _send_frame(conn, encoded)
-            raw = _recv_frame(conn)
+            send_frame(conn, encoded, max_msg_size=MAX_MSG_SIZE)
+            raw = recv_frame(conn, max_msg_size=MAX_MSG_SIZE)
     except (FileNotFoundError, ConnectionRefusedError, TimeoutError, OSError) as exc:
         raise ValueError(f"tool service offline: {tool.endpoint}") from exc
 
@@ -278,8 +196,8 @@ def _tool_to_public(tool: ToolManifest) -> Dict[str, Any]:
         "description": tool.description,
         "input_schema": tool.input_schema,
         "examples": tool.examples,
-        "perm": tool.perm,
-        "cost": tool.cost,
+        "risk_tags": tool.risk_tags,
+        "risk_flags": tool.risk_flags,
         "hash": tool.manifest_hash,
     }
 
@@ -322,6 +240,23 @@ def _build_error(req_id: int, err: str, t_ms: int) -> Dict[str, Any]:
     }
 
 
+def _approval_decide(ticket_id: int, decision: str, operator: str, reason: str, ttl_ms: int) -> None:
+    normalized = decision.strip().lower()
+    decision_code = APPROVAL_DECISION_MAP.get(normalized)
+    if decision_code is None:
+        raise ValueError("decision must be one of: approve, deny, revoke")
+    if ttl_ms <= 0:
+        raise ValueError("ttl_ms must be positive")
+    client = _get_kernel_client()
+    client.approval_decide(
+        ticket_id=ticket_id,
+        decision=decision_code,
+        approver=operator,
+        reason=reason,
+        ttl_ms=ttl_ms,
+    )
+
+
 def _resolve_tool_hash(req: Dict[str, Any], tool: ToolManifest) -> str:
     raw = req.get("tool_hash", "")
     if raw in (None, ""):
@@ -332,10 +267,10 @@ def _resolve_tool_hash(req: Dict[str, Any], tool: ToolManifest) -> str:
 
 
 def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
-    req_id = _ensure_int("req_id", req.get("req_id", 0))
-    agent_id = _ensure_non_empty_str("agent_id", req.get("agent_id", ""))
-    app_id = _ensure_non_empty_str("app_id", req.get("app_id", ""))
-    tool_id = _ensure_int("tool_id", req.get("tool_id", 0))
+    req_id = ensure_int("req_id", req.get("req_id", 0))
+    agent_id = ensure_non_empty_str("agent_id", req.get("agent_id", ""))
+    app_id = ensure_non_empty_str("app_id", req.get("app_id", ""))
+    tool_id = ensure_int("tool_id", req.get("tool_id", 0))
 
     with _registry_lock:
         tool = _tool_registry.get(tool_id)
@@ -347,15 +282,17 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         )
 
     payload = req.get("payload", {})
-    _validate_payload(tool.input_schema, payload)
+    validate_payload(tool.input_schema, payload)
 
     tool_hash = _resolve_tool_hash(req, tool)
     _ensure_agent_registered(agent_id)
-    decision, wait_ms, tokens_left, reason, arb_attempts = _kernel_arbitrate(
+    approval_ticket_id = ensure_int("approval_ticket_id", req.get("approval_ticket_id", 0))
+    decision, reason, ticket_id, policy_id = _kernel_arbitrate(
         req_id=req_id,
         agent_id=agent_id,
         tool_id=tool_id,
         tool_hash=tool_hash,
+        ticket_id=approval_ticket_id,
     )
     if decision == "DENY":
         return {
@@ -365,10 +302,21 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "error": f"kernel arbitration denied: {reason}",
             "t_ms": 0,
             "decision": decision,
-            "wait_ms": wait_ms,
-            "tokens_left": tokens_left,
             "reason": reason,
-            "arb_attempts": arb_attempts,
+            "ticket_id": ticket_id,
+            "policy_id": policy_id,
+        }
+    if decision == "DEFER":
+        return {
+            "req_id": req_id,
+            "status": "error",
+            "result": {},
+            "error": f"kernel arbitration deferred: {reason}",
+            "t_ms": 0,
+            "decision": decision,
+            "reason": reason,
+            "ticket_id": ticket_id,
+            "policy_id": policy_id,
         }
 
     exec_start = time.perf_counter()
@@ -395,10 +343,9 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "t_ms": tool_t_ms,
             "tool_name": tool.name,
             "decision": decision,
-            "wait_ms": wait_ms,
-            "tokens_left": tokens_left,
             "reason": reason,
-            "arb_attempts": arb_attempts,
+            "ticket_id": ticket_id,
+            "policy_id": policy_id,
         }
     finally:
         exec_ms = int((time.perf_counter() - exec_start) * 1000)
@@ -430,7 +377,7 @@ def _handle_connection(conn: socket.socket) -> None:
             req_kind = "tool:exec"
             t0 = time.perf_counter()
             try:
-                raw = _recv_frame(conn)
+                raw = recv_frame(conn, max_msg_size=MAX_MSG_SIZE)
                 req = json.loads(raw.decode("utf-8"))
                 if not isinstance(req, dict):
                     raise ValueError("request must be JSON object")
@@ -439,7 +386,7 @@ def _handle_connection(conn: socket.socket) -> None:
                     req_kind = "sys:list_apps"
                     apps_public = _list_apps_public()
                     resp = {"status": "ok", "apps": apps_public}
-                    _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
+                    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
                     t_ms = int((time.perf_counter() - t0) * 1000)
                     LOGGER.info("kind=%s status=ok apps=%d t_ms=%d", req_kind, len(apps_public), t_ms)
                     continue
@@ -451,7 +398,7 @@ def _handle_connection(conn: socket.socket) -> None:
                         raise ValueError("app_id must be string when provided")
                     app_id_str = "" if app_id_req in ("", None) else app_id_req
                     resp = {"status": "ok", "app_id": app_id_str, "tools": _list_tools_public(app_id=app_id_str)}
-                    _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
+                    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
                     t_ms = int((time.perf_counter() - t0) * 1000)
                     LOGGER.info(
                         "kind=%s status=ok app_id=%s tools=%d t_ms=%d",
@@ -462,15 +409,46 @@ def _handle_connection(conn: socket.socket) -> None:
                     )
                     continue
 
+                if req.get("sys") == "approval_decide":
+                    req_kind = "sys:approval_decide"
+                    ticket_id_raw = req.get("ticket_id", 0)
+                    decision_raw = req.get("decision", "")
+                    operator_raw = req.get("operator", "")
+                    reason_raw = req.get("reason", "")
+                    ttl_ms_raw = req.get("ttl_ms", DEFAULT_APPROVAL_TTL_MS)
+                    ticket_id = ensure_int("ticket_id", ticket_id_raw)
+                    decision_text = ensure_non_empty_str("decision", decision_raw)
+                    operator_text = ensure_non_empty_str("operator", operator_raw)
+                    reason_text = ensure_non_empty_str("reason", reason_raw)
+                    ttl_ms = ensure_int("ttl_ms", ttl_ms_raw)
+                    _approval_decide(ticket_id, decision_text, operator_text, reason_text, ttl_ms)
+                    resp = {
+                        "status": "ok",
+                        "ticket_id": ticket_id,
+                        "decision": decision_text.lower(),
+                        "operator": operator_text,
+                        "ttl_ms": ttl_ms,
+                    }
+                    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
+                    t_ms = int((time.perf_counter() - t0) * 1000)
+                    LOGGER.info(
+                        "kind=%s status=ok ticket_id=%d decision=%s t_ms=%d",
+                        req_kind,
+                        ticket_id,
+                        decision_text.lower(),
+                        t_ms,
+                    )
+                    continue
+
                 if "kind" in req and req.get("kind") != "tool:exec":
                     raise ValueError(f"unsupported request kind: {req.get('kind')}")
 
-                req_id = _ensure_int("req_id", req.get("req_id", 0))
-                agent_id = _ensure_non_empty_str("agent_id", req.get("agent_id", ""))
-                app_id = _ensure_non_empty_str("app_id", req.get("app_id", ""))
-                tool_id = _ensure_int("tool_id", req.get("tool_id", 0))
+                req_id = ensure_int("req_id", req.get("req_id", 0))
+                agent_id = ensure_non_empty_str("agent_id", req.get("agent_id", ""))
+                app_id = ensure_non_empty_str("app_id", req.get("app_id", ""))
+                tool_id = ensure_int("tool_id", req.get("tool_id", 0))
                 resp = _handle_tool_exec(req)
-                _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
+                send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
                 t_ms = int((time.perf_counter() - t0) * 1000)
                 LOGGER.info(
                     "req_id=%d agent=%s app=%s tool=%d kind=%s status=%s t_ms=%d",
@@ -491,7 +469,7 @@ def _handle_connection(conn: socket.socket) -> None:
                 else:
                     resp = _build_error(req_id=req_id, err=str(exc), t_ms=t_ms)
                 try:
-                    _send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"))
+                    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
                 except Exception:  # noqa: BLE001
                     return
                 LOGGER.error(

@@ -15,7 +15,7 @@ REGISTER_BIN = ROOT_DIR / "client" / "bin" / "genl_register_tool"
 LIST_BIN = ROOT_DIR / "client" / "bin" / "genl_list_tools"
 
 LIST_RE = re.compile(
-    r"^id=(?P<id>\d+)\s+name=(?P<name>\S+)\s+perm=(?P<perm>\d+)\s+cost=(?P<cost>\d+)\s+status=(?P<status>\S+)(?:\s+hash=(?P<hash>\S+))?$"
+    r"^id=(?P<id>\d+)\s+name=(?P<name>\S+)\s+risk_flags=(?P<risk_flags>0x[0-9a-fA-F]+)\s+status=(?P<status>\S+)(?:\s+hash=(?P<hash>\S+))?$"
 )
 
 
@@ -60,16 +60,14 @@ def _register_manifest_tools(manifests: Dict[int, ToolManifest]) -> None:
             str(tool.tool_id),
             "--name",
             str(tool.name),
-            "--perm",
-            str(tool.perm),
-            "--cost",
-            str(tool.cost),
+            "--risk-flags",
+            str(tool.risk_flags),
             "--hash",
             str(tool.manifest_hash),
         ]
         _run_cmd(cmd)
         print(
-            f"[reconcile] registered tool id={tool.tool_id} name={tool.name} perm={tool.perm} cost={tool.cost} hash={tool.manifest_hash}",
+            f"[reconcile] registered tool id={tool.tool_id} name={tool.name} risk_flags=0x{tool.risk_flags:08x} hash={tool.manifest_hash}",
             flush=True,
         )
 
@@ -90,8 +88,7 @@ def _list_kernel_tools() -> Dict[int, Dict[str, object]]:
         tools[tool_id] = {
             "tool_id": tool_id,
             "name": match.group("name"),
-            "perm": int(match.group("perm")),
-            "cost": int(match.group("cost")),
+            "risk_flags": int(match.group("risk_flags"), 16),
             "status": match.group("status"),
             "hash": match.group("hash") or "",
         }
@@ -118,10 +115,10 @@ def _verify_mapping(manifests: Dict[int, ToolManifest], kernel_tools: Dict[int, 
         mismatches = []
         if actual["name"] != expected.name:
             mismatches.append(f"name expected={expected.name} got={actual['name']}")
-        if actual["perm"] != expected.perm:
-            mismatches.append(f"perm expected={expected.perm} got={actual['perm']}")
-        if actual["cost"] != expected.cost:
-            mismatches.append(f"cost expected={expected.cost} got={actual['cost']}")
+        if actual["risk_flags"] != expected.risk_flags:
+            mismatches.append(
+                f"risk_flags expected=0x{expected.risk_flags:08x} got=0x{actual['risk_flags']:08x}"
+            )
         if actual["hash"] != expected.manifest_hash:
             mismatches.append(f"hash expected={expected.manifest_hash} got={actual['hash']}")
         if mismatches:

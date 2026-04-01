@@ -45,14 +45,13 @@ struct tool_args {
 	char name[128];
 	char hash[17];
 	bool has_hash;
-	uint32_t perm;
-	uint32_t cost;
+	uint32_t risk_flags;
 };
 
 static void usage(const char *prog)
 {
 	fprintf(stderr,
-		"Usage: %s --id <u32> --name <str> --perm <u32> --cost <u32> [--hash <8hex>]\n",
+		"Usage: %s --id <u32> --name <str> --risk-flags <u32> [--hash <8hex>]\n",
 		prog);
 }
 
@@ -94,8 +93,7 @@ static int parse_args(int argc, char **argv, struct tool_args *args)
 	int i;
 	int seen_id = 0;
 	int seen_name = 0;
-	int seen_perm = 0;
-	int seen_cost = 0;
+	int seen_risk_flags = 0;
 
 	memset(args, 0, sizeof(*args));
 	for (i = 1; i < argc; i++) {
@@ -113,28 +111,22 @@ static int parse_args(int argc, char **argv, struct tool_args *args)
 			seen_name = 1;
 			continue;
 		}
-		if (strcmp(argv[i], "--perm") == 0 && i + 1 < argc) {
-			if (parse_u32(argv[++i], &args->perm))
-				return -EINVAL;
-			seen_perm = 1;
-			continue;
-		}
 		if (strcmp(argv[i], "--hash") == 0 && i + 1 < argc) {
 			if (parse_hash(argv[++i], args->hash, sizeof(args->hash)))
 				return -EINVAL;
 			args->has_hash = true;
 			continue;
 		}
-		if (strcmp(argv[i], "--cost") == 0 && i + 1 < argc) {
-			if (parse_u32(argv[++i], &args->cost))
+		if (strcmp(argv[i], "--risk-flags") == 0 && i + 1 < argc) {
+			if (parse_u32(argv[++i], &args->risk_flags))
 				return -EINVAL;
-			seen_cost = 1;
+			seen_risk_flags = 1;
 			continue;
 		}
 		return -EINVAL;
 	}
 
-	if (!seen_id || !seen_name || !seen_perm || !seen_cost)
+	if (!seen_id || !seen_name || !seen_risk_flags)
 		return -EINVAL;
 	return 0;
 }
@@ -312,12 +304,8 @@ static int register_tool(int fd, uint16_t family_id, const struct tool_args *arg
 		       strlen(args->name) + 1);
 	if (ret)
 		return ret;
-	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_TOOL_PERM, &args->perm,
-		       sizeof(args->perm));
-	if (ret)
-		return ret;
-	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_TOOL_COST, &args->cost,
-		       sizeof(args->cost));
+	ret = add_attr(nlh, sizeof(txbuf), KERNEL_MCP_ATTR_TOOL_RISK_FLAGS,
+		       &args->risk_flags, sizeof(args->risk_flags));
 	if (ret)
 		return ret;
 	if (args->has_hash) {
@@ -375,8 +363,8 @@ int main(int argc, char **argv)
 		return 4;
 	}
 
-	printf("registered tool id=%u name=%s perm=%u cost=%u", args.id,
-	       args.name, args.perm, args.cost);
+	printf("registered tool id=%u name=%s risk_flags=0x%08x", args.id,
+	       args.name, args.risk_flags);
 	if (args.has_hash)
 		printf(" hash=%s", args.hash);
 	printf("\n");

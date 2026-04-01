@@ -108,9 +108,9 @@ def _attr_string(attrs: Dict[int, List[bytes]], key: int) -> str:
 @dataclass(frozen=True)
 class ToolDecision:
     decision: str
-    wait_ms: int
-    tokens_left: int
     reason: str
+    ticket_id: int
+    policy_id: str
 
 
 class KernelMcpNetlinkClient:
@@ -240,8 +240,7 @@ class KernelMcpNetlinkClient:
         *,
         tool_id: int,
         name: str,
-        perm: int,
-        cost: int,
+        risk_flags: int,
         tool_hash: str = "",
     ) -> None:
         if tool_id <= 0:
@@ -251,8 +250,7 @@ class KernelMcpNetlinkClient:
         attrs = [
             (ATTR["TOOL_ID"], struct.pack("=I", tool_id)),
             (ATTR["TOOL_NAME"], name.encode("utf-8") + b"\x00"),
-            (ATTR["TOOL_PERM"], struct.pack("=I", perm)),
-            (ATTR["TOOL_COST"], struct.pack("=I", cost)),
+            (ATTR["TOOL_RISK_FLAGS"], struct.pack("=I", risk_flags)),
         ]
         if tool_hash:
             attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
@@ -270,6 +268,7 @@ class KernelMcpNetlinkClient:
         agent_id: str,
         tool_id: int,
         tool_hash: str,
+        ticket_id: int = 0,
     ) -> ToolDecision:
         attrs = [
             (ATTR["AGENT_ID"], agent_id.encode("utf-8") + b"\x00"),
@@ -278,6 +277,8 @@ class KernelMcpNetlinkClient:
         ]
         if tool_hash:
             attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
+        if ticket_id > 0:
+            attrs.append((ATTR["TICKET_ID"], struct.pack("=Q", ticket_id)))
 
         genl_cmd, resp_attrs = self._request(
             msg_type=self._family_id,
@@ -292,9 +293,38 @@ class KernelMcpNetlinkClient:
         decision = KERNEL_MCP_DECISION_MAP.get(decision_raw, "UNKNOWN")
         return ToolDecision(
             decision=decision,
-            wait_ms=_attr_u32(resp_attrs, ATTR["WAIT_MS"]),
-            tokens_left=_attr_u32(resp_attrs, ATTR["TOKENS_LEFT"]),
             reason=_attr_string(resp_attrs, ATTR["MESSAGE"]),
+            ticket_id=struct.unpack("=Q", _attr_first(resp_attrs, ATTR["TICKET_ID"]))[0]
+            if ATTR["TICKET_ID"] in resp_attrs
+            else 0,
+            policy_id=_attr_string(resp_attrs, ATTR["POLICY_ID"])
+            if ATTR["POLICY_ID"] in resp_attrs
+            else "",
+        )
+
+    def approval_decide(
+        self,
+        *,
+        ticket_id: int,
+        decision: int,
+        approver: str,
+        reason: str,
+        ttl_ms: int,
+    ) -> None:
+        if ticket_id <= 0:
+            raise ValueError("ticket_id must be positive")
+        attrs = [
+            (ATTR["TICKET_ID"], struct.pack("=Q", ticket_id)),
+            (ATTR["APPROVAL_DECISION"], struct.pack("=I", decision)),
+            (ATTR["APPROVER"], approver.encode("utf-8") + b"\x00"),
+            (ATTR["APPROVAL_REASON"], reason.encode("utf-8") + b"\x00"),
+            (ATTR["APPROVAL_TTL_MS"], struct.pack("=I", ttl_ms)),
+        ]
+        self._request(
+            msg_type=self._family_id,
+            cmd=CMD["APPROVAL_DECIDE"],
+            attrs=attrs,
+            need_ack=True,
         )
 
     def tool_complete(

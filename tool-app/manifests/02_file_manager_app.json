@@ -8,8 +8,7 @@
     {
       "tool_id": 3,
       "name": "text_stats",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [],
       "operation": "text_stats",
       "timeout_ms": 30000,
       "description": "Compute text statistics (chars/words/lines) from payload text.",
@@ -41,8 +40,9 @@
     {
       "tool_id": 6,
       "name": "file_preview",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [
+        "sensitive_read"
+      ],
       "operation": "file_preview",
       "timeout_ms": 30000,
       "description": "Preview text files from this repository with line limits and safe path checks.",
@@ -79,8 +79,7 @@
     {
       "tool_id": 7,
       "name": "hash_text",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [],
       "operation": "hash_text",
       "timeout_ms": 30000,
       "description": "Generate SHA-256/SHA-1/MD5 digests for text content.",
@@ -117,8 +116,10 @@
     {
       "tool_id": 10,
       "name": "file_create",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
       "operation": "file_create",
       "timeout_ms": 30000,
       "description": "Create or overwrite a text file under repository root with safe path checks.",
@@ -162,8 +163,9 @@
     {
       "tool_id": 11,
       "name": "file_list",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [
+        "sensitive_read"
+      ],
       "operation": "file_list",
       "timeout_ms": 30000,
       "description": "List directory entries or inspect a file under repository root with safe path checks.",
@@ -196,8 +198,12 @@
     {
       "tool_id": 12,
       "name": "file_delete",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [
+        "filesystem_delete",
+        "filesystem_write",
+        "irreversible",
+        "system_mutation"
+      ],
       "operation": "file_delete",
       "timeout_ms": 30000,
       "description": "Delete a file (or directory with recursive=true) under repository root with safety checks.",
@@ -236,8 +242,10 @@
     {
       "tool_id": 13,
       "name": "file_copy",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
       "operation": "file_copy",
       "timeout_ms": 30000,
       "description": "Copy a file under repository root with safe path checks.",
@@ -282,8 +290,11 @@
     {
       "tool_id": 14,
       "name": "file_rename",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [
+        "filesystem_write",
+        "irreversible",
+        "system_mutation"
+      ],
       "operation": "file_rename",
       "timeout_ms": 30000,
       "description": "Rename or move a file under repository root with safe path checks.",

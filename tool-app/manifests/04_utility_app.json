@@ -8,8 +8,7 @@
     {
       "tool_id": 1,
       "name": "echo",
-      "perm": 1,
-      "cost": 1,
+      "risk_tags": [],
       "operation": "echo",
       "timeout_ms": 30000,
       "description": "Echo tool that returns payload as-is for debugging and simple round-trip checks.",

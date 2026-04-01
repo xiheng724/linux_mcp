@@ -81,8 +81,8 @@ llm-app -> mcpd -> kernel netlink
 - `description`
 - `input_schema`
 - `examples`
-- `perm`
-- `cost`
+- `risk_tags`
+- `risk_flags`
 - `hash`
 
 `tool:exec` 返回统一结构：
@@ -109,14 +109,12 @@ netlink client 在 [netlink_client.py](/home/lxh/Code/linux-mcp/mcpd/netlink_cli
 - `register_agent`
 - `tool_request`
 - `tool_complete`
+- `approval_decide`
 
-当前 `mcpd` 对 `DEFER` 的处理方式是重试：
+当前 `mcpd` 对 `DEFER` 的处理方式是：
 
-- 每次读取内核返回的 `wait_ms`
-- `sleep(wait_ms)`
-- 最多重试 50 次
-
-如果超出次数，会报错退出该请求。
+- 直接把 `ticket_id` / `policy_id` 返回给调用方
+- 由用户态审批端再调用 `{"sys":"approval_decide",...}` 完成放行或拒绝
 
 ## 与 manifest 的关系
 
@@ -133,8 +131,7 @@ manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_
 - tool 级必填：
   - `tool_id`
   - `name`
-  - `perm`
-  - `cost`
+  - `risk_tags`
   - `operation`
   - `description`
   - `input_schema`
@@ -149,8 +146,7 @@ manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_
 - `name`
 - `app_id`
 - `app_name`
-- `perm`
-- `cost`
+- `risk_tags`
 - `description`
 - `input_schema`
 - `examples`
@@ -231,4 +227,3 @@ python3 llm-app/rpc.py
 - payload schema 校验是轻量级的，不是完整 JSON Schema 引擎
 - 大输出仍走 framed JSON，没有单独数据面
 - 没有 async job queue 或长期任务状态查询
-
