@@ -108,36 +108,45 @@ manifest 加载逻辑在 [mcpd/manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd
 
 manifest 目录：`tool-app/manifests/*.json`
 
-当前共有 4 个 app、14 个 tool：
+当前共有 6 个 app、20 个 tool：
 
-- `settings_app`
-  - `cpu_burn`
-  - `sys_info`
-  - `time_now`
-  - `volume_control`
-- `file_manager_app`
-  - `text_stats`
-  - `file_preview`
-  - `hash_text`
-  - `file_create`
-  - `file_list`
-  - `file_delete`
-  - `file_copy`
-  - `file_rename`
-- `calculator_app`
-  - `calc`
-- `utility_app`
-  - `echo`
+- `notes_app`
+  - `note_create`
+  - `note_list`
+  - `note_read`
+  - `note_search`
+- `workspace_app`
+  - `workspace_overview`
+  - `read_document`
+  - `write_document`
+  - `move_document`
+- `planner_app`
+  - `task_add`
+  - `task_list`
+  - `task_update`
+- `desktop_app`
+  - `desktop_snapshot`
+  - `open_url`
+  - `show_notification`
+- `calendar_app`
+  - `event_create`
+  - `event_list`
+  - `event_update`
+- `contacts_app`
+  - `contact_add`
+  - `contact_list`
+  - `contact_find`
 
 所有 demo app 都通过 [tool-app/demo_rpc.py](/home/lxh/Code/linux-mcp/tool-app/demo_rpc.py) 提供统一的 framed JSON over UDS 协议。
 
 几个当前实现里的关键边界：
 
-- `file_manager_app` 只允许操作仓库根目录下的相对路径
+- `workspace_app` 只允许操作仓库根目录下的相对路径
 - 禁止绝对路径和 `..`
-- 文件读写/复制有大小上限
-- `volume_control` 依赖本机 `pactl` 或 `amixer`
-- `sys_info`、`time_now`、`calc`、`echo` 都是本地直接执行
+- `notes_app` 和 `planner_app` 会把 demo 数据写到 `tool-app/demo_data/`
+- `calendar_app` 和 `contacts_app` 也会把 demo 数据写到 `tool-app/demo_data/`
+- `desktop_app.open_url` 依赖本机 `xdg-open` 或 `gio`
+- `desktop_app.show_notification` 依赖本机 `notify-send`
 
 ### 4. llm-app
 

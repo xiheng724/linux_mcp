@@ -1,0 +1,151 @@
+{
+  "app_id": "planner_app",
+  "app_name": "Planner App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/planner_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/planner_app.py",
+  "tools": [
+    {
+      "tool_id": 9,
+      "name": "task_add",
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
+      "operation": "task_add",
+      "timeout_ms": 30000,
+      "description": "Create a task with optional due date, priority, and project grouping.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "title": "Review manifest changes",
+            "project": "linux-mcp",
+            "priority": "high",
+            "due_date": "2026-04-02"
+          }
+        },
+        {
+          "payload": {
+            "title": "Buy groceries",
+            "notes": "milk and eggs"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 10,
+      "name": "task_list",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "task_list",
+      "timeout_ms": 30000,
+      "description": "List tasks with optional project and status filters, ordered by recency.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "project": "linux-mcp",
+            "status": "open"
+          }
+        },
+        {
+          "payload": {
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 11,
+      "name": "task_update",
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
+      "operation": "task_update",
+      "timeout_ms": 30000,
+      "description": "Update one task by identifier, including status, priority, due date, title, and notes.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "task_id"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "task_id": "linux-mcp-20260401-120500",
+            "status": "done"
+          }
+        },
+        {
+          "payload": {
+            "task_id": "inbox-20260401-121000",
+            "priority": "medium",
+            "notes": "Waiting for review"
+          }
+        }
+      ]
+    }
+  ]
+}

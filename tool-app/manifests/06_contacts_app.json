@@ -1,0 +1,131 @@
+{
+  "app_id": "contacts_app",
+  "app_name": "Contacts App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/contacts_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/contacts_app.py",
+  "tools": [
+    {
+      "tool_id": 18,
+      "name": "contact_add",
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
+      "operation": "contact_add",
+      "timeout_ms": 30000,
+      "description": "Create a contact with name plus optional email, phone, company, and notes.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "name": "Alice Chen",
+            "email": "alice@example.com",
+            "company": "Example Inc."
+          }
+        },
+        {
+          "payload": {
+            "name": "Bob",
+            "phone": "+1-555-0100"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 19,
+      "name": "contact_list",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "contact_list",
+      "timeout_ms": 30000,
+      "description": "List saved contacts with optional company filter and result limit.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "company": "Example Inc."
+          }
+        },
+        {
+          "payload": {
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 20,
+      "name": "contact_find",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "contact_find",
+      "timeout_ms": 30000,
+      "description": "Find contacts by matching a keyword against name, email, phone, company, or notes.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "query": "alice"
+          }
+        },
+        {
+          "payload": {
+            "query": "Example Inc.",
+            "limit": 5
+          }
+        }
+      ]
+    }
+  ]
+}

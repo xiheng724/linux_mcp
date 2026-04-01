@@ -1,0 +1,110 @@
+{
+  "app_id": "desktop_app",
+  "app_name": "Desktop App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/desktop_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/desktop_app.py",
+  "tools": [
+    {
+      "tool_id": 12,
+      "name": "desktop_snapshot",
+      "risk_tags": [],
+      "operation": "desktop_snapshot",
+      "timeout_ms": 30000,
+      "description": "Get practical desktop and host status including time, uptime, load, memory, and disk usage.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {}
+        },
+        {
+          "payload": {
+            "path": "."
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 13,
+      "name": "open_url",
+      "risk_tags": [
+        "external_network",
+        "system_mutation"
+      ],
+      "operation": "open_url",
+      "timeout_ms": 30000,
+      "description": "Open a web URL in the default desktop browser or handler.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "url": "https://example.com"
+          }
+        },
+        {
+          "payload": {
+            "url": "https://github.com"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 14,
+      "name": "show_notification",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "show_notification",
+      "timeout_ms": 30000,
+      "description": "Show a desktop notification with title and optional body text.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "title": "Build finished",
+            "body": "All checks passed"
+          }
+        },
+        {
+          "payload": {
+            "title": "Reminder",
+            "body": "Standup starts in 10 minutes"
+          }
+        }
+      ]
+    }
+  ]
+}

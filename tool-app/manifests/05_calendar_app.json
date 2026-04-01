@@ -1,0 +1,158 @@
+{
+  "app_id": "calendar_app",
+  "app_name": "Calendar App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/calendar_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/calendar_app.py",
+  "tools": [
+    {
+      "tool_id": 15,
+      "name": "event_create",
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
+      "operation": "event_create",
+      "timeout_ms": 30000,
+      "description": "Create a calendar event with title, start time, optional end time, location, and notes.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "title",
+          "start_time"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "start_time": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "calendar": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "title": "Design review",
+            "start_time": "2026-04-02T10:00:00+08:00",
+            "end_time": "2026-04-02T11:00:00+08:00",
+            "calendar": "work"
+          }
+        },
+        {
+          "payload": {
+            "title": "Dinner",
+            "start_time": "2026-04-02T19:00:00+08:00",
+            "location": "home"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 16,
+      "name": "event_list",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "event_list",
+      "timeout_ms": 30000,
+      "description": "List calendar events with optional calendar, date prefix, and result limit filters.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "calendar": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "calendar": "work",
+            "date": "2026-04-02"
+          }
+        },
+        {
+          "payload": {
+            "limit": 10
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 17,
+      "name": "event_update",
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
+      "operation": "event_update",
+      "timeout_ms": 30000,
+      "description": "Update an event by identifier, including title, time, location, notes, and calendar.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "event_id"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "start_time": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "calendar": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "event_id": "work-20260401-100000",
+            "location": "Meeting Room A"
+          }
+        },
+        {
+          "payload": {
+            "event_id": "personal-20260401-190000",
+            "title": "Dinner with friends"
+          }
+        }
+      ]
+    }
+  ]
+}

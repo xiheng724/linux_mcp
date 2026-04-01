@@ -60,8 +60,8 @@ llm-app -> mcpd -> kernel netlink
 ```json
 {"sys":"list_apps"}
 {"sys":"list_tools"}
-{"sys":"list_tools","app_id":"settings_app"}
-{"kind":"tool:exec","req_id":1,"agent_id":"a1","app_id":"settings_app","tool_id":2,"tool_hash":"8hex","payload":{"ms":200}}
+{"sys":"list_tools","app_id":"notes_app"}
+{"kind":"tool:exec","req_id":1,"agent_id":"a1","app_id":"notes_app","tool_id":1,"tool_hash":"8hex","payload":{"title":"Daily Standup","body":"Blocked on review"}} 
 ```
 
 `list_apps` 返回每个 app 的：
@@ -163,9 +163,12 @@ manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_
 {
   "req_id": 1,
   "agent_id": "a1",
-  "tool_id": 2,
-  "operation": "cpu_burn",
-  "payload": {"ms": 200}
+  "tool_id": 1,
+  "operation": "note_create",
+  "payload": {
+    "title": "Daily Standup",
+    "body": "Blocked on review"
+  }
 }
 ```
 

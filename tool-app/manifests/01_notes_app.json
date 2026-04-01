@@ -1,0 +1,178 @@
+{
+  "app_id": "notes_app",
+  "app_name": "Notes App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/notes_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/notes_app.py",
+  "tools": [
+    {
+      "tool_id": 1,
+      "name": "note_create",
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
+      "operation": "note_create",
+      "timeout_ms": 30000,
+      "description": "Create a note in a named notebook with title, body, and optional tags.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "title",
+          "body"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "notebook": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "title": "Daily Standup",
+            "body": "Blocked on schema sync review.",
+            "notebook": "work",
+            "tags": [
+              "daily",
+              "team"
+            ]
+          }
+        },
+        {
+          "payload": {
+            "title": "Ideas",
+            "body": "Try turning tool-app into adapter services."
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 2,
+      "name": "note_list",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "note_list",
+      "timeout_ms": 30000,
+      "description": "List notes from a notebook with optional tag filtering and result limit.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "notebook": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "notebook": "work",
+            "limit": 10
+          }
+        },
+        {
+          "payload": {
+            "tag": "daily"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 3,
+      "name": "note_read",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "note_read",
+      "timeout_ms": 30000,
+      "description": "Read one note by note identifier and return its content and metadata.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "note_id"
+        ],
+        "properties": {
+          "note_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "note_id": "work/daily-standup-20260401-120000"
+          }
+        },
+        {
+          "payload": {
+            "note_id": "personal/ideas-20260401-121500"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 4,
+      "name": "note_search",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "note_search",
+      "timeout_ms": 30000,
+      "description": "Search note titles, tags, and bodies for a keyword across all notebooks or within one notebook.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "notebook": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "query": "schema sync"
+          }
+        },
+        {
+          "payload": {
+            "query": "daily",
+            "notebook": "work",
+            "limit": 5
+          }
+        }
+      ]
+    }
+  ]
+}

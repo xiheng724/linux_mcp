@@ -58,11 +58,11 @@ run_as_user bash -lc 'test -n "${DEEPSEEK_API_KEY:-}"' || {
   exit 1
 }
 
-echo "[demo] step 9: llm-app once: hello"
-run_as_user python3 llm-app/cli.py --once "hello"
+echo "[demo] step 9: llm-app once: create a note for today's standup"
+run_as_user python3 llm-app/cli.py --once "create a work note titled Daily Standup saying blocked on review"
 
-echo "[demo] step 10: llm-app once: burn cpu for a bit"
-run_as_user python3 llm-app/cli.py --once "burn cpu for a bit"
+echo "[demo] step 10: llm-app once: show workspace overview"
+run_as_user python3 llm-app/cli.py --once "show me an overview of the tool-app folder"
 
 echo "[demo] step 11: verify sysfs agent completion counters"
 ${SUDO} ls -l /sys/kernel/mcp/agents/a1/

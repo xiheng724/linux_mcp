@@ -1,0 +1,12 @@
+[
+  {
+    "contact_id": "contact-20260401-120622",
+    "name": "Validation User",
+    "email": "validation@example.com",
+    "phone": "",
+    "company": "linux-mcp",
+    "notes": "",
+    "created_at": "2026-04-01T12:06:22.056855+00:00",
+    "updated_at": "2026-04-01T12:06:22.056855+00:00"
+  }
+]

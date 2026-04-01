@@ -1,0 +1,184 @@
+{
+  "app_id": "workspace_app",
+  "app_name": "Workspace App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/workspace_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/workspace_app.py",
+  "tools": [
+    {
+      "tool_id": 5,
+      "name": "workspace_overview",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "workspace_overview",
+      "timeout_ms": 30000,
+      "description": "Summarize files and directories under a repository path with safe path checks.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "max_entries": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": ".",
+            "max_entries": 20
+          }
+        },
+        {
+          "payload": {
+            "path": "tool-app"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 6,
+      "name": "read_document",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "read_document",
+      "timeout_ms": 30000,
+      "description": "Read a text document from the repository with line limits and optional start line.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "start_line": {
+            "type": "integer"
+          },
+          "max_lines": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "README.md",
+            "max_lines": 30
+          }
+        },
+        {
+          "payload": {
+            "path": "llm-app/app_logic.py",
+            "start_line": 100,
+            "max_lines": 40
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 7,
+      "name": "write_document",
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
+      "operation": "write_document",
+      "timeout_ms": 30000,
+      "description": "Create or overwrite a text document under the repository root with safe path checks.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path",
+          "content"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "overwrite": {
+            "type": "boolean"
+          },
+          "create_parents": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "tmp/release-notes.txt",
+            "content": "build ok",
+            "overwrite": true
+          }
+        },
+        {
+          "payload": {
+            "path": "notes/today.md",
+            "content": "# Today"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 8,
+      "name": "move_document",
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
+      "operation": "move_document",
+      "timeout_ms": 30000,
+      "description": "Rename or move a text file under the repository root with safe path checks.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "src_path",
+          "dst_path"
+        ],
+        "properties": {
+          "src_path": {
+            "type": "string"
+          },
+          "dst_path": {
+            "type": "string"
+          },
+          "overwrite": {
+            "type": "boolean"
+          },
+          "create_parents": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "src_path": "tmp/release-notes.txt",
+            "dst_path": "archive/release-notes.txt",
+            "create_parents": true
+          }
+        },
+        {
+          "payload": {
+            "src_path": "drafts/todo.md",
+            "dst_path": "notes/todo.md",
+            "overwrite": true
+          }
+        }
+      ]
+    }
+  ]
+}
