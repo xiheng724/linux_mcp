@@ -46,6 +46,8 @@ _tool_registry: Dict[int, ToolManifest] = {}
 _kernel_client: KernelMcpNetlinkClient | None = None
 _manifest_reload_lock = threading.Lock()
 _manifest_signature = ""
+_approval_lock = threading.Lock()
+_pending_approvals: Dict[int, Dict[str, Any]] = {}
 
 
 def _get_kernel_client() -> KernelMcpNetlinkClient:
@@ -296,6 +298,56 @@ def _resolve_tool_hash(req: Dict[str, Any], tool: ToolManifest) -> str:
     return raw.lower()
 
 
+def _remember_pending_approval(
+    *,
+    ticket_id: int,
+    req_id: int,
+    agent_id: str,
+    app_id: str,
+    tool_id: int,
+    payload: Any,
+    tool_hash: str,
+) -> None:
+    with _approval_lock:
+        _pending_approvals[ticket_id] = {
+            "req": {
+                "req_id": req_id,
+                "agent_id": agent_id,
+                "app_id": app_id,
+                "tool_id": tool_id,
+                "payload": payload,
+                "tool_hash": tool_hash,
+            }
+        }
+
+
+def _take_pending_approval(ticket_id: int) -> Dict[str, Any]:
+    with _approval_lock:
+        pending = _pending_approvals.pop(ticket_id, None)
+    if pending is None:
+        raise ValueError(f"pending approval not found: {ticket_id}")
+    return pending
+
+
+def _drop_pending_approval(ticket_id: int) -> None:
+    with _approval_lock:
+        _pending_approvals.pop(ticket_id, None)
+
+
+def _validate_pending_approval_req(pending: Dict[str, Any]) -> Dict[str, Any]:
+    req = pending.get("req", {})
+    if not isinstance(req, dict):
+        raise ValueError("pending approval request is invalid")
+    return {
+        "req_id": ensure_int("req_id", req.get("req_id", 0)),
+        "agent_id": ensure_non_empty_str("agent_id", req.get("agent_id", "")),
+        "app_id": ensure_non_empty_str("app_id", req.get("app_id", "")),
+        "tool_id": ensure_int("tool_id", req.get("tool_id", 0)),
+        "payload": req.get("payload", {}),
+        "tool_hash": req.get("tool_hash", ""),
+    }
+
+
 def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
     _ensure_runtime_registry_current()
     req_id = ensure_int("req_id", req.get("req_id", 0))
@@ -337,6 +389,16 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "ticket_id": ticket_id,
         }
     if decision == "DEFER":
+        if ticket_id > 0:
+            _remember_pending_approval(
+                ticket_id=ticket_id,
+                req_id=req_id,
+                agent_id=agent_id,
+                app_id=app_id,
+                tool_id=tool_id,
+                payload=payload,
+                tool_hash=tool_hash,
+            )
         return {
             "req_id": req_id,
             "status": "error",
@@ -466,6 +528,49 @@ def _handle_connection(conn: socket.socket) -> None:
                         req_kind,
                         ticket_id,
                         decision_text.lower(),
+                        t_ms,
+                    )
+                    continue
+
+                if req.get("sys") == "approval_reply":
+                    req_kind = "sys:approval_reply"
+                    ticket_id = ensure_int("ticket_id", req.get("ticket_id", 0))
+                    decision_text = ensure_non_empty_str("decision", req.get("decision", ""))
+                    operator_text = ensure_non_empty_str("operator", req.get("operator", ""))
+                    reason_text = ensure_non_empty_str("reason", req.get("reason", ""))
+                    ttl_ms = ensure_int("ttl_ms", req.get("ttl_ms", DEFAULT_APPROVAL_TTL_MS))
+                    normalized = decision_text.strip().lower()
+                    if normalized not in ("approve", "deny"):
+                        raise ValueError("decision must be approve or deny")
+                    pending = _take_pending_approval(ticket_id)
+                    try:
+                        replay_req = _validate_pending_approval_req(pending)
+                        _approval_decide(ticket_id, normalized, operator_text, reason_text, ttl_ms)
+                        if normalized == "deny":
+                            resp = {
+                                "status": "error",
+                                "error": "approval declined by user",
+                                "ticket_id": ticket_id,
+                                "decision": "DENY",
+                                "reason": "user_declined",
+                                "t_ms": 0,
+                            }
+                        else:
+                            replay_req["approval_ticket_id"] = ticket_id
+                            resp = _handle_tool_exec(replay_req)
+                    except Exception:
+                        if normalized == "approve":
+                            with _approval_lock:
+                                _pending_approvals[ticket_id] = pending
+                        raise
+                    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
+                    t_ms = int((time.perf_counter() - t0) * 1000)
+                    LOGGER.info(
+                        "kind=%s status=%s ticket_id=%d decision=%s t_ms=%d",
+                        req_kind,
+                        resp.get("status"),
+                        ticket_id,
+                        normalized,
                         t_ms,
                     )
                     continue

@@ -8,6 +8,7 @@ import sys
 import time
 import argparse
 import os
+import threading
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,7 @@ try:
         QListWidget,
         QListWidgetItem,
         QMainWindow,
+        QMessageBox,
         QPushButton,
         QPlainTextEdit,
         QSplitter,
@@ -36,6 +38,7 @@ except Exception:
     raise SystemExit(2)
 
 from app_logic import (
+    ApprovalRequest,
     DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
@@ -68,10 +71,32 @@ class ExecRequest:
 
 class ExecWorker(QObject):
     finished = Signal(dict)
+    approval_needed = Signal(dict)
 
     def __init__(self, req: ExecRequest) -> None:
         super().__init__()
         self.req = req
+        self._approval_event = threading.Event()
+        self._approval_result = False
+
+    def resolve_approval(self, approved: bool) -> None:
+        self._approval_result = approved
+        self._approval_event.set()
+
+    def _approval_prompt(self, request: ApprovalRequest) -> bool:
+        self._approval_result = False
+        self._approval_event.clear()
+        self.approval_needed.emit(
+            {
+                "step_id": request.step_id,
+                "tool_name": request.tool_name,
+                "ticket_id": request.ticket_id,
+                "reason": request.reason,
+                "payload": request.payload,
+            }
+        )
+        self._approval_event.wait()
+        return self._approval_result
 
     def run(self) -> None:
         now = time.time()
@@ -109,6 +134,7 @@ class ExecWorker(QObject):
                 self.req.selector_cfg,
                 apps=apps,
                 tools=tools,
+                approval_handler=self._approval_prompt,
             )
         except Exception as exc:  # noqa: BLE001
             self.finished.emit({"status": "error", "error": str(exc), "warnings": []})
@@ -253,6 +279,7 @@ class MainWindow(QMainWindow):
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.finished.connect(self._on_worker_done)
+        self._worker.approval_needed.connect(self._on_approval_needed)
         self._worker.finished.connect(self._thread.quit)
         self._thread.finished.connect(self._thread.deleteLater)
         self._thread.start()
@@ -296,6 +323,23 @@ class MainWindow(QMainWindow):
 
         self._thread = None
         self._worker = None
+
+    def _on_approval_needed(self, payload: Dict[str, Any]) -> None:
+        payload_text = _fmt_json(payload.get("payload", {}))
+        choice = QMessageBox.question(
+            self,
+            "Approval Required",
+            (
+                f"Allow {payload.get('tool_name', 'tool')}?\n\n"
+                f"ticket_id: {payload.get('ticket_id', 0)}\n"
+                f"reason: {payload.get('reason', '')}\n\n"
+                f"payload: {payload_text}"
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if self._worker is not None:
+            self._worker.resolve_approval(choice == QMessageBox.StandardButton.Yes)
 
 
 def main() -> int:

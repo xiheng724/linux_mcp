@@ -12,6 +12,7 @@ import time
 from typing import Any, Dict, List
 
 from app_logic import (
+    ApprovalRequest,
     DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
@@ -125,6 +126,23 @@ def _execute_once_with_apps(
 ) -> int:
     if not apps:
         raise CliError("no apps returned by mcpd")
+    def _approval_prompt(request: ApprovalRequest) -> bool:
+        print(
+            (
+                f"[llm-app] approval required: step={request.step_id} "
+                f"tool={request.tool_name} ticket_id={request.ticket_id} reason={request.reason}"
+            ),
+            flush=True,
+        )
+        print(
+            f"[llm-app] approval payload: {json.dumps(request.payload, ensure_ascii=True, sort_keys=True)}",
+            flush=True,
+        )
+        if not sys.stdin.isatty():
+            return False
+        answer = input("[llm-app] approve? [y/N] ").strip().lower()
+        return answer in {"y", "yes"}
+
     execution = execute_plan(
         user_text,
         agent_id,
@@ -132,6 +150,7 @@ def _execute_once_with_apps(
         cfg,
         apps=apps,
         tools=tools,
+        approval_handler=_approval_prompt,
     )
     for line in render_execution_debug_lines(
         execution,
