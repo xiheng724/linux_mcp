@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 try:
+    from schema_utils import ensure_int, ensure_non_empty_str
     from risk import normalize_risk_tags, risk_flags_from_tags
 except ModuleNotFoundError:  # pragma: no cover - package import fallback
+    from .schema_utils import ensure_int, ensure_non_empty_str
     from .risk import normalize_risk_tags, risk_flags_from_tags
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -71,20 +73,15 @@ def _semantic_hash(tool: Dict[str, Any], path: Path) -> str:
     return hashlib.sha256(_canonical_json_bytes(semantic)).hexdigest()[:8]
 
 
-def _ensure_non_empty_str(name: str, value: Any, path: Path) -> str:
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"{path}: {name} must be non-empty string")
-    return value
-
-
-def _ensure_int(name: str, value: Any, path: Path) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{path}: {name} must be int")
-    return value
+def _ensure_non_empty_str_path(name: str, value: Any, path: Path) -> str:
+    try:
+        return ensure_non_empty_str(name, value)
+    except ValueError as exc:
+        raise ValueError(f"{path}: {exc}") from exc
 
 
 def _ensure_rel_tool_path(name: str, value: Any, path: Path) -> str:
-    text = _ensure_non_empty_str(name, value, path)
+    text = _ensure_non_empty_str_path(name, value, path)
     if text.startswith("/"):
         raise ValueError(f"{path}: {name} must be relative to repo root")
     return text
@@ -112,15 +109,15 @@ def _load_tool(
         if field not in raw:
             raise ValueError(f"{path}: tool missing field '{field}'")
 
-    tool_id = _ensure_int("tool_id", raw["tool_id"], path)
-    timeout_ms = _ensure_int("timeout_ms", raw.get("timeout_ms", 30_000), path)
+    tool_id = ensure_int("tool_id", raw["tool_id"])
+    timeout_ms = ensure_int("timeout_ms", raw.get("timeout_ms", 30_000))
     if timeout_ms <= 0:
         raise ValueError(f"{path}: timeout_ms must be positive")
 
-    name = _ensure_non_empty_str("name", raw["name"], path)
+    name = ensure_non_empty_str("name", raw["name"])
     risk_tags = normalize_risk_tags(raw["risk_tags"], source=str(path))
-    operation = _ensure_non_empty_str("operation", raw["operation"], path)
-    description = _ensure_non_empty_str("description", raw["description"], path)
+    operation = ensure_non_empty_str("operation", raw["operation"])
+    description = ensure_non_empty_str("description", raw["description"])
     input_schema = raw["input_schema"]
     examples = raw["examples"]
     if not isinstance(input_schema, dict):
@@ -167,10 +164,10 @@ def load_app_manifest(path: Path) -> AppManifest:
         if field not in raw:
             raise ValueError(f"{path}: missing field '{field}'")
 
-    app_id = _ensure_non_empty_str("app_id", raw["app_id"], path)
-    app_name = _ensure_non_empty_str("app_name", raw["app_name"], path)
-    transport = _ensure_non_empty_str("transport", raw["transport"], path)
-    endpoint = _ensure_non_empty_str("endpoint", raw["endpoint"], path)
+    app_id = ensure_non_empty_str("app_id", raw["app_id"])
+    app_name = ensure_non_empty_str("app_name", raw["app_name"])
+    transport = ensure_non_empty_str("transport", raw["transport"])
+    endpoint = ensure_non_empty_str("endpoint", raw["endpoint"])
 
     if transport != "uds_rpc":
         raise ValueError(f"{path}: unsupported transport {transport!r}")
@@ -239,3 +236,10 @@ def load_all_manifests(manifest_dir: Path = DEFAULT_MANIFEST_DIR) -> List[AppMan
     if not apps:
         raise ValueError(f"no manifests found in {manifest_dir}")
     return apps
+
+
+def load_all_tools(manifest_dir: Path = DEFAULT_MANIFEST_DIR) -> List[ToolManifest]:
+    tools: List[ToolManifest] = []
+    for app in load_all_manifests(manifest_dir):
+        tools.extend(app.tools)
+    return tools

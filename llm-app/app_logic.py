@@ -11,6 +11,7 @@ import urllib.request
 from typing import Any, Dict, List, Tuple
 
 from rpc import mcpd_call
+from mcpd.schema_utils import validate_payload
 
 DEFAULT_DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
@@ -21,6 +22,13 @@ class SelectorConfig:
     deepseek_url: str
     deepseek_model: str
     deepseek_timeout_sec: int
+
+
+def _require_api_key() -> str:
+    api_key = os.getenv("DEEPSEEK_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("DEEPSEEK_API_KEY not set")
+    return api_key
 
 
 def _extract_json_object(text: str) -> Dict[str, Any]:
@@ -190,9 +198,7 @@ def select_app_for_input(user_text: str, apps: List[Dict[str, Any]], cfg: Select
     by_id = _index_apps(apps)
     if not by_id:
         raise RuntimeError("no valid apps discovered from mcpd")
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not set")
+    api_key = _require_api_key()
     app_id, reason = _call_app_selector(user_text, apps, api_key, cfg)
     selected = by_id.get(app_id)
     if selected is None:
@@ -204,9 +210,7 @@ def select_tool_for_input(user_text: str, tools: List[Dict[str, Any]], cfg: Sele
     by_id = _index_tools(tools)
     if not by_id:
         raise RuntimeError("no valid tools discovered from mcpd")
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not set")
+    api_key = _require_api_key()
     tool_id, reason = _call_tool_selector(user_text, tools, api_key, cfg)
     selected = by_id.get(tool_id)
     if selected is None:
@@ -221,63 +225,10 @@ def select_route_for_request(
 ) -> Tuple[Dict[str, Any], Dict[str, Any], str, str, str, str, List[Dict[str, Any]], List[Dict[str, Any]]]:
     apps = _load_apps(sock_path)
     selected_app, app_source, app_reason = select_app_for_input(user_text, apps, cfg)
-    app_id = selected_app.get("app_id", "")
-    if not isinstance(app_id, str) or not app_id:
-        raise RuntimeError("selected app missing app_id")
+    app_id = selected_app["app_id"]
     tools = _load_tools(sock_path, app_id)
     selected_tool, tool_source, tool_reason = select_tool_for_input(user_text, tools, cfg)
     return selected_app, selected_tool, app_source, app_reason, tool_source, tool_reason, apps, tools
-
-
-def _matches_primitive(expected: str, value: Any) -> bool:
-    if expected == "string":
-        return isinstance(value, str)
-    if expected == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if expected == "number":
-        return (isinstance(value, int) or isinstance(value, float)) and not isinstance(value, bool)
-    if expected == "boolean":
-        return isinstance(value, bool)
-    if expected == "object":
-        return isinstance(value, dict)
-    if expected == "array":
-        return isinstance(value, list)
-    if expected == "null":
-        return value is None
-    return True
-
-
-def validate_payload_against_schema(input_schema: Dict[str, Any], payload: Any) -> None:
-    schema_type = input_schema.get("type")
-    if isinstance(schema_type, str) and not _matches_primitive(schema_type, payload):
-        raise ValueError(f"payload type mismatch: expected {schema_type}")
-    if schema_type != "object":
-        return
-    if not isinstance(payload, dict):
-        raise ValueError("payload must be object")
-
-    required = input_schema.get("required", [])
-    if isinstance(required, list):
-        for field in required:
-            if isinstance(field, str) and field not in payload:
-                raise ValueError(f"payload missing required field: {field}")
-
-    properties = input_schema.get("properties", {})
-    if not isinstance(properties, dict):
-        return
-
-    additional_properties = input_schema.get("additionalProperties", True)
-    for key, value in payload.items():
-        prop_schema = properties.get(key)
-        if prop_schema is None:
-            if additional_properties is False:
-                raise ValueError(f"payload has unknown field: {key}")
-            continue
-        if not isinstance(prop_schema, dict):
-            continue
-        expected_type = prop_schema.get("type")
-        if isinstance(expected_type, str) and not _matches_primitive(expected_type, value):
-            raise ValueError(f"field '{key}' type mismatch: expected {expected_type}")
 
 
 def _call_payload_builder(user_text: str, tool: Dict[str, Any], api_key: str, cfg: SelectorConfig) -> Dict[str, Any]:
@@ -305,18 +256,25 @@ def _call_payload_builder(user_text: str, tool: Dict[str, Any], api_key: str, cf
         api_key,
         cfg,
     )
-    if not isinstance(obj, dict):
-        raise RuntimeError(f"payload builder returned non-object: {obj!r}")
     return obj
 
 
 def build_payload_for_tool(tool: Dict[str, Any], user_text: str, cfg: SelectorConfig) -> Dict[str, Any]:
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
+    api_key = _require_api_key()
     input_schema = tool.get("input_schema", {})
     if not isinstance(input_schema, dict):
         raise RuntimeError("selected tool missing valid input_schema")
-    if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not set")
-    payload = _call_payload_builder(user_text, tool, api_key, cfg)
-    validate_payload_against_schema(input_schema, payload)
-    return payload
+
+    last_error: Exception | None = None
+    feedback = ""
+    for attempt in range(3):
+        try:
+            prompt_text = user_text if not feedback else f"{user_text}\n\nPrevious payload error: {feedback}"
+            payload = _call_payload_builder(prompt_text, tool, api_key, cfg)
+            validate_payload(input_schema, payload)
+            return payload
+        except ValueError as exc:
+            last_error = exc
+            feedback = str(exc)
+
+    raise RuntimeError(f"failed to build valid payload after retries: {last_error}") from last_error

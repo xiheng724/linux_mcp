@@ -114,7 +114,7 @@ static DEFINE_HASHTABLE(kernel_mcp_agents, KERNEL_MCP_AGENT_HASH_BITS);
 static DEFINE_MUTEX(kernel_mcp_agents_lock);
 static DEFINE_HASHTABLE(kernel_mcp_approval_tickets, KERNEL_MCP_APPROVAL_HASH_BITS);
 static DEFINE_MUTEX(kernel_mcp_approval_lock);
-static u64 kernel_mcp_next_ticket_id = 1;
+static u64 kernel_mcp_next_ticket_id;
 static struct timer_list kernel_mcp_ticket_cleanup_timer;
 
 static struct kobject *kernel_mcp_sysfs_root;
@@ -316,13 +316,22 @@ static ssize_t kernel_mcp_tool_status_show(struct kobject *kobj,
 					   struct kobj_attribute *attr,
 					   char *buf)
 {
-	struct kernel_mcp_tool_snapshot snapshot;
+	unsigned long tool_id;
+	const char *id_str;
+	struct kernel_mcp_tool *tool;
 	int ret;
 
 	(void)attr;
-	ret = kernel_mcp_lookup_tool_snapshot(kobj, &snapshot);
+	id_str = kobject_name(kobj);
+	ret = kstrtoul(id_str, 10, &tool_id);
 	if (ret)
 		return ret;
+
+	mutex_lock(&kernel_mcp_tools_lock);
+	tool = xa_load(&kernel_mcp_tools, tool_id);
+	mutex_unlock(&kernel_mcp_tools_lock);
+	if (!tool)
+		return -ENOENT;
 	return sysfs_emit(buf, "active\n");
 }
 
@@ -991,6 +1000,7 @@ static int kernel_mcp_cmd_approval_decide(struct sk_buff *skb,
 	u32 ttl_ms = KERNEL_MCP_DEFAULT_APPROVAL_TTL_MS;
 	const char *approver;
 	const char *reason;
+	bool approved;
 
 	(void)skb;
 	if (!info)
@@ -1022,19 +1032,19 @@ static int kernel_mcp_cmd_approval_decide(struct sk_buff *skb,
 
 	strscpy(ticket->approver, approver, sizeof(ticket->approver));
 	strscpy(ticket->reason, reason, sizeof(ticket->reason));
-	if (decision == KERNEL_MCP_APPROVAL_APPROVE) {
-		ticket->decided = true;
-		ticket->approved = true;
-		ticket->expires_jiffies = jiffies + msecs_to_jiffies(ttl_ms);
-	} else if (decision == KERNEL_MCP_APPROVAL_DENY ||
-		   decision == KERNEL_MCP_APPROVAL_REVOKE) {
-		ticket->decided = true;
-		ticket->approved = false;
-		ticket->expires_jiffies = jiffies + msecs_to_jiffies(ttl_ms);
-	} else {
+	if (decision == KERNEL_MCP_APPROVAL_APPROVE)
+		approved = true;
+	else if (decision == KERNEL_MCP_APPROVAL_DENY ||
+		 decision == KERNEL_MCP_APPROVAL_REVOKE)
+		approved = false;
+	else {
 		mutex_unlock(&kernel_mcp_approval_lock);
 		return -EINVAL;
 	}
+
+	ticket->decided = true;
+	ticket->approved = approved;
+	ticket->expires_jiffies = jiffies + msecs_to_jiffies(ttl_ms);
 	mutex_unlock(&kernel_mcp_approval_lock);
 	return 0;
 }

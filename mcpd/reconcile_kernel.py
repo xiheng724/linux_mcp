@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict
 
-from manifest_loader import DEFAULT_MANIFEST_DIR, ToolManifest, load_all_manifests
+from manifest_loader import DEFAULT_MANIFEST_DIR, ToolManifest, load_all_tools
 from netlink_client import KernelMcpNetlinkClient
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -30,11 +30,7 @@ def _run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[
 
 
 def _load_tool_map() -> Dict[int, ToolManifest]:
-    tools: Dict[int, ToolManifest] = {}
-    for app in load_all_manifests(DEFAULT_MANIFEST_DIR):
-        for tool in app.tools:
-            tools[tool.tool_id] = tool
-    return tools
+    return {tool.tool_id: tool for tool in load_all_tools(DEFAULT_MANIFEST_DIR)}
 
 
 def _check_prerequisites() -> None:
@@ -42,13 +38,7 @@ def _check_prerequisites() -> None:
         raise RuntimeError("client binaries missing; run: make -C client clean && make -C client")
 
     lsmod = _run_cmd(["lsmod"])
-    loaded = False
-    for line in lsmod.stdout.splitlines()[1:]:
-        cols = line.split()
-        if cols and cols[0] == "kernel_mcp":
-            loaded = True
-            break
-    if not loaded:
+    if not any(line.split()[:1] == ["kernel_mcp"] for line in lsmod.stdout.splitlines()[1:]):
         raise RuntimeError("kernel module kernel_mcp not loaded")
 
 

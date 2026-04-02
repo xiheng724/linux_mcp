@@ -109,10 +109,6 @@ def _load_runtime_registry() -> str:
 def _ensure_runtime_registry_current(*, force: bool = False) -> None:
     global _manifest_signature
 
-    current_signature = _compute_manifest_signature()
-    if not force and current_signature == _manifest_signature:
-        return
-
     with _manifest_reload_lock:
         current_signature = _compute_manifest_signature()
         if not force and current_signature == _manifest_signature:
@@ -249,7 +245,7 @@ def _app_to_public(app: AppManifest) -> Dict[str, Any]:
 
 def _list_apps_public() -> List[Dict[str, Any]]:
     with _registry_lock:
-        return [_app_to_public(_app_registry[app_id]) for app_id in sorted(_app_registry.keys())]
+        return [_app_to_public(app) for app in sorted(_app_registry.values(), key=lambda item: item.app_id)]
 
 
 def _list_tools_public(app_id: str = "") -> List[Dict[str, Any]]:
@@ -258,10 +254,10 @@ def _list_tools_public(app_id: str = "") -> List[Dict[str, Any]]:
             app = _app_registry.get(app_id)
             if app is None:
                 raise ValueError(f"unknown app_id: {app_id}")
-            tools = sorted(app.tools, key=lambda item: item.tool_id)
+            tools = app.tools
         else:
-            tools = sorted(_tool_registry.values(), key=lambda item: item.tool_id)
-    return [_tool_to_public(tool) for tool in tools]
+            tools = _tool_registry.values()
+    return [_tool_to_public(tool) for tool in sorted(tools, key=lambda item: item.tool_id)]
 
 
 def _build_error(req_id: int, err: str, t_ms: int) -> Dict[str, Any]:

@@ -14,6 +14,7 @@
 #define KERNEL_MCP_CMD_TOOL_COMPLETE 12
 #define KERNEL_MCP_CMD_APPROVAL_DECIDE 13
 #define KERNEL_MCP_CMD_RESET_TOOLS 14
+#define KERNEL_MCP_CMD_MAX KERNEL_MCP_CMD_RESET_TOOLS
 
 /* Attributes: stable numeric IDs, append-only. */
 #define KERNEL_MCP_ATTR_UNSPEC 0
@@ -35,6 +36,7 @@
 #define KERNEL_MCP_ATTR_APPROVAL_REASON 25
 #define KERNEL_MCP_ATTR_APPROVAL_TTL_MS 26
 #define KERNEL_MCP_ATTR_POLICY_ID 27
+#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_POLICY_ID
 
 /* Static tool risk flags, set from manifest risk_tags by user-space. */
 #define KERNEL_MCP_RISK_FILESYSTEM_WRITE (1U << 0)
