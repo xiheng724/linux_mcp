@@ -10,6 +10,8 @@ __pycache__/
 # Local editor / OS
 .DS_Store
 .vscode/
+!.vscode/
+!.vscode/c_cpp_properties.json
 
 # Client build outputs
 client/bin/*
