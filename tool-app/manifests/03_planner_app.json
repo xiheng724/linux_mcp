@@ -14,7 +14,7 @@
       ],
       "operation": "task_add",
       "timeout_ms": 30000,
-      "description": "Create a task with optional due date, priority, and project grouping.",
+      "description": "Create a task with optional project, priority, due-date text, and notes.",
       "input_schema": {
         "type": "object",
         "required": [
@@ -45,7 +45,7 @@
             "title": "Review manifest changes",
             "project": "linux-mcp",
             "priority": "high",
-            "due_date": "2026-04-02"
+            "due_date": "tomorrow"
           }
         },
         {
@@ -64,14 +64,20 @@
       ],
       "operation": "task_list",
       "timeout_ms": 30000,
-      "description": "List tasks with optional project and status filters, ordered by recency.",
+      "description": "Browse tasks with optional project, status, priority, free-text query, and result limit filters, ordered by recency.",
       "input_schema": {
         "type": "object",
         "properties": {
+          "query": {
+            "type": "string"
+          },
           "project": {
             "type": "string"
           },
           "status": {
+            "type": "string"
+          },
+          "priority": {
             "type": "string"
           },
           "limit": {
@@ -84,12 +90,14 @@
         {
           "payload": {
             "project": "linux-mcp",
-            "status": "open"
+            "status": "open",
+            "limit": 10
           }
         },
         {
           "payload": {
-            "limit": 20
+            "query": "manifest review",
+            "priority": "high"
           }
         }
       ]
@@ -103,7 +111,7 @@
       ],
       "operation": "task_update",
       "timeout_ms": 30000,
-      "description": "Update one task by identifier, including status, priority, due date, title, and notes.",
+      "description": "Update one task by exact task identifier, including status, priority, due date, title, and notes. Use a task identifier from task_list when the user did not provide a reliable exact ID.",
       "input_schema": {
         "type": "object",
         "required": [

@@ -15,16 +15,23 @@ from app_logic import (
     DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
-    build_payload_for_tool,
-    select_route_for_request,
+    execute_plan,
+    load_catalog,
+    render_execution_debug_lines,
 )
 from rpc import mcpd_call
 
 SOCK_PATH = "/tmp/mcpd.sock"
+SHOW_PAYLOAD_ENV = "LLM_APP_SHOW_PAYLOAD"
 
 
 class CliError(Exception):
     """User-facing CLI error."""
+
+
+def _env_flag(name: str) -> bool:
+    raw = os.getenv(name, "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _tools_signature(tools: List[Dict[str, Any]]) -> str:
@@ -112,71 +119,34 @@ def _execute_once_with_apps(
     sock_path: str,
     cfg: SelectorConfig,
     apps: List[Dict[str, Any]],
+    tools: List[Dict[str, Any]],
     show_reasons: bool = False,
+    show_payload: bool = False,
 ) -> int:
     if not apps:
         raise CliError("no apps returned by mcpd")
-
-    (
-        selected_app,
-        selected_tool,
-        app_selector_source,
-        app_selector_reason,
-        tool_selector_source,
-        tool_selector_reason,
-        _apps_catalog,
-        tools,
-    ) = select_route_for_request(
+    execution = execute_plan(
         user_text,
+        agent_id,
         sock_path,
         cfg,
+        apps=apps,
+        tools=tools,
     )
-
-    tool_id = int(selected_tool["tool_id"])
-    tool_name = str(selected_tool.get("name", "unknown"))
-    tool_hash_raw = selected_tool.get("hash")
-    tool_hash = tool_hash_raw if isinstance(tool_hash_raw, str) and tool_hash_raw else ""
-    app_id = str(selected_app.get("app_id", ""))
-    app_name = str(selected_app.get("app_name", app_id))
-    if not app_id:
-        raise CliError("selected app missing app_id")
-    payload = build_payload_for_tool(selected_tool, user_text, cfg)
-
-    req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
-    print(
-        (
-            f"[llm-app] route: {app_name} ({app_id})"
-            f" -> {tool_name} #{tool_id} [{tool_hash or '-'}]"
-        ),
-        flush=True,
-    )
+    for line in render_execution_debug_lines(
+        execution,
+        prefix="[llm-app]",
+        show_payload=show_payload,
+    ):
+        print(line, flush=True)
     if show_reasons:
-        print(f"[llm-app] why(app): {app_selector_source} | {app_selector_reason}", flush=True)
-        print(f"[llm-app] why(tool): {tool_selector_source} | {tool_selector_reason}", flush=True)
-    resp = mcpd_call(
-        {
-            "kind": "tool:exec",
-            "req_id": req_id,
-            "agent_id": agent_id,
-            "app_id": app_id,
-            "tool_id": tool_id,
-            "tool_hash": tool_hash,
-            "payload": payload,
-        },
-        sock_path=sock_path,
-        timeout_s=20,
-    )
-    print(
-        f"[llm-app] exec: req_id={req_id} status={resp.get('status')} t_ms={resp.get('t_ms')}",
-        flush=True,
-    )
-    if resp.get("status") == "ok":
-        print(
-            f"[llm-app] result: {json.dumps(resp.get('result', {}), ensure_ascii=True)}",
-            flush=True,
-        )
+        print(f"[llm-app] plan_source: model", flush=True)
+    resp = execution.get("response", {})
+    if not isinstance(resp, dict):
+        resp = {}
+    if execution.get("status") == "ok":
         return 0
-    print(f"[llm-app] error: {resp.get('error', 'unknown error')}", flush=True)
+    print(f"[llm-app] error: {resp.get('error', execution.get('error', 'unknown error'))}", flush=True)
     return 3
 
 
@@ -186,9 +156,9 @@ def _run_once(
     sock_path: str,
     cfg: SelectorConfig,
     show_reasons: bool,
+    show_payload: bool,
 ) -> int:
-    apps = _list_apps(sock_path)
-    tools = _list_tools(sock_path)
+    apps, tools = load_catalog(sock_path)
     print(f"[llm-app] catalog: apps={len(apps)} tools={len(tools)}", flush=True)
     return _execute_once_with_apps(
         user_text,
@@ -196,7 +166,9 @@ def _run_once(
         sock_path,
         cfg,
         apps,
+        tools,
         show_reasons=show_reasons,
+        show_payload=show_payload,
     )
 
 
@@ -214,6 +186,7 @@ def _repl_loop(
     cfg: SelectorConfig,
     show_tools: bool,
     show_reasons: bool,
+    show_payload: bool,
 ) -> int:
     apps = _list_apps(sock_path)
     tools = _list_tools(sock_path)
@@ -272,7 +245,9 @@ def _repl_loop(
             sock_path,
             cfg,
             apps,
+            tools,
             show_reasons=show_reasons,
+            show_payload=show_payload,
         )
         if rc != 0:
             print(f"[llm-app] request failed rc={rc}", flush=True)
@@ -294,7 +269,12 @@ def main() -> int:
     parser.add_argument(
         "--show-reasons",
         action="store_true",
-        help="print selector reasoning details for each request",
+        help="print planner metadata for each request",
+    )
+    parser.add_argument(
+        "--show-payload",
+        action="store_true",
+        help=f"print model-generated payload before tool execution (or set {SHOW_PAYLOAD_ENV}=1)",
     )
     parser.add_argument("--agent", dest="agent_legacy", help=argparse.SUPPRESS)
     parser.add_argument("--socket", dest="socket_legacy", help=argparse.SUPPRESS)
@@ -307,17 +287,32 @@ def main() -> int:
         deepseek_model=args.deepseek_model,
         deepseek_timeout_sec=args.deepseek_timeout_sec,
     )
+    show_payload = args.show_payload or _env_flag(SHOW_PAYLOAD_ENV)
 
     try:
         if args.once and args.repl:
             raise CliError("use either --once or --repl, not both")
         if args.once:
-            return _run_once(args.once, agent_id, sock_path, cfg, args.show_reasons)
+            return _run_once(args.once, agent_id, sock_path, cfg, args.show_reasons, show_payload)
         if args.repl:
-            return _repl_loop(agent_id, sock_path, cfg, args.show_tools, args.show_reasons)
+            return _repl_loop(
+                agent_id,
+                sock_path,
+                cfg,
+                args.show_tools,
+                args.show_reasons,
+                show_payload,
+            )
         if not sys.stdin.isatty():
             raise CliError("no --once/--repl provided and stdin is not interactive")
-        return _repl_loop(agent_id, sock_path, cfg, args.show_tools, args.show_reasons)
+        return _repl_loop(
+            agent_id,
+            sock_path,
+            cfg,
+            args.show_tools,
+            args.show_reasons,
+            show_payload,
+        )
     except CliError as exc:
         print(f"[llm-app] ERROR: {exc}", flush=True)
         return 1

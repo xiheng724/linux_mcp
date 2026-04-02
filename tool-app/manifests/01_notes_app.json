@@ -68,11 +68,14 @@
       ],
       "operation": "note_list",
       "timeout_ms": 30000,
-      "description": "List notes from a notebook with optional tag filtering and result limit.",
+      "description": "Browse recent notes with optional notebook, free-text query, tag filter, and result limit.",
       "input_schema": {
         "type": "object",
         "properties": {
           "notebook": {
+            "type": "string"
+          },
+          "query": {
             "type": "string"
           },
           "tag": {
@@ -88,12 +91,19 @@
         {
           "payload": {
             "notebook": "work",
-            "limit": 10
+            "limit": 5
           }
         },
         {
           "payload": {
-            "tag": "daily"
+            "query": "standup schema sync",
+            "limit": 5
+          }
+        },
+        {
+          "payload": {
+            "tag": "daily",
+            "limit": 10
           }
         }
       ]
@@ -106,7 +116,7 @@
       ],
       "operation": "note_read",
       "timeout_ms": 30000,
-      "description": "Read one note by note identifier and return its content and metadata.",
+      "description": "Read one note by exact note identifier and return full content and metadata. Use a note identifier from note_list or note_search when the user did not provide an exact ID.",
       "input_schema": {
         "type": "object",
         "required": [
@@ -140,7 +150,7 @@
       ],
       "operation": "note_search",
       "timeout_ms": 30000,
-      "description": "Search note titles, tags, and bodies for a keyword across all notebooks or within one notebook.",
+      "description": "Find notes by free-text query across titles, tags, and bodies, optionally scoped to one notebook. Returns note identifiers and excerpts for follow-up note_read steps.",
       "input_schema": {
         "type": "object",
         "required": [
@@ -167,8 +177,7 @@
         },
         {
           "payload": {
-            "query": "daily",
-            "notebook": "work",
+            "query": "daily standup",
             "limit": 5
           }
         }

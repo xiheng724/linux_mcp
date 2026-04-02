@@ -90,10 +90,12 @@ def event_create(payload: Dict[str, Any]) -> Dict[str, Any]:
 def event_list(payload: Dict[str, Any]) -> Dict[str, Any]:
     calendar = _normalize_text("calendar", payload.get("calendar"))
     date_prefix = _normalize_text("date", payload.get("date"))
+    query = _normalize_text("query", payload.get("query"))
     limit = payload.get("limit", 20)
     if isinstance(limit, bool) or not isinstance(limit, int):
         raise ValueError("event_list payload.limit must be integer")
     limit = max(1, min(MAX_EVENTS_RETURNED, limit))
+    needle = query.lower()
 
     items = []
     for event in sorted(_load_events(), key=lambda item: str(item.get("start_time", ""))):
@@ -101,6 +103,17 @@ def event_list(payload: Dict[str, Any]) -> Dict[str, Any]:
             continue
         if date_prefix and not str(event.get("start_time", "")).startswith(date_prefix):
             continue
+        if needle:
+            haystack = " ".join(
+                [
+                    str(event.get("title", "")),
+                    str(event.get("location", "")),
+                    str(event.get("notes", "")),
+                    str(event.get("calendar", "")),
+                ]
+            ).lower()
+            if needle not in haystack:
+                continue
         items.append(event)
         if len(items) >= limit:
             break

@@ -112,12 +112,14 @@ def note_create(payload: Dict[str, Any]) -> Dict[str, Any]:
 def note_list(payload: Dict[str, Any]) -> Dict[str, Any]:
     notebook_filter = payload.get("notebook", "")
     tag_filter = payload.get("tag", "")
+    query = payload.get("query", "")
     limit = payload.get("limit", 20)
-    if not isinstance(notebook_filter, str) or not isinstance(tag_filter, str):
+    if not isinstance(notebook_filter, str) or not isinstance(tag_filter, str) or not isinstance(query, str):
         raise ValueError("note_list filters must be strings")
     if isinstance(limit, bool) or not isinstance(limit, int):
         raise ValueError("note_list payload.limit must be integer")
     limit = max(1, min(MAX_RESULTS, limit))
+    needle = query.strip().lower()
 
     items = []
     for note in reversed(_iter_notes()):
@@ -125,6 +127,16 @@ def note_list(payload: Dict[str, Any]) -> Dict[str, Any]:
             continue
         if tag_filter and tag_filter.strip() not in note.get("tags", []):
             continue
+        if needle:
+            haystack = " ".join(
+                [
+                    str(note.get("title", "")),
+                    str(note.get("body", "")),
+                    " ".join(note.get("tags", [])),
+                ]
+            ).lower()
+            if needle not in haystack:
+                continue
         items.append(
             {
                 "note_id": note.get("note_id", ""),

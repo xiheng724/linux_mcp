@@ -39,8 +39,8 @@ from app_logic import (
     DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
-    build_payload_for_tool,
-    select_route_for_request,
+    execute_plan,
+    render_execution_debug_lines,
 )
 from rpc import mcpd_call
 
@@ -76,7 +76,8 @@ class ExecWorker(QObject):
     def run(self) -> None:
         now = time.time()
         apps = self.req.cached_apps
-        if not apps or (now - self.req.cached_at) > TOOLS_CACHE_TTL_S:
+        tools = self.req.cached_tools
+        if not apps or not tools or (now - self.req.cached_at) > TOOLS_CACHE_TTL_S:
             resp = mcpd_call({"sys": "list_apps"}, sock_path=self.req.sock_path, timeout_s=5)
             if resp.get("status") != "ok":
                 self.finished.emit(
@@ -88,79 +89,39 @@ class ExecWorker(QObject):
                 return
             raw_apps = resp.get("apps", [])
             apps = raw_apps if isinstance(raw_apps, list) else []
+            tools_resp = mcpd_call({"sys": "list_tools"}, sock_path=self.req.sock_path, timeout_s=5)
+            if tools_resp.get("status") != "ok":
+                self.finished.emit(
+                    {
+                        "status": "error",
+                        "error": tools_resp.get("error", "list_tools failed"),
+                    }
+                )
+                return
+            raw_tools = tools_resp.get("tools", [])
+            tools = raw_tools if isinstance(raw_tools, list) else []
 
         try:
-            (
-                selected_app,
-                selected_tool,
-                app_selector_source,
-                app_selector_reason,
-                tool_selector_source,
-                tool_selector_reason,
-                apps,
-                tools,
-            ) = select_route_for_request(
+            execution = execute_plan(
                 self.req.user_text,
+                self.req.agent_id,
                 self.req.sock_path,
                 self.req.selector_cfg,
+                apps=apps,
+                tools=tools,
             )
         except Exception as exc:  # noqa: BLE001
             self.finished.emit({"status": "error", "error": str(exc), "warnings": []})
             return
 
-        app_id = selected_app.get("app_id")
-        app_name = selected_app.get("app_name", "")
-        if not isinstance(app_id, str) or not app_id:
-            self.finished.emit({"status": "error", "error": "selected app missing app_id"})
-            return
-
-        tool_id = selected_tool.get("tool_id")
-        tool_name = selected_tool.get("name", "unknown")
-        tool_hash = selected_tool.get("hash", "")
-        if not isinstance(tool_id, int):
-            self.finished.emit({"status": "error", "error": "selected tool missing tool_id"})
-            return
-        if not isinstance(tool_name, str):
-            tool_name = str(tool_name)
-        if not isinstance(tool_hash, str):
-            tool_hash = ""
-        if not isinstance(app_name, str):
-            app_name = str(app_name)
-
-        req_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
-        payload = build_payload_for_tool(selected_tool, self.req.user_text, self.req.selector_cfg)
-        exec_resp = mcpd_call(
-            {
-                "kind": "tool:exec",
-                "req_id": req_id,
-                "agent_id": self.req.agent_id,
-                "app_id": app_id,
-                "tool_id": tool_id,
-                "tool_hash": tool_hash,
-                "payload": payload,
-            },
-            sock_path=self.req.sock_path,
-            timeout_s=10,
-        )
         self.finished.emit(
             {
-                "status": "ok",
-                "selected": {
-                    "app_id": app_id,
-                    "app_name": app_name,
-                    "tool_id": tool_id,
-                    "tool_name": tool_name,
-                    "tool_hash": tool_hash,
-                },
-                "app_selector_source": app_selector_source,
-                "app_selector_reason": app_selector_reason,
-                "tool_selector_source": tool_selector_source,
-                "tool_selector_reason": tool_selector_reason,
+                "status": execution.get("status", "error"),
+                "error": execution.get("error", ""),
                 "warnings": [],
-                "req_id": req_id,
-                "response": exec_resp,
-                "apps": apps,
-                "tools": tools,
+                "execution": execution,
+                "apps": execution.get("apps", apps),
+                "tools": execution.get("tools", self.req.cached_tools),
                 "tools_at": time.time(),
             }
         )
@@ -319,34 +280,18 @@ class MainWindow(QMainWindow):
         if isinstance(tools_at, (int, float)):
             self.tools_cache_at = float(tools_at)
 
-        selected = payload.get("selected", {})
-        resp = payload.get("response", {})
-        if not isinstance(selected, dict):
-            selected = {}
-        if not isinstance(resp, dict):
-            resp = {"status": "error", "error": "invalid response"}
-        app_name = selected.get("app_name", "unknown")
-        app_id = selected.get("app_id", "?")
-        tool_name = selected.get("tool_name", "unknown")
-        tool_id = selected.get("tool_id", "?")
-        req_id = payload.get("req_id", "?")
-        app_selector_source = payload.get("app_selector_source", "unknown")
-        app_selector_reason = payload.get("app_selector_reason", "")
-        tool_selector_source = payload.get("tool_selector_source", "unknown")
-        tool_selector_reason = payload.get("tool_selector_reason", "")
-
         for msg in payload.get("warnings", []):
             self._append(f"Warn: {msg}")
-        self._append(f"Selected app: {app_name} (id={app_id})")
-        self._append(f"Selected tool: {tool_name} (id={tool_id})")
-        self._append(f"App Selector: {app_selector_source} ({app_selector_reason})")
-        self._append(f"Tool Selector: {tool_selector_source} ({tool_selector_reason})")
-        self._append(f"req_id: {req_id}")
-        self._append(f"status: {resp.get('status')}  t_ms: {resp.get('t_ms')}")
-        if resp.get("status") == "ok":
-            self._append(f"Result: {_fmt_json(resp.get('result', {}))}")
-        else:
-            self._append(f"Error: {resp.get('error', 'unknown error')}")
+        execution = payload.get("execution", {})
+        if not isinstance(execution, dict):
+            execution = {}
+        for line in render_execution_debug_lines(execution, prefix="[llm-app]", show_payload=True):
+            self._append(line)
+        resp = execution.get("response", {})
+        if not isinstance(resp, dict):
+            resp = {}
+        if execution.get("status") != "ok":
+            self._append(f"Error: {resp.get('error', execution.get('error', 'unknown error'))}")
         self._append("")
 
         self._thread = None

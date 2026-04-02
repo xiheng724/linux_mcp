@@ -94,15 +94,21 @@ def task_add(payload: Dict[str, Any]) -> Dict[str, Any]:
 def task_list(payload: Dict[str, Any]) -> Dict[str, Any]:
     project = payload.get("project", "")
     status = payload.get("status", "")
+    priority = payload.get("priority", "")
+    query = payload.get("query", "")
     limit = payload.get("limit", 20)
-    if not isinstance(project, str) or not isinstance(status, str):
+    if not isinstance(project, str) or not isinstance(status, str) or not isinstance(priority, str) or not isinstance(query, str):
         raise ValueError("task_list filters must be strings")
     if isinstance(limit, bool) or not isinstance(limit, int):
         raise ValueError("task_list payload.limit must be integer")
     limit = max(1, min(MAX_TASKS_RETURNED, limit))
     status_filter = status.strip().lower()
+    priority_filter = priority.strip().lower()
+    needle = query.strip().lower()
     if status_filter and status_filter not in VALID_STATUS:
         raise ValueError(f"status must be one of: {sorted(VALID_STATUS)}")
+    if priority_filter and priority_filter not in VALID_PRIORITY:
+        raise ValueError(f"priority must be one of: {sorted(VALID_PRIORITY)}")
 
     items = []
     for task in reversed(_load_tasks()):
@@ -110,6 +116,19 @@ def task_list(payload: Dict[str, Any]) -> Dict[str, Any]:
             continue
         if status_filter and task.get("status") != status_filter:
             continue
+        if priority_filter and task.get("priority") != priority_filter:
+            continue
+        if needle:
+            haystack = " ".join(
+                [
+                    str(task.get("title", "")),
+                    str(task.get("notes", "")),
+                    str(task.get("project", "")),
+                    str(task.get("due_date", "")),
+                ]
+            ).lower()
+            if needle not in haystack:
+                continue
         items.append(task)
         if len(items) >= limit:
             break

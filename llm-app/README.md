@@ -5,10 +5,10 @@
 它的职责不是直接执行工具，而是：
 
 1. 从 `mcpd` 获取 app/tool 语义目录
-2. 用 DeepSeek 选择 app
-3. 用 DeepSeek 选择 tool
-4. 用 DeepSeek 按 `input_schema` 生成 payload
-5. 把最终 `tool:exec` 请求发给 `mcpd`
+2. 用 DeepSeek 生成一个最小可执行 plan
+3. 按 plan 顺序执行 1 到 N 个 tool step
+4. 在 step 间传递上一步结果里的标识符或字段
+5. 把每一步 `tool:exec` 请求发给 `mcpd`
 
 ## 当前真实链路
 
@@ -34,12 +34,13 @@ llm-app
 当前流程是：
 
 1. 调 `{"sys":"list_apps"}`
-2. 用 DeepSeek 从 app 列表里选一个 `app_id`
-3. 调 `{"sys":"list_tools","app_id":"..."}`
-4. 用 DeepSeek 从 tool 列表里选一个 `tool_id`
-5. 用 DeepSeek 生成 payload JSON
-6. 本地按 `input_schema` 再校验一次 payload
-7. 发 `{"kind":"tool:exec", ...}` 给 `mcpd`
+2. 调 `{"sys":"list_tools"}`
+3. 用 DeepSeek 基于全量 tool catalog 生成一个严格 JSON plan
+4. 每个 plan step 选择一个 `tool_id`
+5. 每个 step 生成自己的 payload JSON
+6. 如果后一步需要前一步结果，会通过 `$alias.path` 引用前一步返回值
+7. 本地按 `input_schema` 校验 step payload
+8. 逐步发 `{"kind":"tool:exec", ...}` 给 `mcpd`
 
 这意味着当前 `llm-app` 强依赖：
 
@@ -104,6 +105,7 @@ REPL 内置命令：
 - `--sock /tmp/mcpd.sock`
 - `--show-tools`
 - `--show-reasons`
+- `--show-payload`
 - `--deepseek-model ...`
 - `--deepseek-url ...`
 - `--deepseek-timeout-sec ...`
@@ -155,17 +157,19 @@ pip install PySide6
 CLI 单次执行时，通常会输出：
 
 - 当前 catalog 里的 app/tool 数量
-- 选中的 `app_name/app_id`
-- 选中的 `tool_name/tool_id/hash`
-- 执行状态和耗时
-- 最终结果或错误
+- plan 原因
+- 每一步的 `app_name/app_id`
+- 每一步的 `tool_name/tool_id`
+- 每一步的 payload、执行状态和耗时
+- 每一步结果，以及最终错误
 
-启用 `--show-reasons` 时，还会输出模型的 app/tool 选择理由。
+启用 `--show-payload` 时，会打印每一步真正发送给 `mcpd` 的 payload。
 
 ## 当前限制
 
-- app 选择、tool 选择、payload 构造都依赖 DeepSeek
+- plan 生成和 step payload 构造都依赖 DeepSeek
 - 没有离线 fallback
+- 多步执行质量仍然取决于 manifest 语义和模型规划质量
 - 没有对话记忆压缩或 job 模式
 - GUI 只是 demo UI，不是完整产品界面
 - 真正的仲裁和执行都发生在 `mcpd` 侧，`llm-app` 只负责语义路由

@@ -41,6 +41,7 @@ manifest：
 说明：
 
 - 数据存放在 `tool-app/demo_data/notes/`
+- `note_list` 现在支持 `query`，`note_search` 返回更适合后续 `note_read` 的标识符和摘录
 - 更像一个轻量本地笔记应用
 
 ### workspace_app
@@ -84,6 +85,7 @@ manifest：
 说明：
 
 - 数据存放在 `tool-app/demo_data/planner/tasks.json`
+- `task_list` 现在支持 `query` 和 `priority` 过滤，更适合作为 `task_update` 前的解析步骤
 - 更像一个本地待办/计划应用
 
 ### desktop_app
@@ -127,6 +129,7 @@ manifest：
 说明：
 
 - 数据存放在 `tool-app/demo_data/calendar/events.json`
+- `event_list` 现在支持 `query`，更适合作为 `event_update` 前的解析步骤
 - 更像一个轻量本地日历应用
 
 ### contacts_app
