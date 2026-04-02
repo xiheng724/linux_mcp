@@ -35,12 +35,14 @@ llm-app
 
 1. 调 `{"sys":"list_apps"}`
 2. 调 `{"sys":"list_tools"}`
-3. 用 DeepSeek 基于全量 tool catalog 生成一个严格 JSON plan
-4. 每个 plan step 选择一个 `tool_id`
-5. 每个 step 生成自己的 payload JSON
-6. 如果后一步需要前一步结果，会通过 `$alias.path` 引用前一步返回值
-7. 本地按 `input_schema` 校验 step payload
-8. 逐步发 `{"kind":"tool:exec", ...}` 给 `mcpd`
+3. 用 DeepSeek 先从 catalog 里选出一小组候选 tool
+4. 再基于候选 tool 生成一个严格 JSON plan
+5. 每个 plan step 选择一个 `tool_id`
+6. 每个 step 先解析 partial payload，再按 schema 补全最终 payload
+7. 如果后一步需要前一步结果，会通过显式 selector 或 `$alias.path` 引用前一步返回值
+8. 运行时上下文会显式提供 `context.workspace_root_rel` 之类的环境值
+9. 本地按 `input_schema` 校验 step payload
+10. 逐步发 `{"kind":"tool:exec", ...}` 给 `mcpd`
 
 这意味着当前 `llm-app` 强依赖：
 
@@ -130,6 +132,8 @@ python llm-app/gui_app.py
 
 GUI 和 CLI 使用同一套共享选择逻辑，不是两套不同实现。
 
+如果某一步被内核仲裁成 `DEFER`，CLI/GUI 会向用户请求确认，再通过 `mcpd` 的 `approval_reply` 链路继续执行或拒绝。
+
 ## 运行前提
 
 启动 `llm-app` 之前，通常要先确保：
@@ -170,6 +174,7 @@ CLI 单次执行时，通常会输出：
 - plan 生成和 step payload 构造都依赖 DeepSeek
 - 没有离线 fallback
 - 多步执行质量仍然取决于 manifest 语义和模型规划质量
+- `on_empty`、`selector`、`runtime_context` 都是显式执行语义，不会自动推导任意隐含工作流
 - 没有对话记忆压缩或 job 模式
 - GUI 只是 demo UI，不是完整产品界面
 - 真正的仲裁和执行都发生在 `mcpd` 侧，`llm-app` 只负责语义路由

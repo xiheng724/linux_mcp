@@ -1,6 +1,6 @@
 # tool-app
 
-`tool-app` 目录现在提供 6 个更像独立应用的 demo services，而不是单纯的零散 utility tools。
+`tool-app` 目录现在提供 14 个更像独立应用的 demo services，而不是单纯的零散 utility tools。
 
 当前系统里，`mcpd` 不会 import 这些 app 的 Python 代码直接执行函数。它只会：
 
@@ -152,6 +152,177 @@ manifest：
 
 - 数据存放在 `tool-app/demo_data/contacts/contacts.json`
 - 更像一个轻量本地联系人应用
+
+### launcher_app
+
+manifest：
+
+- [07_launcher_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/07_launcher_app.json)
+
+服务：
+
+- [launcher_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/launcher_app.py)
+
+工具：
+
+- `list_launchable_apps`
+- `launch_app`
+- `open_with_app`
+
+说明：
+
+- 直接桥接 Linux 系统中已有的 `.desktop` 应用和可执行文件
+- 更像一个真实应用入口桥接层，而不是本地数据型 demo app
+- `launch_app` / `open_with_app` 依赖图形桌面会话
+
+### bridge_app
+
+manifest：
+
+- [08_bridge_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/08_bridge_app.json)
+
+服务：
+
+- [bridge_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/bridge_app.py)
+
+工具：
+
+- `list_desktop_entries`
+- `launch_desktop_entry`
+- `run_cli_entry`
+- `call_dbus_method`
+
+说明：
+
+- 把 Linux 真实应用入口整理成 manifest 可调用工具
+- 覆盖三类真实入口：
+  - CLI 参数
+  - `.desktop` / GApplication
+  - D-Bus / Freedesktop 接口
+- 更像一个真实接口桥接样本库，而不是本地数据型 app
+
+### file_manager_app
+
+manifest：
+
+- [09_file_manager_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/09_file_manager_app.json)
+
+服务：
+
+- [file_manager_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/file_manager_app.py)
+
+工具：
+
+- `open_directory`
+- `reveal_path`
+- `show_item_properties`
+
+说明：
+
+- manifest 直接描述文件管理语义，而不是 generic D-Bus 调用
+- 底层桥接标准 `org.freedesktop.FileManager1` 接口
+
+### calendar_desktop_app
+
+manifest：
+
+- [10_calendar_desktop_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/10_calendar_desktop_app.json)
+
+服务：
+
+- [calendar_desktop_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/calendar_desktop_app.py)
+
+工具：
+
+- `open_calendar`
+- `open_calendar_file`
+
+说明：
+
+- manifest 直接描述 GNOME Calendar 的语义能力
+- 底层桥接 `org.freedesktop.Application` D-Bus 接口
+
+### mail_client_app
+
+manifest：
+
+- [11_mail_client_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/11_mail_client_app.json)
+
+服务：
+
+- [mail_client_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/mail_client_app.py)
+
+工具：
+
+- `open_inbox`
+- `compose_email`
+
+说明：
+
+- manifest 直接描述 Thunderbird 的邮件能力
+- 底层桥接 Thunderbird 的真实 CLI compose 入口
+
+### document_viewer_app
+
+manifest：
+
+- [12_document_viewer_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/12_document_viewer_app.json)
+
+服务：
+
+- [document_viewer_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/document_viewer_app.py)
+
+工具：
+
+- `open_document`
+- `open_document_page`
+
+说明：
+
+- manifest 直接描述 Evince 的文档查看能力
+- 底层桥接 Evince 的真实 CLI 参数
+
+### browser_app
+
+manifest：
+
+- [13_browser_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/13_browser_app.json)
+
+服务：
+
+- [browser_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/browser_app.py)
+
+工具：
+
+- `open_tab`
+- `open_private_window`
+- `search_web`
+
+说明：
+
+- manifest 直接描述 Firefox 的浏览器语义能力
+- 底层桥接 Firefox 的真实 CLI 参数
+
+### code_editor_app
+
+manifest：
+
+- [14_code_editor_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/14_code_editor_app.json)
+
+服务：
+
+- [code_editor_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/code_editor_app.py)
+
+工具：
+
+- `open_path`
+- `open_file_at_line`
+- `compare_files`
+
+说明：
+
+- manifest 直接描述 VS Code 的编辑器语义能力
+- 底层桥接 `code` 的真实 CLI 参数
 
 ## manifest 作用
 

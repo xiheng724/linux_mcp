@@ -26,17 +26,16 @@ llm-app
 对应到当前实现：
 
 1. `mcpd` 启动时加载 `tool-app/manifests/*.json`
-2. 每个 manifest tool 会被注册到内核，并带上 `tool_id/name/perm/cost/hash`
+2. 每个 manifest tool 会被注册到内核，并带上 `tool_id/name/risk/hash`
 3. `llm-app` 先调用 `list_apps`
-4. `llm-app` 用 DeepSeek 从 app catalog 里选一个 app
-5. `llm-app` 再调用 `list_tools(app_id=...)`
-6. `llm-app` 用 DeepSeek 从该 app 的 tools 里选一个 tool，并构造 payload
-7. `llm-app` 发送 `tool:exec` 给 `mcpd`
-8. `mcpd` 先确保 agent 已注册，再向内核发起仲裁
-9. 内核返回 `ALLOW` / `DENY` / `DEFER`
-10. 若允许，`mcpd` 通过 UDS RPC 调用对应 app 的 `operation`
-11. 执行结束后，`mcpd` 再向内核上报 `tool_complete`
-12. agent/tool 状态可从 `/sys/kernel/mcp/...` 读取
+4. `llm-app` 用 DeepSeek 从 app/tool catalog 里构造执行计划
+5. `llm-app` 再按计划查询 `list_tools(app_id=...)` 并补全 step payload
+6. `llm-app` 发送 `tool:exec` 给 `mcpd`
+7. `mcpd` 先确保 agent 已注册，再向内核发起仲裁
+8. 内核返回 `ALLOW` / `DENY` / `DEFER`
+9. 若允许，`mcpd` 通过 UDS RPC 调用对应 app 的 `operation`
+10. 执行结束后，`mcpd` 再向内核上报 `tool_complete`
+11. agent/tool 状态可从 `/sys/kernel/mcp/...` 读取
 
 ## 当前仓库结构
 
@@ -110,7 +109,7 @@ manifest 加载逻辑在 [mcpd/manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd
 
 manifest 目录：`tool-app/manifests/*.json`
 
-当前共有 6 个 app、20 个 tool：
+当前共有 14 个 app、42 个 tool：
 
 - `notes_app`
   - `note_create`
@@ -138,6 +137,36 @@ manifest 目录：`tool-app/manifests/*.json`
   - `contact_add`
   - `contact_list`
   - `contact_find`
+- `launcher_app`
+  - `list_launchable_apps`
+  - `launch_app`
+  - `open_with_app`
+- `bridge_app`
+  - `list_desktop_entries`
+  - `launch_desktop_entry`
+  - `run_cli_entry`
+  - `call_dbus_method`
+- `file_manager_app`
+  - `open_directory`
+  - `reveal_path`
+  - `show_item_properties`
+- `calendar_desktop_app`
+  - `open_calendar`
+  - `open_calendar_file`
+- `mail_client_app`
+  - `open_inbox`
+  - `compose_email`
+- `document_viewer_app`
+  - `open_document`
+  - `open_document_page`
+- `browser_app`
+  - `open_tab`
+  - `open_private_window`
+  - `search_web`
+- `code_editor_app`
+  - `open_path`
+  - `open_file_at_line`
+  - `compare_files`
 
 所有 demo app 都通过 [tool-app/demo_rpc.py](/home/lxh/Code/linux-mcp/tool-app/demo_rpc.py) 提供统一的 framed JSON over UDS 协议。
 
@@ -149,6 +178,8 @@ manifest 目录：`tool-app/manifests/*.json`
 - `calendar_app` 和 `contacts_app` 也会把 demo 数据写到 `tool-app/demo_data/`
 - `desktop_app.open_url` 依赖本机 `xdg-open` 或 `gio`
 - `desktop_app.show_notification` 依赖本机 `notify-send`
+- 新增的真实应用语义 app 会桥接 CLI、`.desktop`、D-Bus / Freedesktop 入口
+- 这些桥接型 app 依赖当前会话具备可用的 GUI session
 
 ### 4. llm-app
 
@@ -165,8 +196,7 @@ CLI 在 [llm-app/cli.py](/home/lxh/Code/linux-mcp/llm-app/cli.py)，GUI 在 [llm
   - `description`
   - `input_schema`
   - `examples`
-  - `perm`
-  - `cost`
+  - `risk_tags`
   - `hash`
 - app 选择、tool 选择、payload 构造都依赖 DeepSeek API
 
@@ -194,8 +224,7 @@ tool 级字段：
 
 - `tool_id`
 - `name`
-- `perm`
-- `cost`
+- `risk_tags`
 - `operation`
 - `timeout_ms`
 - `description`
@@ -213,8 +242,7 @@ tool 级字段：
 - `name`
 - `app_id`
 - `app_name`
-- `perm`
-- `cost`
+- `risk_tags`
 - `description`
 - `input_schema`
 - `examples`

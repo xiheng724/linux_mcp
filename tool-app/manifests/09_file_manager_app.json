@@ -1,0 +1,106 @@
+{
+  "app_id": "file_manager_app",
+  "app_name": "File Manager App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/file_manager_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/file_manager_app.py",
+  "tools": [
+    {
+      "tool_id": 28,
+      "name": "open_directory",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "open_directory",
+      "timeout_ms": 30000,
+      "description": "Open a real directory in the system file manager using the standard org.freedesktop.FileManager1 D-Bus interface.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "."
+          }
+        },
+        {
+          "payload": {
+            "path": "tool-app"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 29,
+      "name": "reveal_path",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "reveal_path",
+      "timeout_ms": 30000,
+      "description": "Reveal a specific file or directory in the system file manager using the standard org.freedesktop.FileManager1 D-Bus interface.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "README.md"
+          }
+        },
+        {
+          "payload": {
+            "path": "tool-app/manifests/09_file_manager_app.json"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 30,
+      "name": "show_item_properties",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "show_item_properties",
+      "timeout_ms": 30000,
+      "description": "Open the properties dialog for a file or directory through the standard org.freedesktop.FileManager1 interface.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "README.md"
+          }
+        }
+      ]
+    }
+  ]
+}

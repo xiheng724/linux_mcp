@@ -61,6 +61,7 @@ llm-app -> mcpd -> kernel netlink
 {"sys":"list_apps"}
 {"sys":"list_tools"}
 {"sys":"list_tools","app_id":"notes_app"}
+{"sys":"approval_reply","ticket_id":2,"decision":"approve","operator":"a1","reason":"approved in llm-app","ttl_ms":300000}
 {"kind":"tool:exec","req_id":1,"agent_id":"a1","app_id":"notes_app","tool_id":1,"tool_hash":"8hex","payload":{"title":"Daily Standup","body":"Blocked on review"}} 
 ```
 
@@ -113,8 +114,11 @@ netlink client 在 [netlink_client.py](/home/lxh/Code/linux-mcp/mcpd/netlink_cli
 
 当前 `mcpd` 对 `DEFER` 的处理方式是：
 
-- 直接把 `ticket_id` 返回给调用方
-- 由用户态审批端再调用 `{"sys":"approval_decide",...}` 完成放行或拒绝
+- 先把 `ticket_id` 和原始待执行请求缓存到用户态 pending approval 表
+- 把 `ticket_id` 返回给调用方
+- 由用户态审批端再调用 `{"sys":"approval_reply",...}` 返回批准或拒绝
+- `mcpd` 在批准后调用 `approval_decide`，然后继续执行原始请求
+- 如果用户拒绝，`mcpd` 直接返回 `approval declined by user`
 
 当前仓库约定里，rate limiting 和重试策略应由 `mcpd` 在用户空间完成，不在内核协议或 agent 内核状态里维护 token bucket。
 

@@ -1,0 +1,114 @@
+{
+  "app_id": "code_editor_app",
+  "app_name": "Code Editor App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/code_editor_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/code_editor_app.py",
+  "tools": [
+    {
+      "tool_id": 40,
+      "name": "open_path",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "open_path",
+      "timeout_ms": 30000,
+      "description": "Open a local file or directory in Visual Studio Code.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "."
+          }
+        },
+        {
+          "payload": {
+            "path": "README.md"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 41,
+      "name": "open_file_at_line",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "open_file_at_line",
+      "timeout_ms": 30000,
+      "description": "Open a local file in Visual Studio Code at a specific line and optional column.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path",
+          "line"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "column": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "README.md",
+            "line": 10
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 42,
+      "name": "compare_files",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "compare_files",
+      "timeout_ms": 30000,
+      "description": "Open a side-by-side diff of two local files in Visual Studio Code.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "left_path",
+          "right_path"
+        ],
+        "properties": {
+          "left_path": {
+            "type": "string"
+          },
+          "right_path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "left_path": "README.md",
+            "right_path": "tool-app/README.md"
+          }
+        }
+      ]
+    }
+  ]
+}

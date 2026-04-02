@@ -1,0 +1,202 @@
+{
+  "app_id": "bridge_app",
+  "app_name": "Bridge App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/bridge_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/bridge_app.py",
+  "tools": [
+    {
+      "tool_id": 24,
+      "name": "list_desktop_entries",
+      "risk_tags": [
+        "sensitive_read"
+      ],
+      "operation": "list_desktop_entries",
+      "timeout_ms": 30000,
+      "description": "Discover installed Linux desktop applications from .desktop files, optionally filtered by query.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "query": "calendar",
+            "limit": 10
+          }
+        },
+        {
+          "payload": {
+            "query": "firefox"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 25,
+      "name": "launch_desktop_entry",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "launch_desktop_entry",
+      "timeout_ms": 30000,
+      "description": "Launch a real desktop application through its .desktop entry using gio launch, with an optional target path or URL.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "desktop_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "executable": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "desktop_id": "org.gnome.Calendar.desktop"
+          }
+        },
+        {
+          "payload": {
+            "name": "Files",
+            "target": "."
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 26,
+      "name": "run_cli_entry",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "run_cli_entry",
+      "timeout_ms": 30000,
+      "description": "Invoke a real installed CLI entrypoint by executable name with explicit argument list.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "executable"
+        ],
+        "properties": {
+          "executable": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "executable": "thunderbird",
+            "args": [
+              "-compose"
+            ]
+          }
+        },
+        {
+          "payload": {
+            "executable": "code",
+            "args": [
+              "."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 27,
+      "name": "call_dbus_method",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "call_dbus_method",
+      "timeout_ms": 30000,
+      "description": "Call a D-Bus or Freedesktop method using gdbus on the session or system bus with explicit string arguments.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "destination",
+          "object_path",
+          "interface",
+          "method"
+        ],
+        "properties": {
+          "bus": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "object_path": {
+            "type": "string"
+          },
+          "interface": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "bus": "session",
+            "destination": "org.gnome.Calendar",
+            "object_path": "/org/gnome/Calendar",
+            "interface": "org.gtk.Application",
+            "method": "Activate",
+            "arguments": [
+              "{}"
+            ]
+          }
+        },
+        {
+          "payload": {
+            "bus": "session",
+            "destination": "org.gnome.Calendar",
+            "object_path": "/org/gnome/Calendar",
+            "interface": "org.gtk.Application",
+            "method": "Open",
+            "arguments": [
+              "['file:///tmp/test.ics']",
+              "''",
+              "{}"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

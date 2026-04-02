@@ -1,0 +1,58 @@
+{
+  "app_id": "calendar_desktop_app",
+  "app_name": "Calendar Desktop App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/calendar_desktop_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/calendar_desktop_app.py",
+  "tools": [
+    {
+      "tool_id": 31,
+      "name": "open_calendar",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "open_calendar",
+      "timeout_ms": 30000,
+      "description": "Activate the real GNOME Calendar desktop application using its org.freedesktop.Application D-Bus interface.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {}
+        }
+      ]
+    },
+    {
+      "tool_id": 32,
+      "name": "open_calendar_file",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "open_calendar_file",
+      "timeout_ms": 30000,
+      "description": "Open a local calendar file, such as an ICS file, in the real GNOME Calendar desktop application through its org.freedesktop.Application interface.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "/tmp/demo.ics"
+          }
+        }
+      ]
+    }
+  ]
+}

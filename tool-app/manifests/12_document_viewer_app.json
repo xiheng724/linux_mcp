@@ -1,0 +1,72 @@
+{
+  "app_id": "document_viewer_app",
+  "app_name": "Document Viewer App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/document_viewer_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/document_viewer_app.py",
+  "tools": [
+    {
+      "tool_id": 35,
+      "name": "open_document",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "open_document",
+      "timeout_ms": 30000,
+      "description": "Open a local document in the real Evince document viewer.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "README.md"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 36,
+      "name": "open_document_page",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "open_document_page",
+      "timeout_ms": 30000,
+      "description": "Open a local document in the real Evince document viewer and jump to a specific page.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path",
+          "page_index"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "page_index": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "path": "/tmp/report.pdf",
+            "page_index": 3
+          }
+        }
+      ]
+    }
+  ]
+}

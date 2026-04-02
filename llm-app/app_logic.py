@@ -129,6 +129,14 @@ def _current_time_context() -> Dict[str, str]:
     }
 
 
+def _runtime_context() -> Dict[str, str]:
+    cwd = os.getcwd()
+    return {
+        "workspace_root_rel": ".",
+        "cwd_abs": cwd,
+    }
+
+
 def load_apps(sock_path: str) -> List[Dict[str, Any]]:
     resp = mcpd_call({"sys": "list_apps"}, sock_path=sock_path, timeout_s=5)
     if resp.get("status") != "ok":
@@ -278,6 +286,7 @@ def _call_plan_builder(
     prompt = {
         "user_input": user_text,
         "time_context": _current_time_context(),
+        "runtime_context": _runtime_context(),
         "apps": [
             {
                 "app_id": app.get("app_id", ""),
@@ -303,6 +312,7 @@ def _call_plan_builder(
         "reference_syntax": {
             "description": "Prefer explicit selector objects to read values from prior step results.",
             "examples": [
+                "$context.workspace_root_rel",
                 {"$select": {"step": "matches", "path": "items", "mode": "first", "field": "note_id"}},
                 {"$select": {"step": "events", "path": "items", "mode": "first", "field": "event_id"}},
             ],
@@ -330,17 +340,16 @@ def _call_plan_builder(
         prompt,
         (
             "You are a planning router for tool execution. Build the smallest valid sequential plan. "
+            "A runtime_context object is available for environment values such as the current workspace root. "
+            "When the user refers to the current project folder or current workspace, use $context.workspace_root_rel "
+            "instead of inventing a lookup step. "
             "If the user refers to an item semantically but the write/read tool needs an exact identifier, "
             "first use a search/list/find tool to resolve candidates, then use an explicit selector object in a later step. "
             "The plan payload for each step may be partial. Include constrained fields you know, "
             "but do not inline large freeform text such as source code or full documents into the plan. "
-            "If an initial constrained search may reasonably return zero matches, express that fallback in the plan with on_empty "
-            "instead of relying on implicit executor behavior. "
-            "Only attach on_empty to steps whose result is expected to contain a collection like items. "
+            "If a step may need an explicit empty-result policy, declare it with on_empty rather than relying on implicit executor behavior. "
+            "Only attach on_empty to steps whose result schema is collection-shaped, such as an object containing items. "
             "Do not attach on_empty to create/write steps that return a single object summary. "
-            "When choosing search terms, prefer stable content phrases from the user's request over brittle contextual wording alone. "
-            "Keep contextual filters like notebook or calendar in the first attempt when the user asked for them, "
-            "and only relax them via on_empty if needed. "
             "If a tool schema expects an absolute timestamp field, plan for a payload that contains a valid ISO-8601 time, "
             "not a relative phrase. Use the provided time_context for date resolution. "
             "Do not invent IDs. Prefer plans that can succeed with the available tool schemas. "
@@ -382,9 +391,7 @@ def _call_tool_selector(
     obj = _call_model(
         prompt,
         (
-            "You are a lightweight tool selector. Choose the smallest set of tools needed to satisfy the user request. "
-            "Prefer tools from a single app when possible. "
-            "Include search/list/find tools when the request refers to an item semantically and a later step may need an exact identifier. "
+            "You are a lightweight tool selector. Choose the smallest set of tools needed to satisfy the user request and any identifier-resolution steps implied by the selected tool schemas. "
             "Do not invent tool ids. Return strict JSON only in the format "
             "{\"reason\":\"...\",\"tool_ids\":[1,2]}."
         ),
@@ -675,7 +682,7 @@ def execute_plan(
         apps, tools = load_catalog(sock_path)
     plan = build_execution_plan(user_text, apps, tools, cfg)
 
-    results_by_alias: Dict[str, Any] = {}
+    results_by_alias: Dict[str, Any] = {"context": _runtime_context()}
     executed_steps: List[Dict[str, Any]] = []
     final_response: Dict[str, Any] = {}
     final_status = "ok"

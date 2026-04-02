@@ -1,0 +1,99 @@
+{
+  "app_id": "browser_app",
+  "app_name": "Browser App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/browser_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/browser_app.py",
+  "tools": [
+    {
+      "tool_id": 37,
+      "name": "open_tab",
+      "risk_tags": [
+        "external_network",
+        "system_mutation"
+      ],
+      "operation": "open_tab",
+      "timeout_ms": 30000,
+      "description": "Open a URL in a new Firefox browser tab.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "url": "https://github.com"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 38,
+      "name": "open_private_window",
+      "risk_tags": [
+        "external_network",
+        "system_mutation"
+      ],
+      "operation": "open_private_window",
+      "timeout_ms": 30000,
+      "description": "Open Firefox in a private window, optionally with a starting URL.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "url": "https://example.com"
+          }
+        },
+        {
+          "payload": {}
+        }
+      ]
+    },
+    {
+      "tool_id": 39,
+      "name": "search_web",
+      "risk_tags": [
+        "external_network",
+        "system_mutation"
+      ],
+      "operation": "search_web",
+      "timeout_ms": 30000,
+      "description": "Search the web in Firefox using the default search engine.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "query": "transformer architecture tutorial"
+          }
+        }
+      ]
+    }
+  ]
+}

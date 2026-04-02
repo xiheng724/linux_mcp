@@ -1,0 +1,79 @@
+{
+  "app_id": "mail_client_app",
+  "app_name": "Mail Client App",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/mail_client_app.sock",
+  "demo_entrypoint": "tool-app/demo_apps/mail_client_app.py",
+  "tools": [
+    {
+      "tool_id": 33,
+      "name": "open_inbox",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "open_inbox",
+      "timeout_ms": 30000,
+      "description": "Open the real Thunderbird mail client to its mail view.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {}
+        }
+      ]
+    },
+    {
+      "tool_id": 34,
+      "name": "compose_email",
+      "risk_tags": [
+        "system_mutation"
+      ],
+      "operation": "compose_email",
+      "timeout_ms": 30000,
+      "description": "Open the real Thunderbird compose window with semantic email fields such as recipients, subject, body, and an optional attachment.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string"
+          },
+          "cc": {
+            "type": "string"
+          },
+          "bcc": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "attachment_path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "to": "alice@example.com",
+            "subject": "Schema review",
+            "body": "Can you review the manifest changes today?"
+          }
+        },
+        {
+          "payload": {
+            "to": "team@example.com",
+            "cc": "lead@example.com",
+            "subject": "Weekly update"
+          }
+        }
+      ]
+    }
+  ]
+}
