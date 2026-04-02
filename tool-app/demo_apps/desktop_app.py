@@ -91,6 +91,21 @@ def _run_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, text=True, capture_output=True, check=False)
 
 
+def _has_gui_session() -> bool:
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
+def _spawn_cmd(args: list[str]) -> subprocess.Popen[str]:
+    return subprocess.Popen(  # noqa: S603
+        args,
+        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
 def open_url(payload: Dict[str, Any]) -> Dict[str, Any]:
     url = payload.get("url", "")
     if not isinstance(url, str) or not url.strip():
@@ -98,14 +113,20 @@ def open_url(payload: Dict[str, Any]) -> Dict[str, Any]:
     parsed = urlparse(url.strip())
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("open_url only supports absolute http/https URLs")
+    if not _has_gui_session():
+        raise ValueError("no GUI session available (DISPLAY/WAYLAND_DISPLAY unset)")
+
+    firefox = shutil.which("firefox")
+    if firefox is not None:
+        proc = _spawn_cmd([firefox, "--new-tab", url.strip()])
+        return {"opened": True, "url": url.strip(), "backend": "firefox", "pid": proc.pid}
 
     candidates = [["xdg-open", url.strip()], ["gio", "open", url.strip()]]
     for args in candidates:
         if shutil.which(args[0]) is None:
             continue
-        proc = _run_cmd(args)
-        if proc.returncode == 0:
-            return {"opened": True, "url": url.strip(), "backend": args[0]}
+        proc = _spawn_cmd(args)
+        return {"opened": True, "url": url.strip(), "backend": args[0], "pid": proc.pid}
     raise ValueError("no supported URL opener succeeded (need xdg-open or gio)")
 
 
