@@ -3,19 +3,19 @@
 
 from __future__ import annotations
 
-import json
 import sys
 import time
 import argparse
 import os
 import threading
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 try:
     from PySide6.QtCore import QObject, QThread, Qt, Signal
     from PySide6.QtWidgets import (
         QApplication,
+        QComboBox,
         QHBoxLayout,
         QLabel,
         QLineEdit,
@@ -26,6 +26,7 @@ try:
         QPushButton,
         QPlainTextEdit,
         QSplitter,
+        QTextEdit,
         QVBoxLayout,
         QWidget,
     )
@@ -39,34 +40,31 @@ except Exception:
 
 from app_logic import (
     ApprovalRequest,
+    execute_plan,
+)
+from gui_support import approval_message, execution_lines, fetch_catalog, pull_worker_state, render_catalog_view
+from model_client import (
     DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
-    execute_plan,
-    render_execution_debug_lines,
+    SessionInfo,
+    open_session,
 )
-from rpc import mcpd_call
-
 DEFAULT_SOCK_PATH = "/tmp/mcpd.sock"
 TOOLS_CACHE_TTL_S = 10.0
-
-
-def _fmt_json(data: Any) -> str:
-    try:
-        return json.dumps(data, ensure_ascii=False)
-    except Exception:
-        return str(data)
-
+DEFAULT_SESSION_TTL_MS = 30 * 60 * 1000
+DisplayMode = Literal["user", "dev"]
 
 @dataclass
 class ExecRequest:
     user_text: str
-    agent_id: str
+    client_name: str
     sock_path: str
     selector_cfg: SelectorConfig
     cached_apps: List[Dict[str, Any]]
     cached_tools: List[Dict[str, Any]]
     cached_at: float
+    session: SessionInfo | None
 
 
 class ExecWorker(QObject):
@@ -89,7 +87,9 @@ class ExecWorker(QObject):
         self.approval_needed.emit(
             {
                 "step_id": request.step_id,
+                "app_name": request.app_name,
                 "tool_name": request.tool_name,
+                "purpose": request.purpose,
                 "ticket_id": request.ticket_id,
                 "reason": request.reason,
                 "payload": request.payload,
@@ -103,33 +103,27 @@ class ExecWorker(QObject):
         apps = self.req.cached_apps
         tools = self.req.cached_tools
         if not apps or not tools or (now - self.req.cached_at) > TOOLS_CACHE_TTL_S:
-            resp = mcpd_call({"sys": "list_apps"}, sock_path=self.req.sock_path, timeout_s=5)
-            if resp.get("status") != "ok":
+            catalog = fetch_catalog(self.req.sock_path)
+            if catalog.get("status") != "ok":
                 self.finished.emit(
-                    {
-                        "status": "error",
-                        "error": resp.get("error", "list_apps failed"),
-                    }
+                    {"status": "error", "error": catalog.get("error", "catalog refresh failed")}
                 )
                 return
-            raw_apps = resp.get("apps", [])
-            apps = raw_apps if isinstance(raw_apps, list) else []
-            tools_resp = mcpd_call({"sys": "list_tools"}, sock_path=self.req.sock_path, timeout_s=5)
-            if tools_resp.get("status") != "ok":
-                self.finished.emit(
-                    {
-                        "status": "error",
-                        "error": tools_resp.get("error", "list_tools failed"),
-                    }
-                )
-                return
-            raw_tools = tools_resp.get("tools", [])
-            tools = raw_tools if isinstance(raw_tools, list) else []
+            apps = catalog["apps"]
+            tools = catalog["tools"]
 
         try:
+            session = self.req.session
+            now_ms = int(time.time() * 1000)
+            if session is None or session.expires_at_ms <= (now_ms + 5_000):
+                session = open_session(
+                    self.req.sock_path,
+                    self.req.client_name,
+                    DEFAULT_SESSION_TTL_MS,
+                )
             execution = execute_plan(
                 self.req.user_text,
-                self.req.agent_id,
+                session,
                 self.req.sock_path,
                 self.req.selector_cfg,
                 apps=apps,
@@ -149,21 +143,30 @@ class ExecWorker(QObject):
                 "apps": execution.get("apps", apps),
                 "tools": execution.get("tools", self.req.cached_tools),
                 "tools_at": time.time(),
+                "session": session,
             }
         )
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, sock_path: str, agent_id: str, selector_cfg: SelectorConfig) -> None:
+    def __init__(
+        self,
+        sock_path: str,
+        client_name: str,
+        selector_cfg: SelectorConfig,
+        initial_mode: DisplayMode,
+    ) -> None:
         super().__init__()
         self.sock_path = sock_path
-        self.agent_id = agent_id
+        self.client_name = client_name
         self.selector_cfg = selector_cfg
         self.apps_cache: List[Dict[str, Any]] = []
         self.tools_cache: List[Dict[str, Any]] = []
         self.tools_cache_at: float = 0.0
+        self.session: SessionInfo | None = None
         self._thread: Optional[QThread] = None
         self._worker: Optional[ExecWorker] = None
+        self._tools_visible = False
 
         self.setWindowTitle("Linux MCP LLM App")
         self.resize(980, 620)
@@ -177,10 +180,26 @@ class MainWindow(QMainWindow):
 
         left = QWidget(self)
         left_layout = QVBoxLayout(left)
-        self.refresh_btn = QPushButton("Refresh Apps/Tools", self)
-        self.tools_list = QListWidget(self)
-        left_layout.addWidget(self.refresh_btn)
-        left_layout.addWidget(self.tools_list)
+        top_row = QHBoxLayout()
+        self.refresh_btn = QPushButton("Refresh", self)
+        self.mode_combo = QComboBox(self)
+        self.mode_combo.addItems(["user", "dev"])
+        self.mode_combo.setCurrentText(initial_mode)
+        top_row.addWidget(self.refresh_btn)
+        top_row.addWidget(QLabel("Mode", self))
+        top_row.addWidget(self.mode_combo)
+        self.catalog_label = QLabel("Catalog not loaded", self)
+        self.apps_list = QListWidget(self)
+        self.toggle_tools_btn = QPushButton("Show Tool Details", self)
+        self.tools_text = QTextEdit(self)
+        self.tools_text.setReadOnly(True)
+        self.tools_text.setVisible(False)
+        left_layout.addLayout(top_row)
+        left_layout.addWidget(self.catalog_label)
+        left_layout.addWidget(QLabel("Apps", self))
+        left_layout.addWidget(self.apps_list)
+        left_layout.addWidget(self.toggle_tools_btn)
+        left_layout.addWidget(self.tools_text)
 
         right = QWidget(self)
         right_layout = QVBoxLayout(right)
@@ -191,7 +210,9 @@ class MainWindow(QMainWindow):
 
         input_row = QHBoxLayout()
         self.input_box = QLineEdit(self)
-        self.input_box.setPlaceholderText("Type message and press Enter...")
+        self.input_box.setPlaceholderText(
+            "Ask naturally, for example: create a note titled Daily Standup"
+        )
         self.send_btn = QPushButton("Send", self)
         input_row.addWidget(self.input_box)
         input_row.addWidget(self.send_btn)
@@ -202,10 +223,12 @@ class MainWindow(QMainWindow):
         splitter.setSizes([320, 660])
 
         self.refresh_btn.clicked.connect(self.refresh_tools)
+        self.toggle_tools_btn.clicked.connect(self._toggle_tool_details)
+        self.mode_combo.currentTextChanged.connect(lambda _text: self._render_catalog_views())
         self.send_btn.clicked.connect(self.handle_send)
         self.input_box.returnPressed.connect(self.handle_send)
 
-        self._append("[system] GUI started")
+        self._append(f"[system] GUI started in {initial_mode} mode")
         self.refresh_tools()
 
     def _append(self, text: str) -> None:
@@ -215,42 +238,39 @@ class MainWindow(QMainWindow):
         self.send_btn.setEnabled(not busy)
         self.input_box.setEnabled(not busy)
         self.refresh_btn.setEnabled(not busy)
+        self.mode_combo.setEnabled(not busy)
+
+    def _mode(self) -> DisplayMode:
+        value = self.mode_combo.currentText()
+        return "dev" if value == "dev" else "user"
+
+    def _toggle_tool_details(self) -> None:
+        self._tools_visible = not self._tools_visible
+        self.tools_text.setVisible(self._tools_visible)
+        self.toggle_tools_btn.setText("Hide Tool Details" if self._tools_visible else "Show Tool Details")
+
+    def _render_catalog_views(self) -> None:
+        view = render_catalog_view(
+            self.apps_cache,
+            self.tools_cache,
+            detailed=(self._mode() == "dev"),
+        )
+        self.catalog_label.setText(view["label"])
+        self.apps_list.clear()
+        for line in view["app_lines"]:
+            self.apps_list.addItem(QListWidgetItem(line))
+        self.tools_text.setPlainText(view["tool_text"])
 
     def refresh_tools(self) -> None:
-        apps_resp = mcpd_call({"sys": "list_apps"}, sock_path=self.sock_path, timeout_s=5)
-        if apps_resp.get("status") != "ok":
-            self._append(f"[system] app refresh failed: {apps_resp.get('error', 'unknown error')}")
-            return
-        raw_apps = apps_resp.get("apps", [])
-        if not isinstance(raw_apps, list):
-            self._append("[system] app refresh failed: invalid apps list")
+        catalog = fetch_catalog(self.sock_path)
+        if catalog.get("status") != "ok":
+            self._append(f"[system] catalog refresh failed: {catalog.get('error', 'unknown error')}")
             return
 
-        resp = mcpd_call({"sys": "list_tools"}, sock_path=self.sock_path, timeout_s=5)
-        if resp.get("status") != "ok":
-            self._append(f"[system] tool refresh failed: {resp.get('error', 'unknown error')}")
-            return
-        raw_tools = resp.get("tools", [])
-        if not isinstance(raw_tools, list):
-            self._append("[system] tool refresh failed: invalid tools list")
-            return
-
-        self.apps_cache = raw_apps
-        self.tools_cache = raw_tools
-        self.tools_cache_at = time.time()
-        self.tools_list.clear()
-        for app in self.apps_cache:
-            app_id = app.get("app_id")
-            app_name = app.get("app_name")
-            item = QListWidgetItem(f"[APP] id={app_id}  name={app_name}")
-            self.tools_list.addItem(item)
-        for tool in self.tools_cache:
-            tid = tool.get("tool_id")
-            name = tool.get("name")
-            app_name = tool.get("app_name", "-")
-            desc = tool.get("description")
-            item = QListWidgetItem(f"[TOOL] id={tid}  name={name}  app={app_name}\n{desc}")
-            self.tools_list.addItem(item)
+        self.apps_cache = catalog["apps"]
+        self.tools_cache = catalog["tools"]
+        self.tools_cache_at = float(catalog["tools_at"])
+        self._render_catalog_views()
         self._append(
             f"[system] catalog refreshed: apps={len(self.apps_cache)} tools={len(self.tools_cache)}"
         )
@@ -264,15 +284,20 @@ class MainWindow(QMainWindow):
             return
 
         self._append(f"You: {text}")
+        if self._mode() == "user":
+            self._append("Assistant: Working on it...")
+        else:
+            self._append("[system] executing request...")
         self._set_busy(True)
         req = ExecRequest(
             user_text=text,
-            agent_id=self.agent_id,
+            client_name=self.client_name,
             sock_path=self.sock_path,
             selector_cfg=self.selector_cfg,
             cached_apps=self.apps_cache,
             cached_tools=self.tools_cache,
             cached_at=self.tools_cache_at,
+            session=self.session,
         )
         self._thread = QThread(self)
         self._worker = ExecWorker(req)
@@ -297,27 +322,28 @@ class MainWindow(QMainWindow):
             self._worker = None
             return
 
-        apps = payload.get("apps")
-        if isinstance(apps, list):
-            self.apps_cache = apps
-        tools = payload.get("tools")
-        tools_at = payload.get("tools_at")
-        if isinstance(tools, list):
-            self.tools_cache = tools
-        if isinstance(tools_at, (int, float)):
-            self.tools_cache_at = float(tools_at)
+        state = pull_worker_state(payload, self.session)
+        if isinstance(state["apps"], list):
+            self.apps_cache = state["apps"]
+        if isinstance(state["tools"], list):
+            self.tools_cache = state["tools"]
+        if isinstance(state["tools_at"], float):
+            self.tools_cache_at = state["tools_at"]
+        if isinstance(state["session"], SessionInfo):
+            self.session = state["session"]
+        self._render_catalog_views()
 
         for msg in payload.get("warnings", []):
             self._append(f"Warn: {msg}")
         execution = payload.get("execution", {})
         if not isinstance(execution, dict):
             execution = {}
-        for line in render_execution_debug_lines(execution, prefix="[llm-app]", show_payload=True):
+        for line in execution_lines(execution, dev_mode=(self._mode() == "dev")):
             self._append(line)
         resp = execution.get("response", {})
         if not isinstance(resp, dict):
             resp = {}
-        if execution.get("status") != "ok":
+        if execution.get("status") != "ok" and self._mode() == "dev":
             self._append(f"Error: {resp.get('error', execution.get('error', 'unknown error'))}")
         self._append("")
 
@@ -325,16 +351,10 @@ class MainWindow(QMainWindow):
         self._worker = None
 
     def _on_approval_needed(self, payload: Dict[str, Any]) -> None:
-        payload_text = _fmt_json(payload.get("payload", {}))
         choice = QMessageBox.question(
             self,
             "Approval Required",
-            (
-                f"Allow {payload.get('tool_name', 'tool')}?\n\n"
-                f"ticket_id: {payload.get('ticket_id', 0)}\n"
-                f"reason: {payload.get('reason', '')}\n\n"
-                f"payload: {payload_text}"
-            ),
+            approval_message(payload),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -345,10 +365,11 @@ class MainWindow(QMainWindow):
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sock", default=DEFAULT_SOCK_PATH)
-    parser.add_argument("--agent-id", default="a1")
+    parser.add_argument("--agent-id", default="a1", help="client name hint for session opening")
     parser.add_argument("--deepseek-model", default=DEFAULT_DEEPSEEK_MODEL)
     parser.add_argument("--deepseek-url", default=os.getenv("DEEPSEEK_API_URL", DEFAULT_DEEPSEEK_URL))
     parser.add_argument("--deepseek-timeout-sec", type=int, default=20)
+    parser.add_argument("--mode", choices=("user", "dev"), default="user")
     args = parser.parse_args()
 
     if sys.platform.startswith("linux"):
@@ -366,7 +387,12 @@ def main() -> int:
         deepseek_model=args.deepseek_model,
         deepseek_timeout_sec=args.deepseek_timeout_sec,
     )
-    win = MainWindow(sock_path=args.sock, agent_id=args.agent_id, selector_cfg=selector_cfg)
+    win = MainWindow(
+        sock_path=args.sock,
+        client_name=args.agent_id,
+        selector_cfg=selector_cfg,
+        initial_mode=args.mode,
+    )
     win.show()
     return app.exec()
 

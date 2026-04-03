@@ -10,6 +10,7 @@ import os
 import re
 import signal
 import socket
+import struct
 import threading
 import time
 from pathlib import Path
@@ -18,17 +19,46 @@ from typing import Any, Dict, List, Tuple
 try:
     from manifest_loader import DEFAULT_MANIFEST_DIR, AppManifest, ToolManifest, load_all_manifests
     from netlink_client import KernelMcpNetlinkClient
+    from public_catalog import list_apps_public, list_tools_public
     from rpc_framing import recv_frame, send_frame
     from schema_utils import ensure_int, ensure_non_empty_str, validate_payload
+    from session_store import (
+        AgentBinding,
+        PeerIdentity,
+        normalize_session_ttl_ms,
+        open_session,
+        peek_pending_approval,
+        put_pending_approval,
+        remember_pending_approval,
+        resolve_session,
+        session_binding,
+        take_pending_approval,
+        validate_pending_approval_req,
+    )
 except ModuleNotFoundError:  # pragma: no cover - package import fallback
     from .manifest_loader import DEFAULT_MANIFEST_DIR, AppManifest, ToolManifest, load_all_manifests
     from .netlink_client import KernelMcpNetlinkClient
+    from .public_catalog import list_apps_public, list_tools_public
     from .rpc_framing import recv_frame, send_frame
     from .schema_utils import ensure_int, ensure_non_empty_str, validate_payload
+    from .session_store import (
+        AgentBinding,
+        PeerIdentity,
+        normalize_session_ttl_ms,
+        open_session,
+        peek_pending_approval,
+        put_pending_approval,
+        remember_pending_approval,
+        resolve_session,
+        session_binding,
+        take_pending_approval,
+        validate_pending_approval_req,
+    )
 
 SOCK_PATH = "/tmp/mcpd.sock"
 MAX_MSG_SIZE = 16 * 1024 * 1024
 DEFAULT_APPROVAL_TTL_MS = 5 * 60 * 1000
+DEFAULT_SESSION_TTL_MS = 30 * 60 * 1000
 APPROVAL_DECISION_MAP = {
     "approve": 1,
     "deny": 2,
@@ -40,14 +70,13 @@ HASH_RE = re.compile(r"^[0-9a-fA-F]{8}$")
 _stop_event = threading.Event()
 _agents_lock = threading.Lock()
 _registry_lock = threading.RLock()
-_registered_agents: set[str] = set()
+_registered_agents: Dict[str, "AgentBinding"] = {}
+_agent_bindings: Dict[str, "AgentBinding"] = {}
 _app_registry: Dict[str, AppManifest] = {}
 _tool_registry: Dict[int, ToolManifest] = {}
 _kernel_client: KernelMcpNetlinkClient | None = None
 _manifest_reload_lock = threading.Lock()
 _manifest_signature = ""
-_approval_lock = threading.Lock()
-_pending_approvals: Dict[int, Dict[str, Any]] = {}
 
 
 def _get_kernel_client() -> KernelMcpNetlinkClient:
@@ -120,35 +149,85 @@ def _ensure_runtime_registry_current(*, force: bool = False) -> None:
         LOGGER.info("manifest catalog refreshed signature=%s", loaded_signature[:12])
 
 
-def _ensure_agent_registered(agent_id: str) -> None:
+def _read_peer_identity(conn: socket.socket) -> PeerIdentity:
+    if not hasattr(socket, "SO_PEERCRED"):
+        raise RuntimeError("SO_PEERCRED not available on this platform")
+    raw = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+    pid, uid, gid = struct.unpack("3i", raw)
+    return PeerIdentity(pid=pid, uid=uid, gid=gid)
+
+
+def _bind_agent_identity(agent_id: str, binding: AgentBinding) -> None:
     with _agents_lock:
-        if agent_id in _registered_agents:
+        bound = _agent_bindings.get(agent_id)
+        if bound is not None and bound != binding:
+            raise ValueError("agent_id is bound to a different peer identity")
+        _agent_bindings[agent_id] = binding
+
+
+def _ensure_agent_registered(agent_id: str, binding: AgentBinding) -> None:
+    _bind_agent_identity(agent_id, binding)
+    with _agents_lock:
+        registered_peer = _registered_agents.get(agent_id)
+        if registered_peer is not None:
+            if registered_peer != binding:
+                raise ValueError("agent_id is registered to a different peer identity")
             return
 
     client = _get_kernel_client()
-    uid = os.getuid() if hasattr(os, "getuid") else 0
-    client.register_agent(agent_id, pid=os.getpid(), uid=uid)
-    LOGGER.info("agent registered via netlink: %s", agent_id)
+    try:
+        client.register_agent(
+            agent_id,
+            pid=binding.peer.pid,
+            uid=binding.peer.uid,
+            binding_hash=binding.binding_hash,
+            binding_epoch=binding.binding_epoch,
+        )
+    except RuntimeError as exc:
+        if "Invalid argument" in str(exc):
+            raise RuntimeError(
+                "kernel agent ABI mismatch: rebuild and reload kernel_mcp from this repo"
+            ) from exc
+        raise
+    LOGGER.info(
+        "agent registered via netlink: %s pid=%d uid=%d binding_hash=%016x epoch=%d",
+        agent_id,
+        binding.peer.pid,
+        binding.peer.uid,
+        binding.binding_hash,
+        binding.binding_epoch,
+    )
 
     with _agents_lock:
-        _registered_agents.add(agent_id)
+        _registered_agents[agent_id] = binding
 
 
 def _kernel_arbitrate(
     req_id: int,
     agent_id: str,
+    binding_hash: int,
+    binding_epoch: int,
     tool_id: int,
     tool_hash: str,
     ticket_id: int = 0,
 ) -> Tuple[str, str, int]:
     client = _get_kernel_client()
-    decision_reply = client.tool_request(
-        req_id=req_id,
-        agent_id=agent_id,
-        tool_id=tool_id,
-        tool_hash=tool_hash,
-        ticket_id=ticket_id,
-    )
+    try:
+        decision_reply = client.tool_request(
+            req_id=req_id,
+            agent_id=agent_id,
+            binding_hash=binding_hash,
+            binding_epoch=binding_epoch,
+            tool_id=tool_id,
+            tool_hash=tool_hash,
+            ticket_id=ticket_id,
+        )
+    except RuntimeError as exc:
+        if "Invalid argument" in str(exc):
+            raise RuntimeError(
+                "kernel request ABI mismatch: rebuild and reload kernel_mcp from this repo"
+            ) from exc
+        raise
     LOGGER.info(
         "arb req_id=%d agent=%s tool=%d decision=%s reason=%s ticket_id=%d",
         req_id,
@@ -219,35 +298,9 @@ def _call_tool_service(tool: ToolManifest, req_id: int, agent_id: str, payload: 
     return _call_uds_tool(tool, req_id=req_id, agent_id=agent_id, payload=payload)
 
 
-def _tool_to_public(tool: ToolManifest) -> Dict[str, Any]:
-    return {
-        "tool_id": tool.tool_id,
-        "name": tool.name,
-        "app_id": tool.app_id,
-        "app_name": tool.app_name,
-        "description": tool.description,
-        "input_schema": tool.input_schema,
-        "examples": tool.examples,
-        "risk_tags": tool.risk_tags,
-        "risk_flags": tool.risk_flags,
-        "hash": tool.manifest_hash,
-    }
-
-
-def _app_to_public(app: AppManifest) -> Dict[str, Any]:
-    ordered = sorted(app.tools, key=lambda item: item.tool_id)
-    return {
-        "app_id": app.app_id,
-        "app_name": app.app_name,
-        "tool_count": len(ordered),
-        "tool_ids": [tool.tool_id for tool in ordered],
-        "tool_names": [tool.name for tool in ordered],
-    }
-
-
 def _list_apps_public() -> List[Dict[str, Any]]:
     with _registry_lock:
-        return [_app_to_public(app) for app in sorted(_app_registry.values(), key=lambda item: item.app_id)]
+        return list_apps_public(list(_app_registry.values()))
 
 
 def _list_tools_public(app_id: str = "") -> List[Dict[str, Any]]:
@@ -259,7 +312,7 @@ def _list_tools_public(app_id: str = "") -> List[Dict[str, Any]]:
             tools = app.tools
         else:
             tools = _tool_registry.values()
-    return [_tool_to_public(tool) for tool in sorted(tools, key=lambda item: item.tool_id)]
+    return list_tools_public(list(tools))
 
 
 def _build_error(req_id: int, err: str, t_ms: int) -> Dict[str, Any]:
@@ -272,7 +325,17 @@ def _build_error(req_id: int, err: str, t_ms: int) -> Dict[str, Any]:
     }
 
 
-def _approval_decide(ticket_id: int, decision: str, operator: str, reason: str, ttl_ms: int) -> None:
+def _approval_decide(
+    ticket_id: int,
+    decision: str,
+    agent_id: str,
+    approver: str,
+    reason: str,
+    ttl_ms: int,
+    *,
+    binding_hash: int = 0,
+    binding_epoch: int = 0,
+) -> None:
     normalized = decision.strip().lower()
     decision_code = APPROVAL_DECISION_MAP.get(normalized)
     if decision_code is None:
@@ -282,8 +345,11 @@ def _approval_decide(ticket_id: int, decision: str, operator: str, reason: str, 
     client = _get_kernel_client()
     client.approval_decide(
         ticket_id=ticket_id,
+        agent_id=agent_id,
         decision=decision_code,
-        approver=operator,
+        binding_hash=binding_hash,
+        binding_epoch=binding_epoch,
+        approver=approver,
         reason=reason,
         ttl_ms=ttl_ms,
     )
@@ -298,60 +364,16 @@ def _resolve_tool_hash(req: Dict[str, Any], tool: ToolManifest) -> str:
     return raw.lower()
 
 
-def _remember_pending_approval(
-    *,
-    ticket_id: int,
-    req_id: int,
-    agent_id: str,
-    app_id: str,
-    tool_id: int,
-    payload: Any,
-    tool_hash: str,
-) -> None:
-    with _approval_lock:
-        _pending_approvals[ticket_id] = {
-            "req": {
-                "req_id": req_id,
-                "agent_id": agent_id,
-                "app_id": app_id,
-                "tool_id": tool_id,
-                "payload": payload,
-                "tool_hash": tool_hash,
-            }
-        }
-
-
-def _take_pending_approval(ticket_id: int) -> Dict[str, Any]:
-    with _approval_lock:
-        pending = _pending_approvals.pop(ticket_id, None)
-    if pending is None:
-        raise ValueError(f"pending approval not found: {ticket_id}")
-    return pending
-
-
-def _drop_pending_approval(ticket_id: int) -> None:
-    with _approval_lock:
-        _pending_approvals.pop(ticket_id, None)
-
-
-def _validate_pending_approval_req(pending: Dict[str, Any]) -> Dict[str, Any]:
-    req = pending.get("req", {})
-    if not isinstance(req, dict):
-        raise ValueError("pending approval request is invalid")
-    return {
-        "req_id": ensure_int("req_id", req.get("req_id", 0)),
-        "agent_id": ensure_non_empty_str("agent_id", req.get("agent_id", "")),
-        "app_id": ensure_non_empty_str("app_id", req.get("app_id", "")),
-        "tool_id": ensure_int("tool_id", req.get("tool_id", 0)),
-        "payload": req.get("payload", {}),
-        "tool_hash": req.get("tool_hash", ""),
-    }
-
-
 def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
     _ensure_runtime_registry_current()
     req_id = ensure_int("req_id", req.get("req_id", 0))
-    agent_id = ensure_non_empty_str("agent_id", req.get("agent_id", ""))
+    session_id = ensure_non_empty_str("session_id", req.get("session_id", ""))
+    peer = req.get("_peer")
+    if not isinstance(peer, PeerIdentity):
+        raise ValueError("missing peer identity")
+    session = resolve_session(session_id, peer)
+    binding = session_binding(session)
+    agent_id = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
     app_id = ensure_non_empty_str("app_id", req.get("app_id", ""))
     tool_id = ensure_int("tool_id", req.get("tool_id", 0))
 
@@ -368,11 +390,13 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
     validate_payload(tool.input_schema, payload)
 
     tool_hash = _resolve_tool_hash(req, tool)
-    _ensure_agent_registered(agent_id)
+    _ensure_agent_registered(agent_id, binding)
     approval_ticket_id = ensure_int("approval_ticket_id", req.get("approval_ticket_id", 0))
     decision, reason, ticket_id = _kernel_arbitrate(
         req_id=req_id,
         agent_id=agent_id,
+        binding_hash=binding.binding_hash,
+        binding_epoch=binding.binding_epoch,
         tool_id=tool_id,
         tool_hash=tool_hash,
         ticket_id=approval_ticket_id,
@@ -390,10 +414,13 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         }
     if decision == "DEFER":
         if ticket_id > 0:
-            _remember_pending_approval(
+            remember_pending_approval(
                 ticket_id=ticket_id,
+                session_id=session_id,
                 req_id=req_id,
                 agent_id=agent_id,
+                binding_hash=binding.binding_hash,
+                binding_epoch=binding.binding_epoch,
                 app_id=app_id,
                 tool_id=tool_id,
                 payload=payload,
@@ -459,6 +486,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
 
 def _handle_connection(conn: socket.socket) -> None:
     with conn:
+        peer = _read_peer_identity(conn)
         while True:
             req_id = 0
             agent_id = "unknown"
@@ -501,11 +529,32 @@ def _handle_connection(conn: socket.socket) -> None:
                     )
                     continue
 
+                if req.get("sys") == "open_session":
+                    req_kind = "sys:open_session"
+                    client_name = ensure_non_empty_str("client_name", req.get("client_name", "llm-app"))
+                    ttl_ms = normalize_session_ttl_ms(req.get("ttl_ms", DEFAULT_SESSION_TTL_MS))
+                    resp = open_session(peer, client_name, ttl_ms)
+                    _bind_agent_identity(resp["agent_id"], session_binding(resolve_session(resp["session_id"], peer)))
+                    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
+                    t_ms = int((time.perf_counter() - t0) * 1000)
+                    LOGGER.info(
+                        "kind=%s status=ok client=%s session=%s agent=%s uid=%d pid=%d t_ms=%d",
+                        req_kind,
+                        client_name,
+                        resp["session_id"][:12],
+                        resp["agent_id"],
+                        peer.uid,
+                        peer.pid,
+                        t_ms,
+                    )
+                    continue
+
                 if req.get("sys") == "approval_decide":
                     req_kind = "sys:approval_decide"
                     ticket_id_raw = req.get("ticket_id", 0)
                     decision_raw = req.get("decision", "")
                     operator_raw = req.get("operator", "")
+                    agent_id_raw = req.get("agent_id", "")
                     reason_raw = req.get("reason", "")
                     ttl_ms_raw = req.get("ttl_ms", DEFAULT_APPROVAL_TTL_MS)
                     ticket_id = ensure_int("ticket_id", ticket_id_raw)
@@ -513,12 +562,36 @@ def _handle_connection(conn: socket.socket) -> None:
                     operator_text = ensure_non_empty_str("operator", operator_raw)
                     reason_text = ensure_non_empty_str("reason", reason_raw)
                     ttl_ms = ensure_int("ttl_ms", ttl_ms_raw)
-                    _approval_decide(ticket_id, decision_text, operator_text, reason_text, ttl_ms)
+                    binding_hash = 0
+                    binding_epoch = 0
+                    agent_id_text = agent_id_raw if isinstance(agent_id_raw, str) else ""
+                    try:
+                        pending = peek_pending_approval(ticket_id)
+                        replay_req = validate_pending_approval_req(pending)
+                        if not agent_id_text:
+                            agent_id_text = replay_req["agent_id"]
+                        binding_hash = replay_req["binding_hash"]
+                        binding_epoch = replay_req["binding_epoch"]
+                    except ValueError:
+                        if not agent_id_text:
+                            agent_id_text = operator_text
+                    agent_id_text = ensure_non_empty_str("agent_id", agent_id_text)
+                    _approval_decide(
+                        ticket_id,
+                        decision_text,
+                        agent_id_text,
+                        operator_text,
+                        reason_text,
+                        ttl_ms,
+                        binding_hash=binding_hash,
+                        binding_epoch=binding_epoch,
+                    )
                     resp = {
                         "status": "ok",
                         "ticket_id": ticket_id,
                         "decision": decision_text.lower(),
                         "operator": operator_text,
+                        "agent_id": agent_id_text,
                         "ttl_ms": ttl_ms,
                     }
                     send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
@@ -534,18 +607,33 @@ def _handle_connection(conn: socket.socket) -> None:
 
                 if req.get("sys") == "approval_reply":
                     req_kind = "sys:approval_reply"
+                    session_id = ensure_non_empty_str("session_id", req.get("session_id", ""))
                     ticket_id = ensure_int("ticket_id", req.get("ticket_id", 0))
                     decision_text = ensure_non_empty_str("decision", req.get("decision", ""))
-                    operator_text = ensure_non_empty_str("operator", req.get("operator", ""))
                     reason_text = ensure_non_empty_str("reason", req.get("reason", ""))
                     ttl_ms = ensure_int("ttl_ms", req.get("ttl_ms", DEFAULT_APPROVAL_TTL_MS))
                     normalized = decision_text.strip().lower()
                     if normalized not in ("approve", "deny"):
                         raise ValueError("decision must be approve or deny")
-                    pending = _take_pending_approval(ticket_id)
+                    session = resolve_session(session_id, peer)
+                    pending = peek_pending_approval(ticket_id)
+                    if pending.get("session_id") != session_id:
+                        raise ValueError("approval ticket is bound to a different session")
+                    pending = take_pending_approval(ticket_id)
                     try:
-                        replay_req = _validate_pending_approval_req(pending)
-                        _approval_decide(ticket_id, normalized, operator_text, reason_text, ttl_ms)
+                        replay_req = validate_pending_approval_req(pending)
+                        operator_text = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
+                        binding = session_binding(session)
+                        _approval_decide(
+                            ticket_id=ticket_id,
+                            decision=normalized,
+                            agent_id=operator_text,
+                            approver=operator_text,
+                            reason=reason_text,
+                            ttl_ms=ttl_ms,
+                            binding_hash=binding.binding_hash,
+                            binding_epoch=binding.binding_epoch,
+                        )
                         if normalized == "deny":
                             resp = {
                                 "status": "error",
@@ -557,11 +645,12 @@ def _handle_connection(conn: socket.socket) -> None:
                             }
                         else:
                             replay_req["approval_ticket_id"] = ticket_id
+                            replay_req["_peer"] = peer
+                            replay_req["session_id"] = session_id
                             resp = _handle_tool_exec(replay_req)
                     except Exception:
                         if normalized == "approve":
-                            with _approval_lock:
-                                _pending_approvals[ticket_id] = pending
+                            put_pending_approval(ticket_id, pending)
                         raise
                     send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
                     t_ms = int((time.perf_counter() - t0) * 1000)
@@ -579,15 +668,19 @@ def _handle_connection(conn: socket.socket) -> None:
                     raise ValueError(f"unsupported request kind: {req.get('kind')}")
 
                 req_id = ensure_int("req_id", req.get("req_id", 0))
-                agent_id = ensure_non_empty_str("agent_id", req.get("agent_id", ""))
+                session_id = ensure_non_empty_str("session_id", req.get("session_id", ""))
+                session = resolve_session(session_id, peer)
+                agent_id = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
                 app_id = ensure_non_empty_str("app_id", req.get("app_id", ""))
                 tool_id = ensure_int("tool_id", req.get("tool_id", 0))
+                req["_peer"] = peer
                 resp = _handle_tool_exec(req)
                 send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
                 t_ms = int((time.perf_counter() - t0) * 1000)
                 LOGGER.info(
-                    "req_id=%d agent=%s app=%s tool=%d kind=%s status=%s t_ms=%d",
+                    "req_id=%d session=%s agent=%s app=%s tool=%d kind=%s status=%s t_ms=%d",
                     req_id,
+                    session_id[:12],
                     agent_id,
                     app_id,
                     tool_id,

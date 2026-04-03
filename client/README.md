@@ -1,24 +1,13 @@
 # client
 
-`client/` 提供与当前主链路对应的两个底层 Generic Netlink 调试工具：
+`client/` 现在主要保存和内核 UAPI 对齐的 Python schema：
 
-- `client/bin/genl_register_tool`
-- `client/bin/genl_list_tools`
+- [kernel_mcp/schema.py](/home/lxh/Code/linux-mcp/client/kernel_mcp/schema.py)
 
-这两个工具主要用于：
-- `mcpd/reconcile_kernel.py`
-- 独立排查 kernel/user ABI 是否一致
+当前主链路里，`mcpd` 和 `mcpd/reconcile_kernel.py` 都直接通过 Python netlink client 与内核通信，不再依赖单独的 C 调试工具。
 
-## 构建
+如果改了协议常量，请同时检查：
 
-```bash
-make -C client clean
-make -C client
-```
-
-## 手动检查
-
-```bash
-./client/bin/genl_register_tool --id 1 --name echo --risk-flags 0 --hash 12345678
-./client/bin/genl_list_tools
-```
+- [kernel-mcp/include/uapi/linux/kernel_mcp_schema.h](/home/lxh/Code/linux-mcp/kernel-mcp/include/uapi/linux/kernel_mcp_schema.h)
+- [client/kernel_mcp/schema.py](/home/lxh/Code/linux-mcp/client/kernel_mcp/schema.py)
+- `python3 scripts/verify_schema_sync.py`

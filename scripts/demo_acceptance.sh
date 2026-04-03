@@ -38,48 +38,44 @@ ${SUDO} bash scripts/unload_module.sh || true
 echo "[demo] step 3: load module"
 ${SUDO} bash scripts/load_module.sh
 
-echo "[demo] step 4: build client tools"
-make -C client clean
-make -C client
-
-echo "[demo] step 5: ensure no stale user-space services remain"
+echo "[demo] step 4: ensure no stale user-space services remain"
 run_as_user bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
 run_as_user bash scripts/stop_tool_services.sh >/dev/null 2>&1 || true
 
-echo "[demo] step 6: start demo app services"
+echo "[demo] step 5: start demo app services"
 run_as_user bash scripts/run_tool_services.sh
 
-echo "[demo] step 7: start mcpd"
+echo "[demo] step 6: start mcpd"
 run_as_user bash scripts/run_mcpd.sh
 
-echo "[demo] step 8: verify DeepSeek API key is configured"
+echo "[demo] step 7: verify DeepSeek API key is configured"
 run_as_user bash -lc 'test -n "${DEEPSEEK_API_KEY:-}"' || {
   echo "[demo] missing DEEPSEEK_API_KEY"
   exit 1
 }
 
-echo "[demo] step 9: llm-app once: create a note for today's standup"
+echo "[demo] step 8: llm-app once: create a note for today's standup"
 run_as_user python3 llm-app/cli.py --once "create a work note titled Daily Standup saying blocked on review"
 
-echo "[demo] step 10: llm-app once: show workspace overview"
+echo "[demo] step 9: llm-app once: show workspace overview"
 run_as_user python3 llm-app/cli.py --once "show me an overview of the tool-app folder"
 
-echo "[demo] step 11: verify sysfs agent completion counters"
+echo "[demo] step 10: verify sysfs agent completion counters"
 ${SUDO} ls -l /sys/kernel/mcp/agents/a1/
 ${SUDO} cat /sys/kernel/mcp/agents/a1/completed_ok
 ${SUDO} cat /sys/kernel/mcp/agents/a1/last_exec_ms
 ${SUDO} cat /sys/kernel/mcp/agents/a1/last_status
 
-echo "[demo] step 12: stop mcpd"
+echo "[demo] step 11: stop mcpd"
 run_as_user bash scripts/stop_mcpd.sh
 
-echo "[demo] step 13: stop demo app services"
+echo "[demo] step 12: stop demo app services"
 run_as_user bash scripts/stop_tool_services.sh
 
-echo "[demo] step 14: unload module"
+echo "[demo] step 13: unload module"
 ${SUDO} bash scripts/unload_module.sh
 
-echo "[demo] step 15: reload_10x"
+echo "[demo] step 14: reload_10x"
 ${SUDO} bash scripts/reload_10x.sh
 
 echo "[demo] PASS"

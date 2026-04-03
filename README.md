@@ -30,12 +30,13 @@ llm-app
 3. `llm-app` 先调用 `list_apps`
 4. `llm-app` 用 DeepSeek 从 app/tool catalog 里构造执行计划
 5. `llm-app` 再按计划查询 `list_tools(app_id=...)` 并补全 step payload
-6. `llm-app` 发送 `tool:exec` 给 `mcpd`
-7. `mcpd` 先确保 agent 已注册，再向内核发起仲裁
-8. 内核返回 `ALLOW` / `DENY` / `DEFER`
-9. 若允许，`mcpd` 通过 UDS RPC 调用对应 app 的 `operation`
-10. 执行结束后，`mcpd` 再向内核上报 `tool_complete`
-11. agent/tool 状态可从 `/sys/kernel/mcp/...` 读取
+6. `llm-app` 先通过 `open_session` 从 `mcpd` 获取短期 `session_id` 和服务端签发的 `agent_id`
+7. `llm-app` 再发送带 `session_id` 的 `tool:exec` 给 `mcpd`
+8. `mcpd` 先用 UDS peer credentials 校验 session，派生 `binding_hash / binding_epoch`，再确保对应 agent 已注册，然后向内核发起仲裁
+9. 内核返回 `ALLOW` / `DENY` / `DEFER`
+10. 若允许，`mcpd` 通过 UDS RPC 调用对应 app 的 `operation`
+11. 执行结束后，`mcpd` 再向内核上报 `tool_complete`
+12. agent/tool 状态可从 `/sys/kernel/mcp/...` 读取
 
 ## 当前仓库结构
 
@@ -71,6 +72,10 @@ llm-app
   - `/sys/kernel/mcp/agents/<agent_id>/`
 - `tool_request` 仲裁
 - `tool_complete` 完成回报
+- agent 绑定摘要：
+  - `binding_hash`
+  - `binding_epoch`
+- approval ticket 与 agent 绑定摘要做一致性校验
 
 当前仲裁规则不是通用策略引擎，而是一个很明确的 demo 规则：
 
@@ -79,7 +84,7 @@ llm-app
 - 带高风险标签的工具会返回 `DEFER` 并创建 approval ticket
 - 其他工具默认 `ALLOW`
 
-内核只负责 control-plane 仲裁、tool registry 对齐和 approval ticket 生命周期；限流、重试和更复杂的执行策略应由 `mcpd` 在用户空间完成。
+内核只负责 control-plane 仲裁、tool registry 对齐、agent 绑定摘要校验和 approval ticket 生命周期；session 管理、manifest 解释、限流、重试和更复杂的执行策略应由 `mcpd` 在用户空间完成。
 
 ### 2. mcpd
 
@@ -92,14 +97,19 @@ llm-app
 - 生成语义 hash
 - 启动时把 manifest tool 注册进内核
 - 提供 UDS framed JSON RPC：`/tmp/mcpd.sock`
+- 从 UDS peer credentials 读取真实客户端 `pid/uid/gid`
+- 为客户端签发短期 session，并把 session 绑定到 peer identity
+- 从 session 派生 `binding_hash / binding_epoch`
 - 对外暴露：
   - `{"sys":"list_apps"}`
   - `{"sys":"list_tools"}`
   - `{"sys":"list_tools","app_id":"..."}`
+  - `{"sys":"open_session", ...}`
   - `{"kind":"tool:exec", ...}`
 - 执行前做 payload schema 校验
 - 调用具体 app 的 `endpoint + operation`
 - 将完成状态回报给内核
+- 将 approval 与 tool request 绑定到同一 agent binding
 
 manifest 加载逻辑在 [mcpd/manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_loader.py)，同步核对工具表的脚本在 [mcpd/reconcile_kernel.py](/home/lxh/Code/linux-mcp/mcpd/reconcile_kernel.py)。
 
@@ -261,14 +271,13 @@ tool 级字段：
 运行时依赖：
 
 - 内核模块加载需要 root
-- `mcpd` 依赖已构建的 `client/bin/genl_register_tool` 和 `client/bin/genl_list_tools`
 - `llm-app` 依赖 `DEEPSEEK_API_KEY`
 - GUI 依赖 `PySide6`
 - 部分音量工具依赖 `pactl` 或 `amixer`
 
 可选：
 
-- `pyroute2` 只在部分检查/环境准备里会用到；当前主 netlink client 走的是原生 socket
+- 当前主 netlink client 走的是原生 socket，不依赖 `pyroute2`
 
 ## 快速开始
 
@@ -281,7 +290,6 @@ cd ~/Code/linux-mcp
 ### 1. 环境检查
 
 ```bash
-bash scripts/bootstrap.sh
 bash scripts/run_smoke.sh
 ```
 
@@ -293,11 +301,9 @@ sudo bash scripts/unload_module.sh || true
 sudo bash scripts/load_module.sh
 ```
 
-### 3. 构建 client 小工具
+### 3. 校验 schema 同步
 
 ```bash
-make -C client clean
-make -C client
 make schema-verify
 ```
 
@@ -355,8 +361,6 @@ pip install PySide6
 
 ## 常用脚本
 
-- `bash scripts/bootstrap.sh`
-  初始化目录和 Python 环境检查。
 - `bash scripts/run_smoke.sh`
   跑基础结构、shell 语法、schema 同步检查。
 - `sudo bash scripts/build_kernel.sh`

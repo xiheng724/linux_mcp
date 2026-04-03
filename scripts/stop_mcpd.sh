@@ -3,10 +3,8 @@ set -euo pipefail
 
 RUNTIME_UID="$(id -u)"
 PID_PATH="/tmp/mcpd-${RUNTIME_UID}.pid"
-LEGACY_PID_PATH="/tmp/mcpd.pid"
 SOCK_PATH="/tmp/mcpd.sock"
 LOG_PATH="/tmp/mcpd-${RUNTIME_UID}.log"
-LEGACY_LOG_PATH="/tmp/mcpd.log"
 
 stop_by_pid_file() {
   local pfile="$1"
@@ -30,8 +28,7 @@ stop_by_pid_file() {
 }
 
 stop_by_pid_file "$PID_PATH"
-stop_by_pid_file "$LEGACY_PID_PATH"
 
 rm -f "$SOCK_PATH"
-rm -f "$LOG_PATH" "$LEGACY_LOG_PATH"
+rm -f "$LOG_PATH"
 echo "mcpd stopped"

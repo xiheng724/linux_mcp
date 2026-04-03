@@ -68,6 +68,8 @@ struct kernel_mcp_agent {
 	u32 pid;
 	u32 uid;
 	bool uid_set;
+	u64 binding_hash;
+	u64 binding_epoch;
 	/* Rate limiting is handled in mcpd user space, not in the kernel agent state. */
 	u64 allow_count;
 	u64 deny_count;
@@ -82,6 +84,8 @@ struct kernel_mcp_agent {
 };
 
 struct kernel_mcp_agent_snapshot {
+	u64 binding_hash;
+	u64 binding_epoch;
 	u64 allow_count;
 	u64 deny_count;
 	u64 defer_count;
@@ -97,6 +101,8 @@ struct kernel_mcp_approval_ticket {
 	u64 req_id;
 	u32 tool_id;
 	char agent_id[KERNEL_MCP_AGENT_ID_MAX];
+	u64 binding_hash;
+	u64 binding_epoch;
 	char tool_hash[KERNEL_MCP_TOOL_HASH_MAX];
 	bool decided;
 	bool approved;
@@ -122,7 +128,7 @@ static struct kobject *kernel_mcp_sysfs_tools;
 static struct kobject *kernel_mcp_sysfs_agents;
 static struct genl_family kernel_mcp_genl_family;
 
-static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_POLICY_ID + 1] = {
+static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_MAX + 1] = {
 	[KERNEL_MCP_ATTR_REQ_ID] = { .type = NLA_U64 },
 	[KERNEL_MCP_ATTR_TOOL_ID] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_TOOL_NAME] = {
@@ -159,6 +165,8 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_POLICY_ID + 1] 
 		.type = NLA_NUL_STRING,
 		.len = KERNEL_MCP_REASON_MAX - 1,
 	},
+	[KERNEL_MCP_ATTR_AGENT_BINDING] = { .type = NLA_U64 },
+	[KERNEL_MCP_ATTR_AGENT_EPOCH] = { .type = NLA_U64 },
 };
 
 static u32 kernel_mcp_agent_hash_key(const char *agent_id)
@@ -223,6 +231,8 @@ kernel_mcp_lookup_agent_snapshot(struct kobject *kobj,
 		return -ENOENT;
 	}
 	out->allow_count = agent->allow_count;
+	out->binding_hash = agent->binding_hash;
+	out->binding_epoch = agent->binding_epoch;
 	out->deny_count = agent->deny_count;
 	out->defer_count = agent->defer_count;
 	out->completed_ok_count = agent->completed_ok_count;
@@ -336,6 +346,8 @@ static ssize_t kernel_mcp_tool_status_show(struct kobject *kobj,
 }
 
 KERNEL_MCP_DEFINE_AGENT_SHOW_U64(allow, allow_count)
+KERNEL_MCP_DEFINE_AGENT_SHOW_U64(binding_hash, binding_hash)
+KERNEL_MCP_DEFINE_AGENT_SHOW_U64(binding_epoch, binding_epoch)
 KERNEL_MCP_DEFINE_AGENT_SHOW_U64(deny, deny_count)
 KERNEL_MCP_DEFINE_AGENT_SHOW_U64(defer, defer_count)
 KERNEL_MCP_DEFINE_AGENT_SHOW_STR(last_reason, last_reason)
@@ -366,6 +378,10 @@ static const struct attribute_group kernel_mcp_tool_attr_group = {
 
 static struct kobj_attribute kernel_mcp_agent_allow_attr =
 	__ATTR(allow, 0444, kernel_mcp_agent_allow_show, NULL);
+static struct kobj_attribute kernel_mcp_agent_binding_hash_attr =
+	__ATTR(binding_hash, 0444, kernel_mcp_agent_binding_hash_show, NULL);
+static struct kobj_attribute kernel_mcp_agent_binding_epoch_attr =
+	__ATTR(binding_epoch, 0444, kernel_mcp_agent_binding_epoch_show, NULL);
 static struct kobj_attribute kernel_mcp_agent_deny_attr =
 	__ATTR(deny, 0444, kernel_mcp_agent_deny_show, NULL);
 static struct kobj_attribute kernel_mcp_agent_defer_attr =
@@ -383,6 +399,8 @@ static struct kobj_attribute kernel_mcp_agent_last_status_attr =
 
 static struct attribute *kernel_mcp_agent_attrs[] = {
 	&kernel_mcp_agent_allow_attr.attr,
+	&kernel_mcp_agent_binding_hash_attr.attr,
+	&kernel_mcp_agent_binding_epoch_attr.attr,
 	&kernel_mcp_agent_deny_attr.attr,
 	&kernel_mcp_agent_defer_attr.attr,
 	&kernel_mcp_agent_last_reason_attr.attr,
@@ -553,7 +571,8 @@ static void kernel_mcp_agents_destroy_all(void)
 }
 
 static int kernel_mcp_register_agent(const char *agent_id, u32 pid, bool uid_set,
-				     u32 uid)
+				     u32 uid, u64 binding_hash,
+				     u64 binding_epoch)
 {
 	struct kernel_mcp_agent *agent;
 	u32 key;
@@ -567,6 +586,8 @@ static int kernel_mcp_register_agent(const char *agent_id, u32 pid, bool uid_set
 		agent->uid_set = uid_set;
 		if (uid_set)
 			agent->uid = uid;
+		agent->binding_hash = binding_hash;
+		agent->binding_epoch = binding_epoch;
 		mutex_unlock(&kernel_mcp_agents_lock);
 		return 0;
 	}
@@ -581,6 +602,8 @@ static int kernel_mcp_register_agent(const char *agent_id, u32 pid, bool uid_set
 	agent->pid = pid;
 	agent->uid = uid;
 	agent->uid_set = uid_set;
+	agent->binding_hash = binding_hash;
+	agent->binding_epoch = binding_epoch;
 	strscpy(agent->last_reason, "registered", sizeof(agent->last_reason));
 
 	ret = kernel_mcp_agent_sysfs_create(agent);
@@ -654,7 +677,8 @@ static void kernel_mcp_ticket_cleanup_timer_fn(struct timer_list *timer)
 			  msecs_to_jiffies(KERNEL_MCP_TICKET_CLEANUP_INTERVAL_MS));
 }
 
-static int kernel_mcp_issue_approval_ticket(const char *agent_id, u32 tool_id,
+static int kernel_mcp_issue_approval_ticket(const char *agent_id, u64 binding_hash,
+					    u64 binding_epoch, u32 tool_id,
 					    u64 req_id, const char *tool_hash,
 					    u64 *ticket_id_out)
 {
@@ -674,6 +698,8 @@ static int kernel_mcp_issue_approval_ticket(const char *agent_id, u32 tool_id,
 	ticket->req_id = req_id;
 	ticket->tool_id = tool_id;
 	strscpy(ticket->agent_id, agent_id, sizeof(ticket->agent_id));
+	ticket->binding_hash = binding_hash;
+	ticket->binding_epoch = binding_epoch;
 	if (tool_hash)
 		strscpy(ticket->tool_hash, tool_hash, sizeof(ticket->tool_hash));
 	strscpy(ticket->reason, "pending_approval", sizeof(ticket->reason));
@@ -689,6 +715,7 @@ static int kernel_mcp_issue_approval_ticket(const char *agent_id, u32 tool_id,
 }
 
 static bool kernel_mcp_consume_approval_ticket(u64 ticket_id, const char *agent_id,
+						u64 binding_hash, u64 binding_epoch,
 						u32 tool_id, u64 req_id,
 						const char *tool_hash,
 						const char **reason_out)
@@ -716,6 +743,11 @@ static bool kernel_mcp_consume_approval_ticket(u64 ticket_id, const char *agent_
 	if (ticket->req_id != req_id || ticket->tool_id != tool_id ||
 	    strcmp(ticket->agent_id, agent_id) != 0) {
 		reason = "approval_ticket_scope_mismatch";
+		goto out;
+	}
+	if (ticket->binding_hash != binding_hash ||
+	    ticket->binding_epoch != binding_epoch) {
+		reason = "approval_ticket_binding_mismatch";
 		goto out;
 	}
 	if (tool_hash && ticket->tool_hash[0] != '\0' &&
@@ -823,6 +855,8 @@ static int kernel_mcp_cmd_agent_register(struct sk_buff *skb,
 	const char *agent_id;
 	u32 pid;
 	u32 uid = 0;
+	u64 binding_hash = 0;
+	u64 binding_epoch = 0;
 	bool uid_set = false;
 
 	(void)skb;
@@ -838,8 +872,13 @@ static int kernel_mcp_cmd_agent_register(struct sk_buff *skb,
 		uid = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_UID]);
 		uid_set = true;
 	}
+	if (info->attrs[KERNEL_MCP_ATTR_AGENT_BINDING])
+		binding_hash = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_BINDING]);
+	if (info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH])
+		binding_epoch = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH]);
 
-	return kernel_mcp_register_agent(agent_id, pid, uid_set, uid);
+	return kernel_mcp_register_agent(agent_id, pid, uid_set, uid, binding_hash,
+					 binding_epoch);
 }
 
 static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *info)
@@ -853,6 +892,8 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	u32 tool_id;
 	u64 req_id;
 	u64 ticket_id = 0;
+	u64 binding_hash = 0;
+	u64 binding_epoch = 0;
 	u32 decision = KERNEL_MCP_DECISION_ALLOW;
 	u32 risk_flags = 0;
 	u32 key;
@@ -875,6 +916,10 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 			nla_data(info->attrs[KERNEL_MCP_ATTR_TOOL_HASH]);
 	if (info->attrs[KERNEL_MCP_ATTR_TICKET_ID])
 		ticket_id = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_TICKET_ID]);
+	if (info->attrs[KERNEL_MCP_ATTR_AGENT_BINDING])
+		binding_hash = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_BINDING]);
+	if (info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH])
+		binding_epoch = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH]);
 
 	mutex_lock(&kernel_mcp_tools_lock);
 	tool = xa_load(&kernel_mcp_tools, tool_id);
@@ -903,9 +948,17 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 		reason = "hash_mismatch";
 		goto out_accounting;
 	}
+	if (agent->binding_hash != binding_hash ||
+	    agent->binding_epoch != binding_epoch) {
+		decision = KERNEL_MCP_DECISION_DENY;
+		reason = "binding_mismatch";
+		goto out_accounting;
+	}
 
 	if (risk_flags & KERNEL_MCP_APPROVAL_REQUIRED_FLAGS) {
-		if (kernel_mcp_consume_approval_ticket(ticket_id, agent_id, tool_id,
+		if (kernel_mcp_consume_approval_ticket(ticket_id, agent_id,
+						      binding_hash,
+						      binding_epoch, tool_id,
 						      req_id,
 						      requested_tool_hash,
 						      &ticket_reason)) {
@@ -917,7 +970,9 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 		decision = KERNEL_MCP_DECISION_DEFER;
 		reason = ticket_reason;
 		if (ticket_id == 0) {
-			if (kernel_mcp_issue_approval_ticket(agent_id, tool_id,
+			if (kernel_mcp_issue_approval_ticket(agent_id, binding_hash,
+							     binding_epoch,
+							     tool_id,
 							     req_id,
 							     requested_tool_hash,
 							     &ticket_id) == 0)
@@ -996,8 +1051,11 @@ static int kernel_mcp_cmd_approval_decide(struct sk_buff *skb,
 {
 	struct kernel_mcp_approval_ticket *ticket;
 	u64 ticket_id;
+	const char *agent_id;
 	u32 decision;
 	u32 ttl_ms = KERNEL_MCP_DEFAULT_APPROVAL_TTL_MS;
+	u64 binding_hash = 0;
+	u64 binding_epoch = 0;
 	const char *approver;
 	const char *reason;
 	bool approved;
@@ -1006,17 +1064,23 @@ static int kernel_mcp_cmd_approval_decide(struct sk_buff *skb,
 	if (!info)
 		return -EINVAL;
 	if (!info->attrs[KERNEL_MCP_ATTR_TICKET_ID] ||
+	    !info->attrs[KERNEL_MCP_ATTR_AGENT_ID] ||
 	    !info->attrs[KERNEL_MCP_ATTR_APPROVAL_DECISION] ||
 	    !info->attrs[KERNEL_MCP_ATTR_APPROVER] ||
 	    !info->attrs[KERNEL_MCP_ATTR_APPROVAL_REASON])
 		return -EINVAL;
 
 	ticket_id = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_TICKET_ID]);
+	agent_id = nla_data(info->attrs[KERNEL_MCP_ATTR_AGENT_ID]);
 	decision = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_APPROVAL_DECISION]);
 	approver = nla_data(info->attrs[KERNEL_MCP_ATTR_APPROVER]);
 	reason = nla_data(info->attrs[KERNEL_MCP_ATTR_APPROVAL_REASON]);
 	if (info->attrs[KERNEL_MCP_ATTR_APPROVAL_TTL_MS])
 		ttl_ms = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_APPROVAL_TTL_MS]);
+	if (info->attrs[KERNEL_MCP_ATTR_AGENT_BINDING])
+		binding_hash = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_BINDING]);
+	if (info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH])
+		binding_epoch = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH]);
 
 	mutex_lock(&kernel_mcp_approval_lock);
 	kernel_mcp_purge_expired_tickets_locked();
@@ -1026,6 +1090,12 @@ static int kernel_mcp_cmd_approval_decide(struct sk_buff *skb,
 		return -ENOENT;
 	}
 	if (ticket->consumed) {
+		mutex_unlock(&kernel_mcp_approval_lock);
+		return -EPERM;
+	}
+	if (strcmp(ticket->agent_id, agent_id) != 0 ||
+	    ticket->binding_hash != binding_hash ||
+	    ticket->binding_epoch != binding_epoch) {
 		mutex_unlock(&kernel_mcp_approval_lock);
 		return -EPERM;
 	}
@@ -1125,49 +1195,49 @@ static const struct genl_ops kernel_mcp_genl_ops[] = {
 		.cmd = KERNEL_MCP_CMD_TOOL_REGISTER,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
+		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_tool_register,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_LIST_TOOLS,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
+		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.dumpit = kernel_mcp_cmd_list_tools_dump,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_AGENT_REGISTER,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
+		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_agent_register,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_TOOL_REQUEST,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
+		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_tool_request,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_TOOL_COMPLETE,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
+		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_tool_complete,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_APPROVAL_DECIDE,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
+		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_approval_decide,
 	},
 	{
 		.cmd = KERNEL_MCP_CMD_RESET_TOOLS,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
-		.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
+		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_reset_tools,
 	},
 };
@@ -1175,7 +1245,7 @@ static const struct genl_ops kernel_mcp_genl_ops[] = {
 static struct genl_family kernel_mcp_genl_family = {
 	.name = KERNEL_MCP_GENL_FAMILY_NAME,
 	.version = KERNEL_MCP_GENL_FAMILY_VERSION,
-	.maxattr = KERNEL_MCP_ATTR_POLICY_ID,
+	.maxattr = KERNEL_MCP_ATTR_MAX,
 	.module = THIS_MODULE,
 	.ops = kernel_mcp_genl_ops,
 	.n_ops = ARRAY_SIZE(kernel_mcp_genl_ops),

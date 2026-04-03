@@ -14,6 +14,9 @@
       "operation": "workspace_overview",
       "timeout_ms": 30000,
       "description": "Summarize files and directories under a repository path with safe path checks.",
+      "path_semantics": {
+        "path": "repo_rel"
+      },
       "input_schema": {
         "type": "object",
         "properties": {
@@ -49,6 +52,9 @@
       "operation": "read_document",
       "timeout_ms": 30000,
       "description": "Read a text document from the repository with line limits and optional start line.",
+      "path_semantics": {
+        "path": "repo_rel"
+      },
       "input_schema": {
         "type": "object",
         "required": [
@@ -93,6 +99,9 @@
       "operation": "write_document",
       "timeout_ms": 30000,
       "description": "Create or overwrite a text document under the repository root with safe path checks.",
+      "path_semantics": {
+        "path": "repo_rel"
+      },
       "input_schema": {
         "type": "object",
         "required": [
@@ -141,6 +150,10 @@
       "operation": "move_document",
       "timeout_ms": 30000,
       "description": "Rename or move a text file under the repository root with safe path checks.",
+      "path_semantics": {
+        "src_path": "repo_rel",
+        "dst_path": "repo_rel"
+      },
       "input_schema": {
         "type": "object",
         "required": [

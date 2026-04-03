@@ -27,6 +27,8 @@ SEMANTIC_HASH_FIELDS = (
     "description",
     "input_schema",
     "examples",
+    "path_semantics",
+    "approval_policy",
 )
 
 
@@ -41,6 +43,8 @@ class ToolManifest:
     description: str
     input_schema: Dict[str, Any]
     examples: List[Any]
+    path_semantics: Dict[str, str]
+    approval_policy: Dict[str, Any]
     transport: str
     endpoint: str
     operation: str
@@ -124,6 +128,44 @@ def _load_tool(
         raise ValueError(f"{path}: input_schema must be object")
     if not isinstance(examples, list):
         raise ValueError(f"{path}: examples must be list")
+    path_semantics = raw.get("path_semantics", {})
+    approval_policy = raw.get("approval_policy", {})
+    if not isinstance(path_semantics, dict):
+        raise ValueError(f"{path}: path_semantics must be object")
+    if not isinstance(approval_policy, dict):
+        raise ValueError(f"{path}: approval_policy must be object")
+    normalized_path_semantics: Dict[str, str] = {}
+    for field_name, field_mode in path_semantics.items():
+        if not isinstance(field_name, str) or not field_name:
+            raise ValueError(f"{path}: path_semantics field names must be non-empty strings")
+        if not isinstance(field_mode, str) or not field_mode:
+            raise ValueError(f"{path}: path_semantics values must be non-empty strings")
+        normalized_path_semantics[field_name] = field_mode
+    user_confirmation = approval_policy.get("user_confirmation", {})
+    if user_confirmation not in ({}, None) and not isinstance(user_confirmation, dict):
+        raise ValueError(f"{path}: approval_policy.user_confirmation must be object")
+    normalized_approval_policy: Dict[str, Any] = {}
+    if isinstance(user_confirmation, dict) and user_confirmation:
+        when = ensure_non_empty_str("when", user_confirmation.get("when", ""))
+        if when not in {"always", "path_outside_repo"}:
+            raise ValueError(
+                f"{path}: approval_policy.user_confirmation.when must be one of always,path_outside_repo"
+            )
+        path_fields = user_confirmation.get("path_fields", [])
+        if not isinstance(path_fields, list) or not all(
+            isinstance(item, str) and item for item in path_fields
+        ):
+            raise ValueError(
+                f"{path}: approval_policy.user_confirmation.path_fields must be list[str]"
+            )
+        reason = ensure_non_empty_str("reason", user_confirmation.get("reason", ""))
+        normalized_approval_policy = {
+            "user_confirmation": {
+                "when": when,
+                "path_fields": path_fields,
+                "reason": reason,
+            }
+        }
 
     semantic_raw: Dict[str, Any] = {
         "tool_id": tool_id,
@@ -134,6 +176,8 @@ def _load_tool(
         "description": description,
         "input_schema": input_schema,
         "examples": examples,
+        "path_semantics": normalized_path_semantics,
+        "approval_policy": normalized_approval_policy,
     }
 
     return ToolManifest(
@@ -146,6 +190,8 @@ def _load_tool(
         description=description,
         input_schema=input_schema,
         examples=examples,
+        path_semantics=normalized_path_semantics,
+        approval_policy=normalized_approval_policy,
         transport=transport,
         endpoint=endpoint,
         operation=operation,

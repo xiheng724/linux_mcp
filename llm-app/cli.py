@@ -9,21 +9,28 @@ import json
 import os
 import sys
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 
 from app_logic import (
     ApprovalRequest,
+    execute_plan,
+    load_catalog,
+)
+from debug_render import render_execution_debug_lines
+from model_client import (
     DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_DEEPSEEK_URL,
     SelectorConfig,
-    execute_plan,
-    load_catalog,
-    render_execution_debug_lines,
+    SessionInfo,
+    open_session,
 )
+from presentation import render_app_lines, render_execution_user_lines, render_tool_lines
 from rpc import mcpd_call
 
 SOCK_PATH = "/tmp/mcpd.sock"
 SHOW_PAYLOAD_ENV = "LLM_APP_SHOW_PAYLOAD"
+DEFAULT_SESSION_TTL_MS = 30 * 60 * 1000
+DisplayMode = Literal["user", "dev"]
 
 
 class CliError(Exception):
@@ -56,11 +63,7 @@ def _list_apps(sock_path: str) -> List[Dict[str, Any]]:
     apps = resp.get("apps", [])
     if not isinstance(apps, list):
         raise CliError("list_apps response missing apps list")
-    typed_apps: List[Dict[str, Any]] = []
-    for app in apps:
-        if isinstance(app, dict):
-            typed_apps.append(app)
-    return typed_apps
+    return [app for app in apps if isinstance(app, dict)]
 
 
 def _list_tools(sock_path: str, app_id: str = "") -> List[Dict[str, Any]]:
@@ -73,64 +76,58 @@ def _list_tools(sock_path: str, app_id: str = "") -> List[Dict[str, Any]]:
     tools = resp.get("tools", [])
     if not isinstance(tools, list):
         raise CliError("list_tools response missing tools list")
-    typed_tools: List[Dict[str, Any]] = []
-    for tool in tools:
-        if isinstance(tool, dict):
-            typed_tools.append(tool)
-    return typed_tools
+    return [tool for tool in tools if isinstance(tool, dict)]
 
 
-def _print_apps(apps: List[Dict[str, Any]]) -> None:
-    print(f"[llm-app] apps ({len(apps)}):", flush=True)
-    for app in apps:
-        print(
-            (
-                f"[llm-app]   - id={app.get('app_id')} "
-                f"name={app.get('app_name')} tools={app.get('tool_count')}"
-            ),
-            flush=True,
-        )
-        tool_names = app.get("tool_names", [])
-        if isinstance(tool_names, list) and tool_names:
-            print(f"[llm-app]     tool_names={','.join(str(x) for x in tool_names)}", flush=True)
+def _print_lines(lines: List[str], *, prefix: str = "[llm-app]") -> None:
+    for line in lines:
+        print(f"{prefix} {line}" if line else "", flush=True)
 
 
-def _print_tools(tools: List[Dict[str, Any]]) -> None:
-    print(f"[llm-app] tools ({len(tools)}):", flush=True)
-    for tool in tools:
-        print(
-            (
-                f"[llm-app]   - id={tool.get('tool_id')} "
-                f"name={tool.get('name')} hash={tool.get('hash', '-')}"
-            ),
-            flush=True,
-        )
-        print(f"[llm-app]     desc={tool.get('description')}", flush=True)
+def _print_apps(apps: List[Dict[str, Any]], mode: DisplayMode) -> None:
+    _print_lines(render_app_lines(apps, detailed=(mode == "dev")))
 
 
-def _print_repl_banner(apps: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> None:
+def _print_tools(tools: List[Dict[str, Any]], mode: DisplayMode) -> None:
+    _print_lines(render_tool_lines(tools, detailed=(mode == "dev")))
+
+
+def _print_repl_banner(apps: List[Dict[str, Any]], tools: List[Dict[str, Any]], mode: DisplayMode) -> None:
     print("[llm-app] REPL ready", flush=True)
+    print(f"[llm-app] mode: {mode}", flush=True)
     print(f"[llm-app] catalog: apps={len(apps)} tools={len(tools)}", flush=True)
-    print("[llm-app] tip: /apps and /tools show full catalogs", flush=True)
+    if mode == "user":
+        print("[llm-app] tip: concise replies enabled; use /mode dev for full traces", flush=True)
+    else:
+        print("[llm-app] tip: dev mode shows planning and execution traces", flush=True)
+
+
+def _ensure_session(sock_path: str, client_name: str, session: SessionInfo | None) -> SessionInfo:
+    now_ms = int(time.time() * 1000)
+    if session is not None and session.expires_at_ms > (now_ms + 5_000):
+        return session
+    return open_session(sock_path, client_name, DEFAULT_SESSION_TTL_MS)
 
 
 def _execute_once_with_apps(
     user_text: str,
-    agent_id: str,
+    session: SessionInfo,
     sock_path: str,
     cfg: SelectorConfig,
     apps: List[Dict[str, Any]],
     tools: List[Dict[str, Any]],
+    mode: DisplayMode,
     show_reasons: bool = False,
     show_payload: bool = False,
 ) -> int:
     if not apps:
         raise CliError("no apps returned by mcpd")
     def _approval_prompt(request: ApprovalRequest) -> bool:
+        ticket_text = f" ticket_id={request.ticket_id}" if request.ticket_id > 0 else ""
         print(
             (
                 f"[llm-app] approval required: step={request.step_id} "
-                f"tool={request.tool_name} ticket_id={request.ticket_id} reason={request.reason}"
+                f"tool={request.tool_name}{ticket_text} reason={request.reason}"
             ),
             flush=True,
         )
@@ -145,20 +142,24 @@ def _execute_once_with_apps(
 
     execution = execute_plan(
         user_text,
-        agent_id,
+        session,
         sock_path,
         cfg,
         apps=apps,
         tools=tools,
         approval_handler=_approval_prompt,
     )
-    for line in render_execution_debug_lines(
-        execution,
-        prefix="[llm-app]",
-        show_payload=show_payload,
-    ):
-        print(line, flush=True)
-    if show_reasons:
+    if mode == "dev":
+        for line in render_execution_debug_lines(
+            execution,
+            prefix="[llm-app]",
+            show_payload=show_payload,
+        ):
+            print(line, flush=True)
+    else:
+        for line in render_execution_user_lines(execution):
+            print(f"assistant> {line}", flush=True)
+    if show_reasons and mode == "dev":
         print(f"[llm-app] plan_source: model", flush=True)
     resp = execution.get("response", {})
     if not isinstance(resp, dict):
@@ -171,49 +172,60 @@ def _execute_once_with_apps(
 
 def _run_once(
     user_text: str,
-    agent_id: str,
+    client_name: str,
     sock_path: str,
     cfg: SelectorConfig,
+    mode: DisplayMode,
     show_reasons: bool,
     show_payload: bool,
 ) -> int:
     apps, tools = load_catalog(sock_path)
+    session = _ensure_session(sock_path, client_name, None)
     print(f"[llm-app] catalog: apps={len(apps)} tools={len(tools)}", flush=True)
     return _execute_once_with_apps(
         user_text,
-        agent_id,
+        session,
         sock_path,
         cfg,
         apps,
         tools,
+        mode,
         show_reasons=show_reasons,
         show_payload=show_payload,
     )
 
 
-def _print_help() -> None:
+def _print_help(mode: DisplayMode) -> None:
     print("[llm-app] commands:", flush=True)
     print("[llm-app]   /help  show help", flush=True)
     print("[llm-app]   /apps  force refresh and print apps", flush=True)
     print("[llm-app]   /tools force refresh and print tools", flush=True)
+    print("[llm-app]   /mode  show current mode", flush=True)
+    print("[llm-app]   /mode user | /mode dev  switch verbosity", flush=True)
     print("[llm-app]   /exit  quit", flush=True)
+    if mode == "user":
+        print("[llm-app] current output: concise user-facing summaries", flush=True)
+    else:
+        print("[llm-app] current output: full planning/debug traces", flush=True)
 
 
 def _repl_loop(
-    agent_id: str,
+    client_name: str,
     sock_path: str,
     cfg: SelectorConfig,
     show_tools: bool,
     show_reasons: bool,
     show_payload: bool,
+    mode: DisplayMode,
 ) -> int:
     apps = _list_apps(sock_path)
     tools = _list_tools(sock_path)
+    session = _ensure_session(sock_path, client_name, None)
     if not apps:
         raise CliError("no apps returned by mcpd")
 
-    _print_repl_banner(apps, tools)
-    _print_help()
+    _print_repl_banner(apps, tools, mode)
+    _print_help(mode)
     last_apps_sig = _apps_signature(apps)
     last_sig = _tools_signature(tools)
 
@@ -229,16 +241,23 @@ def _repl_loop(
         if user_text == "/exit":
             return 0
         if user_text == "/help":
-            _print_help()
+            _print_help(mode)
+            continue
+        if user_text == "/mode":
+            print(f"[llm-app] mode: {mode}", flush=True)
+            continue
+        if user_text in {"/mode user", "/mode dev"}:
+            mode = "dev" if user_text.endswith("dev") else "user"
+            print(f"[llm-app] switched to {mode} mode", flush=True)
             continue
         if user_text == "/apps":
             apps = _list_apps(sock_path)
-            _print_apps(apps)
+            _print_apps(apps, mode)
             last_apps_sig = _apps_signature(apps)
             continue
         if user_text == "/tools":
             tools = _list_tools(sock_path)
-            _print_tools(tools)
+            _print_tools(tools, mode)
             last_sig = _tools_signature(tools)
             continue
 
@@ -246,25 +265,29 @@ def _repl_loop(
         app_sig = _apps_signature(apps)
         if app_sig != last_apps_sig:
             print(f"[llm-app] catalog updated: apps={len(apps)}", flush=True)
-            _print_apps(apps)
+            if mode == "dev":
+                _print_apps(apps, mode)
         last_apps_sig = app_sig
 
         tools = _list_tools(sock_path)
         sig = _tools_signature(tools)
         if show_tools:
-            _print_tools(tools)
+            _print_tools(tools, mode)
         elif sig != last_sig:
             print(f"[llm-app] catalog updated: tools={len(tools)}", flush=True)
-            _print_tools(tools)
+            if mode == "dev":
+                _print_tools(tools, mode)
         last_sig = sig
 
+        session = _ensure_session(sock_path, client_name, session)
         rc = _execute_once_with_apps(
             user_text,
-            agent_id,
+            session,
             sock_path,
             cfg,
             apps,
             tools,
+            mode,
             show_reasons=show_reasons,
             show_payload=show_payload,
         )
@@ -282,9 +305,15 @@ def main() -> int:
         default=os.getenv("DEEPSEEK_API_URL", DEFAULT_DEEPSEEK_URL),
     )
     parser.add_argument("--deepseek-timeout-sec", type=int, default=20)
-    parser.add_argument("--agent-id", default="a1", help="agent id for tool execution")
+    parser.add_argument("--agent-id", default="a1", help="client name hint for session opening")
     parser.add_argument("--sock", default=SOCK_PATH, help="mcpd unix socket path")
     parser.add_argument("--show-tools", action="store_true", help="always print full tool list in REPL")
+    parser.add_argument(
+        "--mode",
+        choices=("user", "dev"),
+        default="user",
+        help="user mode shows concise results; dev mode shows detailed traces",
+    )
     parser.add_argument(
         "--show-reasons",
         action="store_true",
@@ -295,12 +324,10 @@ def main() -> int:
         action="store_true",
         help=f"print model-generated payload before tool execution (or set {SHOW_PAYLOAD_ENV}=1)",
     )
-    parser.add_argument("--agent", dest="agent_legacy", help=argparse.SUPPRESS)
-    parser.add_argument("--socket", dest="socket_legacy", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    agent_id = args.agent_legacy or args.agent_id
-    sock_path = args.socket_legacy or args.sock
+    client_name = args.agent_id
+    sock_path = args.sock
     cfg = SelectorConfig(
         deepseek_url=args.deepseek_url,
         deepseek_model=args.deepseek_model,
@@ -312,25 +339,35 @@ def main() -> int:
         if args.once and args.repl:
             raise CliError("use either --once or --repl, not both")
         if args.once:
-            return _run_once(args.once, agent_id, sock_path, cfg, args.show_reasons, show_payload)
+            return _run_once(
+                args.once,
+                client_name,
+                sock_path,
+                cfg,
+                args.mode,
+                args.show_reasons,
+                show_payload,
+            )
         if args.repl:
             return _repl_loop(
-                agent_id,
+                client_name,
                 sock_path,
                 cfg,
                 args.show_tools,
                 args.show_reasons,
                 show_payload,
+                args.mode,
             )
         if not sys.stdin.isatty():
             raise CliError("no --once/--repl provided and stdin is not interactive")
         return _repl_loop(
-            agent_id,
+            client_name,
             sock_path,
             cfg,
             args.show_tools,
             args.show_reasons,
             show_payload,
+            args.mode,
         )
     except CliError as exc:
         print(f"[llm-app] ERROR: {exc}", flush=True)

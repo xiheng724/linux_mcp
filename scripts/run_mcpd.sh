@@ -14,7 +14,6 @@ SOCK_PATH="/tmp/mcpd.sock"
 RUNTIME_UID="$(id -u)"
 PID_PATH="/tmp/mcpd-${RUNTIME_UID}.pid"
 LOG_PATH="/tmp/mcpd-${RUNTIME_UID}.log"
-LEGACY_PID_PATH="/tmp/mcpd.pid"
 
 manifest_signature() {
   "$PYTHON_BIN" - <<'PY'
@@ -136,20 +135,6 @@ if [[ ! -d /sys/kernel/mcp/tools || ! -d /sys/kernel/mcp/agents ]]; then
   echo "  sudo bash scripts/unload_module.sh"
   echo "  sudo bash scripts/load_module.sh"
   exit 1
-fi
-
-if [[ ! -x ./client/bin/genl_register_tool || ! -x ./client/bin/genl_list_tools ]]; then
-  echo "missing client binaries; run: make -C client clean && make -C client"
-  exit 1
-fi
-
-if [[ -f "$LEGACY_PID_PATH" && ! -f "$PID_PATH" ]]; then
-  old_pid="$(cat "$LEGACY_PID_PATH" 2>/dev/null || true)"
-  if [[ -n "${old_pid}" ]] && kill -0 "$old_pid" 2>/dev/null; then
-    echo "mcpd already running pid=$old_pid (legacy pid file)"
-    exit 0
-  fi
-  rm -f "$LEGACY_PID_PATH"
 fi
 
 if [[ -f "$PID_PATH" ]]; then

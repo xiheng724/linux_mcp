@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import re
-import subprocess
 from pathlib import Path
 from typing import Dict
 
@@ -12,21 +10,6 @@ from manifest_loader import DEFAULT_MANIFEST_DIR, ToolManifest, load_all_tools
 from netlink_client import KernelMcpNetlinkClient
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-REGISTER_BIN = ROOT_DIR / "client" / "bin" / "genl_register_tool"
-LIST_BIN = ROOT_DIR / "client" / "bin" / "genl_list_tools"
-
-LIST_RE = re.compile(
-    r"^id=(?P<id>\d+)\s+name=(?P<name>\S+)\s+risk_flags=(?P<risk_flags>0x[0-9a-fA-F]+)\s+status=(?P<status>\S+)(?:\s+hash=(?P<hash>\S+))?$"
-)
-
-
-def _run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(cmd, cwd=str(ROOT_DIR), text=True, capture_output=True)
-    if check and proc.returncode != 0:
-        raise RuntimeError(
-            f"command failed: {' '.join(cmd)}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
-        )
-    return proc
 
 
 def _load_tool_map() -> Dict[int, ToolManifest]:
@@ -34,12 +17,8 @@ def _load_tool_map() -> Dict[int, ToolManifest]:
 
 
 def _check_prerequisites() -> None:
-    if not REGISTER_BIN.exists() or not LIST_BIN.exists():
-        raise RuntimeError("client binaries missing; run: make -C client clean && make -C client")
-
-    lsmod = _run_cmd(["lsmod"])
-    if not any(line.split()[:1] == ["kernel_mcp"] for line in lsmod.stdout.splitlines()[1:]):
-        raise RuntimeError("kernel module kernel_mcp not loaded")
+    if not (Path("/sys/kernel/mcp/tools").is_dir() and Path("/sys/kernel/mcp/agents").is_dir()):
+        raise RuntimeError("kernel module kernel_mcp not loaded or sysfs ABI mismatch")
 
 
 def _register_manifest_tools(manifests: Dict[int, ToolManifest]) -> None:
@@ -48,18 +27,12 @@ def _register_manifest_tools(manifests: Dict[int, ToolManifest]) -> None:
         client.reset_tools()
         for tool_id in sorted(manifests.keys()):
             tool = manifests[tool_id]
-            cmd = [
-                str(REGISTER_BIN),
-                "--id",
-                str(tool.tool_id),
-                "--name",
-                str(tool.name),
-                "--risk-flags",
-                str(tool.risk_flags),
-                "--hash",
-                str(tool.manifest_hash),
-            ]
-            _run_cmd(cmd)
+            client.register_tool(
+                tool_id=tool.tool_id,
+                name=tool.name,
+                risk_flags=tool.risk_flags,
+                tool_hash=tool.manifest_hash,
+            )
             print(
                 f"[reconcile] registered tool id={tool.tool_id} name={tool.name} risk_flags=0x{tool.risk_flags:08x} hash={tool.manifest_hash}",
                 flush=True,
@@ -69,25 +42,18 @@ def _register_manifest_tools(manifests: Dict[int, ToolManifest]) -> None:
 
 
 def _list_kernel_tools() -> Dict[int, Dict[str, object]]:
-    proc = _run_cmd([str(LIST_BIN)])
+    client = KernelMcpNetlinkClient()
+    try:
+        items = client.list_tools()
+    finally:
+        client.close()
+
     tools: Dict[int, Dict[str, object]] = {}
-    for line in proc.stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        match = LIST_RE.match(line)
-        if not match:
-            continue
-        tool_id = int(match.group("id"))
+    for item in items:
+        tool_id = int(item["tool_id"])
         if tool_id in tools:
             raise RuntimeError(f"duplicate tool_id in kernel list output: {tool_id}")
-        tools[tool_id] = {
-            "tool_id": tool_id,
-            "name": match.group("name"),
-            "risk_flags": int(match.group("risk_flags"), 16),
-            "status": match.group("status"),
-            "hash": match.group("hash") or "",
-        }
+        tools[tool_id] = item
     return tools
 
 

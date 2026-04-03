@@ -39,4 +39,6 @@ ATTR: Final[dict[str, int]] = {
     "APPROVAL_REASON": 25,
     "APPROVAL_TTL_MS": 26,
     "POLICY_ID": 27,
+    "AGENT_BINDING": 28,
+    "AGENT_EPOCH": 29,
 }

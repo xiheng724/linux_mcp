@@ -42,12 +42,14 @@ llm-app
 7. 如果后一步需要前一步结果，会通过显式 selector 或 `$alias.path` 引用前一步返回值
 8. 运行时上下文会显式提供 `context.workspace_root_rel` 之类的环境值
 9. 本地按 `input_schema` 校验 step payload
-10. 逐步发 `{"kind":"tool:exec", ...}` 给 `mcpd`
+10. 先通过 `open_session` 获取短期 `session_id`
+11. 逐步发带 `session_id` 的 `{"kind":"tool:exec", ...}` 给 `mcpd`
 
 这意味着当前 `llm-app` 强依赖：
 
 - `DEEPSEEK_API_KEY`
 - `mcpd` 正常返回 catalog
+- `mcpd` 能成功签发 session
 
 如果没配置 `DEEPSEEK_API_KEY`，CLI 和 GUI 都会直接失败，不存在本地 fallback 路由。
 
@@ -99,12 +101,16 @@ REPL 内置命令：
 - `/help`
 - `/apps`
 - `/tools`
+- `/mode`
+- `/mode user`
+- `/mode dev`
 - `/exit`
 
 常用参数：
 
 - `--agent-id a1`
 - `--sock /tmp/mcpd.sock`
+- `--mode user|dev`
 - `--show-tools`
 - `--show-reasons`
 - `--show-payload`
@@ -122,6 +128,13 @@ GUI 入口在 [gui_app.py](/home/lxh/Code/linux-mcp/llm-app/gui_app.py)。
 python3 llm-app/gui_app.py
 ```
 
+也可以显式指定界面输出模式：
+
+```bash
+python3 llm-app/gui_app.py --mode user
+python3 llm-app/gui_app.py --mode dev
+```
+
 仓库当前推荐的 GUI 开发/运行方式：
 
 ```bash
@@ -132,7 +145,13 @@ python llm-app/gui_app.py
 
 GUI 和 CLI 使用同一套共享选择逻辑，不是两套不同实现。
 
-如果某一步被内核仲裁成 `DEFER`，CLI/GUI 会向用户请求确认，再通过 `mcpd` 的 `approval_reply` 链路继续执行或拒绝。
+- `user` 模式下，CLI/GUI 默认显示简洁的用户结果摘要
+- `dev` 模式下，会显示 plan、step route、payload、执行结果等调试细节
+- GUI 左侧默认只突出 app 概览，tool catalog 需要手动展开查看
+
+如果某一步被内核仲裁成 `DEFER`，CLI/GUI 会向用户请求确认，再通过带 `session_id` 的 `approval_reply` 链路继续执行或拒绝。
+
+另外，`llm-app` 现在不会靠硬编码工具名来判断这类行为，而是读取 tool catalog 里的 `path_semantics` 和 `approval_policy`。只要新工具在 manifest 里正确声明“这是 repo 内路径还是宿主机路径”“何时要用户确认”，CLI/GUI 就会自动沿用同一套路由和审批行为。
 
 ## 运行前提
 
@@ -158,9 +177,14 @@ pip install PySide6
 
 ## 典型输出
 
-CLI 单次执行时，通常会输出：
+CLI/GUI 在 `user` 模式下，通常会输出：
 
 - 当前 catalog 里的 app/tool 数量
+- 简洁的执行摘要
+- 更贴近用户任务的结果说明
+
+CLI/GUI 在 `dev` 模式下，通常会额外输出：
+
 - plan 原因
 - 每一步的 `app_name/app_id`
 - 每一步的 `tool_name/tool_id`

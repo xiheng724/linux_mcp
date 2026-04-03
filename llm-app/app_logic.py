@@ -4,15 +4,11 @@
 from __future__ import annotations
 
 import dataclasses
-import json
-import os
 import time
-from datetime import datetime, timezone
-import urllib.error
-import urllib.request
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
-from debug_render import render_execution_debug_lines
+from model_client import SelectorConfig, SessionInfo, call_model, current_time_context, require_api_key, runtime_context
 from plan_support import (
     EmptyPolicy,
     NoMatchOutcome,
@@ -26,18 +22,12 @@ from plan_support import (
 )
 from rpc import mcpd_call
 
-DEFAULT_DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
-DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
 MAX_PLAN_STEPS = 4
 MAX_PLAN_CANDIDATE_TOOLS = 6
 DEFAULT_APPROVAL_TTL_MS = 5 * 60 * 1000
-
-
-@dataclasses.dataclass(frozen=True)
-class SelectorConfig:
-    deepseek_url: str
-    deepseek_model: str
-    deepseek_timeout_sec: int
+ToolDict = Dict[str, Any]
+ApprovalEvaluator = Callable[[ToolDict, Dict[str, Any], Dict[str, Any]], str | None]
+PathResolver = Callable[[str, Dict[str, str]], Path]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -55,86 +45,30 @@ class ApprovalRequest:
     reason: str
 
 
-def _require_api_key() -> str:
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not set")
-    return api_key
+def _resolve_repo_rel_path(raw_path: str, context: Dict[str, str]) -> Path:
+    return (Path(context["repo_root_abs"]).resolve(strict=False) / raw_path.strip()).resolve(strict=False)
 
 
-def _extract_json_object(text: str) -> Dict[str, Any]:
-    decoder = json.JSONDecoder()
-    for idx, ch in enumerate(text):
-        if ch != "{":
-            continue
-        try:
-            obj, _end = decoder.raw_decode(text[idx:])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(obj, dict):
-            return obj
-    raise ValueError(f"no JSON object found in model output: {text!r}")
+def _resolve_host_any_path(raw_path: str, context: Dict[str, str]) -> Path:
+    text = raw_path.strip()
+    path_obj = Path(text)
+    if text.startswith("~"):
+        return path_obj.expanduser().resolve(strict=False)
+    if path_obj.is_absolute():
+        return path_obj.resolve(strict=False)
+    if path_obj.parts and path_obj.parts[0].lower() == "desktop":
+        desktop_dir = Path(context["desktop_dir_abs"]).resolve(strict=False)
+        return desktop_dir.joinpath(*path_obj.parts[1:]).resolve(strict=False)
+    home_dir = Path(context["home_dir_abs"]).resolve(strict=False)
+    return (home_dir / path_obj).resolve(strict=False)
 
 
-def _call_model(prompt: Dict[str, Any], system_text: str, api_key: str, cfg: SelectorConfig) -> Dict[str, Any]:
-    content = _call_model_text(prompt, system_text, api_key, cfg)
-    return _extract_json_object(content)
+PATH_RESOLVERS: Dict[str, PathResolver] = {
+    "repo_rel": _resolve_repo_rel_path,
+    "host_any": _resolve_host_any_path,
+}
 
 
-def _call_model_text(prompt: Dict[str, Any], system_text: str, api_key: str, cfg: SelectorConfig) -> str:
-    req_obj = {
-        "model": cfg.deepseek_model,
-        "temperature": 0,
-        "messages": [
-            {"role": "system", "content": system_text},
-            {"role": "user", "content": json.dumps(prompt, ensure_ascii=True)},
-        ],
-    }
-    payload = json.dumps(req_obj, ensure_ascii=True).encode("utf-8")
-    req = urllib.request.Request(
-        cfg.deepseek_url,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=cfg.deepseek_timeout_sec) as resp:
-            raw = resp.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"DeepSeek HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"DeepSeek request failed: {exc}") from exc
-
-    data = json.loads(raw.decode("utf-8"))
-    choices = data.get("choices", [])
-    if not isinstance(choices, list) or not choices:
-        raise RuntimeError(f"invalid DeepSeek response, missing choices: {data}")
-    msg = choices[0].get("message", {})
-    content = msg.get("content", "")
-    if not isinstance(content, str) or not content:
-        raise RuntimeError(f"invalid DeepSeek response content: {data}")
-    return content
-
-
-def _current_time_context() -> Dict[str, str]:
-    now = datetime.now(timezone.utc)
-    return {
-        "current_utc_time": now.isoformat(),
-        "current_utc_date": now.date().isoformat(),
-        "current_timezone": "UTC",
-    }
-
-
-def _runtime_context() -> Dict[str, str]:
-    cwd = os.getcwd()
-    return {
-        "workspace_root_rel": ".",
-        "cwd_abs": cwd,
-    }
 
 
 def load_apps(sock_path: str) -> List[Dict[str, Any]]:
@@ -180,18 +114,9 @@ def _compact_tool(tool: Dict[str, Any]) -> Dict[str, Any]:
         "app_id": tool.get("app_id", ""),
         "app_name": tool.get("app_name", ""),
         "description": tool.get("description", ""),
+        "path_semantics": tool.get("path_semantics", {}),
+        "approval_policy": tool.get("approval_policy", {}),
     }
-
-
-def _call_payload_builder(user_text: str, tool: Dict[str, Any], api_key: str, cfg: SelectorConfig) -> Dict[str, Any]:
-    return _call_payload_builder_with_seed(
-        user_text=user_text,
-        tool=tool,
-        step_purpose="",
-        seed_payload={},
-        api_key=api_key,
-        cfg=cfg,
-    )
 
 
 def _call_payload_builder_with_seed(
@@ -206,7 +131,7 @@ def _call_payload_builder_with_seed(
     prompt = {
         "user_input": user_text,
         "step_purpose": step_purpose,
-        "time_context": _current_time_context(),
+        "time_context": current_time_context(),
         "selected_tool": {
             "tool_id": tool.get("tool_id"),
             "name": tool.get("name", ""),
@@ -220,7 +145,7 @@ def _call_payload_builder_with_seed(
         "output_format": "payload JSON object",
         "rule": "Return one JSON object only. The object itself must be the payload.",
     }
-    return _call_model(
+    return call_model(
         prompt,
         (
             "You format tool payloads. Given the selected tool description, input schema, examples, "
@@ -238,10 +163,6 @@ def _call_payload_builder_with_seed(
     )
 
 
-def build_payload_for_tool(tool: Dict[str, Any], user_text: str, cfg: SelectorConfig) -> Dict[str, Any]:
-    return build_payload_for_step(tool, user_text, "", {}, cfg)
-
-
 def build_payload_for_step(
     tool: Dict[str, Any],
     user_text: str,
@@ -249,7 +170,7 @@ def build_payload_for_step(
     seed_payload: Dict[str, Any],
     cfg: SelectorConfig,
 ) -> Dict[str, Any]:
-    api_key = _require_api_key()
+    api_key = require_api_key()
     input_schema = tool.get("input_schema", {})
     if not isinstance(input_schema, dict):
         raise RuntimeError("selected tool missing valid input_schema")
@@ -285,8 +206,8 @@ def _call_plan_builder(
 ) -> Dict[str, Any]:
     prompt = {
         "user_input": user_text,
-        "time_context": _current_time_context(),
-        "runtime_context": _runtime_context(),
+        "time_context": current_time_context(),
+        "runtime_context": runtime_context(),
         "apps": [
             {
                 "app_id": app.get("app_id", ""),
@@ -305,6 +226,8 @@ def _call_plan_builder(
                 "description": tool.get("description", ""),
                 "input_schema": tool.get("input_schema", {}),
                 "examples": tool.get("examples", []),
+                "path_semantics": tool.get("path_semantics", {}),
+                "approval_policy": tool.get("approval_policy", {}),
             }
             for tool in tools
             if isinstance(tool.get("tool_id"), int)
@@ -336,13 +259,17 @@ def _call_plan_builder(
         },
         "rule": "Return one JSON object only. No markdown. Use 1-4 steps.",
     }
-    obj = _call_model(
+    obj = call_model(
         prompt,
         (
             "You are a planning router for tool execution. Build the smallest valid sequential plan. "
             "A runtime_context object is available for environment values such as the current workspace root. "
             "When the user refers to the current project folder or current workspace, use $context.workspace_root_rel "
             "instead of inventing a lookup step. "
+            "Use each tool's path_semantics metadata to match the user's path scope. "
+            "repo_rel means the path must stay under the repository root. "
+            "host_any means the path targets the real host filesystem. "
+            "When the user specifies a non-repository path, prefer a tool whose path_semantics matches that host path scope. "
             "If the user refers to an item semantically but the write/read tool needs an exact identifier, "
             "first use a search/list/find tool to resolve candidates, then use an explicit selector object in a later step. "
             "The plan payload for each step may be partial. Include constrained fields you know, "
@@ -373,6 +300,7 @@ def _call_tool_selector(
 ) -> Dict[str, Any]:
     prompt = {
         "user_input": user_text,
+        "runtime_context": runtime_context(),
         "apps": [
             {
                 "app_id": app.get("app_id", ""),
@@ -388,10 +316,14 @@ def _call_tool_selector(
         },
         "rule": f"Return one JSON object only. Choose 1-{MAX_PLAN_CANDIDATE_TOOLS} tool_ids.",
     }
-    obj = _call_model(
+    obj = call_model(
         prompt,
         (
             "You are a lightweight tool selector. Choose the smallest set of tools needed to satisfy the user request and any identifier-resolution steps implied by the selected tool schemas. "
+            "Use each tool's path_semantics metadata to match explicit user path scope. "
+            "repo_rel tools are for repository-root paths. "
+            "host_any tools are for real host filesystem paths. "
+            "When the user specifies a non-repository path, prefer a host-path tool instead of a repo_rel tool. "
             "Do not invent tool ids. Return strict JSON only in the format "
             "{\"reason\":\"...\",\"tool_ids\":[1,2]}."
         ),
@@ -409,7 +341,7 @@ def _select_candidate_tools(
     tools: List[Dict[str, Any]],
     cfg: SelectorConfig,
 ) -> Tuple[str, List[Dict[str, Any]]]:
-    api_key = _require_api_key()
+    api_key = require_api_key()
     tools_by_id = _index_tools(tools)
     selector_obj = _call_tool_selector(user_text, apps, tools, api_key, cfg)
     reason = str(selector_obj.get("reason", "")).strip() or "model-selected"
@@ -443,7 +375,7 @@ def build_execution_plan(
     tools_by_id = _index_tools(candidate_tools)
     if not tools_by_id:
         raise RuntimeError("no valid tools discovered from mcpd")
-    plan_obj = _call_plan_builder(user_text, apps, candidate_tools, _require_api_key(), cfg)
+    plan_obj = _call_plan_builder(user_text, apps, candidate_tools, require_api_key(), cfg)
     reason, steps = normalize_plan(plan_obj, tools_by_id, max_plan_steps=MAX_PLAN_STEPS)
     plan_reason = reason if selector_reason == "model-selected" else f"{selector_reason}; {reason}"
     return {"reason": plan_reason, "steps": steps}
@@ -451,7 +383,7 @@ def build_execution_plan(
 
 def _exec_tool_request(
     *,
-    agent_id: str,
+    session: SessionInfo,
     sock_path: str,
     step: PlannedStep,
     payload: Dict[str, Any],
@@ -464,7 +396,7 @@ def _exec_tool_request(
     req_obj = {
         "kind": "tool:exec",
         "req_id": request_id,
-        "agent_id": agent_id,
+        "session_id": session.session_id,
         "app_id": step.app_id,
         "tool_id": step.tool_id,
         "tool_hash": tool_hash,
@@ -478,7 +410,7 @@ def _exec_tool_request(
 
 def _execute_candidate_fallback(
     *,
-    agent_id: str,
+    session: SessionInfo,
     sock_path: str,
     step: PlannedStep,
     input_schema: Dict[str, Any],
@@ -490,19 +422,11 @@ def _execute_candidate_fallback(
     if fallback_payload == original_payload:
         return None
     validate_payload_against_schema(input_schema, fallback_payload)
-    fallback_exec = _exec_tool_request(
-        agent_id=agent_id,
+    resolved_exec = _execute_step_with_approvals(
+        session=session,
         sock_path=sock_path,
         step=step,
         payload=fallback_payload,
-    )
-    resolved_exec = _resolve_deferred_exec(
-        agent_id=agent_id,
-        sock_path=sock_path,
-        step=step,
-        payload=fallback_payload,
-        req_id=fallback_exec["req_id"],
-        response=fallback_exec["response"],
         approval_handler=approval_handler,
     )
     return {
@@ -542,19 +466,57 @@ def _build_approval_request(
     )
 
 
+def _approval_reason_always(
+    tool: ToolDict,
+    payload: Dict[str, Any],
+    user_confirmation: Dict[str, Any],
+) -> str | None:
+    del tool, payload
+    return str(user_confirmation.get("reason", "")).strip() or "user confirmation required"
+
+
+def _approval_reason_path_outside_repo(
+    tool: ToolDict,
+    payload: Dict[str, Any],
+    user_confirmation: Dict[str, Any],
+) -> str | None:
+    path_fields = user_confirmation.get("path_fields", [])
+    if not isinstance(path_fields, list):
+        return None
+    reason_prefix = str(user_confirmation.get("reason", "")).strip() or "user confirmation required"
+    context = runtime_context()
+    repo_root = Path(context["repo_root_abs"]).resolve(strict=False)
+    for field_name in path_fields:
+        raw_path = payload.get(field_name, "")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        target_path = _resolve_policy_path(tool, field_name, raw_path, context)
+        try:
+            target_path.relative_to(repo_root)
+        except ValueError:
+            return f"{reason_prefix}: {target_path}"
+    return None
+
+
+APPROVAL_EVALUATORS: Dict[str, ApprovalEvaluator] = {
+    "always": _approval_reason_always,
+    "path_outside_repo": _approval_reason_path_outside_repo,
+}
+
+
 def _submit_approval_reply(
     *,
     sock_path: str,
-    agent_id: str,
+    session: SessionInfo,
     ticket_id: int,
     approved: bool,
 ) -> Dict[str, Any]:
     return mcpd_call(
         {
             "sys": "approval_reply",
+            "session_id": session.session_id,
             "ticket_id": ticket_id,
             "decision": "approve" if approved else "deny",
-            "operator": agent_id,
             "reason": "approved in llm-app" if approved else "denied in llm-app",
             "ttl_ms": DEFAULT_APPROVAL_TTL_MS,
         },
@@ -565,7 +527,7 @@ def _submit_approval_reply(
 
 def _resolve_deferred_exec(
     *,
-    agent_id: str,
+    session: SessionInfo,
     sock_path: str,
     step: PlannedStep,
     payload: Dict[str, Any],
@@ -587,7 +549,7 @@ def _resolve_deferred_exec(
     approved = approval_handler(approval_request)
     approval_resp = _submit_approval_reply(
         sock_path=sock_path,
-        agent_id=agent_id,
+        session=session,
         ticket_id=approval_request.ticket_id,
         approved=approved,
     )
@@ -605,6 +567,112 @@ def _resolve_deferred_exec(
         "response": approval_resp,
         "approval_request": approval_request,
     }
+
+
+def _build_local_approval_request(
+    *,
+    step: PlannedStep,
+    payload: Dict[str, Any],
+) -> ApprovalRequest | None:
+    approval_policy = step.tool.get("approval_policy", {})
+    if not isinstance(approval_policy, dict):
+        return None
+    user_confirmation = approval_policy.get("user_confirmation", {})
+    if not isinstance(user_confirmation, dict) or not user_confirmation:
+        return None
+    when = user_confirmation.get("when", "")
+    evaluator = APPROVAL_EVALUATORS.get(when)
+    if evaluator is None:
+        return None
+    reason = evaluator(step.tool, payload, user_confirmation)
+    if not reason:
+        return None
+    return ApprovalRequest(
+        step_index=step.index,
+        step_id=step.step_id,
+        app_name=step.app_name,
+        app_id=step.app_id,
+        tool_name=step.tool_name,
+        tool_id=step.tool_id,
+        purpose=step.purpose,
+        payload=payload,
+        req_id=0,
+        ticket_id=0,
+        reason=reason,
+    )
+
+
+def _resolve_policy_path(
+    tool: Dict[str, Any],
+    field_name: str,
+    raw_path: str,
+    context: Dict[str, str] | None = None,
+) -> Path:
+    active_context = runtime_context() if context is None else context
+    text = raw_path.strip()
+    path_semantics = tool.get("path_semantics", {})
+    mode = path_semantics.get(field_name, "") if isinstance(path_semantics, dict) else ""
+    resolver = PATH_RESOLVERS.get(mode, lambda value, _context: Path(value).expanduser().resolve(strict=False))
+    return resolver(text, active_context)
+
+
+def _execute_step_with_approvals(
+    *,
+    session: SessionInfo,
+    sock_path: str,
+    step: PlannedStep,
+    payload: Dict[str, Any],
+    approval_handler: Callable[[ApprovalRequest], bool] | None,
+) -> Dict[str, Any]:
+    local_approval = _build_local_approval_request(step=step, payload=payload)
+    if local_approval is not None:
+        if approval_handler is None:
+            return {
+                "req_id": 0,
+                "response": {
+                    "status": "error",
+                    "result": {},
+                    "error": "approval required for host filesystem write",
+                    "decision": "DEFER",
+                    "reason": local_approval.reason,
+                    "ticket_id": 0,
+                    "t_ms": 0,
+                },
+                "approval_request": local_approval,
+            }
+        if not approval_handler(local_approval):
+            return {
+                "req_id": 0,
+                "response": {
+                    "status": "error",
+                    "result": {},
+                    "error": "host filesystem write declined by user",
+                    "decision": "DENY",
+                    "reason": "user_declined_host_filesystem_write",
+                    "ticket_id": 0,
+                    "t_ms": 0,
+                },
+                "approval_request": local_approval,
+            }
+
+    primary_exec = _exec_tool_request(
+        session=session,
+        sock_path=sock_path,
+        step=step,
+        payload=payload,
+    )
+    resolved_exec = _resolve_deferred_exec(
+        session=session,
+        sock_path=sock_path,
+        step=step,
+        payload=payload,
+        req_id=primary_exec["req_id"],
+        response=primary_exec["response"],
+        approval_handler=approval_handler,
+    )
+    if local_approval is not None and resolved_exec.get("approval_request") is None:
+        resolved_exec["approval_request"] = local_approval
+    return resolved_exec
 
 
 def _materialize_step_payload(
@@ -671,7 +739,7 @@ def _make_executed_step(
 
 def execute_plan(
     user_text: str,
-    agent_id: str,
+    session: SessionInfo,
     sock_path: str,
     cfg: SelectorConfig,
     apps: List[Dict[str, Any]] | None = None,
@@ -682,7 +750,7 @@ def execute_plan(
         apps, tools = load_catalog(sock_path)
     plan = build_execution_plan(user_text, apps, tools, cfg)
 
-    results_by_alias: Dict[str, Any] = {"context": _runtime_context()}
+    results_by_alias: Dict[str, Any] = {"context": runtime_context()}
     executed_steps: List[Dict[str, Any]] = []
     final_response: Dict[str, Any] = {}
     final_status = "ok"
@@ -696,19 +764,11 @@ def execute_plan(
             results_by_alias=results_by_alias,
             cfg=cfg,
         )
-        primary_exec = _exec_tool_request(
-            agent_id=agent_id,
+        resolved_exec = _execute_step_with_approvals(
+            session=session,
             sock_path=sock_path,
             step=step,
             payload=payload_info["payload_final"],
-        )
-        resolved_exec = _resolve_deferred_exec(
-            agent_id=agent_id,
-            sock_path=sock_path,
-            step=step,
-            payload=payload_info["payload_final"],
-            req_id=primary_exec["req_id"],
-            response=primary_exec["response"],
             approval_handler=approval_handler,
         )
         response = resolved_exec["response"]
@@ -738,7 +798,7 @@ def execute_plan(
         )
         if empty_state is True:
             fallback_exec = _execute_candidate_fallback(
-                agent_id=agent_id,
+                session=session,
                 sock_path=sock_path,
                 step=step,
                 input_schema=payload_info["input_schema"],

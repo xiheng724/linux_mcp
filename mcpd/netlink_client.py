@@ -24,6 +24,9 @@ NETLINK_GENERIC = 16
 NLM_F_REQUEST = 0x01
 NLM_F_MULTI = 0x02
 NLM_F_ACK = 0x04
+NLM_F_ROOT = 0x100
+NLM_F_MATCH = 0x200
+NLM_F_DUMP = NLM_F_ROOT | NLM_F_MATCH
 
 NLMSG_NOOP = 0x01
 NLMSG_ERROR = 0x02
@@ -91,6 +94,13 @@ def _attr_u32(attrs: Dict[int, List[bytes]], key: int) -> int:
     if len(raw) < 4:
         raise RuntimeError(f"invalid u32 attr length key={key} len={len(raw)}")
     return struct.unpack_from("=I", raw, 0)[0]
+
+
+def _attr_u64(attrs: Dict[int, List[bytes]], key: int) -> int:
+    raw = _attr_first(attrs, key)
+    if len(raw) < 8:
+        raise RuntimeError(f"invalid u64 attr length key={key} len={len(raw)}")
+    return struct.unpack_from("=Q", raw, 0)[0]
 
 
 def _attr_u16(attrs: Dict[int, List[bytes]], key: int) -> int:
@@ -172,6 +182,31 @@ class KernelMcpNetlinkClient:
                     continue
                 return msg_type, msg_flags, payload
 
+    def _recv_multi(self, expected_seq: int) -> List[Tuple[int, int, bytes]]:
+        messages: List[Tuple[int, int, bytes]] = []
+        while True:
+            raw = self._sock.recv(65535)
+            offset = 0
+            while offset + NLMSG_HDR_LEN <= len(raw):
+                nlmsg_len, msg_type, msg_flags, msg_seq, _msg_pid = struct.unpack_from(
+                    NLMSG_HDR_FMT, raw, offset
+                )
+                if nlmsg_len < NLMSG_HDR_LEN:
+                    raise RuntimeError(f"invalid nlmsg_len: {nlmsg_len}")
+                end = offset + nlmsg_len
+                if end > len(raw):
+                    raise RuntimeError("malformed netlink packet")
+                payload = raw[offset + NLMSG_HDR_LEN:end]
+                offset += _align4(nlmsg_len)
+
+                if msg_seq != expected_seq:
+                    continue
+                if msg_type == NLMSG_NOOP:
+                    continue
+                if msg_type == NLMSG_DONE:
+                    return messages
+                messages.append((msg_type, msg_flags, payload))
+
     def _parse_ack_error(self, payload: bytes) -> int:
         if len(payload) < 4:
             raise RuntimeError("short NLMSG_ERROR payload")
@@ -204,6 +239,33 @@ class KernelMcpNetlinkClient:
             attrs_dict = _parse_attrs(resp_payload[GENL_HDR_LEN:])
             return genl_cmd, attrs_dict
 
+    def _request_dump(
+        self,
+        *,
+        msg_type: int,
+        cmd: int,
+        attrs: List[Tuple[int, bytes]],
+    ) -> List[Tuple[int, Dict[int, List[bytes]]]]:
+        with self._lock:
+            seq = self._next_seq()
+            flags = NLM_F_REQUEST | NLM_F_DUMP
+            msg = self._build_msg(msg_type=msg_type, flags=flags, seq=seq, cmd=cmd, attrs=attrs)
+            self._sock.sendto(msg, (0, 0))
+
+            out: List[Tuple[int, Dict[int, List[bytes]]]] = []
+            for resp_type, _resp_flags, resp_payload in self._recv_multi(seq):
+                if resp_type == NLMSG_ERROR:
+                    err = self._parse_ack_error(resp_payload)
+                    if err != 0:
+                        raise RuntimeError(f"netlink NLMSG_ERROR={err} ({os.strerror(-err)})")
+                    continue
+                if len(resp_payload) < GENL_HDR_LEN:
+                    raise RuntimeError("short generic netlink payload")
+                genl_cmd, _version, _reserved = struct.unpack_from(GENL_HDR_FMT, resp_payload, 0)
+                attrs_dict = _parse_attrs(resp_payload[GENL_HDR_LEN:])
+                out.append((genl_cmd, attrs_dict))
+            return out
+
     def _resolve_family_id(self) -> int:
         genl_cmd, attrs = self._request(
             msg_type=GENL_ID_CTRL,
@@ -219,7 +281,15 @@ class KernelMcpNetlinkClient:
             raise RuntimeError(f"invalid family_id: {family_id}")
         return family_id
 
-    def register_agent(self, agent_id: str, *, pid: int, uid: int) -> None:
+    def register_agent(
+        self,
+        agent_id: str,
+        *,
+        pid: int,
+        uid: int,
+        binding_hash: int = 0,
+        binding_epoch: int = 0,
+    ) -> None:
         if not agent_id:
             raise ValueError("agent_id must be non-empty")
         attrs = [
@@ -227,6 +297,10 @@ class KernelMcpNetlinkClient:
             (ATTR["PID"], struct.pack("=I", pid)),
             (ATTR["UID"], struct.pack("=I", uid)),
         ]
+        if binding_hash > 0:
+            attrs.append((ATTR["AGENT_BINDING"], struct.pack("=Q", binding_hash)))
+        if binding_epoch > 0:
+            attrs.append((ATTR["AGENT_EPOCH"], struct.pack("=Q", binding_epoch)))
         self._request(
             msg_type=self._family_id,
             cmd=CMD["AGENT_REGISTER"],
@@ -268,11 +342,33 @@ class KernelMcpNetlinkClient:
             need_ack=True,
         )
 
+    def list_tools(self) -> List[Dict[str, object]]:
+        responses = self._request_dump(
+            msg_type=self._family_id,
+            cmd=CMD["LIST_TOOLS"],
+            attrs=[],
+        )
+        tools: List[Dict[str, object]] = []
+        for genl_cmd, attrs in responses:
+            if genl_cmd != CMD["LIST_TOOLS"]:
+                raise RuntimeError(f"unexpected response cmd for LIST_TOOLS: {genl_cmd}")
+            tool: Dict[str, object] = {
+                "tool_id": _attr_u32(attrs, ATTR["TOOL_ID"]),
+                "name": _attr_string(attrs, ATTR["TOOL_NAME"]),
+                "risk_flags": _attr_u32(attrs, ATTR["TOOL_RISK_FLAGS"]),
+                "status": _attr_u32(attrs, ATTR["STATUS"]) if ATTR["STATUS"] in attrs else 0,
+                "hash": _attr_string(attrs, ATTR["TOOL_HASH"]) if ATTR["TOOL_HASH"] in attrs else "",
+            }
+            tools.append(tool)
+        return tools
+
     def tool_request(
         self,
         *,
         req_id: int,
         agent_id: str,
+        binding_hash: int = 0,
+        binding_epoch: int = 0,
         tool_id: int,
         tool_hash: str,
         ticket_id: int = 0,
@@ -282,6 +378,10 @@ class KernelMcpNetlinkClient:
             (ATTR["TOOL_ID"], struct.pack("=I", tool_id)),
             (ATTR["REQ_ID"], struct.pack("=Q", req_id)),
         ]
+        if binding_hash > 0:
+            attrs.append((ATTR["AGENT_BINDING"], struct.pack("=Q", binding_hash)))
+        if binding_epoch > 0:
+            attrs.append((ATTR["AGENT_EPOCH"], struct.pack("=Q", binding_epoch)))
         if tool_hash:
             attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
         if ticket_id > 0:
@@ -301,16 +401,17 @@ class KernelMcpNetlinkClient:
         return ToolDecision(
             decision=decision,
             reason=_attr_string(resp_attrs, ATTR["MESSAGE"]),
-            ticket_id=struct.unpack("=Q", _attr_first(resp_attrs, ATTR["TICKET_ID"]))[0]
-            if ATTR["TICKET_ID"] in resp_attrs
-            else 0,
+            ticket_id=_attr_u64(resp_attrs, ATTR["TICKET_ID"]) if ATTR["TICKET_ID"] in resp_attrs else 0,
         )
 
     def approval_decide(
         self,
         *,
         ticket_id: int,
+        agent_id: str,
         decision: int,
+        binding_hash: int = 0,
+        binding_epoch: int = 0,
         approver: str,
         reason: str,
         ttl_ms: int,
@@ -319,11 +420,16 @@ class KernelMcpNetlinkClient:
             raise ValueError("ticket_id must be positive")
         attrs = [
             (ATTR["TICKET_ID"], struct.pack("=Q", ticket_id)),
+            (ATTR["AGENT_ID"], agent_id.encode("utf-8") + b"\x00"),
             (ATTR["APPROVAL_DECISION"], struct.pack("=I", decision)),
             (ATTR["APPROVER"], approver.encode("utf-8") + b"\x00"),
             (ATTR["APPROVAL_REASON"], reason.encode("utf-8") + b"\x00"),
             (ATTR["APPROVAL_TTL_MS"], struct.pack("=I", ttl_ms)),
         ]
+        if binding_hash > 0:
+            attrs.append((ATTR["AGENT_BINDING"], struct.pack("=Q", binding_hash)))
+        if binding_epoch > 0:
+            attrs.append((ATTR["AGENT_EPOCH"], struct.pack("=Q", binding_epoch)))
         self._request(
             msg_type=self._family_id,
             cmd=CMD["APPROVAL_DECIDE"],

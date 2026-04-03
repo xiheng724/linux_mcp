@@ -20,8 +20,12 @@
 - 维护 app/tool runtime registry
 - 提供 `/tmp/mcpd.sock` 上的 framed JSON RPC
 - 处理 `list_apps` / `list_tools`
+- 基于 UDS `SO_PEERCRED` 读取真实客户端 `pid/uid/gid`
+- 处理 `open_session`
 - 处理 `tool:exec`
-- 为首次出现的 `agent_id` 自动做 netlink agent register
+- 将 session 绑定到 peer identity
+- 为每个 session 派生 `binding_hash / binding_epoch`
+- 为首次出现的服务端 `agent_id` 做带 binding 元数据的 netlink agent register
 - 通过内核做仲裁
 - 调用 tool app 的 UDS endpoint
 - 向内核回报 `tool_complete`
@@ -38,11 +42,14 @@ llm-app -> mcpd -> kernel netlink
 1. 启动时加载所有 manifest
 2. 将每个 tool 注册到内核
 3. 对外暴露 app/tool catalog
-4. 接收 `tool:exec`
-5. 校验请求和 payload
-6. 调用内核 `tool_request`
-7. 若 `ALLOW`，再调用对应 app 的 `operation`
-8. 执行后调用内核 `tool_complete`
+4. 通过 UDS peer credentials 识别本地客户端
+5. 为客户端签发短期 session 和服务端生成的 `agent_id`
+6. 从 session 派生 `binding_hash / binding_epoch`
+7. 接收带 `session_id` 的 `tool:exec`
+8. 校验 session、请求和 payload
+9. 调用内核 `tool_request`
+10. 若 `ALLOW`，再调用对应 app 的 `operation`
+11. 执行后调用内核 `tool_complete`
 
 ## public RPC
 
@@ -61,8 +68,9 @@ llm-app -> mcpd -> kernel netlink
 {"sys":"list_apps"}
 {"sys":"list_tools"}
 {"sys":"list_tools","app_id":"notes_app"}
-{"sys":"approval_reply","ticket_id":2,"decision":"approve","operator":"a1","reason":"approved in llm-app","ttl_ms":300000}
-{"kind":"tool:exec","req_id":1,"agent_id":"a1","app_id":"notes_app","tool_id":1,"tool_hash":"8hex","payload":{"title":"Daily Standup","body":"Blocked on review"}} 
+{"sys":"open_session","client_name":"llm-app","ttl_ms":1800000}
+{"sys":"approval_reply","session_id":"32hex","ticket_id":2,"decision":"approve","reason":"approved in llm-app","ttl_ms":300000}
+{"kind":"tool:exec","req_id":1,"session_id":"32hex","app_id":"notes_app","tool_id":1,"tool_hash":"8hex","payload":{"title":"Daily Standup","body":"Blocked on review"}} 
 ```
 
 `list_apps` 返回每个 app 的：
@@ -82,6 +90,8 @@ llm-app -> mcpd -> kernel netlink
 - `description`
 - `input_schema`
 - `examples`
+- `path_semantics`
+- `approval_policy`
 - `risk_tags`
 - `risk_flags`
 - `hash`
@@ -112,12 +122,17 @@ netlink client 在 [netlink_client.py](/home/lxh/Code/linux-mcp/mcpd/netlink_cli
 - `tool_complete`
 - `approval_decide`
 
+其中 `register_agent` / `tool_request` / `approval_decide` 都会带上 agent binding 元数据：
+
+- `binding_hash`
+- `binding_epoch`
+
 当前 `mcpd` 对 `DEFER` 的处理方式是：
 
 - 先把 `ticket_id` 和原始待执行请求缓存到用户态 pending approval 表
 - 把 `ticket_id` 返回给调用方
-- 由用户态审批端再调用 `{"sys":"approval_reply",...}` 返回批准或拒绝
-- `mcpd` 在批准后调用 `approval_decide`，然后继续执行原始请求
+- 由同一 session / peer identity 的用户态审批端再调用 `{"sys":"approval_reply",...}` 返回批准或拒绝
+- `mcpd` 在批准后带同一 agent binding 调用 `approval_decide`，然后继续执行原始请求
 - 如果用户拒绝，`mcpd` 直接返回 `approval declined by user`
 
 当前仓库约定里，rate limiting 和重试策略应由 `mcpd` 在用户空间完成，不在内核协议或 agent 内核状态里维护 token bucket。
@@ -144,6 +159,8 @@ manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_
   - `description`
   - `input_schema`
   - `examples`
+  - `path_semantics`（可选）
+  - `approval_policy`（可选）
 - 仅支持 `transport = "uds_rpc"`
 - endpoint 必须位于 `/tmp/linux-mcp-apps/`
 - `tool_id` 必须全局唯一
@@ -158,6 +175,8 @@ manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_
 - `description`
 - `input_schema`
 - `examples`
+- `path_semantics`
+- `approval_policy`
 
 ## 与 tool app 的关系
 
@@ -168,7 +187,7 @@ manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_
 ```json
 {
   "req_id": 1,
-  "agent_id": "a1",
+  "agent_id": "ag_3e8_1234_deadbeef",
   "tool_id": 1,
   "operation": "note_create",
   "payload": {
@@ -202,7 +221,6 @@ bash scripts/run_mcpd.sh
 
 - `kernel_mcp` 模块已加载
 - `/sys/kernel/mcp/tools` 和 `/sys/kernel/mcp/agents` 存在
-- `client/bin/genl_register_tool` 和 `client/bin/genl_list_tools` 已构建
 
 然后它会：
 

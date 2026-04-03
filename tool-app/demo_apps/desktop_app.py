@@ -19,6 +19,10 @@ if str(TOOL_APP_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_APP_DIR))
 
 from demo_rpc import parse_args, serve
+from real_app_support import resolve_host_path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+MAX_CONTENT_BYTES = 512 * 1024
 
 
 def _read_uptime_seconds() -> float:
@@ -145,6 +149,42 @@ def show_notification(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {"shown": True, "title": title.strip(), "body": body, "backend": "notify-send"}
 
 
+def write_host_text_file(payload: Dict[str, Any]) -> Dict[str, Any]:
+    raw_path = payload.get("path", "")
+    content = payload.get("content", "")
+    overwrite = payload.get("overwrite", False)
+    create_parents = payload.get("create_parents", True)
+    if not isinstance(content, str):
+        raise ValueError("write_host_text_file payload.content must be string")
+    if len(content.encode("utf-8")) > MAX_CONTENT_BYTES:
+        raise ValueError(f"content too large (max {MAX_CONTENT_BYTES} bytes)")
+    if not isinstance(overwrite, bool) or not isinstance(create_parents, bool):
+        raise ValueError("overwrite/create_parents must be boolean")
+
+    target = resolve_host_path(str(raw_path), allow_missing=True)
+    existed = target.exists()
+    if existed and target.is_dir():
+        raise ValueError(f"path is a directory: {target}")
+    if existed and not overwrite:
+        raise ValueError(f"file already exists: {target}")
+    if create_parents:
+        target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content, encoding="utf-8")
+    outside_repo = True
+    try:
+        target.relative_to(ROOT_DIR)
+        outside_repo = False
+    except ValueError:
+        outside_repo = True
+    return {
+        "path": str(target),
+        "created": not existed,
+        "overwritten": existed,
+        "size_bytes": target.stat().st_size,
+        "outside_repo": outside_repo,
+    }
+
+
 def main() -> int:
     args = parse_args()
     return serve(
@@ -153,6 +193,7 @@ def main() -> int:
             "desktop_snapshot": desktop_snapshot,
             "open_url": open_url,
             "show_notification": show_notification,
+            "write_host_text_file": write_host_text_file,
         },
     )
 

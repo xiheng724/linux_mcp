@@ -12,14 +12,14 @@ if str(TOOL_APP_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_APP_DIR))
 
 from demo_rpc import parse_args, serve
-from real_app_support import find_executable, optional_int, require_gui_session, require_non_empty_string, spawn_detached
-
-
-def _resolve_existing_path(raw_path: str) -> Path:
-    path = Path(raw_path).expanduser().resolve()
-    if not path.exists():
-        raise ValueError(f"path does not exist: {path}")
-    return path
+from real_app_support import (
+    find_executable,
+    optional_int,
+    require_gui_session,
+    require_non_empty_string,
+    resolve_existing_path,
+    spawn_detached,
+)
 
 
 def _code_args_for_path(path: Path, *, line: int | None = None, column: int | None = None) -> List[str]:
@@ -38,14 +38,14 @@ def _code_args_for_path(path: Path, *, line: int | None = None, column: int | No
 
 def open_path(payload: Dict[str, Any]) -> Dict[str, Any]:
     require_gui_session()
-    path = _resolve_existing_path(require_non_empty_string(payload, "path"))
+    path = resolve_existing_path(require_non_empty_string(payload, "path"))
     proc = spawn_detached(_code_args_for_path(path))
     return {"opened": True, "path": str(path), "pid": proc.pid}
 
 
 def open_file_at_line(payload: Dict[str, Any]) -> Dict[str, Any]:
     require_gui_session()
-    path = _resolve_existing_path(require_non_empty_string(payload, "path"))
+    path = resolve_existing_path(require_non_empty_string(payload, "path"))
     if not path.is_file():
         raise ValueError(f"path is not a file: {path}")
     line = optional_int(payload, "line")
@@ -58,8 +58,8 @@ def open_file_at_line(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def compare_files(payload: Dict[str, Any]) -> Dict[str, Any]:
     require_gui_session()
-    left_path = _resolve_existing_path(require_non_empty_string(payload, "left_path"))
-    right_path = _resolve_existing_path(require_non_empty_string(payload, "right_path"))
+    left_path = resolve_existing_path(require_non_empty_string(payload, "left_path"))
+    right_path = resolve_existing_path(require_non_empty_string(payload, "right_path"))
     code = find_executable("code")
     proc = spawn_detached([code, "--diff", str(left_path), str(right_path)])
     return {"opened": True, "left_path": str(left_path), "right_path": str(right_path), "pid": proc.pid}

@@ -14,6 +14,14 @@ from desktop_catalog import has_gui_session
 ALLOWED_URI_SCHEMES = {"file", "mailto", "http", "https", "webcal", "webcals"}
 
 
+def preferred_desktop_dir() -> Path:
+    home = Path.home()
+    desktop = home / "Desktop"
+    if desktop.exists():
+        return desktop
+    return home / "desktop"
+
+
 def require_gui_session() -> None:
     if not has_gui_session():
         raise ValueError("no GUI session available (DISPLAY/WAYLAND_DISPLAY unset)")
@@ -55,6 +63,27 @@ def resolve_existing_path(raw_path: str, *, expect_dir: bool | None = None) -> P
     if expect_dir is False and not path.is_file():
         raise ValueError(f"path is not a file: {path}")
     return path
+
+
+def resolve_host_path(raw_path: str, *, allow_missing: bool = False) -> Path:
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise ValueError("path must be non-empty string")
+
+    text = raw_path.strip()
+    path_obj = Path(text)
+    if text.startswith("~"):
+        target = path_obj.expanduser()
+    elif path_obj.is_absolute():
+        target = path_obj
+    elif path_obj.parts and path_obj.parts[0].lower() == "desktop":
+        target = preferred_desktop_dir().joinpath(*path_obj.parts[1:])
+    else:
+        target = Path.home() / path_obj
+
+    resolved = target.resolve(strict=False)
+    if not allow_missing and not resolved.exists():
+        raise ValueError(f"path does not exist: {resolved}")
+    return resolved
 
 
 def file_uri_from_path(raw_path: str, *, expect_dir: bool | None = None) -> str:
