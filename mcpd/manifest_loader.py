@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
@@ -17,7 +18,8 @@ except ModuleNotFoundError:  # pragma: no cover - package import fallback
     from .risk import normalize_risk_tags, risk_flags_from_tags
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_MANIFEST_DIR = ROOT_DIR / "tool-app" / "manifests"
+MANIFEST_DIR_ENV = "KERNEL_MCP_MANIFEST_DIR"
+DEFAULT_MANIFEST_DIR = Path(os.getenv(MANIFEST_DIR_ENV, str(ROOT_DIR / "tool-app" / "manifests"))).resolve()
 SEMANTIC_HASH_FIELDS = (
     "tool_id",
     "name",

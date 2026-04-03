@@ -9,12 +9,14 @@ import json
 import os
 import sys
 import time
-from typing import Any, Dict, List, Literal
+from typing import Any, Callable, Dict, List, Literal, TypeVar
 
 from app_logic import (
     ApprovalRequest,
     execute_plan,
     load_catalog,
+    load_apps,
+    load_tools,
 )
 from debug_render import render_execution_debug_lines
 from model_client import (
@@ -25,12 +27,12 @@ from model_client import (
     open_session,
 )
 from presentation import render_app_lines, render_execution_user_lines, render_tool_lines
-from rpc import mcpd_call
 
 SOCK_PATH = "/tmp/mcpd.sock"
 SHOW_PAYLOAD_ENV = "LLM_APP_SHOW_PAYLOAD"
 DEFAULT_SESSION_TTL_MS = 30 * 60 * 1000
 DisplayMode = Literal["user", "dev"]
+T = TypeVar("T")
 
 
 class CliError(Exception):
@@ -42,41 +44,34 @@ def _env_flag(name: str) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _tools_signature(tools: List[Dict[str, Any]]) -> str:
-    encoded = json.dumps(tools, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
+def _json_signature(data: Any) -> str:
+    encoded = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
         "utf-8"
     )
     return hashlib.sha256(encoded).hexdigest()[:12]
+
+
+def _tools_signature(tools: List[Dict[str, Any]]) -> str:
+    return _json_signature(tools)
 
 
 def _apps_signature(apps: List[Dict[str, Any]]) -> str:
-    encoded = json.dumps(apps, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
-        "utf-8"
-    )
-    return hashlib.sha256(encoded).hexdigest()[:12]
+    return _json_signature(apps)
+
+
+def _with_cli_error(call: Callable[[], T]) -> T:
+    try:
+        return call()
+    except RuntimeError as exc:
+        raise CliError(str(exc)) from exc
 
 
 def _list_apps(sock_path: str) -> List[Dict[str, Any]]:
-    resp = mcpd_call({"sys": "list_apps"}, sock_path=sock_path, timeout_s=5)
-    if resp.get("status") != "ok":
-        raise CliError(resp.get("error", "list_apps failed"))
-    apps = resp.get("apps", [])
-    if not isinstance(apps, list):
-        raise CliError("list_apps response missing apps list")
-    return [app for app in apps if isinstance(app, dict)]
+    return _with_cli_error(lambda: load_apps(sock_path))
 
 
 def _list_tools(sock_path: str, app_id: str = "") -> List[Dict[str, Any]]:
-    req: Dict[str, Any] = {"sys": "list_tools"}
-    if app_id:
-        req["app_id"] = app_id
-    resp = mcpd_call(req, sock_path=sock_path, timeout_s=5)
-    if resp.get("status") != "ok":
-        raise CliError(resp.get("error", "list_tools failed"))
-    tools = resp.get("tools", [])
-    if not isinstance(tools, list):
-        raise CliError("list_tools response missing tools list")
-    return [tool for tool in tools if isinstance(tool, dict)]
+    return _with_cli_error(lambda: load_tools(sock_path, app_id))
 
 
 def _print_lines(lines: List[str], *, prefix: str = "[llm-app]") -> None:
@@ -179,7 +174,7 @@ def _run_once(
     show_reasons: bool,
     show_payload: bool,
 ) -> int:
-    apps, tools = load_catalog(sock_path)
+    apps, tools = _with_cli_error(lambda: load_catalog(sock_path))
     session = _ensure_session(sock_path, client_name, None)
     print(f"[llm-app] catalog: apps={len(apps)} tools={len(tools)}", flush=True)
     return _execute_once_with_apps(

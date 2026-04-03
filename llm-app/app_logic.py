@@ -71,27 +71,44 @@ PATH_RESOLVERS: Dict[str, PathResolver] = {
 
 
 
-def load_apps(sock_path: str) -> List[Dict[str, Any]]:
-    resp = mcpd_call({"sys": "list_apps"}, sock_path=sock_path, timeout_s=5)
+def _load_catalog_list(
+    *,
+    sock_path: str,
+    req: Dict[str, Any],
+    list_key: str,
+    status_error: str,
+    missing_error: str,
+) -> List[Dict[str, Any]]:
+    resp = mcpd_call(req, sock_path=sock_path, timeout_s=5)
     if resp.get("status") != "ok":
-        raise RuntimeError(resp.get("error", "list_apps failed"))
-    raw_apps = resp.get("apps", [])
-    if not isinstance(raw_apps, list):
-        raise RuntimeError("list_apps response missing apps list")
-    return [app for app in raw_apps if isinstance(app, dict)]
+        raise RuntimeError(resp.get("error", status_error))
+    raw_items = resp.get(list_key, [])
+    if not isinstance(raw_items, list):
+        raise RuntimeError(missing_error)
+    return [item for item in raw_items if isinstance(item, dict)]
+
+
+def load_apps(sock_path: str) -> List[Dict[str, Any]]:
+    return _load_catalog_list(
+        sock_path=sock_path,
+        req={"sys": "list_apps"},
+        list_key="apps",
+        status_error="list_apps failed",
+        missing_error="list_apps response missing apps list",
+    )
 
 
 def load_tools(sock_path: str, app_id: str = "") -> List[Dict[str, Any]]:
     req: Dict[str, Any] = {"sys": "list_tools"}
     if app_id:
         req["app_id"] = app_id
-    resp = mcpd_call(req, sock_path=sock_path, timeout_s=5)
-    if resp.get("status") != "ok":
-        raise RuntimeError(resp.get("error", "list_tools failed"))
-    raw_tools = resp.get("tools", [])
-    if not isinstance(raw_tools, list):
-        raise RuntimeError("list_tools response missing tools list")
-    return [tool for tool in raw_tools if isinstance(tool, dict)]
+    return _load_catalog_list(
+        sock_path=sock_path,
+        req=req,
+        list_key="tools",
+        status_error="list_tools failed",
+        missing_error="list_tools response missing tools list",
+    )
 
 
 def load_catalog(sock_path: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -737,6 +754,18 @@ def _make_executed_step(
     }
 
 
+def _record_fallback_execution(
+    executed_step: Dict[str, Any],
+    fallback_exec: Dict[str, Any],
+) -> None:
+    executed_step["fallback_payload"] = fallback_exec["payload"]
+    executed_step["fallback_req_id"] = fallback_exec["req_id"]
+    executed_step["fallback_response"] = fallback_exec["response"]
+    fallback_approval_request = fallback_exec.get("approval_request")
+    if isinstance(fallback_approval_request, ApprovalRequest):
+        executed_step["fallback_approval_request"] = dataclasses.asdict(fallback_approval_request)
+
+
 def execute_plan(
     user_text: str,
     session: SessionInfo,
@@ -807,14 +836,7 @@ def execute_plan(
                 approval_handler=approval_handler,
             )
             if fallback_exec is not None:
-                executed_step["fallback_payload"] = fallback_exec["payload"]
-                executed_step["fallback_req_id"] = fallback_exec["req_id"]
-                executed_step["fallback_response"] = fallback_exec["response"]
-                fallback_approval_request = fallback_exec.get("approval_request")
-                if isinstance(fallback_approval_request, ApprovalRequest):
-                    executed_step["fallback_approval_request"] = dataclasses.asdict(
-                        fallback_approval_request
-                    )
+                _record_fallback_execution(executed_step, fallback_exec)
                 final_response = fallback_exec["response"]
                 if fallback_exec["response"].get("status") != "ok":
                     final_status = "error"

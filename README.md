@@ -381,6 +381,253 @@ pip install PySide6
   连续装卸模块 10 次并扫描 `dmesg`。
 - `sudo bash scripts/demo_acceptance.sh`
   跑一遍端到端验收。
+- `bash scripts/run_experiment_suite.sh`
+  跑单轮 benchmark 实验。
+- `bash scripts/experiments/run_matrix.sh`
+  跑多组负载矩阵 benchmark。
+- `bash scripts/run_repeated_suite.sh`
+  跑重复 benchmark 并生成聚合统计。
+- `bash scripts/run_atc_evaluation.sh`
+  跑论文导向的综合评估。
+
+## 测试总览
+
+当前仓库没有 `pytest` 或独立 `tests/` 目录，测试主要由脚本化验证组成，可以分成 4 类：
+
+### 1. 静态与结构检查
+
+- `python3 scripts/verify_schema_sync.py`
+  检查内核 UAPI 和 Python schema 常量是否同步。
+- `make schema-verify`
+  等价于运行 schema 同步检查。
+- `bash scripts/run_smoke.sh`
+  检查仓库目录结构、关键脚本是否存在、shell 语法是否正确、client Python 导入是否正常、schema 是否同步。
+
+### 2. 构建与生命周期验证
+
+- `sudo bash scripts/build_kernel.sh`
+  编译内核模块。
+- `sudo bash scripts/load_module.sh`
+  加载 `kernel_mcp` 模块。
+- `sudo bash scripts/unload_module.sh`
+  卸载模块。
+- `sudo bash scripts/reload_10x.sh`
+  连续装卸模块 10 次，并扫描 `dmesg` 中的 OOPS/WARN，主要验证 sysfs/kobject 生命周期和模块反复装载的稳定性。
+
+### 3. 用户态与端到端验收
+
+- `bash scripts/run_tool_services.sh`
+  启动全部 demo tool services。
+- `bash scripts/run_mcpd.sh`
+  启动 `mcpd`，等待 `/tmp/mcpd.sock` 就绪，并自动执行 kernel reconcile。
+- `python3 llm-app/cli.py --once "..."`
+  做单次 LLM 驱动请求，验证 catalog -> planning -> tool execution 全链路。
+- `sudo bash scripts/demo_acceptance.sh`
+  这是最完整的端到端验收脚本，会串起：
+  - 编译模块
+  - 卸载旧模块
+  - 加载新模块
+  - 清理旧用户态服务
+  - 启动 tool services
+  - 启动 `mcpd`
+  - 检查 `DEEPSEEK_API_KEY`
+  - 跑两次 `llm-app/cli.py --once`
+  - 检查 sysfs agent 计数
+  - 停止服务
+  - 卸载模块
+  - 跑 `reload_10x`
+
+### 4. 实验评估
+
+实验脚本集中在 [`scripts/experiments/README.md`](/home/lxh/Code/linux-mcp/scripts/experiments/README.md)。
+当前主要有 4 条实验入口：
+
+- `bash scripts/run_experiment_suite.sh`
+  单轮 benchmark，对比 `direct` 和 `mcpd`。
+- `bash scripts/experiments/run_matrix.sh`
+  多组请求规模和并发矩阵。
+- `bash scripts/run_repeated_suite.sh`
+  重复 benchmark，并自动生成聚合 CSV/markdown 报告。
+- `bash scripts/run_atc_evaluation.sh`
+  更完整的论文导向评估，包含主实验、ablation、trace、policy mix、restart recovery、manifest scale 等。
+
+## 实验测试方法
+
+### A. 单轮 Benchmark
+
+用途：
+
+- 比较 `direct` 与 `mcpd`
+- 观察不同并发下吞吐和 tail latency
+- 验证负控路径是否稳定 fast-fail
+
+命令：
+
+```bash
+cd ~/Code/linux-mcp
+bash scripts/run_experiment_suite.sh
+```
+
+默认输出：
+
+- `experiment-results/run-<timestamp>/summary.json`
+- `experiment-results/run-<timestamp>/report.md`
+- `experiment-results/run-<timestamp>/<scenario>.csv`
+
+可调参数示例：
+
+```bash
+bash scripts/run_experiment_suite.sh \
+  --requests 12000 \
+  --concurrency "1,8,16,32,64" \
+  --negative-repeats 1200 \
+  --max-tools 24
+```
+
+### B. Matrix Benchmark
+
+用途：
+
+- 做更大规模的请求量和并发 sweep
+- 看结论是否在多组负载下保持一致
+
+命令：
+
+```bash
+cd ~/Code/linux-mcp
+bash scripts/experiments/run_matrix.sh
+```
+
+输出：
+
+- `experiment-results/matrix/run-<timestamp>/summary.json`
+- `experiment-results/matrix/run-<timestamp>/report.md`
+- `experiment-results/matrix/run-<timestamp>/<scenario>.csv`
+
+### C. Repeated Benchmark
+
+用途：
+
+- 重复运行 benchmark
+- 生成均值、中位数、标准差等统计汇总
+- 支撑更稳的性能结论
+
+命令：
+
+```bash
+cd ~/Code/linux-mcp
+bash scripts/run_repeated_suite.sh
+```
+
+输出：
+
+- `experiment-results/repeated-suite/run-<timestamp>/raw/run-<timestamp>/...`
+- `experiment-results/repeated-suite/run-<timestamp>/aggregate/detailed_report.md`
+- `experiment-results/repeated-suite/run-<timestamp>/aggregate/suite_aggregate.csv`
+- `experiment-results/repeated-suite/run-<timestamp>/aggregate/suite_ratio_aggregate.csv`
+
+轻量示例：
+
+```bash
+bash scripts/run_repeated_suite.sh \
+  --skip-start \
+  --repeats 3 \
+  --requests 1000 \
+  --concurrency "1,4,8,16"
+```
+
+### D. ATC-Oriented Evaluation
+
+用途：
+
+- 做论文导向的系统评估
+- 同时覆盖性能、控制面、approval、安全、恢复和扩展性
+
+当前主实验组：
+
+- `direct`
+- `mcpd`
+  也就是当前完整的 `kernel_control_plane`
+- `forwarder_only`
+  只保留 `mcpd` lookup + relay
+- `userspace_semantic_plane`
+  保留 session/hash/approval 等语义，但不走 kernel netlink；这是 equivalent userspace baseline
+
+命令：
+
+```bash
+cd ~/Code/linux-mcp
+bash scripts/run_tool_services.sh
+bash scripts/run_mcpd.sh
+bash scripts/run_atc_evaluation.sh
+```
+
+默认会测：
+
+- E2E overhead
+- `forwarder_only` / `userspace_semantic_plane` ablation
+- fixed trace workload
+- control-plane RPC latency
+- negative controls
+- approval path
+- policy mix
+- restart recovery
+- manifest scale
+- 可选 `reload_10x`
+
+输出：
+
+- `experiment-results/atc/run-<timestamp>/atc_summary.json`
+- `experiment-results/atc/run-<timestamp>/atc_report.md`
+- `experiment-results/atc/run-<timestamp>/e2e_summaries.csv`
+- `experiment-results/atc/run-<timestamp>/variant_summaries.csv`
+- `experiment-results/atc/run-<timestamp>/trace_results.csv`
+- `experiment-results/atc/run-<timestamp>/policy_mix.csv`
+- `experiment-results/atc/run-<timestamp>/control_plane_rpcs.csv`
+- `experiment-results/atc/run-<timestamp>/negative_controls.csv`
+- `experiment-results/atc/run-<timestamp>/approval_path.csv`
+- `experiment-results/atc/run-<timestamp>/restart_recovery.csv`
+- `experiment-results/atc/run-<timestamp>/manifest_scale.csv`
+- `experiment-results/atc/run-<timestamp>/derived_metrics.csv`
+- `experiment-results/atc/run-<timestamp>/selected_tools.csv`
+
+轻量 smoke：
+
+```bash
+bash scripts/run_atc_evaluation.sh \
+  --skip-start \
+  --skip-reload-10x \
+  --requests 200 \
+  --trace-requests 50 \
+  --policy-requests 50 \
+  --restart-requests 50 \
+  --restart-after 10 \
+  --negative-repeats 20 \
+  --approval-repeats 10 \
+  --rpc-repeats 20 \
+  --scale-repeats 2 \
+  --concurrency "1,4" \
+  --manifest-scales "1,2" \
+  --max-tools 8
+```
+
+论文级一轮示例：
+
+```bash
+bash scripts/run_atc_evaluation.sh \
+  --requests 4000 \
+  --trace-requests 1000 \
+  --policy-requests 1000 \
+  --restart-requests 1000 \
+  --restart-after 300 \
+  --negative-repeats 500 \
+  --approval-repeats 100 \
+  --rpc-repeats 300 \
+  --scale-repeats 10 \
+  --concurrency "1,4,8,16,32" \
+  --manifest-scales "1,2,4,8" \
+  --max-tools 20
+```
 
 ## 观测点
 

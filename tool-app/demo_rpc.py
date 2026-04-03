@@ -7,40 +7,29 @@ import argparse
 import json
 import signal
 import socket
-import struct
+import sys
 import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from mcpd.rpc_framing import recv_frame, send_frame
+
 MAX_MSG_SIZE = 16 * 1024 * 1024
 
 
-def _recv_exact(sock: socket.socket, n: int) -> bytes:
-    buf = bytearray()
-    while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
-        if not chunk:
-            raise ConnectionError("peer closed")
-        buf.extend(chunk)
-    return bytes(buf)
-
-
 def recv_msg(sock: socket.socket) -> Any:
-    header = _recv_exact(sock, 4)
-    (length,) = struct.unpack(">I", header)
-    if length == 0 or length > MAX_MSG_SIZE:
-        raise ValueError(f"invalid frame length: {length}")
-    payload = _recv_exact(sock, length)
+    payload = recv_frame(sock, max_msg_size=MAX_MSG_SIZE)
     return json.loads(payload.decode("utf-8"))
 
 
 def send_msg(sock: socket.socket, obj: Any) -> None:
     payload = json.dumps(obj, ensure_ascii=True).encode("utf-8")
-    if len(payload) > MAX_MSG_SIZE:
-        raise ValueError("payload too large")
-    sock.sendall(struct.pack(">I", len(payload)))
-    sock.sendall(payload)
+    send_frame(sock, payload, max_msg_size=MAX_MSG_SIZE)
 
 
 def load_manifest(manifest_path: str) -> Dict[str, Any]:

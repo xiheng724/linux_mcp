@@ -137,6 +137,21 @@ netlink client 在 [netlink_client.py](/home/lxh/Code/linux-mcp/mcpd/netlink_cli
 
 当前仓库约定里，rate limiting 和重试策略应由 `mcpd` 在用户空间完成，不在内核协议或 agent 内核状态里维护 token bucket。
 
+## 实验模式
+
+`mcpd` 支持通过 `MCPD_EXPERIMENT_MODE` 切换实验路径：
+
+- `normal`
+  当前默认完整路径，也就是 kernel-backed control plane
+- `forwarder_only`
+  保留 `mcpd` 作为 catalog lookup + UDS relay hop，但不做 session/hash/approval 语义仲裁
+- `userspace_semantic_plane`
+  在 `mcpd` 内保留 session/hash/approval 语义与 pending approval ticket，避免走 kernel netlink 仲裁
+- `no_complete_report`
+  保留 kernel 仲裁，但跳过 `tool_complete`
+
+其中 `userspace_semantic_plane` 是当前实验里的 equivalent userspace baseline。
+
 另外，`mcpd` 运行期间会在处理 `list_apps`、`list_tools` 和 `tool:exec` 前检查 manifest 目录是否变化；如果 `tool-app/manifests/*.json` 有新增、删除或修改，它会自动刷新内存 registry 并重新把当前 manifest tools 同步到内核 registry，无需手动重启 `mcpd`。
 
 ## 与 manifest 的关系

@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 from debug_render import render_execution_debug_lines
 from model_client import SessionInfo
 from presentation import render_app_lines, render_execution_user_lines, render_tool_catalog_text
-from rpc import mcpd_call
+from app_logic import load_catalog
 
 
 def fmt_json(data: Any) -> str:
@@ -21,20 +21,10 @@ def fmt_json(data: Any) -> str:
 
 
 def fetch_catalog(sock_path: str) -> Dict[str, Any]:
-    apps_resp = mcpd_call({"sys": "list_apps"}, sock_path=sock_path, timeout_s=5)
-    if apps_resp.get("status") != "ok":
-        return {"status": "error", "error": apps_resp.get("error", "list_apps failed")}
-    apps = apps_resp.get("apps", [])
-    if not isinstance(apps, list):
-        return {"status": "error", "error": "invalid apps list"}
-
-    tools_resp = mcpd_call({"sys": "list_tools"}, sock_path=sock_path, timeout_s=5)
-    if tools_resp.get("status") != "ok":
-        return {"status": "error", "error": tools_resp.get("error", "list_tools failed")}
-    tools = tools_resp.get("tools", [])
-    if not isinstance(tools, list):
-        return {"status": "error", "error": "invalid tools list"}
-
+    try:
+        apps, tools = load_catalog(sock_path)
+    except RuntimeError as exc:
+        return {"status": "error", "error": str(exc)}
     return {"status": "ok", "apps": apps, "tools": tools, "tools_at": time.time()}
 
 

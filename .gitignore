@@ -40,3 +40,6 @@ kernel-mcp/out/
 # Runtime-created demo note records
 tool-app/demo_data/notes/*/*.json
 !tool-app/demo_data/notes/validation/validation-note-20260401-093811.json
+
+# Experiment outputs
+experiment-results/

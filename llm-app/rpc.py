@@ -5,8 +5,15 @@ from __future__ import annotations
 
 import json
 import socket
-import struct
+import sys
+from pathlib import Path
 from typing import Any, Dict
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from mcpd.rpc_framing import recv_frame, send_frame
 
 DEFAULT_SOCK_PATH = "/tmp/mcpd.sock"
 DEFAULT_TIMEOUT_S = 5.0
@@ -15,29 +22,6 @@ MAX_MSG_SIZE = 16 * 1024 * 1024
 
 def _error(msg: str) -> Dict[str, Any]:
     return {"status": "error", "error": msg}
-
-
-def _recv_exact(conn: socket.socket, n: int) -> bytes:
-    buf = bytearray()
-    while len(buf) < n:
-        chunk = conn.recv(n - len(buf))
-        if not chunk:
-            raise ConnectionError("peer closed while receiving frame")
-        buf.extend(chunk)
-    return bytes(buf)
-
-
-def _send_frame(conn: socket.socket, payload: bytes) -> None:
-    conn.sendall(struct.pack(">I", len(payload)))
-    conn.sendall(payload)
-
-
-def _recv_frame(conn: socket.socket) -> bytes:
-    header = _recv_exact(conn, 4)
-    (length,) = struct.unpack(">I", header)
-    if length <= 0 or length > MAX_MSG_SIZE:
-        raise ValueError(f"invalid frame length: {length}")
-    return _recv_exact(conn, length)
 
 
 def mcpd_call(
@@ -58,8 +42,8 @@ def mcpd_call(
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
             conn.settimeout(timeout_s)
             conn.connect(sock_path)
-            _send_frame(conn, payload)
-            raw = _recv_frame(conn)
+            send_frame(conn, payload, max_msg_size=MAX_MSG_SIZE)
+            raw = recv_frame(conn, max_msg_size=MAX_MSG_SIZE)
     except FileNotFoundError:
         return _error(f"mcpd socket not found: {sock_path}")
     except PermissionError:
