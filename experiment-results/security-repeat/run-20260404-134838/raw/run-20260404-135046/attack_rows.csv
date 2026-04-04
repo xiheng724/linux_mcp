@@ -1,0 +1,364 @@
+scenario_group,attack_case,mode,attack_profile,status,decision,error,latency_ms,unauthorized_success,expected_reject,invariant_violated
+A,fake_session_id,mcpd,,error,,session not found or expired,0.414,0,1,0
+A,expired_session,mcpd,,error,,session not found or expired,0.413,0,1,0
+A,session_token_theft,mcpd,,error,,session is bound to a different peer identity,0.912,0,1,0
+A,fake_session_id,mcpd,,error,,session not found or expired,1.511,0,1,0
+A,expired_session,mcpd,,error,,session not found or expired,0.314,0,1,0
+A,session_token_theft,mcpd,,error,,session is bound to a different peer identity,0.91,0,1,0
+A,fake_session_id,mcpd,,error,,session not found or expired,0.732,0,1,0
+A,expired_session,mcpd,,error,,session not found or expired,0.425,0,1,0
+A,session_token_theft,mcpd,,error,,session is bound to a different peer identity,0.955,0,1,0
+A,fake_session_id,mcpd,,error,,session not found or expired,0.299,0,1,0
+A,expired_session,mcpd,,error,,session not found or expired,0.516,0,1,0
+A,session_token_theft,mcpd,,error,,session is bound to a different peer identity,0.353,0,1,0
+A,fake_session_id,mcpd,,error,,session not found or expired,0.368,0,1,0
+A,expired_session,mcpd,,error,,session not found or expired,0.291,0,1,0
+A,session_token_theft,mcpd,,error,,session is bound to a different peer identity,0.289,0,1,0
+A,fake_session_id,mcpd,,error,,session not found or expired,0.223,0,1,0
+A,expired_session,mcpd,,error,,session not found or expired,0.24,0,1,0
+A,session_token_theft,mcpd,,error,,session is bound to a different peer identity,0.327,0,1,0
+A,fake_session_id,mcpd,,error,,session not found or expired,0.32,0,1,0
+A,expired_session,mcpd,,error,,session not found or expired,0.376,0,1,0
+A,session_token_theft,mcpd,,error,,session is bound to a different peer identity,0.311,0,1,0
+A,fake_session_id,mcpd,,error,,session not found or expired,2.319,0,1,0
+A,expired_session,mcpd,,error,,session not found or expired,0.387,0,1,0
+A,session_token_theft,mcpd,,error,,session is bound to a different peer identity,0.346,0,1,0
+B,forged_approval_ticket,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.969,0,1,0
+B,cross_agent_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.867,0,1,0
+B,cross_tool_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.1,0,1,0
+B,expired_ticket_replay,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.134,0,1,0
+B,denied_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.773,0,1,0
+B,forged_approval_ticket,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.85,0,1,0
+B,cross_agent_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.873,0,1,0
+B,cross_tool_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.814,0,1,0
+B,expired_ticket_replay,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.022,0,1,0
+B,denied_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,4.285,0,1,0
+B,forged_approval_ticket,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.426,0,1,0
+B,cross_agent_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.628,0,1,0
+B,cross_tool_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,3.407,0,1,0
+B,expired_ticket_replay,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,3.758,0,1,0
+B,denied_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.411,0,1,0
+B,forged_approval_ticket,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.871,0,1,0
+B,cross_agent_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.973,0,1,0
+B,cross_tool_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.765,0,1,0
+B,expired_ticket_replay,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.018,0,1,0
+B,denied_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.837,0,1,0
+B,forged_approval_ticket,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.377,0,1,0
+B,cross_agent_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.122,0,1,0
+B,cross_tool_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.254,0,1,0
+B,expired_ticket_replay,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.118,0,1,0
+B,denied_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.247,0,1,0
+B,forged_approval_ticket,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.733,0,1,0
+B,cross_agent_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.751,0,1,0
+B,cross_tool_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.811,0,1,0
+B,expired_ticket_replay,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.09,0,1,0
+B,denied_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.759,0,1,0
+B,forged_approval_ticket,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.718,0,1,0
+B,cross_agent_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.726,0,1,0
+B,cross_tool_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.309,0,1,0
+B,expired_ticket_replay,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.892,0,1,0
+B,denied_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.646,0,1,0
+B,forged_approval_ticket,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.67,0,1,0
+B,cross_agent_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.199,0,1,0
+B,cross_tool_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.211,0,1,0
+B,expired_ticket_replay,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.02,0,1,0
+B,denied_ticket_reuse,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.787,0,1,0
+C,hash_mismatch,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,2.861,0,1,0
+C,wrong_app_binding,mcpd,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),0.705,0,1,0
+C,stale_catalog_replay,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.719,0,1,0
+C,hash_mismatch,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.832,0,1,0
+C,wrong_app_binding,mcpd,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),1.481,0,1,0
+C,stale_catalog_replay,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.959,0,1,0
+C,hash_mismatch,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,1.185,0,1,0
+C,wrong_app_binding,mcpd,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),1.853,0,1,0
+C,stale_catalog_replay,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.707,0,1,0
+C,hash_mismatch,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.737,0,1,0
+C,wrong_app_binding,mcpd,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),0.723,0,1,0
+C,stale_catalog_replay,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.734,0,1,0
+C,hash_mismatch,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.793,0,1,0
+C,wrong_app_binding,mcpd,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),0.706,0,1,0
+C,stale_catalog_replay,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,1.262,0,1,0
+C,hash_mismatch,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,2.246,0,1,0
+C,wrong_app_binding,mcpd,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),1.324,0,1,0
+C,stale_catalog_replay,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.76,0,1,0
+C,hash_mismatch,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,1.023,0,1,0
+C,wrong_app_binding,mcpd,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),1.014,0,1,0
+C,stale_catalog_replay,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.966,0,1,0
+C,hash_mismatch,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.902,0,1,0
+C,wrong_app_binding,mcpd,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),1.077,0,1,0
+C,stale_catalog_replay,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,2.018,0,1,0
+E,toctou_hash_mismatch_after_approval,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.734,0,1,0
+E,toctou_tool_swap_after_approval,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.737,0,1,0
+E,toctou_hash_mismatch_after_approval,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,1.021,0,1,0
+E,toctou_tool_swap_after_approval,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.062,0,1,0
+E,toctou_hash_mismatch_after_approval,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.781,0,1,0
+E,toctou_tool_swap_after_approval,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.777,0,1,0
+E,toctou_hash_mismatch_after_approval,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.72,0,1,0
+E,toctou_tool_swap_after_approval,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.64,0,1,0
+E,toctou_hash_mismatch_after_approval,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.713,0,1,0
+E,toctou_tool_swap_after_approval,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.82,0,1,0
+E,toctou_hash_mismatch_after_approval,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.664,0,1,0
+E,toctou_tool_swap_after_approval,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.648,0,1,0
+E,toctou_hash_mismatch_after_approval,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.65,0,1,0
+E,toctou_tool_swap_after_approval,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.818,0,1,0
+E,toctou_hash_mismatch_after_approval,mcpd,,error,DENY,kernel arbitration denied: hash_mismatch,0.658,0,1,0
+E,toctou_tool_swap_after_approval,mcpd,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.682,0,1,0
+D,invalid_session_hash_bypass,mcpd,,error,,session not found or expired,0.148,0,1,0
+D,approval_required_bypass,mcpd,,error,,session not found or expired,0.357,0,1,0
+D,invalid_session_hash_bypass,mcpd,,error,,session not found or expired,0.309,0,1,0
+D,approval_required_bypass,mcpd,,error,,session not found or expired,0.153,0,1,0
+D,invalid_session_hash_bypass,mcpd,,error,,session not found or expired,0.135,0,1,0
+D,approval_required_bypass,mcpd,,error,,session not found or expired,0.516,0,1,0
+D,invalid_session_hash_bypass,mcpd,,error,,session not found or expired,0.139,0,1,0
+D,approval_required_bypass,mcpd,,error,,session not found or expired,0.139,0,1,0
+D,invalid_session_hash_bypass,mcpd,,error,,session not found or expired,0.128,0,1,0
+D,approval_required_bypass,mcpd,,error,,session not found or expired,0.147,0,1,0
+D,invalid_session_hash_bypass,mcpd,,error,,session not found or expired,0.659,0,1,0
+D,approval_required_bypass,mcpd,,error,,session not found or expired,0.139,0,1,0
+D,invalid_session_hash_bypass,mcpd,,error,,session not found or expired,0.126,0,1,0
+D,approval_required_bypass,mcpd,,error,,session not found or expired,0.15,0,1,0
+D,invalid_session_hash_bypass,mcpd,,error,,session not found or expired,0.129,0,1,0
+D,approval_required_bypass,mcpd,,error,,session not found or expired,0.164,0,1,0
+A,fake_session_id,userspace_semantic_plane,,error,,session not found or expired,0.256,0,1,0
+A,expired_session,userspace_semantic_plane,,error,,session not found or expired,0.227,0,1,0
+A,session_token_theft,userspace_semantic_plane,,error,,session is bound to a different peer identity,0.191,0,1,0
+A,fake_session_id,userspace_semantic_plane,,error,,session not found or expired,0.193,0,1,0
+A,expired_session,userspace_semantic_plane,,error,,session not found or expired,0.204,0,1,0
+A,session_token_theft,userspace_semantic_plane,,error,,session is bound to a different peer identity,0.726,0,1,0
+A,fake_session_id,userspace_semantic_plane,,error,,session not found or expired,0.882,0,1,0
+A,expired_session,userspace_semantic_plane,,error,,session not found or expired,0.182,0,1,0
+A,session_token_theft,userspace_semantic_plane,,error,,session is bound to a different peer identity,0.195,0,1,0
+A,fake_session_id,userspace_semantic_plane,,error,,session not found or expired,0.206,0,1,0
+A,expired_session,userspace_semantic_plane,,error,,session not found or expired,0.228,0,1,0
+A,session_token_theft,userspace_semantic_plane,,error,,session is bound to a different peer identity,0.251,0,1,0
+A,fake_session_id,userspace_semantic_plane,,error,,session not found or expired,0.202,0,1,0
+A,expired_session,userspace_semantic_plane,,error,,session not found or expired,0.279,0,1,0
+A,session_token_theft,userspace_semantic_plane,,error,,session is bound to a different peer identity,0.409,0,1,0
+A,fake_session_id,userspace_semantic_plane,,error,,session not found or expired,0.175,0,1,0
+A,expired_session,userspace_semantic_plane,,error,,session not found or expired,0.25,0,1,0
+A,session_token_theft,userspace_semantic_plane,,error,,session is bound to a different peer identity,0.253,0,1,0
+A,fake_session_id,userspace_semantic_plane,,error,,session not found or expired,0.163,0,1,0
+A,expired_session,userspace_semantic_plane,,error,,session not found or expired,0.17,0,1,0
+A,session_token_theft,userspace_semantic_plane,,error,,session is bound to a different peer identity,0.257,0,1,0
+A,fake_session_id,userspace_semantic_plane,,error,,session not found or expired,0.187,0,1,0
+A,expired_session,userspace_semantic_plane,,error,,session not found or expired,0.176,0,1,0
+A,session_token_theft,userspace_semantic_plane,,error,,session is bound to a different peer identity,0.266,0,1,0
+B,forged_approval_ticket,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.61,0,1,0
+B,cross_agent_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.974,0,1,0
+B,cross_tool_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.641,0,1,0
+B,expired_ticket_replay,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.847,0,1,0
+B,denied_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.565,0,1,0
+B,forged_approval_ticket,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.552,0,1,0
+B,cross_agent_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.75,0,1,0
+B,cross_tool_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.683,0,1,0
+B,expired_ticket_replay,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.771,0,1,0
+B,denied_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.695,0,1,0
+B,forged_approval_ticket,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.079,0,1,0
+B,cross_agent_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.698,0,1,0
+B,cross_tool_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.647,0,1,0
+B,expired_ticket_replay,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.791,0,1,0
+B,denied_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.309,0,1,0
+B,forged_approval_ticket,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.928,0,1,0
+B,cross_agent_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.584,0,1,0
+B,cross_tool_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.566,0,1,0
+B,expired_ticket_replay,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.728,0,1,0
+B,denied_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,5.191,0,1,0
+B,forged_approval_ticket,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.628,0,1,0
+B,cross_agent_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.93,0,1,0
+B,cross_tool_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.572,0,1,0
+B,expired_ticket_replay,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.768,0,1,0
+B,denied_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.606,0,1,0
+B,forged_approval_ticket,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.567,0,1,0
+B,cross_agent_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.599,0,1,0
+B,cross_tool_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.52,0,1,0
+B,expired_ticket_replay,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.791,0,1,0
+B,denied_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.687,0,1,0
+B,forged_approval_ticket,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.634,0,1,0
+B,cross_agent_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.571,0,1,0
+B,cross_tool_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.776,0,1,0
+B,expired_ticket_replay,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.586,0,1,0
+B,denied_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.271,0,1,0
+B,forged_approval_ticket,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.611,0,1,0
+B,cross_agent_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.723,0,1,0
+B,cross_tool_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.646,0,1,0
+B,expired_ticket_replay,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.324,0,1,0
+B,denied_ticket_reuse,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.647,0,1,0
+C,hash_mismatch,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.655,0,1,0
+C,wrong_app_binding,userspace_semantic_plane,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),0.578,0,1,0
+C,stale_catalog_replay,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,2.85,0,1,0
+C,hash_mismatch,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.699,0,1,0
+C,wrong_app_binding,userspace_semantic_plane,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),2.783,0,1,0
+C,stale_catalog_replay,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.605,0,1,0
+C,hash_mismatch,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.744,0,1,0
+C,wrong_app_binding,userspace_semantic_plane,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),0.583,0,1,0
+C,stale_catalog_replay,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.645,0,1,0
+C,hash_mismatch,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.667,0,1,0
+C,wrong_app_binding,userspace_semantic_plane,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),0.541,0,1,0
+C,stale_catalog_replay,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.652,0,1,0
+C,hash_mismatch,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.597,0,1,0
+C,wrong_app_binding,userspace_semantic_plane,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),0.734,0,1,0
+C,stale_catalog_replay,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,2.475,0,1,0
+C,hash_mismatch,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.644,0,1,0
+C,wrong_app_binding,userspace_semantic_plane,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),0.523,0,1,0
+C,stale_catalog_replay,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.558,0,1,0
+C,hash_mismatch,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.686,0,1,0
+C,wrong_app_binding,userspace_semantic_plane,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),1.756,0,1,0
+C,stale_catalog_replay,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,2.004,0,1,0
+C,hash_mismatch,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.558,0,1,0
+C,wrong_app_binding,userspace_semantic_plane,,error,,tool_id=2 does not belong to app_id=workspace_app (expected notes_app),0.573,0,1,0
+C,stale_catalog_replay,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.583,0,1,0
+E,toctou_hash_mismatch_after_approval,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.664,0,1,0
+E,toctou_tool_swap_after_approval,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.64,0,1,0
+E,toctou_hash_mismatch_after_approval,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.638,0,1,0
+E,toctou_tool_swap_after_approval,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.097,0,1,0
+E,toctou_hash_mismatch_after_approval,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.622,0,1,0
+E,toctou_tool_swap_after_approval,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.627,0,1,0
+E,toctou_hash_mismatch_after_approval,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,1.163,0,1,0
+E,toctou_tool_swap_after_approval,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.992,0,1,0
+E,toctou_hash_mismatch_after_approval,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,1.616,0,1,0
+E,toctou_tool_swap_after_approval,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.602,0,1,0
+E,toctou_hash_mismatch_after_approval,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.697,0,1,0
+E,toctou_tool_swap_after_approval,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.611,0,1,0
+E,toctou_hash_mismatch_after_approval,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.643,0,1,0
+E,toctou_tool_swap_after_approval,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.661,0,1,0
+E,toctou_hash_mismatch_after_approval,userspace_semantic_plane,,error,DENY,kernel arbitration denied: hash_mismatch,0.595,0,1,0
+E,toctou_tool_swap_after_approval,userspace_semantic_plane,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.675,0,1,0
+D,invalid_session_hash_bypass,userspace_semantic_plane,,error,,session not found or expired,0.25,0,1,0
+D,approval_required_bypass,userspace_semantic_plane,,error,,session not found or expired,0.522,0,1,0
+D,invalid_session_hash_bypass,userspace_semantic_plane,,error,,session not found or expired,0.136,0,1,0
+D,approval_required_bypass,userspace_semantic_plane,,error,,session not found or expired,0.113,0,1,0
+D,invalid_session_hash_bypass,userspace_semantic_plane,,error,,session not found or expired,0.1,0,1,0
+D,approval_required_bypass,userspace_semantic_plane,,error,,session not found or expired,0.095,0,1,0
+D,invalid_session_hash_bypass,userspace_semantic_plane,,error,,session not found or expired,0.091,0,1,0
+D,approval_required_bypass,userspace_semantic_plane,,error,,session not found or expired,0.132,0,1,0
+D,invalid_session_hash_bypass,userspace_semantic_plane,,error,,session not found or expired,0.308,0,1,0
+D,approval_required_bypass,userspace_semantic_plane,,error,,session not found or expired,0.106,0,1,0
+D,invalid_session_hash_bypass,userspace_semantic_plane,,error,,session not found or expired,0.1,0,1,0
+D,approval_required_bypass,userspace_semantic_plane,,error,,session not found or expired,0.089,0,1,0
+D,invalid_session_hash_bypass,userspace_semantic_plane,,error,,session not found or expired,0.681,0,1,0
+D,approval_required_bypass,userspace_semantic_plane,,error,,session not found or expired,0.094,0,1,0
+D,invalid_session_hash_bypass,userspace_semantic_plane,,error,,session not found or expired,0.095,0,1,0
+D,approval_required_bypass,userspace_semantic_plane,,error,,session not found or expired,0.095,0,1,0
+A,fake_session_id,userspace_tamper_session,tamper_session,ok,ALLOW,,4.172,1,1,1
+A,expired_session,userspace_tamper_session,tamper_session,ok,ALLOW,,3.105,1,1,1
+A,session_token_theft,userspace_tamper_session,tamper_session,error,,agent_id is bound to a different peer identity,0.92,0,1,0
+A,fake_session_id,userspace_tamper_session,tamper_session,ok,ALLOW,,1.451,1,1,1
+A,expired_session,userspace_tamper_session,tamper_session,ok,ALLOW,,1.402,1,1,1
+A,session_token_theft,userspace_tamper_session,tamper_session,error,,agent_id is bound to a different peer identity,1.829,0,1,0
+A,fake_session_id,userspace_tamper_session,tamper_session,ok,ALLOW,,1.726,1,1,1
+A,expired_session,userspace_tamper_session,tamper_session,ok,ALLOW,,1.362,1,1,1
+A,session_token_theft,userspace_tamper_session,tamper_session,error,,agent_id is bound to a different peer identity,0.8,0,1,0
+A,fake_session_id,userspace_tamper_session,tamper_session,ok,ALLOW,,1.458,1,1,1
+A,expired_session,userspace_tamper_session,tamper_session,ok,ALLOW,,1.334,1,1,1
+A,session_token_theft,userspace_tamper_session,tamper_session,error,,agent_id is bound to a different peer identity,0.778,0,1,0
+A,fake_session_id,userspace_tamper_session,tamper_session,ok,ALLOW,,2.412,1,1,1
+A,expired_session,userspace_tamper_session,tamper_session,ok,ALLOW,,2.328,1,1,1
+A,session_token_theft,userspace_tamper_session,tamper_session,error,,agent_id is bound to a different peer identity,3.011,0,1,0
+A,fake_session_id,userspace_tamper_session,tamper_session,ok,ALLOW,,1.465,1,1,1
+A,expired_session,userspace_tamper_session,tamper_session,ok,ALLOW,,1.381,1,1,1
+A,session_token_theft,userspace_tamper_session,tamper_session,error,,agent_id is bound to a different peer identity,0.691,0,1,0
+A,fake_session_id,userspace_tamper_session,tamper_session,ok,ALLOW,,1.415,1,1,1
+A,expired_session,userspace_tamper_session,tamper_session,ok,ALLOW,,3.869,1,1,1
+A,session_token_theft,userspace_tamper_session,tamper_session,error,,agent_id is bound to a different peer identity,2.904,0,1,0
+A,fake_session_id,userspace_tamper_session,tamper_session,ok,ALLOW,,1.371,1,1,1
+A,expired_session,userspace_tamper_session,tamper_session,ok,ALLOW,,1.304,1,1,1
+A,session_token_theft,userspace_tamper_session,tamper_session,error,,agent_id is bound to a different peer identity,3.204,0,1,0
+B,forged_approval_ticket,userspace_tamper_approval,tamper_approval,ok,ALLOW,,8.948,1,1,1
+B,cross_agent_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,3.547,1,1,1
+B,cross_tool_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,51.172,1,1,1
+B,expired_ticket_replay,userspace_tamper_approval,tamper_approval,ok,ALLOW,,35.841,1,1,1
+B,denied_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,36.255,1,1,1
+B,forged_approval_ticket,userspace_tamper_approval,tamper_approval,ok,ALLOW,,46.107,1,1,1
+B,cross_agent_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,86.249,1,1,1
+B,cross_tool_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,95.875,1,1,1
+B,expired_ticket_replay,userspace_tamper_approval,tamper_approval,ok,ALLOW,,33.648,1,1,1
+B,denied_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,20.104,1,1,1
+B,forged_approval_ticket,userspace_tamper_approval,tamper_approval,ok,ALLOW,,70.616,1,1,1
+B,cross_agent_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,33.334,1,1,1
+B,cross_tool_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,1.693,1,1,1
+B,expired_ticket_replay,userspace_tamper_approval,tamper_approval,ok,ALLOW,,24.987,1,1,1
+B,denied_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,15.727,1,1,1
+B,forged_approval_ticket,userspace_tamper_approval,tamper_approval,ok,ALLOW,,6.912,1,1,1
+B,cross_agent_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,10.755,1,1,1
+B,cross_tool_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,11.082,1,1,1
+B,expired_ticket_replay,userspace_tamper_approval,tamper_approval,ok,ALLOW,,3.888,1,1,1
+B,denied_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,5.161,1,1,1
+B,forged_approval_ticket,userspace_tamper_approval,tamper_approval,ok,ALLOW,,60.889,1,1,1
+B,cross_agent_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,31.864,1,1,1
+B,cross_tool_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,43.059,1,1,1
+B,expired_ticket_replay,userspace_tamper_approval,tamper_approval,ok,ALLOW,,19.684,1,1,1
+B,denied_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,4.683,1,1,1
+B,forged_approval_ticket,userspace_tamper_approval,tamper_approval,ok,ALLOW,,126.158,1,1,1
+B,cross_agent_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,56.333,1,1,1
+B,cross_tool_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,62.578,1,1,1
+B,expired_ticket_replay,userspace_tamper_approval,tamper_approval,ok,ALLOW,,49.466,1,1,1
+B,denied_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,34.748,1,1,1
+B,forged_approval_ticket,userspace_tamper_approval,tamper_approval,ok,ALLOW,,53.195,1,1,1
+B,cross_agent_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,8.434,1,1,1
+B,cross_tool_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,9.099,1,1,1
+B,expired_ticket_replay,userspace_tamper_approval,tamper_approval,ok,ALLOW,,19.792,1,1,1
+B,denied_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,20.158,1,1,1
+B,forged_approval_ticket,userspace_tamper_approval,tamper_approval,ok,ALLOW,,24.196,1,1,1
+B,cross_agent_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,42.699,1,1,1
+B,cross_tool_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,42.744,1,1,1
+B,expired_ticket_replay,userspace_tamper_approval,tamper_approval,ok,ALLOW,,56.225,1,1,1
+B,denied_ticket_reuse,userspace_tamper_approval,tamper_approval,ok,ALLOW,,14.9,1,1,1
+E,toctou_hash_mismatch_after_approval,userspace_tamper_approval,tamper_approval,error,DENY,kernel arbitration denied: hash_mismatch,0.738,0,1,0
+E,toctou_tool_swap_after_approval,userspace_tamper_approval,tamper_approval,ok,ALLOW,,30.868,1,1,1
+E,toctou_hash_mismatch_after_approval,userspace_tamper_approval,tamper_approval,error,DENY,kernel arbitration denied: hash_mismatch,0.924,0,1,0
+E,toctou_tool_swap_after_approval,userspace_tamper_approval,tamper_approval,ok,ALLOW,,21.124,1,1,1
+E,toctou_hash_mismatch_after_approval,userspace_tamper_approval,tamper_approval,error,DENY,kernel arbitration denied: hash_mismatch,0.983,0,1,0
+E,toctou_tool_swap_after_approval,userspace_tamper_approval,tamper_approval,ok,ALLOW,,38.156,1,1,1
+E,toctou_hash_mismatch_after_approval,userspace_tamper_approval,tamper_approval,error,DENY,kernel arbitration denied: hash_mismatch,1.739,0,1,0
+E,toctou_tool_swap_after_approval,userspace_tamper_approval,tamper_approval,ok,ALLOW,,19.757,1,1,1
+E,toctou_hash_mismatch_after_approval,userspace_tamper_approval,tamper_approval,error,DENY,kernel arbitration denied: hash_mismatch,0.749,0,1,0
+E,toctou_tool_swap_after_approval,userspace_tamper_approval,tamper_approval,ok,ALLOW,,19.079,1,1,1
+E,toctou_hash_mismatch_after_approval,userspace_tamper_approval,tamper_approval,error,DENY,kernel arbitration denied: hash_mismatch,1.156,0,1,0
+E,toctou_tool_swap_after_approval,userspace_tamper_approval,tamper_approval,ok,ALLOW,,44.013,1,1,1
+E,toctou_hash_mismatch_after_approval,userspace_tamper_approval,tamper_approval,error,DENY,kernel arbitration denied: hash_mismatch,1.244,0,1,0
+E,toctou_tool_swap_after_approval,userspace_tamper_approval,tamper_approval,ok,ALLOW,,22.808,1,1,1
+E,toctou_hash_mismatch_after_approval,userspace_tamper_approval,tamper_approval,error,DENY,kernel arbitration denied: hash_mismatch,0.744,0,1,0
+E,toctou_tool_swap_after_approval,userspace_tamper_approval,tamper_approval,ok,ALLOW,,36.148,1,1,1
+C,hash_mismatch,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,2.126,1,1,1
+C,wrong_app_binding,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,2.481,1,1,1
+C,stale_catalog_replay,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.875,1,1,1
+C,hash_mismatch,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.179,1,1,1
+C,wrong_app_binding,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,3.036,1,1,1
+C,stale_catalog_replay,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.096,1,1,1
+C,hash_mismatch,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.137,1,1,1
+C,wrong_app_binding,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.082,1,1,1
+C,stale_catalog_replay,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.072,1,1,1
+C,hash_mismatch,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.532,1,1,1
+C,wrong_app_binding,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.175,1,1,1
+C,stale_catalog_replay,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.129,1,1,1
+C,hash_mismatch,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,3.411,1,1,1
+C,wrong_app_binding,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,2.386,1,1,1
+C,stale_catalog_replay,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.269,1,1,1
+C,hash_mismatch,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.154,1,1,1
+C,wrong_app_binding,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,3.454,1,1,1
+C,stale_catalog_replay,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.162,1,1,1
+C,hash_mismatch,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.141,1,1,1
+C,wrong_app_binding,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.228,1,1,1
+C,stale_catalog_replay,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.153,1,1,1
+C,hash_mismatch,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.245,1,1,1
+C,wrong_app_binding,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,1.15,1,1,1
+C,stale_catalog_replay,userspace_tamper_metadata,tamper_metadata,ok,ALLOW,,2.622,1,1,1
+D,invalid_session_hash_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,1.551,1,1,1
+D,approval_required_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,42.995,1,1,1
+D,invalid_session_hash_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,1.747,1,1,1
+D,approval_required_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,39.093,1,1,1
+D,invalid_session_hash_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,1.978,1,1,1
+D,approval_required_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,5.095,1,1,1
+D,invalid_session_hash_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,2.578,1,1,1
+D,approval_required_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,48.149,1,1,1
+D,invalid_session_hash_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,1.685,1,1,1
+D,approval_required_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,47.745,1,1,1
+D,invalid_session_hash_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,1.649,1,1,1
+D,approval_required_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,75.316,1,1,1
+D,invalid_session_hash_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,1.612,1,1,1
+D,approval_required_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,46.157,1,1,1
+D,invalid_session_hash_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,1.862,1,1,1
+D,approval_required_bypass,userspace_compromised,compromised_userspace,ok,ALLOW,,26.994,1,1,1
+E1,direct_safe_tool,direct,,ok,,,0.811,1,1,1
+E1,direct_risky_tool,direct,,ok,,,78.653,1,1,1
+E1,forwarder_fake_session,forwarder_only,,error,,session not found or expired,1.297,0,1,0

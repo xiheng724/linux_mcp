@@ -21,6 +21,8 @@ TRACE_REQUESTS="1000"
 POLICY_REQUESTS="1000"
 RESTART_REQUESTS="1000"
 RESTART_AFTER="300"
+TOOL_RESTART_REQUESTS="1000"
+TOOL_RESTART_AFTER="300"
 MAX_TOOLS="20"
 OUTPUT_DIR="experiment-results/atc"
 TIMEOUT_S="10"
@@ -53,6 +55,10 @@ while [[ $# -gt 0 ]]; do
       RESTART_REQUESTS="$2"; shift 2 ;;
     --restart-after)
       RESTART_AFTER="$2"; shift 2 ;;
+    --tool-restart-requests)
+      TOOL_RESTART_REQUESTS="$2"; shift 2 ;;
+    --tool-restart-after)
+      TOOL_RESTART_AFTER="$2"; shift 2 ;;
     --max-tools)
       MAX_TOOLS="$2"; shift 2 ;;
     --output-dir)
@@ -77,7 +83,7 @@ if [[ "$SKIP_START" -eq 0 ]]; then
   echo "[atc] starting tool services"
   bash scripts/run_tool_services.sh
   echo "[atc] starting mcpd"
-  bash scripts/run_mcpd.sh
+  MCPD_TRACE_TIMING=1 bash scripts/run_mcpd.sh
 fi
 
 ARGS=(
@@ -95,6 +101,8 @@ ARGS=(
   --policy-requests "$POLICY_REQUESTS"
   --restart-requests "$RESTART_REQUESTS"
   --restart-after "$RESTART_AFTER"
+  --tool-restart-requests "$TOOL_RESTART_REQUESTS"
+  --tool-restart-after "$TOOL_RESTART_AFTER"
   --max-tools "$MAX_TOOLS"
 )
 
@@ -119,6 +127,9 @@ fi
 
 echo "[atc] rendering report"
 "$PYTHON_BIN" scripts/experiments/render_atc_report.py "$LATEST_RUN/atc_summary.json" --output "$LATEST_RUN/atc_report.md"
+
+echo "[atc] rendering plots"
+"$PYTHON_BIN" scripts/experiments/plot_atc_results.py --atc-dir "$LATEST_RUN" --output-dir "$LATEST_RUN/plots"
 
 echo "[atc] done"
 echo "[atc] result dir: $LATEST_RUN"

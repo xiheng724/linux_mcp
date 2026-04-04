@@ -1,0 +1,4 @@
+case,repeats,error_rate,deny_rate,defer_rate,latency_avg_ms,latency_p95_ms
+invalid_session,40,1.0,0.0,0.0,0.5,1.411
+invalid_tool_id,40,1.0,0.0,0.0,2.778,11.725
+hash_mismatch,40,1.0,1.0,0.0,2.066,4.873

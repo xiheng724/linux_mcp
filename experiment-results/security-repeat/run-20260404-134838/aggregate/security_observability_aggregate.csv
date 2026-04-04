@@ -1,0 +1,3 @@
+mode,runs,independent_audit_mean,state_introspection_mean,post_crash_visibility_mean,root_cause_success_rate_mean
+kernel,3,1.0,1.0,1.0,1.0
+userspace,3,0.0,0.0,0.0,1.0

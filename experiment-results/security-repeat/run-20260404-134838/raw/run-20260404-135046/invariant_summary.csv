@@ -1,0 +1,9 @@
+mode,I1_unauthorized_blocked,I2_approval_required_enforced,I3_session_binding_enforced,I4_metadata_integrity_enforced,I5_compromise_contained,preserved_invariants_ratio
+direct,no,no,no,no,no,0.0
+forwarder_only,no,no,no,no,no,0.0
+mcpd,yes,yes,yes,yes,yes,1.0
+userspace_compromised,no,yes,yes,yes,no,0.6
+userspace_semantic_plane,yes,yes,yes,yes,yes,1.0
+userspace_tamper_approval,no,no,yes,yes,no,0.4
+userspace_tamper_metadata,no,yes,yes,no,yes,0.6
+userspace_tamper_session,no,yes,no,yes,yes,0.6

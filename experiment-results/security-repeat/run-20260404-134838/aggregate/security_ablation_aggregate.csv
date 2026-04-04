@@ -1,0 +1,6 @@
+mechanism,runs,delta_mean,delta_median,delta_stdev,baseline_attack_success_rate_mean,ablated_attack_success_rate_mean
+agent_binding,3,0.666667,0.666667,0.0,0.0,0.666667
+approval_token,3,1.0,1.0,0.0,0.0,1.0
+kernel_state,3,1.0,1.0,0.0,0.0,1.0
+semantic_hash,3,1.0,1.0,0.0,0.0,1.0
+toctou_binding,3,0.5,0.5,0.0,0.0,0.5

@@ -1,0 +1,7 @@
+scenario,mode,concurrency,requests,ok,error,success_rate,throughput_rps,latency_avg_ms,latency_p50_ms,latency_p95_ms,latency_p99_ms
+direct_c1,direct,1,300,300,0,1.0,1196.01,0.825,0.603,1.933,3.859
+direct_c4,direct,4,300,300,0,1.0,2417.192,1.572,0.696,4.694,19.267
+direct_c8,direct,8,300,300,0,1.0,3277.321,2.237,1.001,8.08,10.021
+mcpd_c1,mcpd,1,300,300,0,1.0,449.483,2.214,1.723,4.367,7.14
+mcpd_c4,mcpd,4,300,300,0,1.0,570.747,6.887,5.903,11.877,27.385
+mcpd_c8,mcpd,8,300,300,0,1.0,620.609,12.37,11.395,21.074,40.583

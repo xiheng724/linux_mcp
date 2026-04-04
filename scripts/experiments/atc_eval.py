@@ -220,12 +220,86 @@ def flatten_approval_rows(item: Dict[str, Any]) -> List[Dict[str, Any]]:
     ]
 
 
+def flatten_path_rows(items: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        lat = item.get("latency_ms", {})
+        arb = item.get("arbitration_ms", {})
+        total = item.get("total_ms", {})
+        rows.append(
+            {
+                "mode": item.get("mode", ""),
+                "path": item.get("path", ""),
+                "repeats": item.get("repeats", 0),
+                "success_rate": item.get("success_rate", 0.0),
+                "throughput_rps": item.get("throughput_rps", 0.0),
+                "latency_avg_ms": lat.get("avg", 0.0),
+                "latency_p50_ms": lat.get("p50", 0.0),
+                "latency_p95_ms": lat.get("p95", 0.0),
+                "latency_p99_ms": lat.get("p99", 0.0),
+                "arbitration_avg_ms": arb.get("avg", 0.0),
+                "arbitration_p95_ms": arb.get("p95", 0.0),
+                "total_avg_ms": total.get("avg", 0.0),
+                "total_p95_ms": total.get("p95", 0.0),
+                "sample_error": item.get("sample_error", ""),
+            }
+        )
+    return rows
+
+
+def flatten_path_sample_rows(items: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        for sample in item.get("samples", []):
+            if not isinstance(sample, dict):
+                continue
+            rows.append(
+                {
+                    "mode": item.get("mode", ""),
+                    "path": item.get("path", ""),
+                    "sample_idx": sample.get("sample_idx", 0),
+                    "status": sample.get("status", ""),
+                    "decision": sample.get("decision", ""),
+                    "e2e_ms": sample.get("e2e_ms", 0.0),
+                    "arbitration_ms": sample.get("arbitration_ms", 0.0),
+                    "total_ms": sample.get("total_ms", 0.0),
+                }
+            )
+    return rows
+
+
 def flatten_restart_rows(item: Dict[str, Any]) -> List[Dict[str, Any]]:
     if not isinstance(item, dict):
         return []
     return [
         {
             "status": item.get("status", ""),
+            "requests": item.get("requests", 0),
+            "restart_after": item.get("restart_after", 0),
+            "success_rate": item.get("success_rate", 0.0),
+            "error_rate": item.get("error_rate", 0.0),
+            "post_restart_error_rate": item.get("post_restart_error_rate", 0.0),
+            "outage_ms": item.get("outage_ms", 0.0),
+            "latency_avg_ms": item.get("latency_ms", {}).get("avg", 0.0),
+            "latency_p95_ms": item.get("latency_ms", {}).get("p95", 0.0),
+            "latency_p99_ms": item.get("latency_ms", {}).get("p99", 0.0),
+        }
+    ]
+
+
+def flatten_tool_service_recovery_rows(item: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if not isinstance(item, dict):
+        return []
+    return [
+        {
+            "status": item.get("status", ""),
+            "app_id": item.get("app_id", ""),
+            "tool_id": item.get("tool_id", 0),
+            "tool_name": item.get("tool_name", ""),
             "requests": item.get("requests", 0),
             "restart_after": item.get("restart_after", 0),
             "success_rate": item.get("success_rate", 0.0),
@@ -301,6 +375,7 @@ def launch_mcpd_variant(*, mode: str, sock_path: str) -> subprocess.Popen[str]:
     env = os.environ.copy()
     env["MCPD_EXPERIMENT_MODE"] = mode
     env["MCPD_SOCK_PATH"] = sock_path
+    env["MCPD_TRACE_TIMING"] = "1"
     return subprocess.Popen(  # noqa: S603
         [sys.executable, "-u", "mcpd/server.py"],
         cwd=ROOT_DIR,
@@ -316,7 +391,11 @@ def wait_mcpd_ready(sock_path: str, timeout_s: float) -> None:
     last_error = ""
     while time.time() < deadline:
         time.sleep(0.1)
-        resp = rpc_call(sock_path, {"sys": "list_apps"}, 1.0)
+        try:
+            resp = rpc_call(sock_path, {"sys": "list_apps"}, 1.0)
+        except Exception as exc:  # noqa: BLE001
+            last_error = str(exc)
+            continue
         if resp.get("status") == "ok":
             return
         last_error = str(resp.get("error", "mcpd variant not ready"))
@@ -518,6 +597,96 @@ def run_approval_path(
         "deny_latency_ms": summarize_durations_ms(deny_latencies),
         "sample_error": sample_error,
     }
+
+
+def _timing_value(resp: Dict[str, Any], key: str) -> float:
+    timing = resp.get("timing_ms", {})
+    if not isinstance(timing, dict):
+        return 0.0
+    try:
+        return float(timing.get(key, 0.0))
+    except Exception:
+        return 0.0
+
+
+def run_path_breakdown(
+    *,
+    sock_path: str,
+    timeout_s: float,
+    mode_label: str,
+    safe_tool: ToolCase | None,
+    risky_tool: ToolCase | None,
+    repeats: int,
+) -> List[Dict[str, Any]]:
+    if safe_tool is None:
+        return []
+    cases: List[tuple[str, ToolCase, Dict[str, Any]]] = [
+        ("allow", safe_tool, {"tool_hash": safe_tool.manifest_hash}),
+        ("deny", safe_tool, {"tool_hash": "deadbeef"}),
+    ]
+    if risky_tool is not None:
+        cases.append(("defer", risky_tool, {"tool_hash": risky_tool.manifest_hash}))
+    details = open_session(sock_path, timeout_s, f"path-{mode_label}")
+    session_id = details[0]
+    rows: List[Dict[str, Any]] = []
+    for path_name, tool, extra in cases:
+        latencies: List[float] = []
+        arbitration_latencies: List[float] = []
+        total_latencies: List[float] = []
+        ok_count = 0
+        sample_error = ""
+        samples: List[Dict[str, Any]] = []
+        started = time.perf_counter()
+        for idx in range(repeats):
+            req = {
+                "kind": "tool:exec",
+                "req_id": 910000 + (1000 * len(rows)) + idx,
+                "session_id": session_id,
+                "app_id": tool.app_id,
+                "tool_id": tool.tool_id,
+                "payload": dict(tool.payloads[0]),
+                "tool_hash": str(extra.get("tool_hash", tool.manifest_hash)),
+            }
+            t0 = time.perf_counter()
+            resp = rpc_call(sock_path, req, timeout_s)
+            latencies.append((time.perf_counter() - t0) * 1000.0)
+            arbitration_latencies.append(_timing_value(resp, "arbitration"))
+            total_latencies.append(_timing_value(resp, "total"))
+            samples.append(
+                {
+                    "sample_idx": idx,
+                    "status": str(resp.get("status", "")),
+                    "decision": str(resp.get("decision", "")),
+                    "e2e_ms": round(latencies[-1], 3),
+                    "arbitration_ms": round(arbitration_latencies[-1], 3),
+                    "total_ms": round(total_latencies[-1], 3),
+                }
+            )
+            decision = str(resp.get("decision", ""))
+            if path_name == "allow" and resp.get("status") == "ok":
+                ok_count += 1
+            elif path_name == "deny" and decision == "DENY":
+                ok_count += 1
+            elif path_name == "defer" and decision == "DEFER":
+                ok_count += 1
+            elif not sample_error:
+                sample_error = str(resp.get("error", "unexpected path response"))
+        elapsed_s = max(time.perf_counter() - started, 1e-9)
+        rows.append(
+            {
+                "mode": mode_label,
+                "path": path_name,
+                "repeats": repeats,
+                "success_rate": round(ok_count / repeats, 6) if repeats else 0.0,
+                "throughput_rps": round(repeats / elapsed_s, 3),
+                "latency_ms": summarize_durations_ms(latencies),
+                "arbitration_ms": summarize_durations_ms(arbitration_latencies),
+                "total_ms": summarize_durations_ms(total_latencies),
+                "samples": samples,
+                "sample_error": sample_error,
+            }
+        )
+    return rows
 
 
 def _trace_mixed(tools: Sequence[ToolCase], requests: int) -> List[ToolCase]:
@@ -796,6 +965,134 @@ def maybe_run_reload_10x(timeout_s: float) -> Dict[str, Any]:
     }
 
 
+def _load_app_manifest(app_id: str) -> tuple[Path, Dict[str, Any]]:
+    for manifest_path in sorted((ROOT_DIR / "tool-app" / "manifests").glob("*.json")):
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if raw.get("app_id") == app_id:
+            if not isinstance(raw, dict):
+                break
+            return (manifest_path, raw)
+    raise RuntimeError(f"manifest not found for app_id={app_id}")
+
+
+def _app_pidfile(app_id: str) -> Path:
+    return Path(f"/tmp/linux-mcp-app-{app_id}.pid")
+
+
+def _stop_app_service(app_id: str, endpoint: str) -> None:
+    pidfile = _app_pidfile(app_id)
+    pid_text = pidfile.read_text(encoding="utf-8").strip() if pidfile.exists() else ""
+    if pid_text:
+        try:
+            os.kill(int(pid_text), 15)
+        except Exception:  # noqa: BLE001
+            pass
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            try:
+                os.kill(int(pid_text), 0)
+                time.sleep(0.05)
+            except OSError:
+                break
+        try:
+            os.kill(int(pid_text), 9)
+        except Exception:  # noqa: BLE001
+            pass
+    pidfile.unlink(missing_ok=True)
+    Path(endpoint).unlink(missing_ok=True)
+
+
+def _start_app_service(app_id: str, timeout_s: float) -> None:
+    manifest_path, manifest = _load_app_manifest(app_id)
+    demo_entrypoint = str(manifest.get("demo_entrypoint", ""))
+    endpoint = str(manifest.get("endpoint", ""))
+    if not demo_entrypoint or not endpoint:
+        raise RuntimeError(f"manifest missing demo_entrypoint/endpoint for app_id={app_id}")
+    service_file = ROOT_DIR / demo_entrypoint
+    if not service_file.exists():
+        raise RuntimeError(f"missing service file: {service_file}")
+    Path(endpoint).unlink(missing_ok=True)
+    proc = subprocess.Popen(  # noqa: S603
+        [sys.executable, "-u", str(service_file), "--manifest", str(manifest_path)],
+        cwd=ROOT_DIR,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    _app_pidfile(app_id).write_text(str(proc.pid), encoding="utf-8")
+    deadline = time.time() + max(5.0, timeout_s)
+    while time.time() < deadline:
+        if Path(endpoint).exists():
+            return
+        time.sleep(0.05)
+    raise RuntimeError(f"service restart timed out for app_id={app_id}")
+
+
+def run_tool_service_restart_recovery(
+    *,
+    tool: ToolCase,
+    timeout_s: float,
+    requests: int,
+    restart_after: int,
+    mcpd_sock: str,
+) -> Dict[str, Any]:
+    _manifest_path, manifest = _load_app_manifest(tool.app_id)
+    endpoint = str(manifest.get("endpoint", ""))
+    latencies: List[float] = []
+    ok_count = 0
+    error_count = 0
+    post_restart_errors = 0
+    outage_start: float | None = None
+    outage_end: float | None = None
+    session_id, _agent_id = open_session(mcpd_sock, timeout_s, "tool-restart-recovery")
+    payload = dict(tool.payloads[0])
+
+    for idx in range(requests):
+        if idx == restart_after:
+            outage_start = time.time()
+            _stop_app_service(tool.app_id, endpoint)
+            _start_app_service(tool.app_id, timeout_s)
+        t0 = time.perf_counter()
+        try:
+            resp = call_tool_via_mcpd(
+                tool,
+                payload,
+                timeout_s,
+                idx + 1,
+                mcpd_sock=mcpd_sock,
+                session_id=session_id,
+                include_hash=True,
+            )
+        except Exception as exc:  # noqa: BLE001
+            resp = {"status": "error", "error": str(exc)}
+        latencies.append((time.perf_counter() - t0) * 1000.0)
+        if resp.get("status") == "ok":
+            ok_count += 1
+            if outage_start is not None and outage_end is None:
+                outage_end = time.time()
+        else:
+            error_count += 1
+            if idx >= restart_after:
+                post_restart_errors += 1
+
+    outage_ms = 0.0
+    if outage_start is not None and outage_end is not None:
+        outage_ms = max(0.0, (outage_end - outage_start) * 1000.0)
+    return {
+        "status": "ok",
+        "app_id": tool.app_id,
+        "tool_id": tool.tool_id,
+        "tool_name": tool.tool_name,
+        "requests": requests,
+        "restart_after": restart_after,
+        "success_rate": round(ok_count / requests, 6) if requests else 0.0,
+        "error_rate": round(error_count / requests, 6) if requests else 0.0,
+        "post_restart_error_rate": round(post_restart_errors / max(requests - restart_after, 1), 6),
+        "outage_ms": round(outage_ms, 3),
+        "latency_ms": summarize_durations_ms(latencies),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run ATC-style evaluation for linux-mcp")
     parser.add_argument("--mcpd-sock", default=DEFAULT_MCPD_SOCK)
@@ -812,6 +1109,8 @@ def main() -> int:
     parser.add_argument("--policy-requests", type=int, default=1000)
     parser.add_argument("--restart-requests", type=int, default=1000)
     parser.add_argument("--restart-after", type=int, default=300)
+    parser.add_argument("--tool-restart-requests", type=int, default=1000)
+    parser.add_argument("--tool-restart-after", type=int, default=300)
     parser.add_argument("--max-tools", type=int, default=20)
     parser.add_argument("--include-write-tools", action="store_true")
     parser.add_argument("--skip-direct", action="store_true")
@@ -952,6 +1251,13 @@ def main() -> int:
         requests=args.restart_requests,
         restart_after=min(args.restart_after, max(args.restart_requests - 1, 0)),
     )
+    tool_service_recovery = run_tool_service_restart_recovery(
+        tool=choose_safe_tool(selected) or selected[0],
+        timeout_s=args.timeout_s,
+        requests=args.tool_restart_requests,
+        restart_after=min(args.tool_restart_after, max(args.tool_restart_requests - 1, 0)),
+        mcpd_sock=args.mcpd_sock,
+    )
 
     negative = run_negative_controls(
         tool=selected[0],
@@ -970,6 +1276,29 @@ def main() -> int:
         timeout_s=args.timeout_s,
         repeats=args.rpc_repeats,
     )
+    path_breakdown = run_path_breakdown(
+        sock_path=args.mcpd_sock,
+        timeout_s=args.timeout_s,
+        mode_label="mcpd",
+        safe_tool=choose_safe_tool(selected) or selected[0],
+        risky_tool=choose_defer_tool(tools),
+        repeats=max(20, min(args.rpc_repeats, 200)),
+    )
+    with managed_mcpd_variant(
+        mode="userspace_semantic_plane",
+        sock_path=variant_socks["userspace_semantic_plane"],
+        timeout_s=max(10.0, args.timeout_s),
+    ) as _:
+        path_breakdown.extend(
+            run_path_breakdown(
+                sock_path=variant_socks["userspace_semantic_plane"],
+                timeout_s=args.timeout_s,
+                mode_label="userspace_semantic_plane",
+                safe_tool=choose_safe_tool(selected) or selected[0],
+                risky_tool=choose_defer_tool(tools),
+                repeats=max(20, min(args.rpc_repeats, 200)),
+            )
+        )
     scale_results = run_manifest_scale(
         scales=parse_concurrency(args.manifest_scales),
         repeats=args.scale_repeats,
@@ -990,6 +1319,8 @@ def main() -> int:
             "policy_requests": args.policy_requests,
             "restart_requests": args.restart_requests,
             "restart_after": args.restart_after,
+            "tool_restart_requests": args.tool_restart_requests,
+            "tool_restart_after": args.tool_restart_after,
             "manifest_scales": parse_concurrency(args.manifest_scales),
             "selected_tools": [
                 {
@@ -1006,9 +1337,11 @@ def main() -> int:
         "trace_results": trace_results,
         "policy_mix": policy_mix,
         "restart_recovery": restart_recovery,
+        "tool_service_recovery": tool_service_recovery,
         "negative_controls": negative,
         "approval_path": approval,
         "control_plane_rpcs": control_plane,
+        "path_breakdown": path_breakdown,
         "manifest_scale": scale_results,
         "reload_10x": reload_result,
     }
@@ -1115,6 +1448,40 @@ def main() -> int:
         ],
     )
     write_csv(
+        run_dir / "path_breakdown.csv",
+        flatten_path_rows(result["path_breakdown"]),
+        [
+            "mode",
+            "path",
+            "repeats",
+            "success_rate",
+            "throughput_rps",
+            "latency_avg_ms",
+            "latency_p50_ms",
+            "latency_p95_ms",
+            "latency_p99_ms",
+            "arbitration_avg_ms",
+            "arbitration_p95_ms",
+            "total_avg_ms",
+            "total_p95_ms",
+            "sample_error",
+        ],
+    )
+    write_csv(
+        run_dir / "path_breakdown_raw.csv",
+        flatten_path_sample_rows(result["path_breakdown"]),
+        [
+            "mode",
+            "path",
+            "sample_idx",
+            "status",
+            "decision",
+            "e2e_ms",
+            "arbitration_ms",
+            "total_ms",
+        ],
+    )
+    write_csv(
         run_dir / "manifest_scale.csv",
         flatten_manifest_scale_rows(result["manifest_scale"]),
         [
@@ -1154,6 +1521,25 @@ def main() -> int:
         flatten_restart_rows(result["restart_recovery"]),
         [
             "status",
+            "requests",
+            "restart_after",
+            "success_rate",
+            "error_rate",
+            "post_restart_error_rate",
+            "outage_ms",
+            "latency_avg_ms",
+            "latency_p95_ms",
+            "latency_p99_ms",
+        ],
+    )
+    write_csv(
+        run_dir / "tool_service_recovery.csv",
+        flatten_tool_service_recovery_rows(result["tool_service_recovery"]),
+        [
+            "status",
+            "app_id",
+            "tool_id",
+            "tool_name",
             "requests",
             "restart_after",
             "success_rate",

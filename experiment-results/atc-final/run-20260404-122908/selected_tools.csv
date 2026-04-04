@@ -1,0 +1,11 @@
+tool_id,tool_name,app_id,risk_tags
+2,note_list,notes_app,['sensitive_read']
+4,note_search,notes_app,['sensitive_read']
+5,workspace_overview,workspace_app,['sensitive_read']
+6,read_document,workspace_app,['sensitive_read']
+10,task_list,planner_app,['sensitive_read']
+12,desktop_snapshot,desktop_app,[]
+16,event_list,calendar_app,['sensitive_read']
+19,contact_list,contacts_app,['sensitive_read']
+20,contact_find,contacts_app,['sensitive_read']
+21,list_launchable_apps,launcher_app,['sensitive_read']

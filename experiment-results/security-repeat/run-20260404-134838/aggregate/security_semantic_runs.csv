@@ -1,0 +1,4 @@
+run_id,precision,recall,false_positive_rate,false_negative_rate,bypass_success_rate
+run-20260404-134839,1.0,0.666667,0.0,0.333333,0.333333
+run-20260404-135006,1.0,0.666667,0.0,0.333333,0.333333
+run-20260404-135046,1.0,0.666667,0.0,0.333333,0.333333

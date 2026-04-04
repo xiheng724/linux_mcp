@@ -1,0 +1,2 @@
+runs,precision_mean,precision_median,precision_stdev,recall_mean,recall_median,recall_stdev,false_positive_rate_mean,false_positive_rate_median,false_positive_rate_stdev,false_negative_rate_mean,false_negative_rate_median,false_negative_rate_stdev,bypass_success_rate_mean,bypass_success_rate_median,bypass_success_rate_stdev
+3,1.0,1.0,0.0,0.666667,0.666667,0.0,0.0,0.0,0.0,0.333333,0.333333,0.0,0.333333,0.333333,0.0

@@ -1,134 +1,145 @@
 # Experiment Suite
 
-This directory contains a large-volume comparative experiment framework for linux-mcp.
+`linux-mcp` 现在保留两条主实验线：
+
+1. `security_eval.py`
+   attack-driven 安全评估，重点比较 kernel-backed control plane、equivalent userspace semantic plane，以及被显式 tamper 的 userspace baseline。
+2. `atc_eval.py`
+   论文导向综合评估，覆盖性能、机制级对照、approval path、恢复、扩展性和路径级 latency 分解。
+
+配套保留两个 repeated wrapper：
+
+- `scripts/run_repeated_atc.sh`
+- `scripts/run_repeated_security.sh`
+
+旧的 benchmark-only 入口、matrix wrapper、全局 plot 汇总脚本和历史 smoke/debug 结果已经删除，避免和新的 ATC/security 口径重复、结论冲突。
 
 ## Files
 
-- `benchmark_suite.py`: main benchmark runner
-- `atc_eval.py`: ATC-oriented evaluation runner
-- `render_report.py`: render `summary.json` to markdown
-- `render_atc_report.py`: render `atc_summary.json` to markdown
-- `aggregate_eval.py`: aggregate multiple benchmark runs into CSV tables and a detailed report
-- `run_matrix.sh`: high-volume matrix runner
-- `../run_experiment_suite.sh`: one-click run for a single benchmark campaign
-- `../run_atc_evaluation.sh`: one-click run for an ATC-style evaluation campaign
-- `../run_repeated_suite.sh`: repeated benchmark campaigns plus statistical aggregation
+- `benchmark_suite.py`
+  共享实验库，提供 manifest 预检、direct/mcpd 请求驱动、基础 latency 汇总等通用能力。
+- `atc_eval.py`
+  综合评估 runner。
+- `render_atc_report.py`
+  将 `atc_summary.json` 渲染成 markdown。
+- `plot_atc_results.py`
+  为单次 ATC run 生成 figure，包括 ablation、path breakdown、CDF、recovery 图。
+- `aggregate_atc_runs.py`
+  聚合 repeated ATC runs。
+- `security_eval.py`
+  attack-driven 安全评估 runner。
+- `plot_security_results.py`
+  生成安全实验图，包括 attack success、detection latency、mixed attack、semantic+ablation、recovery+observability。
 
-## What Is Compared
+## Security Evaluation
 
-`benchmark_suite.py` runs multiple scenarios:
+入口：
 
-1. `direct_cX`: direct app endpoint RPC (baseline, bypass mcpd + kernel arbitration)
-2. `mcpd_cX`: mcpd mediated execution path (includes session + kernel arbitration)
-3. negative controls:
-   - invalid session
-   - invalid tool id
-   - hash mismatch
+```bash
+bash scripts/run_security_evaluation.sh
+```
 
-The default concurrency sweep is `1,4,8,16,32`.
+如果服务已经启动：
 
-It answers three basic questions:
+```bash
+bash scripts/run_security_evaluation.sh --skip-start
+```
 
-1. what is the fixed cost of mediated execution vs direct endpoint RPC
-2. how throughput and tail latency evolve as concurrency increases
-3. whether negative-control paths fail fast and deterministically
+当前覆盖：
 
-## ATC-Oriented Evaluation
+1. identity spoofing
+   - fake session id
+   - expired session
+   - session token theft
+2. approval replay / forgery
+   - forged approval ticket
+   - cross-agent replay
+   - cross-tool replay
+   - delayed replay
+   - denied-ticket replay
+3. semantic tampering
+   - live metadata tampering
+   - offline semantic fingerprint precision / recall
+4. daemon compromise
+   - compromised userspace baseline
+   - daemon crash / approval-state preservation 对比
+5. TOCTOU
+   - approve 后 hash mismatch
+   - approve 后 tool swap
+6. mechanism ablation
+   - agent binding
+   - approval token
+   - semantic hash
+   - kernel state
+7. observability
+   - independent audit
+   - state introspection
+   - post-crash visibility
 
-`atc_eval.py` adds experiment groups that map more directly to a systems-paper evaluation:
+主要输出：
 
-1. end-to-end mediated overhead vs direct endpoint RPC
-2. mcpd ablation runs:
-   - `forwarder_only`: keep `mcpd` as a lookup/relay hop with minimal semantics
-   - `userspace_semantic_plane`: preserve session/hash/approval semantics in `mcpd`, without kernel arbitration
-3. fixed trace workloads:
-   - mixed round-robin trace
-   - hotspot trace
-4. control-plane RPC latency for `list_apps`, `list_tools`, and `open_session`
-5. safety/correctness controls, including approval-path behavior
-6. policy-mix experiments as the high-risk request ratio increases
-7. restart-recovery experiments under continuing request load
-8. synthetic manifest-scale experiments for control-plane metadata growth
-9. optional `reload_10x` stability check when run as root
+- `security_summary.json`
+- `attack_rows.csv`
+- `attack_summary.csv`
+- `semantic_tampering.csv`
+- `semantic_summary.csv`
+- `daemon_compromise.csv`
+- `mechanism_ablation.csv`
+- `observability.csv`
+- `mixed_attack.csv`
+- `security_report.md`
+- `plots/figure_security_*.png`
 
-The most important comparison group is now:
+## ATC Evaluation
 
-1. `direct`
-2. `mcpd`
-3. `forwarder_only`
-4. `userspace_semantic_plane`
-
-Interpretation:
-
-- `direct` is the lower bound with no mediation
-- `forwarder_only` measures the cost of keeping `mcpd` as a lookup + relay hop
-- `userspace_semantic_plane` is the equivalent userspace baseline
-- `mcpd` is the current full kernel-backed control plane path
-
-Run it with:
+入口：
 
 ```bash
 bash scripts/run_atc_evaluation.sh
 ```
 
-If services are already up, you can skip auto-start:
+如果服务已经启动：
 
 ```bash
 bash scripts/run_atc_evaluation.sh --skip-start
 ```
 
-## Default Scale
+当前覆盖：
 
-Single campaign defaults:
+1. end-to-end direct vs mediated comparison
+2. `forwarder_only` / `userspace_semantic_plane` ablation
+3. trace workloads
+4. control-plane RPC latency
+5. allow / defer / deny path breakdown
+6. arbitration / kernel round-trip timing
+7. approval path
+8. policy mix
+9. daemon restart recovery
+10. tool-service restart recovery
+11. manifest scale
+12. optional `reload_10x`
 
-- requests per scenario: 4000
-- negative repeats: 500
-- max validated tools: 20
+主要输出：
 
-Large matrix (`run_matrix.sh`) defaults:
+- `atc_summary.json`
+- `atc_report.md`
+- `e2e_summaries.csv`
+- `variant_summaries.csv`
+- `trace_results.csv`
+- `policy_mix.csv`
+- `control_plane_rpcs.csv`
+- `path_breakdown.csv`
+- `path_breakdown_raw.csv`
+- `negative_controls.csv`
+- `approval_path.csv`
+- `restart_recovery.csv`
+- `tool_service_recovery.csv`
+- `manifest_scale.csv`
+- `derived_metrics.csv`
+- `selected_tools.csv`
+- `plots/figure_atc_*.png`
 
-- requests: 2000, 8000, 20000
-- concurrency profiles: `1,4,8,16` / `1,8,16,32` / `1,16,32,64`
-- negative repeats: 300, 800, 1500
-
-Repeated suite (`run_repeated_suite.sh`) defaults:
-
-- repeats: 5
-- requests per scenario: 4000
-- concurrency: `1,4,8,16,32`
-- aggregate outputs: per-run raw summaries plus aggregate CSV/markdown tables
-
-## Run Commands
-
-Single campaign:
-
-```bash
-bash scripts/run_experiment_suite.sh
-```
-
-Single campaign with larger load:
-
-```bash
-bash scripts/run_experiment_suite.sh \
-  --requests 12000 \
-  --concurrency "1,8,16,32,64" \
-  --negative-repeats 1200 \
-  --max-tools 24
-```
-
-Large matrix campaign:
-
-```bash
-bash scripts/experiments/run_matrix.sh
-```
-
-Repeated benchmark campaign with aggregation:
-
-```bash
-bash scripts/run_repeated_suite.sh
-```
-
-ATC smoke run:
+ATC smoke：
 
 ```bash
 bash scripts/run_atc_evaluation.sh \
@@ -148,44 +159,42 @@ bash scripts/run_atc_evaluation.sh \
   --max-tools 8
 ```
 
-## Output Layout
+## Repeated ATC
 
-Each run writes to:
+入口：
 
-- `experiment-results/run-<timestamp>/summary.json`
-- `experiment-results/run-<timestamp>/report.md`
-- `experiment-results/run-<timestamp>/<scenario>.csv`
+```bash
+bash scripts/run_repeated_atc.sh
+```
 
-For matrix runs:
+输出：
 
-- `experiment-results/matrix/run-<timestamp>/...`
+- `experiment-results/atc-repeat/run-<timestamp>/raw/run-<timestamp>/...`
+- `experiment-results/atc-repeat/run-<timestamp>/aggregate/atc_e2e_aggregate.csv`
+- `experiment-results/atc-repeat/run-<timestamp>/aggregate/atc_variant_aggregate.csv`
+- `experiment-results/atc-repeat/run-<timestamp>/aggregate/repeated_atc_report.md`
 
-For repeated runs:
+## Repeated Security
 
-- `experiment-results/repeated-suite/run-<timestamp>/raw/run-<timestamp>/...`
-- `experiment-results/repeated-suite/run-<timestamp>/aggregate/detailed_report.md`
-- `experiment-results/repeated-suite/run-<timestamp>/aggregate/*.csv`
+入口：
 
-For ATC runs:
+```bash
+bash scripts/run_repeated_security.sh
+```
 
-- `experiment-results/atc/run-<timestamp>/atc_summary.json`
-- `experiment-results/atc/run-<timestamp>/atc_report.md`
-- `experiment-results/atc/run-<timestamp>/e2e_summaries.csv`
-- `experiment-results/atc/run-<timestamp>/variant_summaries.csv`
-- `experiment-results/atc/run-<timestamp>/trace_results.csv`
-- `experiment-results/atc/run-<timestamp>/policy_mix.csv`
-- `experiment-results/atc/run-<timestamp>/control_plane_rpcs.csv`
-- `experiment-results/atc/run-<timestamp>/negative_controls.csv`
-- `experiment-results/atc/run-<timestamp>/approval_path.csv`
-- `experiment-results/atc/run-<timestamp>/restart_recovery.csv`
-- `experiment-results/atc/run-<timestamp>/manifest_scale.csv`
-- `experiment-results/atc/run-<timestamp>/derived_metrics.csv`
-- `experiment-results/atc/run-<timestamp>/selected_tools.csv`
+输出：
 
-## Notes
+- `experiment-results/security-repeat/run-<timestamp>/raw/run-<timestamp>/...`
+- `experiment-results/security-repeat/run-<timestamp>/aggregate/security_attack_aggregate.csv`
+- `experiment-results/security-repeat/run-<timestamp>/aggregate/security_semantic_aggregate.csv`
+- `experiment-results/security-repeat/run-<timestamp>/aggregate/security_daemon_aggregate.csv`
+- `experiment-results/security-repeat/run-<timestamp>/aggregate/security_mixed_aggregate.csv`
+- `experiment-results/security-repeat/run-<timestamp>/aggregate/security_ablation_aggregate.csv`
+- `experiment-results/security-repeat/run-<timestamp>/aggregate/repeated_security_report.md`
 
-- Start scripts are auto-invoked by `run_experiment_suite.sh` unless `--skip-start` is passed.
-- Start scripts are auto-invoked by `run_atc_evaluation.sh` unless `--skip-start` is passed.
-- By default, write/mutation tools are excluded. Add `--include-write-tools` to include them.
-- Tool selection is preflight-validated through both direct and mcpd paths to keep comparisons fair.
-- `reload_10x` requires root; otherwise ATC output will mark it as skipped.
+## Interpretation Boundaries
+
+- 安全实验支持的强结论是 control-plane enforcement、spoofing/replay/tampering resistance、以及 kernel-held approval state 在 daemon crash 后仍可被重放验证。
+- 它们不支持 “execution is protected” 或 “prevents all attacks” 之类的过强 claim。
+- daemon crash 实验会明确展示一个 falsifiable 限制：
+  kernel approval state 可保留，但 userspace session 仍会在 daemon restart 后丢失。

@@ -49,9 +49,11 @@ def render_report(data: Dict[str, Any]) -> str:
     traces = [item for item in data.get("trace_results", []) if isinstance(item, dict)]
     policy_mix = [item for item in data.get("policy_mix", []) if isinstance(item, dict)]
     restart_recovery = data.get("restart_recovery", {})
+    tool_service_recovery = data.get("tool_service_recovery", {})
     negative = data.get("negative_controls", {})
     approval = data.get("approval_path", {})
     control = data.get("control_plane_rpcs", {})
+    path_breakdown = [item for item in data.get("path_breakdown", []) if isinstance(item, dict)]
     scale = data.get("manifest_scale", [])
     reload_result = data.get("reload_10x", {})
 
@@ -123,6 +125,22 @@ def render_report(data: Dict[str, Any]) -> str:
         lines.append(f"- p95_ms: {fmt_ms(lat.get('p95', 0))}")
     lines.append("")
 
+    lines.append("## Tool-Service Recovery")
+    lines.append("")
+    lines.append(f"- status: {tool_service_recovery.get('status', '')}")
+    if tool_service_recovery.get("status") == "ok":
+        lat = tool_service_recovery.get("latency_ms", {})
+        lines.append(f"- app_id: {tool_service_recovery.get('app_id', '')}")
+        lines.append(f"- tool: {tool_service_recovery.get('tool_name', '')} ({tool_service_recovery.get('tool_id', 0)})")
+        lines.append(f"- requests: {tool_service_recovery.get('requests', 0)}")
+        lines.append(f"- restart_after: {tool_service_recovery.get('restart_after', 0)}")
+        lines.append(f"- success_rate: {fmt_pct(tool_service_recovery.get('success_rate', 0.0))}")
+        lines.append(f"- error_rate: {fmt_pct(tool_service_recovery.get('error_rate', 0.0))}")
+        lines.append(f"- post_restart_error_rate: {fmt_pct(tool_service_recovery.get('post_restart_error_rate', 0.0))}")
+        lines.append(f"- outage_ms: {fmt_ms(tool_service_recovery.get('outage_ms', 0))}")
+        lines.append(f"- p95_ms: {fmt_ms(lat.get('p95', 0))}")
+    lines.append("")
+
     lines.append("## Control-Plane RPCs")
     lines.append("")
     lines.append("| rpc | repeats | success_rate | avg_ms | p95_ms | sample_error |")
@@ -134,6 +152,21 @@ def render_report(data: Dict[str, Any]) -> str:
         lines.append(
             f"| {name} | {item.get('repeats', 0)} | {fmt_pct(item.get('success_rate', 0.0))} | "
             f"{fmt_ms(lat.get('avg', 0))} | {fmt_ms(lat.get('p95', 0))} | {item.get('sample_error', '')} |"
+        )
+    lines.append("")
+
+    lines.append("## Path Breakdown")
+    lines.append("")
+    lines.append("| mode | path | repeats | success_rate | throughput_rps | e2e_p95_ms | arbitration_p95_ms | total_p95_ms | sample_error |")
+    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---|")
+    for item in path_breakdown:
+        lat = item.get("latency_ms", {})
+        arb = item.get("arbitration_ms", {})
+        total = item.get("total_ms", {})
+        lines.append(
+            f"| {item.get('mode','')} | {item.get('path','')} | {item.get('repeats',0)} | {fmt_pct(item.get('success_rate', 0.0))} | "
+            f"{item.get('throughput_rps',0)} | {fmt_ms(lat.get('p95', 0))} | {fmt_ms(arb.get('p95', 0))} | {fmt_ms(total.get('p95', 0))} | "
+            f"{item.get('sample_error', '')} |"
         )
     lines.append("")
 

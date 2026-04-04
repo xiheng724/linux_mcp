@@ -1,0 +1,10 @@
+kind,concurrency,lhs,rhs,throughput_ratio,p95_ratio,p99_ratio
+mcpd_vs_direct,1,mcpd,direct,0.499452,1.470297,1.251772
+mcpd_vs_direct,4,mcpd,direct,0.197657,3.50487,4.67752
+mcpd_vs_direct,8,mcpd,direct,0.079979,8.564255,6.979542
+variant_vs_mcpd,1,forwarder_only,mcpd,0.02746,13.484848,417.0796
+variant_vs_mcpd,4,forwarder_only,mcpd,0.831418,1.358132,1.382954
+variant_vs_mcpd,8,forwarder_only,mcpd,3.577317,0.203313,0.153711
+variant_vs_mcpd,1,userspace_semantic_plane,mcpd,0.238095,4.32985,6.095273
+variant_vs_mcpd,4,userspace_semantic_plane,mcpd,1.061073,1.400419,0.828885
+variant_vs_mcpd,8,userspace_semantic_plane,mcpd,4.536782,0.207201,0.271678

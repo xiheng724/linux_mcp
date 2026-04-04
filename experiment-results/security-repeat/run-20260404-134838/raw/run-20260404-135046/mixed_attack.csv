@@ -1,0 +1,13 @@
+mode,attack_profile,malicious_pct,requests,concurrency,legit_throughput_rps,legit_success_rate,legit_p95_ms,attack_acceptance_rate,attack_count
+mcpd,,0,150,8,536.782,1.0,22.342,0.0,0
+mcpd,,5,150,8,559.837,1.0,20.31,0.0,8
+mcpd,,10,150,8,609.227,1.0,19.728,0.0,16
+mcpd,,20,150,8,631.675,1.0,19.752,0.0,32
+userspace_semantic_plane,,0,150,8,691.79,1.0,18.919,0.0,0
+userspace_semantic_plane,,5,150,8,701.431,1.0,19.547,0.0,8
+userspace_semantic_plane,,10,150,8,634.459,1.0,19.666,0.0,16
+userspace_semantic_plane,,20,150,8,640.178,1.0,19.411,0.0,32
+userspace_compromised,compromised_userspace,0,150,8,737.905,1.0,18.055,0.0,0
+userspace_compromised,compromised_userspace,5,150,8,433.393,1.0,5.323,1.0,8
+userspace_compromised,compromised_userspace,10,150,8,316.24,1.0,12.094,1.0,16
+userspace_compromised,compromised_userspace,20,150,8,331.63,1.0,5.333,1.0,32

@@ -109,6 +109,13 @@ def _normalized_experiment_mode() -> str:
     return mode
 
 
+def _attack_profiles() -> set[str]:
+    raw = os.getenv("MCPD_ATTACK_PROFILE", "").strip().lower()
+    if not raw:
+        return set()
+    return {part.strip() for part in raw.split(",") if part.strip()}
+
+
 def _kernel_mode_enabled() -> bool:
     return _normalized_experiment_mode() in {"normal", "no_complete_report"}
 
@@ -121,8 +128,30 @@ def _uses_forwarder_only() -> bool:
     return _normalized_experiment_mode() == "forwarder_only"
 
 
+def _userspace_attack_enabled(*profiles: str) -> bool:
+    if not _uses_userspace_semantic_plane():
+        return False
+    active = _attack_profiles()
+    if not active:
+        return False
+    return "compromised_userspace" in active or any(profile in active for profile in profiles)
+
+
+def _compromised_binding_for_peer(peer: PeerIdentity) -> AgentBinding:
+    return AgentBinding(
+        peer=peer,
+        binding_hash=0xD1CE000000000000 | (peer.pid & 0xFFFF),
+        binding_epoch=0xC0DE0000 | (peer.uid & 0xFFFF),
+    )
+
+
 def _tool_complete_enabled() -> bool:
     return _normalized_experiment_mode() == "normal"
+
+
+def _timing_enabled() -> bool:
+    raw = os.getenv("MCPD_TRACE_TIMING", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def _get_kernel_client() -> KernelMcpNetlinkClient:
@@ -245,6 +274,8 @@ def _userspace_consume_approval_ticket(
     req_id: int,
     tool_hash: str,
 ) -> Tuple[bool, str]:
+    if _userspace_attack_enabled("tamper_approval", "tamper_policy"):
+        return (True, "approval_bypassed_by_userspace_attack")
     now_ms = int(time.time() * 1000)
     _userspace_purge_expired_tickets(now_ms)
     with _userspace_state_lock:
@@ -439,20 +470,31 @@ def _kernel_arbitrate(
     if _uses_forwarder_only():
         return ("ALLOW", "allow_forwarder_only", 0)
     if _uses_userspace_semantic_plane():
+        if _userspace_attack_enabled("tamper_policy"):
+            decision = ("ALLOW", "allow_compromised_userspace_policy", ticket_id)
+            _userspace_record_decision(agent_id, decision[0], decision[1])
+            return decision
         with _registry_lock:
             tool = _tool_registry.get(tool_id)
         if tool is None:
             raise ValueError(f"unsupported tool_id: {tool_id}")
         with _agents_lock:
             registered_peer = _registered_agents.get(agent_id)
-        if registered_peer is None:
+        if registered_peer is None and _userspace_attack_enabled("tamper_session"):
+            decision = ("ALLOW", "allow_tampered_unknown_agent", ticket_id)
+        elif registered_peer is None:
             decision = ("DENY", "deny_unknown_agent", 0)
         elif (
             registered_peer.binding_hash != binding_hash
             or registered_peer.binding_epoch != binding_epoch
-        ):
+        ) and not _userspace_attack_enabled("tamper_session"):
             decision = ("DENY", "binding_mismatch", 0)
-        elif tool.manifest_hash and tool_hash and tool.manifest_hash != tool_hash:
+        elif (
+            tool.manifest_hash
+            and tool_hash
+            and tool.manifest_hash != tool_hash
+            and not _userspace_attack_enabled("tamper_metadata")
+        ):
             decision = ("DENY", "hash_mismatch", 0)
         elif tool.risk_flags & APPROVAL_REQUIRED_FLAGS:
             if ticket_id > 0:
@@ -660,6 +702,7 @@ def _resolve_tool_hash(req: Dict[str, Any], tool: ToolManifest) -> str:
 
 
 def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
+    total_start = time.perf_counter()
     _ensure_runtime_registry_current()
     req_id = ensure_int("req_id", req.get("req_id", 0))
     peer = req.get("_peer")
@@ -667,6 +710,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("missing peer identity")
     session_id = ensure_non_empty_str("session_id", req.get("session_id", ""))
     binding: AgentBinding | None = None
+    session_lookup_start = time.perf_counter()
     if _uses_forwarder_only():
         try:
             session = resolve_session(session_id, peer)
@@ -674,9 +718,21 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:  # noqa: BLE001
             agent_id = "forwarder"
     else:
-        session = resolve_session(session_id, peer)
-        binding = session_binding(session)
-        agent_id = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
+        try:
+            session = resolve_session(session_id, peer)
+            binding = session_binding(session)
+            agent_id = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
+        except Exception:
+            if not _userspace_attack_enabled("tamper_session", "tamper_policy"):
+                raise
+            session = {
+                "session_id": session_id,
+                "agent_id": "compromised-agent",
+                "peer": peer,
+            }
+            binding = _compromised_binding_for_peer(peer)
+            agent_id = "compromised-agent"
+    session_lookup_ms = (time.perf_counter() - session_lookup_start) * 1000.0
     app_id = ensure_non_empty_str("app_id", req.get("app_id", ""))
     tool_id = ensure_int("tool_id", req.get("tool_id", 0))
 
@@ -684,7 +740,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         tool = _tool_registry.get(tool_id)
     if tool is None:
         raise ValueError(f"unsupported tool_id: {tool_id}")
-    if tool.app_id != app_id:
+    if tool.app_id != app_id and not _userspace_attack_enabled("tamper_metadata", "tamper_policy"):
         raise ValueError(
             f"tool_id={tool_id} does not belong to app_id={app_id} (expected {tool.app_id})"
         )
@@ -701,6 +757,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("missing session binding")
         _ensure_agent_registered(agent_id, binding)
         approval_ticket_id = ensure_int("approval_ticket_id", req.get("approval_ticket_id", 0))
+        arbitration_start = time.perf_counter()
         decision, reason, ticket_id = _kernel_arbitrate(
             req_id=req_id,
             agent_id=agent_id,
@@ -710,8 +767,9 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             tool_hash=tool_hash,
             ticket_id=approval_ticket_id,
         )
+        arbitration_ms = (time.perf_counter() - arbitration_start) * 1000.0
         if decision == "DENY":
-            return {
+            resp = {
                 "req_id": req_id,
                 "status": "error",
                 "result": {},
@@ -721,6 +779,14 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
                 "reason": reason,
                 "ticket_id": ticket_id,
             }
+            if _timing_enabled():
+                resp["timing_ms"] = {
+                    "session_lookup": round(session_lookup_ms, 3),
+                    "arbitration": round(arbitration_ms, 3),
+                    "tool_exec": 0.0,
+                    "total": round((time.perf_counter() - total_start) * 1000.0, 3),
+                }
+            return resp
         if decision == "DEFER":
             if ticket_id > 0:
                 remember_pending_approval(
@@ -735,7 +801,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
                     payload=payload,
                     tool_hash=tool_hash,
                 )
-            return {
+            resp = {
                 "req_id": req_id,
                 "status": "error",
                 "result": {},
@@ -745,6 +811,16 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
                 "reason": reason,
                 "ticket_id": ticket_id,
             }
+            if _timing_enabled():
+                resp["timing_ms"] = {
+                    "session_lookup": round(session_lookup_ms, 3),
+                    "arbitration": round(arbitration_ms, 3),
+                    "tool_exec": 0.0,
+                    "total": round((time.perf_counter() - total_start) * 1000.0, 3),
+                }
+            return resp
+    else:
+        arbitration_ms = 0.0
 
     exec_start = time.perf_counter()
     status_code = 1
@@ -762,7 +838,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             tool_t_ms = int((time.perf_counter() - exec_start) * 1000)
         if status == "ok":
             status_code = 0
-        return {
+        resp = {
             "req_id": req_id,
             "status": status,
             "result": result if status == "ok" else {},
@@ -773,6 +849,14 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "reason": reason,
             "ticket_id": ticket_id,
         }
+        if _timing_enabled():
+            resp["timing_ms"] = {
+                "session_lookup": round(session_lookup_ms, 3),
+                "arbitration": round(arbitration_ms, 3),
+                "tool_exec": round((time.perf_counter() - exec_start) * 1000.0, 3),
+                "total": round((time.perf_counter() - total_start) * 1000.0, 3),
+            }
+        return resp
     finally:
         exec_ms = int((time.perf_counter() - exec_start) * 1000)
         try:
@@ -846,13 +930,15 @@ def _handle_sys_approval_decide(conn: socket.socket, req: Dict[str, Any], t0: fl
     agent_id_raw = req.get("agent_id", "")
     reason_raw = req.get("reason", "")
     ttl_ms_raw = req.get("ttl_ms", DEFAULT_APPROVAL_TTL_MS)
+    binding_hash_raw = req.get("binding_hash", 0)
+    binding_epoch_raw = req.get("binding_epoch", 0)
     ticket_id = ensure_int("ticket_id", ticket_id_raw)
     decision_text = ensure_non_empty_str("decision", decision_raw)
     operator_text = ensure_non_empty_str("operator", operator_raw)
     reason_text = ensure_non_empty_str("reason", reason_raw)
     ttl_ms = ensure_int("ttl_ms", ttl_ms_raw)
-    binding_hash = 0
-    binding_epoch = 0
+    binding_hash = ensure_int("binding_hash", binding_hash_raw)
+    binding_epoch = ensure_int("binding_epoch", binding_epoch_raw)
     agent_id_text = agent_id_raw if isinstance(agent_id_raw, str) else ""
     try:
         pending = peek_pending_approval(ticket_id)
@@ -994,8 +1080,13 @@ def _handle_connection(conn: socket.socket) -> None:
 
                 req_id = ensure_int("req_id", req.get("req_id", 0))
                 session_id = ensure_non_empty_str("session_id", req.get("session_id", ""))
-                session = resolve_session(session_id, peer)
-                agent_id = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
+                try:
+                    session = resolve_session(session_id, peer)
+                    agent_id = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
+                except Exception:
+                    if not _userspace_attack_enabled("tamper_session", "tamper_policy"):
+                        raise
+                    agent_id = "compromised-agent"
                 app_id = ensure_non_empty_str("app_id", req.get("app_id", ""))
                 tool_id = ensure_int("tool_id", req.get("tool_id", 0))
                 req["_peer"] = peer
