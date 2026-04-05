@@ -1,9 +1,0 @@
-label,mode,requests,success_rate,latency_avg_ms,latency_p50_ms,latency_p95_ms,latency_p99_ms
-mixed,direct,100,1.0,5.988,1.842,25.258,58.403
-hotspot,direct,100,1.0,1.434,0.763,4.062,13.66
-mixed,mcpd,100,1.0,6.241,4.454,17.222,27.593
-mixed,forwarder_only,100,1.0,7.758,4.038,26.664,44.751
-mixed,userspace_semantic_plane,100,1.0,4.615,2.566,13.776,31.205
-hotspot,mcpd,100,1.0,1.916,1.485,4.283,6.68
-hotspot,forwarder_only,100,1.0,1.905,1.397,3.956,5.573
-hotspot,userspace_semantic_plane,100,1.0,2.825,2.187,5.807,13.802

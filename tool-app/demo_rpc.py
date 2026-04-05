@@ -18,6 +18,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from mcpd.rpc_framing import recv_frame, send_frame
+from sandbox import apply_process_sandbox
 
 MAX_MSG_SIZE = 16 * 1024 * 1024
 
@@ -50,6 +51,7 @@ def serve(
     operations: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]],
 ) -> int:
     raw = load_manifest(manifest_path)
+    apply_process_sandbox()
     endpoint = raw.get("endpoint", "")
     app_id = raw.get("app_id", "unknown")
     if not isinstance(endpoint, str) or not endpoint:

@@ -15,7 +15,7 @@ from demo_rpc import parse_args, serve
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 MAX_READ_BYTES = 1024 * 1024
-MAX_CONTENT_BYTES = 512 * 1024
+MAX_CONTENT_BYTES = 1024 * 1024
 MAX_ENTRIES_LIMIT = 1000
 
 

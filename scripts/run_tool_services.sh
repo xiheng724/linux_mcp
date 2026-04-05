@@ -11,6 +11,21 @@ else
 fi
 
 SOCK_DIR="/tmp/linux-mcp-apps"
+SANDBOX_MODE=""
+SANDBOX_FSIZE_BYTES="1048576"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --sandbox)
+      SANDBOX_MODE="$2"; shift 2 ;;
+    --sandbox-fsize-bytes)
+      SANDBOX_FSIZE_BYTES="$2"; shift 2 ;;
+    *)
+      echo "unknown option: $1"
+      exit 1 ;;
+  esac
+done
+
 mkdir -p "$SOCK_DIR"
 
 found_manifest=0
@@ -66,7 +81,14 @@ PY
   fi
 
   rm -f "$endpoint"
-  nohup setsid "$PYTHON_BIN" -u "$service_file" --manifest "$manifest" >"$logfile" 2>&1 </dev/null &
+  if [[ -n "$SANDBOX_MODE" ]]; then
+    nohup env \
+      LINUX_MCP_SIMPLE_SANDBOX="$SANDBOX_MODE" \
+      LINUX_MCP_SANDBOX_FSIZE_BYTES="$SANDBOX_FSIZE_BYTES" \
+      setsid "$PYTHON_BIN" -u "$service_file" --manifest "$manifest" >"$logfile" 2>&1 </dev/null &
+  else
+    nohup setsid "$PYTHON_BIN" -u "$service_file" --manifest "$manifest" >"$logfile" 2>&1 </dev/null &
+  fi
   pid=$!
   echo "$pid" >"$pidfile"
 

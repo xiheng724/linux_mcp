@@ -1,0 +1,4 @@
+system,max_calls,requests,allowed,denied,first_reject_at
+userspace,0,0,0,0,0
+seccomp,0,0,0,0,0
+kernel,0,0,0,0,0

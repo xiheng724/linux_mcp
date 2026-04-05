@@ -20,9 +20,10 @@ if str(TOOL_APP_DIR) not in sys.path:
 
 from demo_rpc import parse_args, serve
 from real_app_support import resolve_host_path
+from sandbox import deny_subprocess_if_sandboxed, simple_sandbox_enabled
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-MAX_CONTENT_BYTES = 512 * 1024
+MAX_CONTENT_BYTES = 1024 * 1024
 
 
 def _read_uptime_seconds() -> float:
@@ -92,6 +93,7 @@ def desktop_snapshot(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _run_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
+    deny_subprocess_if_sandboxed(args)
     return subprocess.run(args, text=True, capture_output=True, check=False)
 
 
@@ -100,6 +102,7 @@ def _has_gui_session() -> bool:
 
 
 def _spawn_cmd(args: list[str]) -> subprocess.Popen[str]:
+    deny_subprocess_if_sandboxed(args)
     return subprocess.Popen(  # noqa: S603
         args,
         text=True,
@@ -162,6 +165,11 @@ def write_host_text_file(payload: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("overwrite/create_parents must be boolean")
 
     target = resolve_host_path(str(raw_path), allow_missing=True)
+    if simple_sandbox_enabled():
+        try:
+            target.relative_to(ROOT_DIR)
+        except ValueError as exc:
+            raise ValueError(f"simple sandbox blocked host write outside repo: {target}") from exc
     existed = target.exists()
     if existed and target.is_dir():
         raise ValueError(f"path is a directory: {target}")

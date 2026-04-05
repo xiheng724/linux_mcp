@@ -1,2 +1,0 @@
-status,requests,restart_after,success_rate,error_rate,post_restart_error_rate,outage_ms,latency_avg_ms,latency_p95_ms,latency_p99_ms
-ok,100,20,1.0,0.0,0.0,105.212,2.606,4.959,5.998

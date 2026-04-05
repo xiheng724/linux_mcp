@@ -1,4 +1,0 @@
-scale,apps,tools,catalog_bytes,load_manifests_avg_ms,load_manifests_p95_ms,load_tools_avg_ms,load_tools_p95_ms,render_catalog_avg_ms,render_catalog_p95_ms
-1,14,43,26713,1.435,1.947,0.991,1.059,0.037,0.049
-2,28,86,53425,2.627,3.0,3.25,3.981,0.101,0.129
-4,56,172,106849,5.146,5.47,4.848,5.276,0.221,0.271

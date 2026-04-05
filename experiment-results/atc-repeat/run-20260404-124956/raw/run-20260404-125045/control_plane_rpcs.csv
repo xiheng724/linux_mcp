@@ -1,4 +1,0 @@
-rpc,repeats,ok,error,success_rate,sample_error,latency_avg_ms,latency_p50_ms,latency_p95_ms,latency_p99_ms
-list_apps,40,40,0,1.0,,1.711,1.014,5.973,7.48
-list_tools,40,40,0,1.0,,4.283,3.213,7.339,23.811
-open_session,40,40,0,1.0,,0.642,0.369,1.733,4.536

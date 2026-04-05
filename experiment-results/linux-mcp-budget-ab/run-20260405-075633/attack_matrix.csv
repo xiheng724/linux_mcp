@@ -1,0 +1,9 @@
+attack_type,system,attempts,successes,success_rate,outcome
+spoof,userspace,15,10,0.666667,success
+replay,userspace,20,20,1.0,success
+substitute,userspace,15,15,1.0,success
+escalation,userspace,5,5,1.0,success
+spoof,seccomp,15,10,0.666667,success
+replay,seccomp,20,0,0.0,fail
+substitute,seccomp,15,10,0.666667,success
+escalation,seccomp,5,0,0.0,fail

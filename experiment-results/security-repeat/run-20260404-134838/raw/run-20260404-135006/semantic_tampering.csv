@@ -1,7 +1,0 @@
-tool_id,tool_name,mutation_kind,mutation_name,detected,expected_detect,outcome
-13,open_url,benign,risk_tag_reorder,0,0,tn
-13,open_url,benign,example_reorder,0,0,tn
-13,open_url,benign,description_whitespace,0,0,tn
-13,open_url,adversarial,risk_downgrade,1,1,tp
-13,open_url,adversarial,approval_removed,0,1,fn
-13,open_url,adversarial,operation_swap,1,1,tp

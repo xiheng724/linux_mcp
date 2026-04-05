@@ -235,7 +235,7 @@ sequenceDiagram
 - `tool_exec`
 - `total`
 
-ATC path breakdown 实验正是利用这一点。
+旧的路径分解实验正是利用这一点。
 
 ## 7. Session 与 Agent Binding
 

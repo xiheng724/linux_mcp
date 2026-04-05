@@ -111,7 +111,8 @@
       "name": "write_host_text_file",
       "risk_tags": [
         "filesystem_write",
-        "system_mutation"
+        "system_mutation",
+        "irreversible"
       ],
       "operation": "write_host_text_file",
       "timeout_ms": 30000,
@@ -153,7 +154,8 @@
         {
           "payload": {
             "path": "~/Desktop/lxh.txt",
-            "content": ""
+            "content": "",
+            "overwrite": true
           }
         },
         {

@@ -23,7 +23,7 @@ The repository is not a phase-based sketch. It is a runnable end-to-end system w
 | Semantic source of truth | `tool-app/manifests/*.json` |
 | Runtime gateway | `mcpd` |
 | Kernel interface | Generic Netlink + sysfs |
-| Main experiments | ATC-style evaluation and attack-driven security evaluation |
+| Main experiments | linux_mcp evaluation and attack-driven security evaluation |
 | Retained results | 4 curated snapshots under [`experiment-results/`](/home/lxh/Code/linux-mcp/experiment-results) |
 
 ## Highlights
@@ -32,7 +32,7 @@ The repository is not a phase-based sketch. It is a runnable end-to-end system w
 - Manifest-driven catalog export through `list_apps` and `list_tools`
 - Session binding against real UDS peer credentials
 - Approval-gated mediation for risky tools
-- Repeated ATC and repeated security campaigns with curated retained artifacts
+- Repeated linux_mcp and repeated security campaigns with curated retained artifacts
 - Sysfs-backed observability for debugging and post-crash inspection
 
 ## Overview
@@ -320,7 +320,7 @@ flowchart LR
     A[Schema checks] --> B[Build and lifecycle]
     B --> C[Userspace startup]
     C --> D[End-to-end acceptance]
-    D --> E[ATC and security experiments]
+    D --> E[linux_mcp and security experiments]
 ```
 
 ### Main validation entrypoints
@@ -332,9 +332,9 @@ flowchart LR
 | Smoke | `bash scripts/run_smoke.sh` |
 | Lifecycle | `sudo bash scripts/reload_10x.sh` |
 | Acceptance | `sudo bash scripts/demo_acceptance.sh` |
-| Experiments | `bash scripts/run_atc_evaluation.sh` |
+| Experiments | `bash scripts/run_linux_mcp_evaluation.sh` |
 | Experiments | `bash scripts/run_security_evaluation.sh` |
-| Repeated experiments | `bash scripts/run_repeated_atc.sh` |
+| Repeated experiments | `bash scripts/run_repeated_linux_mcp.sh` |
 | Repeated experiments | `bash scripts/run_repeated_security.sh` |
 
 ## Experiments
@@ -343,9 +343,9 @@ Experiment-specific details live in [scripts/experiments/README.md](/home/lxh/Co
 
 ```mermaid
 flowchart TB
-    A[Single ATC run] --> A1[performance + path breakdown + recovery]
+    A[Single linux_mcp run] --> A1[latency + scale + attack matrix]
     B[Single security run] --> B1[attack-driven evaluation]
-    C[Repeated ATC] --> C1[aggregate mean / median / stdev]
+    C[Repeated linux_mcp] --> C1[aggregate repeated samples]
     D[Repeated security] --> D1[aggregate attack and robustness results]
 ```
 
@@ -353,9 +353,9 @@ flowchart TB
 
 | Command | Scope |
 |---|---|
-| `bash scripts/run_atc_evaluation.sh` | Single ATC-oriented evaluation |
+| `bash scripts/run_linux_mcp_evaluation.sh` | Single linux_mcp evaluation |
 | `bash scripts/run_security_evaluation.sh` | Single attack-driven security evaluation |
-| `bash scripts/run_repeated_atc.sh` | Repeated ATC aggregation |
+| `bash scripts/run_repeated_linux_mcp.sh` | Repeated linux_mcp runs |
 | `bash scripts/run_repeated_security.sh` | Repeated security aggregation |
 
 ### Retained result snapshots
@@ -363,8 +363,8 @@ flowchart TB
 Only four curated result sets are kept in-tree:
 
 - [security-final/run-20260404-122908](/home/lxh/Code/linux-mcp/experiment-results/security-final/run-20260404-122908)
-- [atc-final/run-20260404-122908](/home/lxh/Code/linux-mcp/experiment-results/atc-final/run-20260404-122908)
-- [atc-repeat/run-20260404-124956](/home/lxh/Code/linux-mcp/experiment-results/atc-repeat/run-20260404-124956)
+- [linux-mcp-smoke/run-20260405-065703](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-smoke/run-20260405-065703)
+- [linux-mcp-smoke2/run-20260405-065804](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-smoke2/run-20260405-065804)
 - [security-repeat/run-20260404-134838](/home/lxh/Code/linux-mcp/experiment-results/security-repeat/run-20260404-134838)
 
 ### Result summary
@@ -373,8 +373,7 @@ Only four curated result sets are kept in-tree:
 |---|---|---|
 | Single security | Kernel-backed control-plane checks block the tested spoofing, replay, tampering, and TOCTOU cases in the maintained attack suite. | [security_report.md](/home/lxh/Code/linux-mcp/experiment-results/security-final/run-20260404-122908/security_report.md), [plots](/home/lxh/Code/linux-mcp/experiment-results/security-final/run-20260404-122908/plots) |
 | Repeated security | Repeated runs stabilize the same conclusion and quantify semantic recall limits, daemon-crash behavior, and mixed-traffic outcomes. | [repeated_security_report.md](/home/lxh/Code/linux-mcp/experiment-results/security-repeat/run-20260404-134838/aggregate/repeated_security_report.md), [figure_captions.md](/home/lxh/Code/linux-mcp/experiment-results/security-repeat/run-20260404-134838/aggregate/figure_captions.md) |
-| Single ATC | The mediated path adds overhead, but the project now measures it with path-level timing, approval-path breakdown, and recovery experiments rather than only raw throughput. | [atc_report.md](/home/lxh/Code/linux-mcp/experiment-results/atc-final/run-20260404-122908/atc_report.md), [plots](/home/lxh/Code/linux-mcp/experiment-results/atc-final/run-20260404-122908/plots) |
-| Repeated ATC | Repeated runs provide steadier throughput and tail-latency aggregates for `direct`, `mcpd`, and userspace placement baselines. | [repeated_atc_report.md](/home/lxh/Code/linux-mcp/experiment-results/atc-repeat/run-20260404-124956/aggregate/repeated_atc_report.md), [figure_captions.md](/home/lxh/Code/linux-mcp/experiment-results/atc-repeat/run-20260404-124956/aggregate/figure_captions.md) |
+| Single linux_mcp | The maintained evaluation now centers on A/B/C comparison across latency, scale, and attack outcomes rather than the older composite framing. | [linux_mcp_report.md](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-smoke2/run-20260405-065804/linux_mcp_report.md), [plots](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-smoke2/run-20260405-065804/plots) |
 
 ### Security claims supported by the current results
 

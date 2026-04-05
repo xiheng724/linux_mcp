@@ -1,3 +1,0 @@
-mode,runs,approval_state_preserved_mean,approval_state_preserved_median,approval_state_preserved_stdev,session_state_preserved_mean,session_state_preserved_median,session_state_preserved_stdev,post_crash_agent_visible_mean,post_crash_agent_visible_median,post_crash_agent_visible_stdev,approval_latency_ms_mean,approval_latency_ms_median,approval_latency_ms_stdev,replay_latency_ms_mean,replay_latency_ms_median,replay_latency_ms_stdev
-kernel,3,1.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.307667,0.334,0.057239,0.505333,0.206,0.518461
-userspace,3,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.217,1.562,0.816155,0.245,0.247,0.017088

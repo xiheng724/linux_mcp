@@ -18,6 +18,6 @@ if lsmod | awk '{print $1}' | grep -qx kernel_mcp; then
   exit 0
 fi
 
-insmod kernel-mcp/kernel_mcp.ko
+AGENT_MAX_CALLS="${KERNEL_MCP_AGENT_MAX_CALLS:-0}"
+insmod kernel-mcp/kernel_mcp.ko "agent_max_calls=${AGENT_MAX_CALLS}"
 echo "module kernel_mcp loaded"
-

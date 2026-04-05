@@ -1,2 +1,0 @@
-status,tool_id,tool_name,risk_tags,repeats,defer_success_rate,deny_error_rate,session_mismatch_error_rate,defer_avg_ms,defer_p95_ms,deny_avg_ms,deny_p95_ms,sample_error
-ok,13,open_url,"[""external_network"", ""system_mutation""]",24,1.0,1.0,1.0,1.741,3.823,0.69,1.63,

@@ -92,6 +92,21 @@ _userspace_approval_tickets: Dict[int, Dict[str, Any]] = {}
 _userspace_agent_stats: Dict[str, Dict[str, Any]] = {}
 
 
+def _env_flag(name: str) -> bool:
+    raw = os.getenv(name, "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _env_positive_int(name: str) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return 0
+    value = int(raw)
+    if value < 0:
+        raise ValueError(f"{name} must be >= 0")
+    return value
+
+
 def _sock_path() -> str:
     return os.getenv("MCPD_SOCK_PATH", SOCK_PATH)
 
@@ -150,8 +165,56 @@ def _tool_complete_enabled() -> bool:
 
 
 def _timing_enabled() -> bool:
-    raw = os.getenv("MCPD_TRACE_TIMING", "0").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
+    return _env_flag("MCPD_TRACE_TIMING")
+
+
+def _strict_checks_enabled() -> bool:
+    return _env_flag("MCPD_STRICT_CHECKS")
+
+
+def _audit_logging_enabled() -> bool:
+    return _env_flag("MCPD_AUDIT_LOGGING")
+
+
+def _agent_max_calls() -> int:
+    return _env_positive_int("MCPD_AGENT_MAX_CALLS")
+
+
+def _audit_log_path() -> Path:
+    return Path(f"/tmp/mcpd-audit-{os.getuid()}.log")
+
+
+def _append_audit_event(event: Dict[str, Any]) -> None:
+    if not _audit_logging_enabled():
+        return
+    payload = json.dumps(event, ensure_ascii=True, sort_keys=True)
+    with _userspace_state_lock:
+        with _audit_log_path().open("a", encoding="utf-8") as handle:
+            handle.write(payload + "\n")
+
+
+def _strict_request_validation(*, tool: ToolManifest, app_id: str, payload: Any) -> None:
+    if not _strict_checks_enabled():
+        return
+    if tool.app_id != app_id:
+        raise ValueError("strict check failed: app/tool binding mismatch")
+    # Force a canonical payload serialization and a registry scan to model a
+    # more defensive userspace baseline with extra bookkeeping overhead.
+    canonical = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    with _registry_lock:
+        matching = [item.tool_id for item in _tool_registry.values() if item.app_id == app_id]
+    if tool.tool_id not in matching:
+        raise ValueError("strict check failed: tool missing from app registry scan")
+
+
+def _userspace_budget_exhausted(agent_id: str) -> bool:
+    max_calls = _agent_max_calls()
+    if max_calls <= 0:
+        return False
+    record = _userspace_agent_record(agent_id)
+    with _userspace_state_lock:
+        return int(record.get("allow_count", 0)) >= max_calls
 
 
 def _get_kernel_client() -> KernelMcpNetlinkClient:
@@ -496,6 +559,8 @@ def _kernel_arbitrate(
             and not _userspace_attack_enabled("tamper_metadata")
         ):
             decision = ("DENY", "hash_mismatch", 0)
+        elif _userspace_budget_exhausted(agent_id):
+            decision = ("DENY", "budget_calls_exhausted", 0)
         elif tool.risk_flags & APPROVAL_REQUIRED_FLAGS:
             if ticket_id > 0:
                 approved, reason = _userspace_consume_approval_ticket(
@@ -747,6 +812,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
 
     payload = req.get("payload", {})
     validate_payload(tool.input_schema, payload)
+    _strict_request_validation(tool=tool, app_id=app_id, payload=payload)
 
     tool_hash = tool.manifest_hash if _uses_forwarder_only() else _resolve_tool_hash(req, tool)
     decision = "ALLOW"
@@ -786,6 +852,18 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
                     "tool_exec": 0.0,
                     "total": round((time.perf_counter() - total_start) * 1000.0, 3),
                 }
+            _append_audit_event(
+                {
+                    "kind": "tool_exec",
+                    "req_id": req_id,
+                    "agent_id": agent_id,
+                    "app_id": app_id,
+                    "tool_id": tool_id,
+                    "status": "error",
+                    "decision": decision,
+                    "reason": reason,
+                }
+            )
             return resp
         if decision == "DEFER":
             if ticket_id > 0:
@@ -818,6 +896,19 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
                     "tool_exec": 0.0,
                     "total": round((time.perf_counter() - total_start) * 1000.0, 3),
                 }
+            _append_audit_event(
+                {
+                    "kind": "tool_exec",
+                    "req_id": req_id,
+                    "agent_id": agent_id,
+                    "app_id": app_id,
+                    "tool_id": tool_id,
+                    "status": "deferred",
+                    "decision": decision,
+                    "reason": reason,
+                    "ticket_id": ticket_id,
+                }
+            )
             return resp
     else:
         arbitration_ms = 0.0
@@ -856,6 +947,19 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
                 "tool_exec": round((time.perf_counter() - exec_start) * 1000.0, 3),
                 "total": round((time.perf_counter() - total_start) * 1000.0, 3),
             }
+        _append_audit_event(
+            {
+                "kind": "tool_exec",
+                "req_id": req_id,
+                "agent_id": agent_id,
+                "app_id": app_id,
+                "tool_id": tool_id,
+                "status": status,
+                "decision": decision,
+                "reason": reason,
+                "tool_status": tool_resp.get("status", ""),
+            }
+        )
         return resp
     finally:
         exec_ms = int((time.perf_counter() - exec_start) * 1000)

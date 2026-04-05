@@ -1,0 +1,10 @@
+system,payload_label,payload_bytes,requests,errors,latency_avg_ms,latency_p50_ms,latency_p95_ms,latency_p99_ms
+userspace,small,100,1000,0,2.162,1.633,4.455,7.833
+userspace,medium,10240,1000,0,2.372,1.875,4.969,7.053
+userspace,large,1048576,1000,0,16.601,15.313,22.498,52.826
+seccomp,small,100,1000,0,2.772,2.209,5.537,7.637
+seccomp,medium,10240,1000,0,2.99,2.397,5.595,8.918
+seccomp,large,1048576,1000,0,21.448,19.983,27.405,58.481
+kernel,small,100,1000,0,2.489,1.921,4.905,8.084
+kernel,medium,10240,1000,0,2.675,2.128,5.133,7.714
+kernel,large,1048576,1000,0,16.726,15.51,22.635,49.948

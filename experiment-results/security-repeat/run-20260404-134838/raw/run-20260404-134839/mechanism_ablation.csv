@@ -1,6 +1,0 @@
-mechanism,baseline_mode,ablated_mode,baseline_attack_success_rate,ablated_attack_success_rate,delta
-agent_binding,mcpd,userspace_tamper_session,0.0,0.666667,0.666667
-approval_token,mcpd,userspace_tamper_approval,0.0,1.0,1.0
-semantic_hash,mcpd,userspace_tamper_metadata,0.0,1.0,1.0
-toctou_binding,mcpd,userspace_tamper_approval,0.0,0.5,0.5
-kernel_state,kernel,userspace,0.0,1.0,1.0

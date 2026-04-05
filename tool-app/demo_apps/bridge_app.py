@@ -16,11 +16,13 @@ if str(TOOL_APP_DIR) not in sys.path:
 
 from desktop_catalog import find_desktop_app, has_gui_session, iter_desktop_apps
 from demo_rpc import parse_args, serve
+from sandbox import deny_subprocess_if_sandboxed
 
 MAX_RESULTS = 100
 
 
 def _spawn_cmd(args: List[str]) -> subprocess.Popen[str]:
+    deny_subprocess_if_sandboxed(args)
     return subprocess.Popen(  # noqa: S603
         args,
         text=True,
@@ -32,6 +34,7 @@ def _spawn_cmd(args: List[str]) -> subprocess.Popen[str]:
 
 
 def _run_cmd(args: List[str]) -> subprocess.CompletedProcess[str]:
+    deny_subprocess_if_sandboxed(args)
     return subprocess.run(args, text=True, capture_output=True, check=False)  # noqa: S603
 
 

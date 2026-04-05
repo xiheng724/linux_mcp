@@ -122,6 +122,9 @@ static DEFINE_HASHTABLE(kernel_mcp_approval_tickets, KERNEL_MCP_APPROVAL_HASH_BI
 static DEFINE_MUTEX(kernel_mcp_approval_lock);
 static u64 kernel_mcp_next_ticket_id;
 static struct timer_list kernel_mcp_ticket_cleanup_timer;
+static unsigned long long kernel_mcp_agent_max_calls;
+module_param_named(agent_max_calls, kernel_mcp_agent_max_calls, ullong, 0644);
+MODULE_PARM_DESC(agent_max_calls, "maximum allowed calls per agent before denial; 0 disables the budget");
 
 static struct kobject *kernel_mcp_sysfs_root;
 static struct kobject *kernel_mcp_sysfs_tools;
@@ -952,6 +955,12 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	    agent->binding_epoch != binding_epoch) {
 		decision = KERNEL_MCP_DECISION_DENY;
 		reason = "binding_mismatch";
+		goto out_accounting;
+	}
+	if (kernel_mcp_agent_max_calls > 0 &&
+	    agent->allow_count >= kernel_mcp_agent_max_calls) {
+		decision = KERNEL_MCP_DECISION_DENY;
+		reason = "budget_calls_exhausted";
 		goto out_accounting;
 	}
 

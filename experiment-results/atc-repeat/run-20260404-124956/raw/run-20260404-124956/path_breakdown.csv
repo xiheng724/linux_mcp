@@ -1,7 +1,0 @@
-mode,path,repeats,success_rate,throughput_rps,latency_avg_ms,latency_p50_ms,latency_p95_ms,latency_p99_ms,arbitration_avg_ms,arbitration_p95_ms,total_avg_ms,total_p95_ms,sample_error
-mcpd,allow,40,1.0,101.156,9.865,8.183,17.392,32.581,0.192,0.359,8.679,15.835,
-mcpd,deny,40,1.0,216.458,4.603,2.771,14.168,21.384,0.213,1.024,2.211,6.033,
-mcpd,defer,40,1.0,291.047,3.36,2.515,7.418,10.685,0.221,0.696,1.722,5.055,
-userspace_semantic_plane,allow,40,1.0,118.378,8.436,7.061,21.128,27.011,0.01,0.02,6.988,20.321,
-userspace_semantic_plane,deny,40,1.0,486.499,2.042,1.622,4.181,5.529,0.021,0.019,1.126,3.136,
-userspace_semantic_plane,defer,40,1.0,324.697,3.056,2.093,6.667,16.367,0.02,0.038,1.169,3.895,

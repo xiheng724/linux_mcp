@@ -10,6 +10,7 @@ from typing import Any, Dict, Iterable, List
 from urllib.parse import urlparse
 
 from desktop_catalog import has_gui_session
+from sandbox import deny_subprocess_if_sandboxed
 
 ALLOWED_URI_SCHEMES = {"file", "mailto", "http", "https", "webcal", "webcals"}
 
@@ -110,6 +111,7 @@ def find_executable(name: str) -> str:
 
 
 def spawn_detached(args: List[str]) -> subprocess.Popen[str]:
+    deny_subprocess_if_sandboxed(args)
     return subprocess.Popen(  # noqa: S603
         args,
         text=True,
@@ -121,6 +123,7 @@ def spawn_detached(args: List[str]) -> subprocess.Popen[str]:
 
 
 def run_cmd(args: List[str]) -> subprocess.CompletedProcess[str]:
+    deny_subprocess_if_sandboxed(args)
     return subprocess.run(args, text=True, capture_output=True, check=False)  # noqa: S603
 
 

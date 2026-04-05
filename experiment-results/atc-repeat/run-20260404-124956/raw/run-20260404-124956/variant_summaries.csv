@@ -1,7 +1,0 @@
-scenario,mode,concurrency,requests,ok,error,success_rate,throughput_rps,latency_avg_ms,latency_p50_ms,latency_p95_ms,latency_p99_ms
-forwarder_only_c1,forwarder_only,1,300,300,0,1.0,352.254,2.825,2.06,6.297,10.464
-forwarder_only_c4,forwarder_only,4,300,300,0,1.0,607.853,6.393,6.0,10.787,12.781
-forwarder_only_c8,forwarder_only,8,300,300,0,1.0,614.8,12.66,10.733,32.591,41.764
-userspace_semantic_plane_c1,userspace_semantic_plane,1,300,300,0,1.0,354.0,2.81,2.018,5.964,10.48
-userspace_semantic_plane_c4,userspace_semantic_plane,4,300,300,0,1.0,477.979,8.112,7.138,16.633,36.706
-userspace_semantic_plane_c8,userspace_semantic_plane,8,300,300,0,1.0,459.485,17.01,15.003,35.175,61.976
