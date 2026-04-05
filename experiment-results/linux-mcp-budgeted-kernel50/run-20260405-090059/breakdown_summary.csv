@@ -1,0 +1,10 @@
+system,payload_label,payload_bytes,payload_display,runs,session_lookup_ms,arbitration_ms,tool_exec_ms,total_ms,tool_exec_share_pct
+kernel,small,100,100 B,2,0.014,0.064,0.08,0.998,4.268
+kernel,medium,10240,"10 KB (10,240 B)",2,0.015,0.062,0.0,0.932,0.0
+kernel,large,1048576,"1 MB (1,048,576 B)",2,0.018,0.106,0.0,1.119,0.0
+seccomp,small,100,100 B,2,0.011,0.013,0.766,1.654,44.515
+seccomp,medium,10240,"10 KB (10,240 B)",2,0.018,0.013,0.895,1.876,46.154
+seccomp,large,1048576,"1 MB (1,048,576 B)",2,0.019,0.018,7.346,11.809,62.062
+userspace,small,100,100 B,2,0.013,0.009,0.785,1.649,44.752
+userspace,medium,10240,"10 KB (10,240 B)",2,0.014,0.018,0.786,1.677,46.303
+userspace,large,1048576,"1 MB (1,048,576 B)",2,0.019,0.012,7.288,8.287,88.002

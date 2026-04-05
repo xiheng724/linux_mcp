@@ -1,0 +1,781 @@
+system,attack_type,scenario_group,attack_case,mode,attack_profile,status,decision,error,latency_ms,unauthorized_success,expected_reject,invariant_violated
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.695,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.969,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.137,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,2.044,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.641,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.023,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,3.191,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.652,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.355,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.606,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.954,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,2.947,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.622,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.97,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.42,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,3.591,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,2.005,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.405,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.975,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.824,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.35,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,2.93,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,3.715,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.1,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,2.15,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.835,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,3.434,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,2.07,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,3.036,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.607,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.808,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.967,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.131,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,2.334,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,2.194,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,0.987,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,3.039,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.809,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.375,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.494,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,2.101,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.123,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.742,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.913,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,4.572,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.678,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,1.647,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.286,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.632,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,2.001,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.304,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.792,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,4.166,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.056,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,3.017,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,2.689,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.974,0,1,0
+userspace,spoof,A,fake_session_id,userspace,tamper_session,ok,ALLOW,,1.579,1,1,1
+userspace,spoof,A,expired_session,userspace,tamper_session,ok,ALLOW,,2.01,1,1,1
+userspace,spoof,A,session_token_theft,userspace,tamper_session,error,,agent_id is bound to a different peer identity,1.041,0,1,0
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,1.806,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.424,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),2.637,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,7.376,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.108,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,3.849,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.022,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.21,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.625,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,6.638,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,2.266,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,3.246,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),4.215,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,3.969,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,3.644,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,2.884,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,5.927,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),2.198,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,4.982,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.751,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,1.634,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.7,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.177,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.454,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.821,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,3.558,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,4.151,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),3.83,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.166,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.323,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,1.809,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.394,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.518,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,3.61,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.772,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,2.021,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.942,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.254,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.407,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,3.058,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,2.134,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.271,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.698,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,3.512,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.892,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,2.024,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.175,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.244,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.442,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.765,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,3.578,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.968,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),2.608,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.164,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.918,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,2.163,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.639,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),6.842,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.827,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.574,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,1.808,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,5.844,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),2.24,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,3.767,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.216,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,1.597,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.485,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.975,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.47,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.461,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,2.777,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.616,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),3.95,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,3.158,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.089,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,1.95,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.861,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.505,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,4.515,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,3.148,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,1.744,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,4.13,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),2.504,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.33,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.556,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,2.435,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,5.231,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.653,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,5.165,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.879,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,2.451,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,3.088,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.366,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.156,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,2.637,1,1,1
+userspace,replay,B,forged_approval_ticket,userspace,tamper_approval,ok,ALLOW,,1.38,1,1,1
+userspace,replay,B,cross_agent_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,1.336,1,1,1
+userspace,replay,B,cross_tool_ticket_reuse,userspace,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),3.82,0,1,0
+userspace,replay,B,expired_ticket_replay,userspace,tamper_approval,ok,ALLOW,,2.134,1,1,1
+userspace,replay,B,denied_ticket_reuse,userspace,tamper_approval,ok,ALLOW,,3.154,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.914,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.362,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.202,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.343,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,4.549,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.239,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,2.421,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.98,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.761,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,2.608,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.521,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,2.113,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.76,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.249,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.495,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.136,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.224,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.578,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,2.108,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.634,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.117,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,27.809,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,2.368,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,2.649,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,8.387,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.84,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.367,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,2.424,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,2.134,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,3.094,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,2.441,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.407,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.79,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.716,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.932,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,2.391,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.736,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,3.276,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.534,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.426,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.91,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,3.072,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.506,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,3.415,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.683,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.057,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.445,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.596,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.322,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.185,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.451,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.313,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.165,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.356,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.35,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,1.638,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.587,1,1,1
+userspace,substitute,C,hash_mismatch,userspace,tamper_metadata,ok,ALLOW,,1.263,1,1,1
+userspace,substitute,C,wrong_app_binding,userspace,tamper_metadata,ok,ALLOW,,3.159,1,1,1
+userspace,substitute,C,stale_catalog_replay,userspace,tamper_metadata,ok,ALLOW,,1.605,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,2.241,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.416,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,1.907,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,3.54,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,2.562,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,6.768,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,1.972,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.474,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,4.184,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.443,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,2.5,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,2.31,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,1.432,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.93,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,1.743,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.909,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,2.073,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,2.198,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,1.565,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.979,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,4.83,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.363,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,1.645,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.72,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,2.645,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.296,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,1.46,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.515,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,2.255,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.605,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,2.346,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.778,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,2.213,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.541,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,6.847,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.501,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,1.925,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,3.889,1,1,1
+userspace,escalation,D,invalid_session_hash_bypass,userspace,compromised_userspace,ok,ALLOW,,1.325,1,1,1
+userspace,escalation,D,approval_required_bypass,userspace,compromised_userspace,ok,ALLOW,,1.912,1,1,1
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,7.313,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,3.135,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,2.216,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.247,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,2.043,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.4,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,6.753,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,2.098,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.578,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.459,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,4.287,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.349,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.485,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,3.158,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.252,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.243,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,3.855,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.575,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.314,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,4.04,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.455,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,3.207,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,4.296,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.665,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.126,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,2.833,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.128,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,4.262,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,4.321,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.186,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.223,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,7.407,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.367,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,1.831,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,3.521,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.291,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.149,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,3.143,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,2.292,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.237,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,4.75,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.952,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.636,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,3.754,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.411,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.839,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,2.83,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.088,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.397,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,2.059,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.248,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.524,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,2.173,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.597,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,2.254,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,2.094,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.119,0,1,0
+seccomp,spoof,A,fake_session_id,seccomp,tamper_session,ok,ALLOW,,3.338,1,1,1
+seccomp,spoof,A,expired_session,seccomp,tamper_session,ok,ALLOW,,4.865,1,1,1
+seccomp,spoof,A,session_token_theft,seccomp,tamper_session,error,,agent_id is bound to a different peer identity,1.102,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.555,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.483,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.918,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.408,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.761,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.376,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.98,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),2.449,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.866,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.891,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.397,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.274,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.197,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.107,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,6.49,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.542,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.837,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.754,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.094,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.585,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.799,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.884,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.304,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.633,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.73,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,4.612,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.763,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.884,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,3.778,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,3.024,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.608,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.64,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.852,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,8.478,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.559,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.39,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.28,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),3.767,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.609,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.299,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.088,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,5.192,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),4.401,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.95,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.874,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,34.465,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,13.643,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),2.9,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.332,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.055,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.804,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.309,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.302,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.23,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.744,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.335,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.618,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.377,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.435,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.333,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.74,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.525,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.156,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.383,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.544,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.099,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.505,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.372,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.838,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.681,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.724,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.942,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),3.972,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.004,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.767,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.481,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.132,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),2.402,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.787,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.076,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.535,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.557,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.745,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,5.491,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.402,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.509,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.404,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.181,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.694,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.659,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.495,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.408,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.392,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.89,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.794,0,1,0
+seccomp,replay,B,forged_approval_ticket,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.911,0,1,0
+seccomp,replay,B,cross_agent_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,3.076,0,1,0
+seccomp,replay,B,cross_tool_ticket_reuse,seccomp,tamper_approval,error,ALLOW,no GUI session available (DISPLAY/WAYLAND_DISPLAY unset),1.56,0,1,0
+seccomp,replay,B,expired_ticket_replay,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.898,0,1,0
+seccomp,replay,B,denied_ticket_reuse,seccomp,tamper_approval,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.369,0,1,0
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,2.289,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,0.982,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.404,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.632,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.151,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,2.459,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,4.772,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.012,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,2.107,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.311,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,0.998,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.5,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.685,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.565,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.695,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,2.165,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,3.578,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.589,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,4.824,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,0.978,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,2.419,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.729,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,2.235,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.96,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.644,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,0.885,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.818,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,2.154,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.27,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.469,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.528,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,2.061,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.679,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.788,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,0.959,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,2.359,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.704,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.074,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.761,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,2.419,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,0.99,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.955,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.581,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.249,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.625,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.528,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.342,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,2.033,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.412,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.212,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.543,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,2.216,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,0.913,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,1.54,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,6.193,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.714,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,2.691,1,1,1
+seccomp,substitute,C,hash_mismatch,seccomp,tamper_metadata,ok,ALLOW,,1.686,1,1,1
+seccomp,substitute,C,wrong_app_binding,seccomp,tamper_metadata,error,,strict check failed: app/tool binding mismatch,1.856,0,1,0
+seccomp,substitute,C,stale_catalog_replay,seccomp,tamper_metadata,ok,ALLOW,,2.098,1,1,1
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.606,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.386,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.473,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.542,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.775,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.362,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.339,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.484,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.262,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.835,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,5.677,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.438,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.817,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.997,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,2.37,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.678,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,3.188,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.871,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,4.139,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.485,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,2.962,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.431,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.448,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.535,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.317,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.512,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.316,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,3.283,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.488,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.855,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.452,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.519,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.476,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.429,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,2.039,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.226,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.706,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.358,0,1,0
+seccomp,escalation,D,invalid_session_hash_bypass,seccomp,compromised_userspace,ok,ALLOW,,1.728,1,1,1
+seccomp,escalation,D,approval_required_bypass,seccomp,compromised_userspace,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.869,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.637,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.71,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.369,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.512,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.657,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.479,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.812,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.457,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.406,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.364,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.532,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.35,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.321,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.454,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.523,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,1.249,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.554,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.477,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.335,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.478,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.566,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.562,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.349,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.79,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.742,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.4,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.404,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.382,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.633,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.411,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.429,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,1.237,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.406,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.347,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.599,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.335,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.471,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.348,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.688,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.376,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.47,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.35,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.508,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.424,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.472,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.31,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.662,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,1.483,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.483,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.39,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.46,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.353,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.49,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.653,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.421,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.354,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,2.887,0,1,0
+kernel,spoof,A,fake_session_id,kernel,,error,,session not found or expired,0.329,0,1,0
+kernel,spoof,A,expired_session,kernel,,error,,session not found or expired,0.513,0,1,0
+kernel,spoof,A,session_token_theft,kernel,,error,,session is bound to a different peer identity,0.539,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.036,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.036,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.281,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.266,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.102,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.479,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.046,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.07,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.3,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.359,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.695,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.19,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.628,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.807,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.992,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.269,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,5.426,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.402,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.876,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.91,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.117,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.11,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.346,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.57,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.298,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.258,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.906,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.021,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.242,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.514,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.121,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.05,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.992,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.895,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.152,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.963,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.975,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.951,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.288,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.947,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.277,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.756,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.006,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.841,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.159,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.03,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.989,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.935,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,4.029,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.083,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.902,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.024,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.285,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.905,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.31,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.013,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.981,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.176,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.837,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.979,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.176,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.05,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.339,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.551,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.993,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,3.156,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.061,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.406,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.065,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.053,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.013,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.044,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.098,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.483,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.342,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.272,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.911,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.157,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.579,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.904,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.078,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.822,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.081,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,35.868,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.92,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.312,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.131,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,2.022,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,2.124,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.333,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.167,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.049,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.936,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.233,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.599,0,1,0
+kernel,replay,B,forged_approval_ticket,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.326,0,1,0
+kernel,replay,B,cross_agent_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.094,0,1,0
+kernel,replay,B,cross_tool_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.938,0,1,0
+kernel,replay,B,expired_ticket_replay,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.33,0,1,0
+kernel,replay,B,denied_ticket_reuse,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.111,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.273,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),1.435,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.127,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.952,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.811,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.155,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.915,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),1.138,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,3.927,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.28,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),1.603,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.898,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.965,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),2.586,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.507,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.172,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.922,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.853,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.86,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.903,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.283,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.965,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.902,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.931,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.921,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.742,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.758,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.027,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.934,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.19,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.579,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.87,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.255,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.537,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),1.005,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.388,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.954,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.796,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.909,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.919,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.776,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.197,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.967,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.862,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.723,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.115,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.818,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.927,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.881,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.949,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.048,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.273,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.923,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.616,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.957,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),1.125,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.006,0,1,0
+kernel,substitute,C,hash_mismatch,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.354,0,1,0
+kernel,substitute,C,wrong_app_binding,kernel,,error,,tool_id=12 does not belong to app_id=notes_app (expected desktop_app),0.969,0,1,0
+kernel,substitute,C,stale_catalog_replay,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.882,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.304,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.308,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.401,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.515,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.25,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.213,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.156,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.156,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.162,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.15,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.143,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.173,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.175,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.298,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.207,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.659,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.095,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.085,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.08,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.076,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.077,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.073,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.074,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.52,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.586,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.34,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.197,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.14,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.135,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.151,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.113,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.118,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.109,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.112,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.109,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.108,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.176,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.11,0,1,0
+kernel,escalation,D,invalid_session_hash_bypass,kernel,,error,,session not found or expired,0.111,0,1,0
+kernel,escalation,D,approval_required_bypass,kernel,,error,,session not found or expired,0.1,0,1,0

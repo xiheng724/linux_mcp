@@ -1,0 +1,3 @@
+mode,scenario,ticket_id,approval_state_preserved,session_state_preserved,approval_error,replay_error,approval_latency_ms,replay_latency_ms,pre_crash_agent_visible,post_crash_agent_visible
+kernel,daemon_crash,71,1,0,,session not found or expired,0.81,1.694,1,1
+userspace,daemon_crash,1,0,0,pending approval not found: 1,session not found or expired,0.442,0.545,0,0

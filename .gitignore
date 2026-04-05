@@ -41,3 +41,11 @@ kernel-mcp/out/
 tool-app/demo_data/notes/*/*.json
 !tool-app/demo_data/notes/validation/validation-note-20260401-093811.json
 
+# Local experiment scratch outputs
+tmp/linux-mcp-bench/
+tmp/release-notes.txt
+
+# Raw experiment samples are regenerated locally; keep summaries and plots only
+experiment-results/**/latency_samples.csv
+experiment-results/**/scalability_samples.csv
+experiment-results/**/throughput_buckets.csv

@@ -10,6 +10,9 @@ from typing import Any, Dict, List
 
 
 def render(summary: Dict[str, Any]) -> str:
+    precomputed = summary.get("report_markdown")
+    if isinstance(precomputed, str) and precomputed.strip():
+        return precomputed
     latency_rows = summary.get("latency_summary", [])
     scalability_rows = summary.get("scalability_summary", [])
     attack_rows = summary.get("attack_matrix", [])
