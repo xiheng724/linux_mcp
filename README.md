@@ -23,8 +23,8 @@ The repository is not a phase-based sketch. It is a runnable end-to-end system w
 | Semantic source of truth | `tool-app/manifests/*.json` |
 | Runtime gateway | `mcpd` |
 | Kernel interface | Generic Netlink + sysfs |
-| Main experiments | linux_mcp evaluation and attack-driven security evaluation |
-| Retained results | 4 curated snapshots under [`experiment-results/`](/home/lxh/Code/linux-mcp/experiment-results) |
+| Main experiments | linux_mcp comparative evaluation (userspace / seccomp / kernel), including latency, throughput, attack matrix, and daemon-failure checks |
+| Retained results | 5 curated linux_mcp snapshots under [experiment-results/](experiment-results/), including the latest paper-ready n=5 run |
 
 ## Highlights
 
@@ -32,8 +32,13 @@ The repository is not a phase-based sketch. It is a runnable end-to-end system w
 - Manifest-driven catalog export through `list_apps` and `list_tools`
 - Session binding against real UDS peer credentials
 - Approval-gated mediation for risky tools
-- Repeated linux_mcp and repeated security campaigns with curated retained artifacts
+- A paper-ready `linux_mcp` snapshot with controlled-noise latency, throughput, attack, and daemon-failure results
 - Sysfs-backed observability for debugging and post-crash inspection
+
+## seccomp in this repo
+
+`seccomp` (secure computing mode) is Linux syscall filtering.
+In this repository, `seccomp` refers to a hardened userspace baseline (`userspace + sandbox + audit logging + stricter checks`), used as a comparison target against the kernel-assisted control plane.
 
 ## Overview
 
@@ -339,53 +344,51 @@ flowchart LR
 
 ## Experiments
 
-Experiment-specific details live in [scripts/experiments/README.md](/home/lxh/Code/linux-mcp/scripts/experiments/README.md). At the repository level, there are four maintained experiment entrypoints:
+Experiment-specific details live in [scripts/experiments/README.md](scripts/experiments/README.md).
 
-```mermaid
-flowchart TB
-    A[Single linux_mcp run] --> A1[latency + scale + attack matrix]
-    B[Single security run] --> B1[attack-driven evaluation]
-    C[Repeated linux_mcp] --> C1[aggregate repeated samples]
-    D[Repeated security] --> D1[aggregate attack and robustness results]
-```
+At repository level, the maintained and curated outputs in-tree are linux_mcp comparative runs (userspace / seccomp / kernel).
 
 ### Experiment entrypoints
 
 | Command | Scope |
 |---|---|
 | `bash scripts/run_linux_mcp_evaluation.sh` | Single linux_mcp evaluation |
-| `bash scripts/run_security_evaluation.sh` | Single attack-driven security evaluation |
 | `bash scripts/run_repeated_linux_mcp.sh` | Repeated linux_mcp runs |
-| `bash scripts/run_repeated_security.sh` | Repeated security aggregation |
+| `bash scripts/run_security_evaluation.sh` | Attack-driven security evaluation (optional, not part of current curated snapshots) |
+| `bash scripts/run_repeated_security.sh` | Repeated security aggregation (optional, not part of current curated snapshots) |
 
 ### Retained result snapshots
 
-Only four curated result sets are kept in-tree:
+Five curated linux_mcp result sets are kept in-tree:
 
-- [security-final/run-20260404-122908](/home/lxh/Code/linux-mcp/experiment-results/security-final/run-20260404-122908)
-- [linux-mcp-smoke/run-20260405-065703](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-smoke/run-20260405-065703)
-- [linux-mcp-smoke2/run-20260405-065804](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-smoke2/run-20260405-065804)
-- [security-repeat/run-20260404-134838](/home/lxh/Code/linux-mcp/experiment-results/security-repeat/run-20260404-134838)
+- [linux-mcp-budget-ab/run-20260405-075633](experiment-results/linux-mcp-budget-ab/run-20260405-075633)
+- [linux-mcp-hardened-final/run-20260405-074727](experiment-results/linux-mcp-hardened-final/run-20260405-074727)
+- [linux-mcp-budgeted-kernel50/run-20260405-090059](experiment-results/linux-mcp-budgeted-kernel50/run-20260405-090059)
+- [linux-mcp-paper-final/run-20260405-095038](experiment-results/linux-mcp-paper-final/run-20260405-095038)
+- [linux-mcp-paper-final-n5/run-20260405-173020](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020)
 
-### Result summary
+### Latest paper-ready run summary (n=5)
 
-| Evaluation | Main takeaway | Primary artifacts |
-|---|---|---|
-| Single security | Kernel-backed control-plane checks block the tested spoofing, replay, tampering, and TOCTOU cases in the maintained attack suite. | [security_report.md](/home/lxh/Code/linux-mcp/experiment-results/security-final/run-20260404-122908/security_report.md), [plots](/home/lxh/Code/linux-mcp/experiment-results/security-final/run-20260404-122908/plots) |
-| Repeated security | Repeated runs stabilize the same conclusion and quantify semantic recall limits, daemon-crash behavior, and mixed-traffic outcomes. | [repeated_security_report.md](/home/lxh/Code/linux-mcp/experiment-results/security-repeat/run-20260404-134838/aggregate/repeated_security_report.md), [figure_captions.md](/home/lxh/Code/linux-mcp/experiment-results/security-repeat/run-20260404-134838/aggregate/figure_captions.md) |
-| Single linux_mcp | The maintained evaluation now centers on A/B/C comparison across latency, scale, and attack outcomes rather than the older composite framing. | [linux_mcp_report.md](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-smoke2/run-20260405-065804/linux_mcp_report.md), [plots](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-smoke2/run-20260405-065804/plots) |
+Primary run:
 
-### Security claims supported by the current results
+- [linux-mcp-paper-final-n5/run-20260405-173020](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020)
+- report: [linux_mcp_report.md](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/linux_mcp_report.md)
+- concise interpretation: [experiment_report.md](experiment_report.md)
+- figures: [plots/](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/plots)
 
-- kernel-backed control-plane enforcement is stronger than the equivalent userspace baselines used here
-- the maintained kernel path blocks the tested spoofing, replay, tampering, and TOCTOU cases
-- kernel-visible approval state survives daemon failure better than the compared userspace baseline
+Key observations from that run:
 
-### Claims intentionally not made
+- Small and medium payload (`100 B`, `10 KB`) end-to-end latency differences are small.
+- At `1 MB`, userspace and kernel stay close (`7.226 ms` vs `6.908 ms`), while seccomp is slower (`9.330 ms`).
+- Throughput stays in the same order of magnitude across modes (about `1000-1220 RPS` under this demo workload).
+- Attack matrix shows kernel path blocks all maintained spoof/replay/substitute/escalation cases in this run.
+- Kernel-held approval state remains visible across daemon failure in this setup.
 
-- the system is fully secure
-- all attacks are prevented
-- tool execution itself is kernel-protected
+### Where to look first
+
+- Latency overview figure: [figure_latency_by_payload.png](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/plots/figure_latency_by_payload.png)
+- Throughput figure: [figure_throughput_by_agents.png](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/plots/figure_throughput_by_agents.png)
+- Attack heatmap: [figure_attack_heatmap.png](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/plots/figure_attack_heatmap.png)
 
 ## Limitations
 

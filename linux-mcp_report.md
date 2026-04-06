@@ -515,6 +515,15 @@ framing helper 和 `mcpd` 侧复用同一套 [rpc_framing.py](/home/lxh/Code/lin
 
 这很重要，因为实验比较的是“同一份系统代码中的机制位置和机制开关”，而不是两个完全不同的实现。
 
+当前文档引用的正式 `linux_mcp` 实验结果以 [linux_mcp_report.md](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/linux_mcp_report.md) 为准。最新这组受控环境结果表明：
+
+- `100 B` 和 `10 KB` payload 下，`userspace`、`seccomp`、`kernel` 的端到端延迟差异不具统计显著性
+- `kernel` 的 arbitration 开销约为 `0.026 ms`（`1 MB` 时为 `0.033 ms`），绝对值很小
+- `1 MB` payload 下 `kernel` 与 `userspace` 延迟接近，但 `seccomp` 显著更慢
+- `kernel` 在当前 spoof / replay / substitute / escalation 攻击集上保持 `0%` bypass，并且 daemon crash 后仍保留 approval state
+
+这也解释了为什么实验代码要保留这些“userspace baseline / seccomp / kernel”模式切换：它们不是替代实现，而是用于在同一代码基线上定位控制面机制到底贡献了什么。
+
 ## 15. 这个项目最值得掌握的 5 个实现点
 
 如果你想真正掌握这个项目，最核心的是吃透下面 5 件事：
@@ -549,6 +558,6 @@ sysfs 是当前系统 observability 的重要组成部分，也是 daemon failur
 4. 然后重点读 [server.py](/home/lxh/Code/linux-mcp/mcpd/server.py)
 5. 再读 [kernel_mcp_main.c](/home/lxh/Code/linux-mcp/kernel-mcp/src/kernel_mcp_main.c)
 6. 再读 [app_logic.py](/home/lxh/Code/linux-mcp/llm-app/app_logic.py)
-7. 最后读 [scripts/experiments/README.md](/home/lxh/Code/linux-mcp/scripts/experiments/README.md) 和实验报告
+7. 最后读 [scripts/experiments/README.md](/home/lxh/Code/linux-mcp/scripts/experiments/README.md) 和最新正式实验报告 [linux_mcp_report.md](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/linux_mcp_report.md)
 
 按这个顺序，你会先建立“语义 -> session -> 仲裁 -> 执行 -> 实验”的完整脑图。
