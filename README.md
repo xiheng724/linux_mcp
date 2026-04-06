@@ -23,8 +23,8 @@ The repository is not a phase-based sketch. It is a runnable end-to-end system w
 | Semantic source of truth | `tool-app/manifests/*.json` |
 | Runtime gateway | `mcpd` |
 | Kernel interface | Generic Netlink + sysfs |
-| Main experiments | linux_mcp comparative evaluation (userspace / seccomp / kernel), including latency, throughput, attack matrix, and daemon-failure checks |
-| Retained results | 5 curated linux_mcp snapshots under [experiment-results/](experiment-results/), including the latest paper-ready n=5 run |
+| Main experiments | linux_mcp comparative evaluation plus two supplementary experiments: semantic-hash runtime substitution and Generic Netlink RTT microbenchmark |
+| Retained results | 3 actively referenced snapshots under [experiment-results/](experiment-results/): 1 main run and 2 supplementary experiments |
 
 ## Highlights
 
@@ -38,7 +38,7 @@ The repository is not a phase-based sketch. It is a runnable end-to-end system w
 ## seccomp in this repo
 
 `seccomp` (secure computing mode) is Linux syscall filtering.
-In this repository, `seccomp` refers to a hardened userspace baseline (`userspace + sandbox + audit logging + stricter checks`), used as a comparison target against the kernel-assisted control plane.
+In this repository, `seccomp` means a hardened userspace baseline (`userspace + sandbox + audit logging + stricter checks`) used as the comparison target.
 
 ## Overview
 
@@ -155,82 +155,31 @@ linux-mcp/
 ### `kernel-mcp`
 
 The kernel module is the control-plane enforcement point, not the execution engine.
-
-It currently provides:
-
-- `KERNEL_MCP` Generic Netlink family
-- tool registry and agent registry
-- approval ticket lifecycle
-- binding checks using `binding_hash` and `binding_epoch`
-- sysfs state under `/sys/kernel/mcp/tools/` and `/sys/kernel/mcp/agents/`
-
-Current demo arbitration rules are intentionally simple:
-
-- unregistered agents are denied
-- manifest hash mismatches are denied
-- risky tools are deferred for approval
-- other tools are allowed
+It provides the `KERNEL_MCP` Generic Netlink family, tool/agent state, approval tickets, binding checks, and sysfs exposure under `/sys/kernel/mcp/...`.
+The demo policy is intentionally simple: deny unknown agents and hash mismatches, defer risky tools, allow the rest.
 
 ### `mcpd`
 
 `mcpd` is the only component that understands both tool semantics and runtime endpoints.
-
-It is responsible for:
-
-- loading `tool-app/manifests/*.json`
-- computing semantic hashes
-- registering tools in the kernel at startup and on manifest refresh
-- exposing `/tmp/mcpd.sock`
-- binding sessions to UDS peer credentials
-- validating payloads before execution
-- forwarding tool RPCs to userspace services
-- reporting completion back to the kernel
+It loads manifests, computes hashes, registers tools in the kernel, exposes `/tmp/mcpd.sock`, binds sessions to UDS peers, validates payloads, forwards tool RPCs, and reports completion back to the kernel.
 
 ### `tool-app`
 
-`tool-app` contains demo backends and manifest definitions. The README intentionally does not enumerate every app and tool individually; the authoritative semantic catalog lives in `tool-app/manifests/*.json` and is surfaced at runtime through `mcpd`.
+`tool-app` contains demo backends and manifest definitions. The authoritative catalog lives in `tool-app/manifests/*.json` and is surfaced at runtime through `mcpd`.
 
 ### `llm-app`
 
-`llm-app` provides both CLI and GUI frontends.
-
-It does not talk directly to tool services. Instead, it uses:
-
-- `list_apps`
-- `list_tools`
-- `open_session`
-- `tool:exec`
-
-The current planner depends on `DEEPSEEK_API_KEY`.
+`llm-app` provides both CLI and GUI frontends. It talks only to `mcpd` through `list_apps`, `list_tools`, `open_session`, and `tool:exec`. The current planner depends on `DEEPSEEK_API_KEY`.
 
 ## Manifest Model
 
 The manifest layer is the semantic source of truth for the system.
 
-### App-level fields
-
-- `app_id`
-- `app_name`
-- `transport`
-- `endpoint`
-- `demo_entrypoint`
-
-### Tool-level fields
-
-- `tool_id`
-- `name`
-- `risk_tags`
-- `operation`
-- `timeout_ms`
-- `description`
-- `input_schema`
-- `examples`
-
 ### Current constraints
 
 - only `transport = "uds_rpc"` is supported
 - endpoints must live under `/tmp/linux-mcp-apps/`
-- manifest semantics are hashed into the exported tool identity
+- manifest semantics are hashed into exported tool identity
 
 ## Getting Started
 
@@ -276,22 +225,6 @@ source .venv/bin/activate
 python llm-app/gui_app.py
 ```
 
-## Common Commands
-
-| Command | Purpose |
-|---|---|
-| `bash scripts/run_smoke.sh` | Basic repository and schema smoke checks |
-| `make schema-verify` | Verify UAPI and Python schema synchronization |
-| `sudo bash scripts/build_kernel.sh` | Build the kernel module |
-| `sudo bash scripts/load_module.sh` | Load `kernel_mcp` |
-| `sudo bash scripts/unload_module.sh` | Unload `kernel_mcp` |
-| `bash scripts/run_tool_services.sh` | Start demo tool services |
-| `bash scripts/run_mcpd.sh` | Start `mcpd`, wait for socket readiness, reconcile kernel state |
-| `bash scripts/stop_tool_services.sh` | Stop demo tool services |
-| `bash scripts/stop_mcpd.sh` | Stop `mcpd` |
-| `sudo bash scripts/reload_10x.sh` | Repeated module reload stability check |
-| `sudo bash scripts/demo_acceptance.sh` | End-to-end acceptance run |
-
 ## Observability
 
 ### Kernel state
@@ -316,37 +249,11 @@ cat /tmp/mcpd-$(id -u).log
 ls /tmp/linux-mcp-app-*.log
 ```
 
-## Validation Model
-
-The repository does not currently use a standalone `tests/` tree. Validation is script-driven.
-
-```mermaid
-flowchart LR
-    A[Schema checks] --> B[Build and lifecycle]
-    B --> C[Userspace startup]
-    C --> D[End-to-end acceptance]
-    D --> E[linux_mcp and security experiments]
-```
-
-### Main validation entrypoints
-
-| Layer | Command |
-|---|---|
-| Schema | `python3 scripts/verify_schema_sync.py` |
-| Schema | `make schema-verify` |
-| Smoke | `bash scripts/run_smoke.sh` |
-| Lifecycle | `sudo bash scripts/reload_10x.sh` |
-| Acceptance | `sudo bash scripts/demo_acceptance.sh` |
-| Experiments | `bash scripts/run_linux_mcp_evaluation.sh` |
-| Experiments | `bash scripts/run_security_evaluation.sh` |
-| Repeated experiments | `bash scripts/run_repeated_linux_mcp.sh` |
-| Repeated experiments | `bash scripts/run_repeated_security.sh` |
-
 ## Experiments
 
 Experiment-specific details live in [scripts/experiments/README.md](scripts/experiments/README.md).
 
-At repository level, the maintained and curated outputs in-tree are linux_mcp comparative runs (userspace / seccomp / kernel).
+At repository level, the curated outputs are the main linux_mcp comparative run plus two supplementary experiments.
 
 ### Experiment entrypoints
 
@@ -359,13 +266,11 @@ At repository level, the maintained and curated outputs in-tree are linux_mcp co
 
 ### Retained result snapshots
 
-Five curated linux_mcp result sets are kept in-tree:
+Currently referenced snapshots:
 
-- [linux-mcp-budget-ab/run-20260405-075633](experiment-results/linux-mcp-budget-ab/run-20260405-075633)
-- [linux-mcp-hardened-final/run-20260405-074727](experiment-results/linux-mcp-hardened-final/run-20260405-074727)
-- [linux-mcp-budgeted-kernel50/run-20260405-090059](experiment-results/linux-mcp-budgeted-kernel50/run-20260405-090059)
-- [linux-mcp-paper-final/run-20260405-095038](experiment-results/linux-mcp-paper-final/run-20260405-095038)
 - [linux-mcp-paper-final-n5/run-20260405-173020](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020)
+- [semantic-hash-injection-a/run-20260406-111420](experiment-results/semantic-hash-injection-a/run-20260406-111420)
+- [netlink-microbench-e/run-20260406-111914](experiment-results/netlink-microbench-e/run-20260406-111914)
 
 ### Latest paper-ready run summary (n=5)
 
@@ -376,7 +281,7 @@ Primary run:
 - concise interpretation: [experiment_report.md](experiment_report.md)
 - figures: [plots/](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/plots)
 
-Key observations from that run:
+Key observations:
 
 - Small and medium payload (`100 B`, `10 KB`) end-to-end latency differences are small.
 - At `1 MB`, userspace and kernel stay close (`7.226 ms` vs `6.908 ms`), while seccomp is slower (`9.330 ms`).
@@ -384,11 +289,58 @@ Key observations from that run:
 - Attack matrix shows kernel path blocks all maintained spoof/replay/substitute/escalation cases in this run.
 - Kernel-held approval state remains visible across daemon failure in this setup.
 
+### Supplementary experiment snapshots
+
+- Semantic-hash runtime substitution: [semantic-hash-injection-a/run-20260406-111420](experiment-results/semantic-hash-injection-a/run-20260406-111420)
+  - `30/30` live-planned chains selected the legitimate `notes_app`
+  - `30/30` runtime `tool_hash` substitutions were denied by kernel with `reason=hash_mismatch`
+  - figures: [plots/](experiment-results/semantic-hash-injection-a/run-20260406-111420/plots)
+- Generic Netlink RTT microbenchmark: [netlink-microbench-e/run-20260406-111914](experiment-results/netlink-microbench-e/run-20260406-111914)
+  - bare RTT: `0.008196 ms`
+  - full RTT: `0.009315 ms`
+  - lookup overhead mean: `0.001119 ms`
+  - figures: [plots/](experiment-results/netlink-microbench-e/run-20260406-111914/plots)
+
+### How to reproduce the retained results
+
+Main comparative run (`linux-mcp-paper-final-n5` style):
+
+```bash
+sudo bash scripts/build_kernel.sh
+sudo bash scripts/unload_module.sh || true
+sudo bash scripts/load_module.sh
+bash scripts/run_linux_mcp_evaluation.sh --output-dir experiment-results/linux-mcp-paper-final-n5
+```
+
+Purpose: reproduce the main userspace / seccomp / kernel comparison.
+
+Semantic-hash runtime substitution:
+
+```bash
+export DEEPSEEK_API_KEY="your_key"
+bash scripts/run_semantic_hash_prompt_injection.sh --output-dir experiment-results/semantic-hash-injection-a
+```
+
+Purpose: reproduce the supplementary security result for runtime `tool_hash` substitution.
+
+Generic Netlink RTT microbenchmark:
+
+```bash
+sudo bash scripts/build_kernel.sh
+sudo bash scripts/unload_module.sh || true
+sudo bash scripts/load_module.sh
+bash scripts/run_netlink_microbenchmark.sh --output-dir experiment-results/netlink-microbench-e
+```
+
+Purpose: reproduce the supplementary microbenchmark separating bare Generic Netlink RTT from the full `TOOL_REQUEST` path.
+
 ### Where to look first
 
 - Latency overview figure: [figure_latency_by_payload.png](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/plots/figure_latency_by_payload.png)
 - Throughput figure: [figure_throughput_by_agents.png](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/plots/figure_throughput_by_agents.png)
 - Attack heatmap: [figure_attack_heatmap.png](experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/plots/figure_attack_heatmap.png)
+- Semantic-hash block rate figure: [figure_kernel_block_rate_by_case.png](experiment-results/semantic-hash-injection-a/run-20260406-111420/plots/figure_kernel_block_rate_by_case.png)
+- Netlink RTT boxplot: [figure_netlink_rtt_boxplot.png](experiment-results/netlink-microbench-e/run-20260406-111914/plots/figure_netlink_rtt_boxplot.png)
 
 ## Limitations
 
@@ -406,15 +358,4 @@ For the most complete local confidence check:
 sudo bash scripts/demo_acceptance.sh
 ```
 
-This runs the system through:
-
-1. kernel build and module load
-2. client build
-3. tool service startup
-4. `mcpd` startup
-5. DeepSeek-key check
-6. two LLM-driven CLI invocations
-7. sysfs inspection
-8. service shutdown
-9. module unload
-10. repeated reload validation
+It covers kernel/module lifecycle, tool and `mcpd` startup, DeepSeek-key validation, a small end-to-end CLI flow, sysfs inspection, shutdown, and reload validation.

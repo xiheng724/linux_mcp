@@ -28,6 +28,7 @@ DEFAULT_APPROVAL_TTL_MS = 5 * 60 * 1000
 ToolDict = Dict[str, Any]
 ApprovalEvaluator = Callable[[ToolDict, Dict[str, Any], Dict[str, Any]], str | None]
 PathResolver = Callable[[str, Dict[str, str]], Path]
+RequestMutator = Callable[[PlannedStep, Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -406,6 +407,7 @@ def _exec_tool_request(
     payload: Dict[str, Any],
     req_id: int | None = None,
     approval_ticket_id: int = 0,
+    request_mutator: RequestMutator | None = None,
 ) -> Dict[str, Any]:
     request_id = req_id if req_id is not None else int(time.time_ns() & 0xFFFFFFFFFFFF)
     tool_hash_raw = step.tool.get("hash")
@@ -421,8 +423,12 @@ def _exec_tool_request(
     }
     if approval_ticket_id > 0:
         req_obj["approval_ticket_id"] = approval_ticket_id
+    if request_mutator is not None:
+        req_obj = request_mutator(step, payload, req_obj)
+        if not isinstance(req_obj, dict):
+            raise RuntimeError("request_mutator must return request object")
     response = mcpd_call(req_obj, sock_path=sock_path, timeout_s=20)
-    return {"req_id": request_id, "response": response}
+    return {"req_id": request_id, "response": response, "request": req_obj}
 
 
 def _execute_candidate_fallback(
@@ -434,6 +440,7 @@ def _execute_candidate_fallback(
     empty_policy: EmptyPolicy,
     original_payload: Dict[str, Any],
     approval_handler: Callable[[ApprovalRequest], bool] | None,
+    request_mutator: RequestMutator | None,
 ) -> Dict[str, Any] | None:
     fallback_payload = apply_empty_policy(original_payload, empty_policy)
     if fallback_payload == original_payload:
@@ -445,11 +452,13 @@ def _execute_candidate_fallback(
         step=step,
         payload=fallback_payload,
         approval_handler=approval_handler,
+        request_mutator=request_mutator,
     )
     return {
         "payload": fallback_payload,
         "req_id": resolved_exec["req_id"],
         "response": resolved_exec["response"],
+        "request": resolved_exec.get("request"),
         "approval_request": resolved_exec.get("approval_request"),
     }
 
@@ -551,6 +560,7 @@ def _resolve_deferred_exec(
     req_id: int,
     response: Dict[str, Any],
     approval_handler: Callable[[ApprovalRequest], bool] | None,
+    request_obj: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     approval_request = _build_approval_request(
         step=step,
@@ -559,9 +569,19 @@ def _resolve_deferred_exec(
         response=response,
     )
     if approval_request is None:
-        return {"req_id": req_id, "response": response, "approval_request": None}
+        return {
+            "req_id": req_id,
+            "response": response,
+            "approval_request": None,
+            "request": request_obj if isinstance(request_obj, dict) else {},
+        }
     if approval_handler is None:
-        return {"req_id": req_id, "response": response, "approval_request": approval_request}
+        return {
+            "req_id": req_id,
+            "response": response,
+            "approval_request": approval_request,
+            "request": request_obj if isinstance(request_obj, dict) else {},
+        }
 
     approved = approval_handler(approval_request)
     approval_resp = _submit_approval_reply(
@@ -578,11 +598,13 @@ def _resolve_deferred_exec(
                 "error": approval_resp.get("error", "approval reply failed"),
             },
             "approval_request": approval_request,
+            "request": request_obj if isinstance(request_obj, dict) else {},
         }
     return {
         "req_id": req_id,
         "response": approval_resp,
         "approval_request": approval_request,
+        "request": request_obj if isinstance(request_obj, dict) else {},
     }
 
 
@@ -640,6 +662,7 @@ def _execute_step_with_approvals(
     step: PlannedStep,
     payload: Dict[str, Any],
     approval_handler: Callable[[ApprovalRequest], bool] | None,
+    request_mutator: RequestMutator | None,
 ) -> Dict[str, Any]:
     local_approval = _build_local_approval_request(step=step, payload=payload)
     if local_approval is not None:
@@ -677,6 +700,7 @@ def _execute_step_with_approvals(
         sock_path=sock_path,
         step=step,
         payload=payload,
+        request_mutator=request_mutator,
     )
     resolved_exec = _resolve_deferred_exec(
         session=session,
@@ -686,9 +710,12 @@ def _execute_step_with_approvals(
         req_id=primary_exec["req_id"],
         response=primary_exec["response"],
         approval_handler=approval_handler,
+        request_obj=primary_exec.get("request"),
     )
     if local_approval is not None and resolved_exec.get("approval_request") is None:
         resolved_exec["approval_request"] = local_approval
+    if "request" not in resolved_exec:
+        resolved_exec["request"] = primary_exec.get("request", {})
     return resolved_exec
 
 
@@ -735,6 +762,7 @@ def _make_executed_step(
     payload_info: Dict[str, Any],
     req_id: int,
     response: Dict[str, Any],
+    request_obj: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     return {
         "index": step.index,
@@ -750,6 +778,7 @@ def _make_executed_step(
         "payload_final": payload_info["payload_final"],
         "generated_fields": payload_info["generated_fields"],
         "req_id": req_id,
+        "request": request_obj if isinstance(request_obj, dict) else {},
         "response": response,
     }
 
@@ -774,10 +803,15 @@ def execute_plan(
     apps: List[Dict[str, Any]] | None = None,
     tools: List[Dict[str, Any]] | None = None,
     approval_handler: Callable[[ApprovalRequest], bool] | None = None,
+    request_mutator: RequestMutator | None = None,
+    plan_override: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     if apps is None or tools is None:
         apps, tools = load_catalog(sock_path)
-    plan = build_execution_plan(user_text, apps, tools, cfg)
+    plan = plan_override if isinstance(plan_override, dict) else build_execution_plan(user_text, apps, tools, cfg)
+    raw_steps = plan.get("steps", [])
+    if not isinstance(raw_steps, list):
+        raise RuntimeError("execution plan missing steps list")
 
     results_by_alias: Dict[str, Any] = {"context": runtime_context()}
     executed_steps: List[Dict[str, Any]] = []
@@ -786,7 +820,7 @@ def execute_plan(
     error_text = ""
     no_match: NoMatchOutcome | None = None
 
-    for step in plan["steps"]:
+    for step in raw_steps:
         payload_info = _materialize_step_payload(
             user_text=user_text,
             step=step,
@@ -799,6 +833,7 @@ def execute_plan(
             step=step,
             payload=payload_info["payload_final"],
             approval_handler=approval_handler,
+            request_mutator=request_mutator,
         )
         response = resolved_exec["response"]
         executed_step = _make_executed_step(
@@ -806,6 +841,7 @@ def execute_plan(
             payload_info=payload_info,
             req_id=resolved_exec["req_id"],
             response=response,
+            request_obj=resolved_exec.get("request"),
         )
         approval_request = resolved_exec.get("approval_request")
         if isinstance(approval_request, ApprovalRequest):
@@ -834,6 +870,7 @@ def execute_plan(
                 empty_policy=empty_policy,
                 original_payload=payload_info["payload_final"],
                 approval_handler=approval_handler,
+                request_mutator=request_mutator,
             )
             if fallback_exec is not None:
                 _record_fallback_execution(executed_step, fallback_exec)

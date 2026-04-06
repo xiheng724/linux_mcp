@@ -38,7 +38,11 @@
 #define KERNEL_MCP_ATTR_POLICY_ID 27
 #define KERNEL_MCP_ATTR_AGENT_BINDING 28
 #define KERNEL_MCP_ATTR_AGENT_EPOCH 29
-#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_AGENT_EPOCH
+#define KERNEL_MCP_ATTR_EXPERIMENT_FLAGS 30
+#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_EXPERIMENT_FLAGS
+
+/* Optional experiment flags for microbenchmarks. */
+#define KERNEL_MCP_EXPERIMENT_SKIP_LOOKUPS (1U << 0)
 
 /* Static tool risk flags, set from manifest risk_tags by user-space. */
 #define KERNEL_MCP_RISK_FILESYSTEM_WRITE (1U << 0)

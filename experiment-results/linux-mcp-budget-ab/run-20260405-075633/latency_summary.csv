@@ -1,7 +1,0 @@
-system,payload_label,payload_bytes,requests,errors,latency_avg_ms,latency_p50_ms,latency_p95_ms,latency_p99_ms
-userspace,small,100,300,0,2.468,1.879,4.7,8.83
-userspace,medium,10240,300,0,2.363,1.88,4.428,6.438
-userspace,large,1048576,300,0,16.238,14.847,21.636,53.996
-seccomp,small,100,300,0,2.926,2.453,5.645,7.365
-seccomp,medium,10240,300,0,3.061,2.573,5.279,8.618
-seccomp,large,1048576,300,0,21.389,19.76,28.071,61.711

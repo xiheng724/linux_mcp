@@ -372,6 +372,7 @@ class KernelMcpNetlinkClient:
         tool_id: int,
         tool_hash: str,
         ticket_id: int = 0,
+        experiment_flags: int = 0,
     ) -> ToolDecision:
         attrs = [
             (ATTR["AGENT_ID"], agent_id.encode("utf-8") + b"\x00"),
@@ -386,6 +387,8 @@ class KernelMcpNetlinkClient:
             attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
         if ticket_id > 0:
             attrs.append((ATTR["TICKET_ID"], struct.pack("=Q", ticket_id)))
+        if experiment_flags > 0:
+            attrs.append((ATTR["EXPERIMENT_FLAGS"], struct.pack("=I", experiment_flags)))
 
         genl_cmd, resp_attrs = self._request(
             msg_type=self._family_id,

@@ -170,6 +170,7 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_MAX + 1] = {
 	},
 	[KERNEL_MCP_ATTR_AGENT_BINDING] = { .type = NLA_U64 },
 	[KERNEL_MCP_ATTR_AGENT_EPOCH] = { .type = NLA_U64 },
+	[KERNEL_MCP_ATTR_EXPERIMENT_FLAGS] = { .type = NLA_U32 },
 };
 
 static u32 kernel_mcp_agent_hash_key(const char *agent_id)
@@ -898,6 +899,7 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	u64 binding_hash = 0;
 	u64 binding_epoch = 0;
 	u32 decision = KERNEL_MCP_DECISION_ALLOW;
+	u32 experiment_flags = 0;
 	u32 risk_flags = 0;
 	u32 key;
 	bool hash_mismatch = false;
@@ -923,6 +925,16 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 		binding_hash = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_BINDING]);
 	if (info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH])
 		binding_epoch = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH]);
+	if (info->attrs[KERNEL_MCP_ATTR_EXPERIMENT_FLAGS])
+		experiment_flags =
+			nla_get_u32(info->attrs[KERNEL_MCP_ATTR_EXPERIMENT_FLAGS]);
+
+	if (experiment_flags & KERNEL_MCP_EXPERIMENT_SKIP_LOOKUPS) {
+		decision = KERNEL_MCP_DECISION_ALLOW;
+		reason = "allow_benchmark_skip_lookups";
+		return kernel_mcp_reply_tool_decision(info, agent_id, tool_id, req_id,
+						      decision, reason, 0);
+	}
 
 	mutex_lock(&kernel_mcp_tools_lock);
 	tool = xa_load(&kernel_mcp_tools, tool_id);

@@ -1,3 +1,0 @@
-system,max_calls,requests,allowed,denied,first_reject_at
-userspace,50,100,50,50,51
-seccomp,50,100,50,50,51
