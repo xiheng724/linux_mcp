@@ -251,6 +251,8 @@ ls /tmp/linux-mcp-app-*.log
 
 ## Experiments
 
+> All the experiments are conducted on experiment/evaluation-suite-20260403 branch.
+
 Experiment-specific details live in [scripts/experiments/README.md](scripts/experiments/README.md).
 
 At repository level, the curated outputs are the main linux_mcp comparative run plus two supplementary experiments.
