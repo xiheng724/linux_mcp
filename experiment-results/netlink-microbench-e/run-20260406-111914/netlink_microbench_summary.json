@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "warmup_requests": 500,
+    "measure_requests": 10000,
+    "agent_id": "bench-agent",
+    "tool_id": 9001,
+    "tool_name": "bench_tool",
+    "tool_hash": "abcd1234",
+    "binding_hash": 4660,
+    "binding_epoch": 1
+  },
+  "bare": {
+    "mode": "bare",
+    "samples": 10000,
+    "avg_ms": 0.008196,
+    "std_ms": 0.002594,
+    "ci95_ms": 5.1e-05,
+    "p50_ms": 0.007583,
+    "p95_ms": 0.010417,
+    "p99_ms": 0.020959,
+    "min_ms": 0.007,
+    "max_ms": 0.066958
+  },
+  "full": {
+    "mode": "full",
+    "samples": 10000,
+    "avg_ms": 0.009315,
+    "std_ms": 0.13064,
+    "ci95_ms": 0.002561,
+    "p50_ms": 0.006875,
+    "p95_ms": 0.00975,
+    "p99_ms": 0.020167,
+    "min_ms": 0.006583,
+    "max_ms": 12.818001
+  },
+  "lookup_overhead": {
+    "avg_ms": 0.001119,
+    "p95_ms": 0.002375
+  },
+  "lookup_share_pct": 12.011
+}
