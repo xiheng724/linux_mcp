@@ -1,0 +1,146 @@
+\section*{Chapter 2: Background}
+\setcounter{section}{2} \setcounter{subsection}{0}
+\phantomsection \addcontentsline{toc}{section}{\textit{Chapter 2: Background}}
+
+
+
+\subsection{From Process-centric Systems to Agent-mediated Computing}
+
+Modern operating systems are traditionally organised around the process as the primary abstraction for scheduling and protection.
+Classical designs emphasise address-space isolation, controlled access to files and devices, and well-defined inter-process communication \cite{tanenbaum2022}. 
+These abstractions remain fundamental, but they are increasingly strained by agent-based workloads.
+
+In emerging agent systems, execution is no longer driven solely by programs issuing system calls. 
+Instead, an agent plans over semantically described tools, constructs structured requests, and performs actions on behalf of a user. 
+This introduces a layer of intent between the user and execution. 
+As a result, correctness depends not only on process isolation, but also on whether the semantics of a requested operation match what is actually executed.
+
+Recent work reflects this shift. 
+Systems such as generative agents demonstrate long-lived entities capable of maintaining memory and coordinating workflows \cite{park2023generative}, while tool-oriented LLM systems show that performance depends critically on structured access to external capabilities \cite{qin2024toolllm}.
+More recent autonomous agents, such as Manus\cite{mei2024aios,liu2026agentos}, further illustrate that agents can plan, execute, and verify complex tasks through multi-agent decomposition. 
+In these settings, the system must preserve consistency between tool descriptions, permissions, and runtime behaviour not directly captured by traditional OS abstractions.
+
+
+
+\subsection{AI Agent Operating Systems}
+
+Motivated by these challenges, several systems have begun to position themselves explicitly as AI agent operating systems. 
+For example, proposes embedding LLM-centric services into a system-level kernel that manages scheduling, memory, and tool access for agents \cite{packer2024memgpt, zhang2024llmos, wu2024oscopilot}. 
+More broadly, the LLM-as-OS paradigm conceptualises the model as a system kernel, with agents acting as applications and tools as system resources \cite{packer2024memgpt}. 
+These designs aim to provide unified abstractions for agent execution, including context management, multi-agent coordination, and resource governance.
+
+In parallel, practical systems have emerged that approximate this vision at the application layer. 
+OpenClaw\cite{openclaw2026, openclaw_security1, openclaw_security2} represents a widely deployed open-source agent framework that operates as a persistent, self-hosted assistant capable of executing real-world tasks through LLM-driven planning and tool invocation.
+It exposes capabilities through a gateway and modular “skills,” effectively acting as a user-space control layer for coordinating tool execution.
+Similarly, commercial platforms such as Apple Intelligence\cite{apple2024pcc} integrate AI agents deeply into the operating environment, combining on-device models with system services to provide personalised, context-aware assistance across applications.
+
+At the same time, industrial systems are beginning to integrate AI agents more tightly into operating environments. 
+These developments suggest that agent execution is increasingly becoming an operating-system concern rather than a purely application-level feature.
+
+Despite differences in implementation, these systems share a common trend: they introduce an additional control layer that mediates between user intent, model reasoning, and tool execution. 
+This layer increasingly resembles operating-system functionality, even when implemented entirely in user space.
+
+
+
+\subsection{What MCP Provides}
+
+The MCP provides a useful abstraction for structuring this interaction. 
+It defines a client-host-server architecture in which tools, resources and prompts are exposed through a standardised interface \cite{mcp2025}.
+The host coordinates sessions and mediates access, while servers implement capabilities behind a JSON-RPC protocol.
+
+This separation simplifies interoperability and modularity. 
+However, it also concentrates responsibility in the host: identity management, approval decisions, and consistency between tool descriptions and execution all depend on correct host behaviour.
+MCP defines how components communicate, but does not specify how a local system should enforce these properties.
+
+\subsection{Limits of User-space Mediation}
+
+In most existing systems, including OpenClaw architectures, this control logic resides entirely in a user-space gateway \cite{langchain2022, autogpt2023}.
+This design enables rapid development and flexible integration, but introduces several structural weaknesses.
+Because tool invocation depends on semantically rich manifests---combining natural-language descriptions, schemas and examples \cite{schick2023toolformer, patil2023gorilla, mcp2025}---there is an implicit assumption that these descriptions remain aligned with the underlying implementation.
+When both interpretation and enforcement reside in a mutable user-space process, inconsistencies can arise \cite{liu2023prompt}.
+A change in implementation or a weakened control path may result in executing a capability that no longer matches the approved semantics.
+A similar issue arises with identity.
+Agent systems operate over richer notions of identity than traditional processes, often binding requests to sessions or agents rather than PIDs \cite{yao2023react, autogpt2023, park2023generative}.
+Without anchoring these identities in OS-visible credentials, approval decisions can be reused or replayed across contexts, weakening isolation
+guarantees \cite{greshake2023prompt}.
+Finally, durability becomes problematic when control-plane state is held only in memory \cite{packer2024memgpt}.
+Approval decisions and pending requests may be lost on crash or restart, leaving no authoritative state that other components can consult.
+This fragility is particularly relevant in long-running agent systems where execution spans multiple steps and decisions \cite{wang2023voyager, yang2024swe}.
+These limitations are not unique to any single framework.
+Rather, they reflect a broader pattern: current agent systems increasingly rely on control plane invariants \cite{anderson1972computer} that are difficult to enforce when confined to user space \cite{garfinkel2003terra, watson2010capsicum}.
+
+\subsection{Design Positioning}
+
+This observation places the present work between two extremes.
+On one end, AIOS-style proposals advocate for a full rethinking of the operating system around LLM-centric abstractions. 
+On the other, existing agent frameworks operate entirely in user space, relying on application-level logic to enforce correctness and security.
+
+The approach taken here is narrower. 
+Instead of redefining the entire operating system, it focuses on a specific question: which control-plane invariants in MCP-style tool invocation benefit from kernel-level enforcement?
+
+\subsection{Relation to Native Linux Security Mechanisms}
+
+Any such design must coexist with existing Linux security mechanisms. Facilities such as seccomp, AppArmor, SELinux and Landlock provide strong guarantees over system calls, resources and process privileges \cite{seccomp2026,lsm2026,apparmor2026,selinux2026,landlock2026}. 
+These mechanisms operate at the level of kernel objects and access rights.
+
+However, they do not capture higher-level concepts such as tool identity, semantic equivalence between a manifest and an execution endpoint, or the scope of an approval decision. 
+For example, they cannot directly express whether a particular tool invocation matches an approved semantic description, or whether a request belongs to a specific agent session.
+
+This gap becomes more pronounced as agent systems evolve toward persistent, autonomous operation with rich tool ecosystems. 
+Addressing it requires introducing a control layer that reasons about semantics and identity before execution reaches user space logic.
+
+
+
+\subsection{Threat Model}
+
+The above limitations suggest that the correctness of MCP-style systems depends on a small set of control-plane invariants, including identity binding, approval validity, and consistency between tool semantics and execution.
+We therefore ground our design in a threat model that focuses on attacks against these invariants in a local-host setting.
+
+We consider a local adversary operating on the same host as the MCP gateway.
+The attacker interacts with the system through exposed user-space interfaces and may craft arbitrary requests, replay previously observed messages, and exploit inconsistencies in user-space state management.
+We assume that the attacker has full knowledge of the system’s protocol, implementation, and manifest structure.
+
+We do not assume elevated privileges beyond the normal user-space boundary.
+Attacks that require modification of trusted configuration inputs, direct process compromise (e.g., \texttt{ptrace}), or kernel-level control are considered out of scope.
+Similarly, remote adversaries and external service compromise are not part of the evaluation.
+
+Within this scope, we focus on four classes of control-plane failures:
+(1) \emph{spoofing} of identity or session context,
+(2) \emph{replay} of previously valid requests or approval decisions,
+(3) \emph{substitution} of tool identity or semantics, and
+(4) \emph{escalation} through bypassing admission checks in the gateway.
+These attack classes and their corresponding defenses are summarized in Table~\ref{tab:threat_in_scope}.
+
+The system does not aim to provide complete host security.
+Instead, it ensures that critical control-plane invariants are enforced outside the mutable user-space execution path, making them significantly harder to bypass through gateway-local bugs or weakened mediation logic.
+These attack classes directly inform the design of \texttt{linux-mcp}, and are revisited in the evaluation through targeted adversarial experiments.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{l p{4.8cm} p{5.2cm}}
+\toprule
+\textbf{Attack class} & \textbf{Representative attack} & \textbf{Defense in \texttt{linux-mcp}} \\
+\midrule
+
+Spoofing 
+& Forged session identity or mismatched tool hash 
+& Kernel-verified identity binding and semantic-hash consistency \\
+
+Replay 
+& Reuse of stale approval tickets or prior requests 
+& Kernel-enforced approval lifecycle with binding and lifetime validation \\
+
+Substitution 
+& Executing a tool diverging from declared semantics 
+& Verification of manifest-derived semantic identity \\
+
+Escalation 
+& Bypassing gateway checks via logic flaws 
+& Mandatory kernel arbitration for all invocations \\
+
+\bottomrule
+\end{tabular}
+\caption{Control-plane threats and defenses (in scope).}
+\label{tab:threat_in_scope}
+\end{table}

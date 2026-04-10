@@ -1,0 +1,103 @@
+\documentclass[12pt,a4paper,UTF8]{article}
+\usepackage{requirements}
+\usepackage{environments}
+\usepackage{booktabs}
+\usepackage{siunitx}
+
+\begin{document}
+
+\include{cover}
+{
+    \calibrifont % Switch to Calibri for table of content page only
+    \tableofcontents
+    \newpage
+}
+% \tableofcontents
+\thispagestyle{fancy}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Your report content starts here
+% The commands below defines the structure of your report
+% The \input{...} command includes the content of the specified file (e.g., contents/abstract.tex) into the document
+% to edit the content, locate and modify the corresponding file.
+\linespread{1.5} % Set line spacing to 1.5x
+
+\newpage
+\input{contents/abstract}
+
+\newpage
+\input{contents/abstract_chinese}
+
+\newpage
+\input{contents/introduction}
+
+\newpage
+\input{contents/background}
+
+\newpage
+\input{contents/design&implementation}
+
+\newpage
+\input{contents/results&discussion}
+
+\newpage
+\input{contents/conclusion&furtherwork}
+
+\newpage
+\addcontentsline{toc}{section}{\textit{References}}
+\bibliography{reference}
+% Referencing in LaTeX: A Quick Guide
+% ----------------------------------
+% 1. Add References:
+%    - Open the existing 'references.bib' file.
+%    - Add new references in BibTeX format.
+%    - Example BibTeX entry for a journal article:
+%      @article{newkey,
+%        author  = {Author Name},
+%        title   = {Article Title},
+%        journal = {Journal Name},
+%        year    = {Year},
+%        volume  = {Volume},
+%        pages   = {Pages}
+%      }
+
+% 2. Cite References Inline:
+%    - Use the \cite{key} command in your document, where 'key' is the unique identifier from the BibTeX entry.
+%    - Example (try uncomment the following line and run compile to see the result):
+     % This method was proposed in \cite{basar2019,mouftah2018,qmul2024,saputra2019}.
+
+%%%%%%%% delete the following paragraphs in your report.%%%%%%%%
+
+%%%%%%%%%%% delete up to here%%%%%%%%%%%%
+
+\newpage
+\input{contents/acknowledgement}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Here's your appendix section
+\newpage
+\input{appendices/disclaimer}
+
+\newpage
+\input{appendices/AcknowledgementGenAI}
+
+\newpage
+\input{appendices/projectSpecification}
+
+\newpage
+\input{appendices/earlyTermProgressReport}
+
+\newpage
+\input{appendices/midTermProgressReport}
+
+\newpage
+\input{appendices/supervisionLog}
+
+\newpage
+\input{appendices/additionalAppendices}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The final section on "Risk and environmental impact assessment"
+\newpage
+\input{contents/riskAssessment}
+
+\end{document}

@@ -1,0 +1,22 @@
+\onehalfspacing
+{\fontsize{16pt}{30pt}\selectfont \noindent\textbf{摘要}}
+\vspace{0.7cm}
+{\fontsize{12pt}{18pt}\selectfont
+% replace the paragraph below with your abstract
+
+随着 AI agents 日益依赖外部工具来扩展其能力，现有系统在工具调用管理方面仍缺乏高效且安全的操作系统级支持。对大语言模型（LLM）和外部工具的非受控访问会带来资源滥用、安全漏洞以及执行不可靠等风险，这凸显了对 AI 原生操作系统支持的迫切需求。
+
+为此，我们提出了 \texttt{linux-mcp}，一种面向 Linux 操作系统的、内核辅助的工具调用控制平面。该系统引入了一种新的操作系统架构：将语义解析和工具执行保留在用户态，同时将准入控制下沉至 Linux 内核模块中。该设计通过统一的守护进程对所有外部工具调用进行中介，从而实现强隔离，在保证极低开销的同时建立起操作系统与外部工具之间严格的安全边界。此外，基于 MCP 协议的抽象框架支持无缝的工具集成：开发者只需给接口添加一个简单的适配器，即可在 manifest 中以声明方式描述工具的功能和参数，将外部工具暴露给 AI agent。
+
+我们从延迟、吞吐量、抗攻击能力以及故障场景等方面，将 \texttt{linux-mcp} 与纯用户态基线系统和强化用户态系统进行了对比评估。实验结果表明，基于内核的设计能够消除在强化用户态方案中仍然存在的所有已测试攻击类型，同时仅引入可忽略的延迟开销，并在多 agent 负载下保持可比的吞吐性能。该原型系统已在 14 个应用中暴露了 43 个工具，并已开源发布：\url{https://github.com/xiheng724/linux_mcp}。
+
+}
+\vspace{1.0cm}
+{\fontsize{16pt}{30pt}\selectfont \noindent\textbf{关键词}}
+\vspace{0.7cm}
+{\fontsize{12pt}{18pt}\selectfont
+% replace the paragraph below with your keywords
+
+AI智能体，操作系统，工具调用，系统安全
+
+}

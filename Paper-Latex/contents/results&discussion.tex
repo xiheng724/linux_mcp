@@ -1,0 +1,149 @@
+\section*{Chapter 4: Results and Discussion}
+\setcounter{section}{4} \setcounter{subsection}{0}
+\phantomsection \addcontentsline{toc}{section}{\textit{Chapter 4: Results and Discussion}}
+
+% Most projects will have results, especially for a research project. But again you should talk to your supervisor about it.
+
+We evaluate \texttt{linux-mcp} along four dimensions: control-plane latency and its breakdown across invocation stages, throughput under concurrent load, resistance to a representative set of control-plane attacks, and the system's behaviour under daemon failure and restart.
+The central claim under test is that relocating admission-control state into the kernel strengthens enforcement without making the tool invocation path prohibitively expensive. 
+To separate this effect from user-space hardening alone, two baselines are used throughout: a conventional user-space mediator (\textbf{userspace}), in which registration, admission, and approval all reside in the daemon, and a hardened variant (\textbf{seccomp}) that augments the same user-space control path with stricter syscall filtering, additional validation, and audit logging. 
+All experiments were conducted on a VMware guest (Apple aarch64 host, 4 vCPU, 8 GB RAM) in a headless configuration with no concurrent user-space workloads; results are reported over $n = 5$ independent runs to reduce sensitivity to hypervisor-induced noise.
+
+
+
+\subsection{Latency and Control-Plane Overhead}
+
+Table~\ref{tab:latency} and Figure~\ref{fig:chapter4-latency} report mean end-to-end latency for each system at three payload sizes. For small and medium payloads---100 B and 10 KB---the kernel path is marginally slower than the user-space baseline: \num{0.787} ms versus \num{0.764} ms at 100 B (+3.0\%), and \num{0.828} ms versus \num{0.801} ms at 10 KB (+3.4\%).
+Neither difference is statistically significant at $\alpha = 0.05$ (Welch's $t$-test, $p = 0.526$ and $p = 0.287$ respectively), which is consistent with the expectation that the fixed cost of a Generic Netlink round-trip is small relative to the remaining user-space path.
+
+The 1 MB result deserves separate attention. At this payload size the kernel path (\num{6.908} ms) is actually slightly faster than the plain user-space baseline (\num{7.226} ms), and considerably faster than the hardened variant (\num{9.330} ms). The seccomp penalty at large payloads reflects the cost of applying BPF filters across the heavier socket traffic associated with copying a megabyte-class payload through the mediation layer. The kernel path does not incur this cost because its socket handling is not subject to the same per-syscall filtering overhead.
+
+Stage-level breakdown in Figure~\ref{fig:chapter4-breakdown} confirms that arbitration itself is a minor contributor at all payload sizes. Mean kernel arbitration time is \num{0.026} ms for 100 B and 10 KB payloads, and \num{0.033} ms for the 1 MB case. At 1 MB, tool execution accounts for 89.4\% of total end-to-end time in the kernel path (90.0\% in the user-space path), which means the control-plane machinery as a whole---including Generic Netlink round-trip, session lookup, and arbitration---is responsible for the remaining 10.6\% of latency, and the arbitration contribution within that fraction is only about three hundredths of a millisecond.
+
+A supplementary microbenchmark, shown in Figure~\ref{fig:chapter4-netlink-rtt}, isolates the Generic Netlink layer itself. Bare round-trip time (a no-op ping-pong with no registry lookup) averages \num{8.196} $\mu$s; the full \texttt{TOOL\_REQUEST} path, which includes tool and agent registry lookups, averages \num{9.315} $\mu$s. The lookup overhead is therefore approximately \num{1.1} $\mu$s, representing 12\% of the bare RTT. This places the kernel-side arbitration cost at roughly one order of magnitude below the control-plane overhead visible in end-to-end measurements, which in turn confirms that the dominant overhead in the kernel path comes from user-space components---session management, payload serialisation, and socket I/O---rather than from the kernel module itself.
+
+\begin{table}[t]
+\centering
+\caption{Mean end-to-end latency (ms) by payload size and system ($n = 5$).}
+\label{tab:latency}
+\begin{tabular}{lccc}
+\toprule
+Payload & \texttt{userspace} & \texttt{seccomp} & \texttt{kernel} \\
+\midrule
+100 B   & 0.764 & 0.778 & 0.787 \\
+10 KB   & 0.801 & 0.839 & 0.828 \\
+1 MB    & 7.226 & 9.330 & 6.908 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{figures/figure_latency_by_payload.png}
+\caption{End-to-end latency by payload size for the three systems. Error bars indicate one standard deviation across runs.}
+\label{fig:chapter4-latency}
+\end{figure}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{figures/figure_latency_breakdown.png}
+\caption{Invocation stage breakdown (session lookup, arbitration, tool execution) for each system at 100 B and 1 MB payloads.}
+\label{fig:chapter4-breakdown}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.9\linewidth]{figures/figure_netlink_rtt_boxplot.png}
+\caption{Generic Netlink microbenchmark results for bare round-trip time and the full \texttt{TOOL\_REQUEST} path. The full path adds tool and agent registry lookups but remains within the same microsecond-scale range.}
+\label{fig:chapter4-netlink-rtt}
+\end{figure}
+
+
+
+\subsection{Throughput and Scalability}
+
+To assess whether the kernel-assisted control plane becomes a bottleneck under load, throughput was measured across a range of agent counts (1, 5, 10, 20, 50) and concurrency levels (1, 10, 50, 100). Figure~\ref{fig:chapter4-throughput} summarises the throughput trends across those configurations.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{figures/figure_throughput_by_agents.png}
+\caption{Throughput (requests per second) across agent-count configurations for the three systems under the tested concurrency levels.}
+\label{fig:chapter4-throughput}
+\end{figure}
+
+The user-space baseline achieves the highest peak throughput, ranging from \num{1090} to \num{1219} RPS across configurations. The kernel path ranges from \num{1003} to \num{1137} RPS, and the seccomp path from \num{1020} to \num{1200} RPS. As a representative point, at one agent and concurrency 50: userspace achieves \num{1215.6} RPS, seccomp \num{1123.5} RPS, and the kernel path \num{1096.2} RPS. The kernel path is approximately 10\% slower than the user-space peak, which is consistent with the additional round-trip through Generic Netlink and the serialisation of admission decisions through the kernel module.
+
+What the throughput numbers do not show directly is the distribution of tail latency under load. As concurrency increases, the user-space baseline shows growing variance in per-request latency, reflecting contention over shared admission-control state that is serialised entirely within the daemon. The kernel path shows more stable tail behaviour because the arbitration decision is narrow: the kernel module needs to acquire a lock over the tool and agent registries for the duration of a hash comparison and a policy check, but it does not hold that lock across the semantic work---payload validation, session resolution, socket forwarding---that the daemon performs around it. This narrower critical section does not eliminate contention, but it prevents the entire semantic pipeline from becoming part of the serialised hot path.
+
+These results support the practical viability of the design. Kernel arbitration adds overhead, but that overhead does not produce a throughput collapse under the workloads tested here. Whether it would at substantially higher concurrency or with much larger agent populations is a fair question; the current experiments do not go beyond 100 concurrent requests, and throughput at that point has not shown signs of approaching a kernel-side bottleneck.
+
+
+\subsection{Security Evaluation}
+
+Performance results are secondary to the question of whether kernel placement actually strengthens admission control. The attack evaluation targets four categories that correspond to the threat model sketched in Chapter 2: identity spoofing (forging or borrowing session identity to impersonate a registered agent), replay (reusing a stale approval ticket across a new session or after expiry), substitution (tampering with the \texttt{tool\_id} or \texttt{tool\_hash} in a live request to redirect execution to a different tool), and escalation (attempting to bypass the approval gate so that a high-risk tool invocation proceeds without explicit confirmation).
+
+Each system received 220 attack attempts in total, spread across the four categories. The outcomes are summarised in Table~\ref{tab:attacks} and Figure~\ref{fig:chapter4-security}.
+
+\begin{table}[t]
+\centering
+\caption{Attack outcomes by system (220 attempts each). Success rate measures the fraction of attack attempts that bypassed the intended control.}
+\label{tab:attacks}
+\begin{tabular}{lccc}
+\toprule
+System & Bypasses & Total & Bypass rate \\
+\midrule
+\texttt{userspace} & 200 & 220 & 90.9\% \\
+\texttt{seccomp}   &  79 & 220 & 35.9\% \\
+\texttt{kernel}    &   0 & 220 &  0.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{figures/figure_attack_heatmap.png}
+\caption{Attack outcome heatmap by category and system. Darker cells indicate a higher bypass rate.}
+\label{fig:chapter4-security}
+\end{figure}
+
+The plain user-space baseline blocks very few attacks---200 of 220 attempts succeed, a bypass rate of 90.9\%. This is consistent with the architecture: because admission, approval, and registration all coexist in the same user-space process, attacks that exploit sequencing assumptions or forge session context are not blocked by any mechanism that the attacker cannot also influence. The hardened variant reduces this substantially to 35.9\%, reflecting the effect of stricter checks and reduced syscall surface. However, because admission remains a user-space decision, attacks that do not need to cross a privilege boundary---particularly substitution and replay---still succeed at meaningful rates.
+
+The kernel path blocks all 220 attempts in the current test set. Spoofing fails because agent identity is tied to a kernel-registered agent identifier that the control plane verifies independently of the daemon's session state. Replay fails because approval tickets are kernel-resident lifecycle objects with explicit consumed and expired fields; once a ticket has been advanced or has passed its validity window, no subsequent \texttt{APPROVAL\_DECIDE} can reopen it. Substitution is blocked by the semantic hash check: even if an attacker modifies the \texttt{tool\_hash} field in the request payload or replaces the tool endpoint at runtime, the kernel compares the submitted hash against the one recorded at registration and rejects any mismatch. The supplementary injection experiment confirms this independently: in 30 live \texttt{llm-app $\to$ mcpd $\to$ kernel} execution chains, every runtime hash substitution (using \texttt{deadbeef} as a stand-in) produced a \texttt{DENY} with \texttt{reason=hash\_mismatch} at the kernel layer, regardless of which tool the LLM planner had selected.
+
+Several caveats apply. The attack set is representative of the threat model but is not exhaustive. Tools with unsafe internal semantics, policies that are too permissive, or client-side payload construction errors are not addressed by kernel-level admission control and fall outside the scope of these experiments. The 0\% bypass rate should therefore be read as a statement about control-plane admission attacks rather than about the full attack surface of an LLM-integrated system.
+
+
+\subsection{Daemon Failure and Recovery}
+
+One architectural argument for kernel-held state is that it should outlive the process that registered it. To test whether this property holds, the daemon was forcibly interrupted mid-operation and the state of the control plane was observed before and after restart.
+
+% \begin{figure}[t]
+% \centering
+% \includegraphics[width=0.95\linewidth]{figures/chapter4_recovery.pdf}
+% \caption{Control-plane state preservation across daemon failure. Each bar indicates whether the named state class was recoverable after restart.}
+% \label{fig:chapter4-recovery}
+% \end{figure}
+
+In both user-space systems, daemon failure is equivalent to control-plane failure. Registered tool state, in-flight session context, and pending approval tickets are all bound to the process that held them. After restart, none of this state is available from outside the daemon; recovery amounts to either starting over or reloading from application-level logs, which is not guaranteed to be consistent.
+
+In the kernel path, approval state is preserved across the daemon failure: after restart, the kernel module's approval tickets remain in whatever state they were in at the time of the crash, and they are visible through \texttt{sysfs} without any daemon involvement. Session state is not preserved---the binding context for active sessions is owned by the daemon process and is lost with it---but this is expected given that session state is inherently tied to an active connection. The practically important property is that deferred approvals, the tool registry, and agent registration survive the failure, which allows \texttt{mcpd} to reconcile its manifest-derived view against the kernel-held view on restart and re-establish a consistent catalog without issuing duplicate registrations.
+
+The reconciliation path works as follows. On startup, \texttt{mcpd} queries the kernel's current tool registry via \texttt{LIST\_TOOLS\_DUMP}, compares the returned hashes against those computed from the manifests on disk, and issues \texttt{TOOL\_REGISTER} messages only for tools whose hash is absent or stale. This is a conservative strategy---it rebuilds from the manifest source of truth rather than trusting that partial kernel state is still valid---but it keeps the recovery logic straightforward and avoids the need to reason about partial updates.
+
+
+\subsection{Discussion}
+
+The results are interpretable in terms of the original design goals from Chapter 3. The goal of relocating admission-critical state to the kernel is supported by the security evaluation: all four attack categories that specifically target the control plane are blocked, and the blocking mechanism---hash comparison and ticket lifecycle---is narrow enough that it does not impose large overhead on the normal path. The goal of compatibility with ordinary user-space tools is supported by the throughput and latency measurements, which show that the system remains in the same practical range as the baselines at realistic payload sizes. The goal of independently inspectable state is supported by the failure experiment, which confirms that the kernel-held view of approval and registration state persists across daemon restart and is queryable without any daemon process running.
+
+The latency comparison at 1 MB is worth singling out because it runs counter to the intuition that any additional boundary crossing must be costly. The kernel path is faster than the seccomp baseline at large payloads because the seccomp variant applies BPF-based syscall filtering to every socket operation, and at megabyte-class payloads that per-operation overhead accumulates. This suggests that the cost of user-space hardening is not always smaller than the cost of kernel placement; the right comparison depends on what kind of enforcement the hardening is actually doing.
+
+One aspect of the design that the current experiments cannot fully characterise is the behaviour under sustained high-concurrency workloads with many simultaneous deferred approvals. The current test reaches 100 concurrent requests, and neither throughput nor tail latency shows evidence of a kernel-side bottleneck at that scale. Whether the approval ticket management or the registry locking in the kernel module would become a bottleneck at significantly higher concurrency is an open question.
+
+
+\subsection{Threats to Validity}
+
+Three limitations are worth stating explicitly. First, all experiments were conducted on a single VMware guest; the absolute latency and throughput numbers are therefore specific to that environment, and the hypervisor introduces timing noise that is difficult to eliminate entirely. We mitigated this by running each experiment five times and reporting means, but single-machine virtualised experiments cannot be treated as representative of bare-metal or distributed deployments.
+
+Second, the tool workload used in the experiments is a demonstration workload rather than a production one. The tools return structured responses to controlled inputs, which means execution time is roughly constant and predictable. In practice, tool invocations with variable execution time or network-dependent latency would change the relative weight of control-plane overhead.
+
+Third, the attack evaluation covers the attack categories that the design is specifically intended to address. Attacks that assume compromise of the kernel module itself, attacks that exploit semantic vulnerabilities in tool logic, or attacks mounted by a principal that has already obtained root privilege are outside the scope of what admission control at this level can provide.
+

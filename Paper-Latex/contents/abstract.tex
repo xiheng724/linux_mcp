@@ -1,0 +1,33 @@
+\onehalfspacing
+\phantomsection % this is to manually fix anchor
+\addcontentsline{toc}{section}{\textit{Abstract}}
+{\fontsize{16pt}{30pt}\selectfont \noindent\textbf{Abstract}}
+\vspace{0.5cm}
+{\fontsize{12pt}{18pt}\selectfont
+% replace the paragraph below with your abstract
+
+AI agents increasingly rely on external tools to extend their capabilities, yet existing systems lack efficient and secure OS-level support for managing tool invocation. 
+Unrestricted access to Large Language Models(LLMs) and external tools introduces risks of resource misuse, security vulnerabilities, and unreliable execution, highlighting the need for AI-native OS support.
+
+To address this, we present \texttt{linux-mcp}, a kernel-assisted control plane for tool invocation on Linux operating system.
+It introduces a novel operating system architecture for serving AI agents by keeping semantic parsing and tool execution in user space while moving admission control into a Linux kernel module.
+This design enables strong isolation via a unified daemon that mediates all external tool invocations, enforcing a strict OS–tool security boundary with minimal overhead.
+Furthermore, the Model Context Protocol(MCP) abstraction enables seamless tool integration: external tools can be exposed to AI agents by simply specifying their functionality and parameters in a manifest, without additional implementation.
+
+We evaluate \texttt{linux-mcp} against both a pure user-space baseline and a hardened user-space design across latency, throughput, attack resistance, and failure scenarios. 
+Our results show that the kernel-based design eliminates all tested attack classes that persist in the hardened baseline, while introducing negligible latency overhead and maintaining comparable throughput under multi-agent workloads.
+The prototype exposes 43 tools across 14 applications and is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
+
+}
+\vspace{0.5cm}
+\addcontentsline{toc}{section}{\textit{Keywords}}
+{\fontsize{16pt}{30pt}\selectfont \noindent\textbf{Keywords}}
+\vspace{0.5cm}
+{\fontsize{12pt}{18pt}\selectfont
+% replace the paragraph below with your keywords
+
+AI Agents, Operating Systems, Tool Invocation, System Security
+
+}
+
+

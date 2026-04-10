@@ -1,0 +1,87 @@
+\section*{Risk and Environmental Impact Assessment}
+\setcounter{section}{6} \setcounter{subsection}{0}
+\phantomsection \addcontentsline{toc}{section}{\textit{Risk and Environmental Impact Assessment}}
+% Please use only \subsection*{} and \subsubsection*{} in this section. This suppresses the subsection numbering in the Table of Contents.
+
+
+\textbf{Risk and Environmental Impact Assessment}
+
+This project investigates \texttt{linux-mcp}, a kernel-assisted control-plane architecture for AI tool invocation.
+Its goal is to improve the safety and observability of tool use in AI-agent systems by separating semantic interpretation and tool execution in user space from admission control and approval handling in the kernel.
+Because the system spans an LLM-facing application, a user-space gateway, kernel mechanisms, and external tools, it introduces technical, security, and resource-related risks.
+A formal risk and environmental impact assessment is therefore necessary.
+
+Following the prescribed method, each risk is assigned a likelihood level $L$ and a consequence level $C$, and the overall score is calculated as $R = L \cdot C$.
+This assessment considers risks to project completion, risks of harm to systems or organisations, environmental impact, and losses of time or computational resources.
+
+\textbf{Project and technical risks}
+
+A primary technical risk is kernel-level instability.
+Since \texttt{linux-mcp} moves part of the control plane into the Linux kernel, faults in Netlink communication, synchronization, or state management may lead to crashes or inconsistent behaviour.
+This risk is assigned moderate likelihood ($L = 3$) and major consequence ($C = 4$), giving $R = 12$.
+The mitigation is to keep the kernel scope narrow and rely on strict interfaces, staged testing, and stress testing.
+
+A second risk is the possibility that the project does not demonstrate a convincing advantage over strong user-space baselines.
+The value of \texttt{linux-mcp} depends not only on correctness but also on showing that kernel placement provides stronger control properties than user-space mediation alone.
+This risk is assigned likely likelihood ($L = 4$) and very serious consequence ($C = 3$), giving $R = 12$.
+It should be mitigated by evaluation against both conventional and hardened user-space baselines under representative performance and adversarial workloads.
+
+A third risk is cross-component integration failure.
+The system includes an LLM-side application, the \texttt{mcpd} daemon, the kernel control plane, and tool-side services, and mismatches between these components may create failures that are difficult to isolate.
+This risk is assigned moderate likelihood ($L = 3$) and serious consequence ($C = 2$), giving $R = 6$.
+This can be reduced through explicit protocol definitions, schema synchronization, and end-to-end validation.
+
+\textbf{Security and operational risks}
+
+A central operational risk is unsafe or unauthorized tool invocation.
+Since \texttt{linux-mcp} mediates LLM-triggered access to tools with possible side effects, an error in the admission path could allow an action that should have been denied or deferred.
+This risk is assigned moderate likelihood ($L = 3$) and major consequence ($C = 4$), giving $R = 12$.
+Mitigation includes deny-by-default admission, explicit approval binding, auditable state transitions, and attack-oriented testing.
+
+A second risk is overestimating the system's security guarantees.
+Kernel placement can strengthen enforcement of specific invariants, but it does not eliminate threats arising from semantic errors in user space, unsafe tool implementations, or incomplete policies.
+This risk is assigned moderate likelihood ($L = 3$) and very serious consequence ($C = 3$), giving $R = 9$.
+The mitigation is to define the threat model precisely and to state clearly which protections are provided by kernel enforcement and which remain outside its scope.
+
+A further risk is degraded responsiveness under load.
+Additional arbitration and approval steps may increase latency or reduce throughput, especially when multiple agents or tools are active concurrently.
+This risk is assigned moderate likelihood ($L = 3$) and serious consequence ($C = 2$), giving $R = 6$.
+It should be mitigated through latency analysis, concurrency benchmarking, and optimization of common low-risk paths.
+
+\textbf{Environmental and resource impact}
+
+The direct environmental impact of \texttt{linux-mcp} is limited because the project is software-based and does not involve substantial material waste.
+However, development and evaluation still consume computational resources.
+Repeated benchmarking, adversarial testing, virtual-machine execution, and debugging of kernel-space behaviour all increase CPU time and electricity consumption.
+This environmental risk is assigned likely likelihood ($L = 4$) and serious consequence ($C = 2$), giving $R = 8$.
+The appropriate mitigation is careful experiment planning, automation of result collection, and avoidance of redundant reruns.
+
+A practical project-management risk is loss of development time and compute resources due to unstable experiments, failed integration, or repeated debugging.
+This risk is assigned likely likelihood ($L = 4$) and serious consequence ($C = 2$), giving $R = 8$.
+Mitigation includes reproducible scripts, checkpointing of experiment outputs, staged deployment, and careful configuration management.
+
+Another resource-related risk is dependence on external tooling or infrastructure.
+The project may rely on LLM APIs, network configuration, proxies, virtual machines, or other software dependencies during development and evaluation.
+This risk is assigned moderate likelihood ($L = 3$) and serious consequence ($C = 2$), giving $R = 6$.
+This risk can be reduced by separating the core evaluation from optional cloud dependencies and by supporting local or mocked execution paths where possible.
+
+\begin{table}[t]
+\centering
+\caption{Summary of identified risks and mitigation strategies for \texttt{linux-mcp}.}
+\begin{tabular}{p{4.1cm} c c c p{2.1cm} p{5.9cm}}
+\hline
+\textbf{Risk} & \textbf{$L$} & \textbf{$C$} & \textbf{$R$} & \textbf{Rating} & \textbf{Mitigation} \\
+\hline
+Kernel-level instability & 3 & 4 & 12 & Significant & Narrow kernel scope, strict interfaces, staged testing, stress testing \\
+Weak justification over user-space baselines & 4 & 3 & 12 & Significant & Strong baselines, adversarial evaluation, quantitative comparison \\
+Cross-component integration failure & 3 & 2 & 6 & Moderate & Explicit protocols, schema synchronization, end-to-end validation \\
+Unsafe or unauthorized tool invocation & 3 & 4 & 12 & Significant & Deny-by-default admission, approval binding, auditability, misuse testing \\
+Overestimated security guarantees & 3 & 3 & 9 & Significant & Precise threat model, careful claims, clear scope of guarantees \\
+Added latency or reduced throughput & 3 & 2 & 6 & Moderate & Latency analysis, concurrency evaluation, fast-path optimization \\
+Additional compute and energy use & 4 & 2 & 8 & Significant & Efficient experiment planning, automation, fewer redundant reruns \\
+Loss of development time and compute resources & 4 & 2 & 8 & Significant & Reproducible workflows, checkpointing, staged deployment \\
+External dependency or infrastructure failure & 3 & 2 & 6 & Moderate & Local or mocked backends, dependency isolation, reduced cloud reliance \\
+\hline
+\end{tabular}
+\label{tab:risk_assessment}
+\end{table}
