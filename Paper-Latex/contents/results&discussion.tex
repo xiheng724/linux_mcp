@@ -41,14 +41,22 @@ Payload & \texttt{userspace} & \texttt{seccomp} & \texttt{kernel} & $p$(seccomp)
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\linewidth]{figures/figure_latency_by_payload.png}
-\caption{End-to-end latency by payload size for the three systems. Error bars indicate one standard deviation across runs.}
+\includegraphics[width=0.98\linewidth]{figures/figure_latency_mean_by_payload.pdf}
+\caption{Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100 B and 10 KiB are not flattened by the much larger absolute values at 1 MiB. Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt{userspace} baseline (\texttt{ns} = not significant, * = $p < 0.05$, ** = $p < 0.01$, *** = $p < 0.001$).}
 \label{fig:chapter4-latency}
 \end{figure}
+
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\linewidth]{figures/figure_latency_breakdown.png}
-\caption{Invocation stage breakdown (session lookup, arbitration, tool execution) for each system at 100 B and 1 MB payloads.}
+\includegraphics[width=0.95\linewidth]{figures/figure_latency_overhead.pdf}
+\caption{Mean-latency ratio of each hardened variant to the plain \texttt{userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100 B and 10 KiB visible alongside the larger effect at 1 MiB. The \texttt{seccomp} path is significantly slower at every payload size, while the \texttt{kernel} path is indistinguishable from \texttt{userspace} at small/medium payloads and measurably faster at 1 MiB.}
+\label{fig:chapter4-overhead}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/figure_latency_breakdown.pdf}
+\caption{Invocation stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes it possible to see session\_lookup (around 4\,\textmu s) at the same time as tool\_exec (around 4\,ms). The \texttt{kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num{0.04}\,ms and is invisible relative to the tool-execution portion of the invocation.}
 \label{fig:chapter4-breakdown}
 \end{figure}
 
@@ -102,8 +110,8 @@ System & Bypasses & Total & Bypass rate \\
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\linewidth]{figures/figure_attack_heatmap.png}
-\caption{Attack outcome heatmap by category and system. Darker cells indicate a higher bypass rate.}
+\includegraphics[width=0.75\linewidth]{figures/figure_attack_matrix.pdf}
+\caption{Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt{kernel} column is uniformly zero across all four categories, while the two user-space baselines still leak on the specific checks that their instrumented tamper profiles relax.}
 \label{fig:chapter4-security}
 \end{figure}
 
@@ -151,6 +159,13 @@ Case & \texttt{userspace} & \texttt{seccomp} & \texttt{kernel} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.75\linewidth]{figures/figure_boundary_matrix.pdf}
+\caption{Boundary-condition supplement visualised. Each row is one of the eight probe cases (the race probe appears as two rows, one per concurrent worker), each column is a system, and each cell shows the absolute count (successes/attempts) of attempts that bypassed the invariant. Every cell is 0/10 across all three systems; the colorbar axis is kept at its full [0, 1] range so that this result is visually comparable to the main attack matrix in Figure~\ref{fig:chapter4-security}.}
+\label{fig:chapter4-boundary}
+\end{figure}
 
 All eight cases are rejected on all three systems across all ten repeats (240 attempts total, zero bypasses). Three observations about this result are worth recording honestly rather than treating it as a uniform win.
 
