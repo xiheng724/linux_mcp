@@ -1,0 +1,13 @@
+attack_type,system,attempts,successes,success_rate,outcome
+spoof,userspace,0,0,0.0,BLOCKED
+replay,userspace,0,0,0.0,BLOCKED
+substitute,userspace,0,0,0.0,BLOCKED
+escalation,userspace,0,0,0.0,BLOCKED
+spoof,seccomp,0,0,0.0,BLOCKED
+replay,seccomp,0,0,0.0,BLOCKED
+substitute,seccomp,0,0,0.0,BLOCKED
+escalation,seccomp,0,0,0.0,BLOCKED
+spoof,kernel,0,0,0.0,BLOCKED
+replay,kernel,0,0,0.0,BLOCKED
+substitute,kernel,0,0,0.0,BLOCKED
+escalation,kernel,0,0,0.0,BLOCKED

@@ -38,6 +38,11 @@ kernel-mcp/out/
 *.pid
 *.sock
 
+# Raw experiment samples are regenerated locally; keep summaries and plots only
+experiment-results/**/latency_samples.csv
+experiment-results/**/scalability_samples.csv
+experiment-results/**/throughput_buckets.csv
+
 # LaTeX build outputs
 Paper-Latex/*.aux
 Paper-Latex/*.bbl

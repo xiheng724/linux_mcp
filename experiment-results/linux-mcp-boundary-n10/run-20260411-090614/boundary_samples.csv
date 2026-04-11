@@ -1,0 +1,241 @@
+system,attack_type,scenario_group,attack_case,mode,attack_profile,status,decision,error,latency_ms,unauthorized_success,expected_reject,invariant_violated
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.928,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,0.88,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.828,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.886,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,2.079,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,1.843,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,1.113,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,1.082,0,1,0
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.907,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.794,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.699,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.691,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.335,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,1.907,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,0.777,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,1.652,0,1,0
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.298,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.657,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.558,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.537,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,3.049,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,3.218,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,0.976,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,0.818,0,1,0
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.624,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.589,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.589,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.566,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.122,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,3.295,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,0.588,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,0.576,0,1,0
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.57,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.576,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.602,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.564,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.559,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,1.195,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,0.798,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,0.699,0,1,0
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.597,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.572,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.575,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.557,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,3.518,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,1.276,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,0.794,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,0.662,0,1,0
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.554,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.651,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.67,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.553,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.06,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,1.248,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,3.345,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,1.572,0,1,0
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.563,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.599,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.593,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.577,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.142,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,2.974,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,0.556,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,1.205,0,1,0
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.599,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.629,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,2.321,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.632,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.918,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,2.053,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,1.303,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,0.738,0,1,0
+userspace,boundary,F,ticket_id_bitflip,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.602,0,1,0
+userspace,boundary,F,ticket_id_off_by_one,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.518,0,1,0
+userspace,boundary,F,ticket_id_zero,userspace,,error,DEFER,kernel arbitration deferred: require_approval,0.506,0,1,0
+userspace,boundary,F,ticket_id_max,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.479,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w0,userspace,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.247,0,1,0
+userspace,boundary,F,ticket_race_double_consume_w1,userspace,,ok_legitimate_consume,ALLOW,,1.188,0,1,0
+userspace,boundary,F,tool_hash_one_char_flip,userspace,,error,DENY,kernel arbitration denied: hash_mismatch,0.537,0,1,0
+userspace,boundary,F,tool_hash_prefix_truncated,userspace,,error,,tool_hash must be 8 hex chars,0.551,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,1.004,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_scope_mismatch,1.046,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,1.004,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.003,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,2.302,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,2.202,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.83,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.781,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.811,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.832,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,0.829,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.872,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.86,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.948,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.733,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.709,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.765,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.782,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,0.71,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.708,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.401,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.558,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.709,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.658,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.704,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.694,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,0.626,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.617,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.447,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.579,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.619,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.603,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.648,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.616,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,0.661,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.608,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.381,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.354,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.624,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.525,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.768,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.588,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,0.624,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.698,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.299,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.422,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.696,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.585,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.649,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.768,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,0.742,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.718,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.475,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.545,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.582,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.548,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.565,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.607,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,0.722,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.7,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.352,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.08,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.596,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.662,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.715,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.623,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,0.703,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.71,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.39,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.409,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.605,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.665,0,1,0
+seccomp,boundary,F,ticket_id_bitflip,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.551,0,1,0
+seccomp,boundary,F,ticket_id_off_by_one,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.645,0,1,0
+seccomp,boundary,F,ticket_id_zero,seccomp,,error,DEFER,kernel arbitration deferred: require_approval,0.699,0,1,0
+seccomp,boundary,F,ticket_id_max,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.717,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w0,seccomp,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.254,0,1,0
+seccomp,boundary,F,ticket_race_double_consume_w1,seccomp,,error,ALLOW,simple sandbox blocked host write outside repo: /home/lxh/Desktop/lxh.txt,1.371,0,1,0
+seccomp,boundary,F,tool_hash_one_char_flip,seccomp,,error,DENY,kernel arbitration denied: hash_mismatch,0.708,0,1,0
+seccomp,boundary,F,tool_hash_prefix_truncated,seccomp,,error,,tool_hash must be 8 hex chars,0.631,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.886,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.794,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,0.888,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.823,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.736,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,ok_legitimate_consume,ALLOW,,1.906,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.788,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,0.756,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.757,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.814,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,1.022,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,1.794,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,ok_legitimate_consume,ALLOW,,1.237,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.529,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.68,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,0.986,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.691,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.605,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,3.439,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,3.577,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.159,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,ok_legitimate_consume,ALLOW,,1.997,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.774,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,0.595,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.663,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.951,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,0.648,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.629,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.263,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,ok_legitimate_consume,ALLOW,,1.903,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.77,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,1.6,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.788,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.725,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,1.75,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.79,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.403,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,ok_legitimate_consume,ALLOW,,1.211,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.664,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,0.563,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.565,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.611,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,0.562,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.529,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,ok_legitimate_consume,ALLOW,,1.297,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,3.12,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.847,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,0.949,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.627,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.544,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,0.586,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.661,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,5.654,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,ok_legitimate_consume,ALLOW,,5.439,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.679,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,0.527,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.675,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.662,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,0.607,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.568,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.13,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,ok_legitimate_consume,ALLOW,,1.307,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.7,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,0.584,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.612,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.613,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,0.574,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.63,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,2.204,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,ok_legitimate_consume,ALLOW,,2.068,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,0.718,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,0.657,0,1,0
+kernel,boundary,F,ticket_id_bitflip,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,0.611,0,1,0
+kernel,boundary,F,ticket_id_off_by_one,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.768,0,1,0
+kernel,boundary,F,ticket_id_zero,kernel,,error,DEFER,kernel arbitration deferred: require_approval,0.604,0,1,0
+kernel,boundary,F,ticket_id_max,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_unknown,0.659,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w0,kernel,,error,DEFER,kernel arbitration deferred: approval_ticket_consumed,1.349,0,1,0
+kernel,boundary,F,ticket_race_double_consume_w1,kernel,,ok_legitimate_consume,ALLOW,,1.511,0,1,0
+kernel,boundary,F,tool_hash_one_char_flip,kernel,,error,DENY,kernel arbitration denied: hash_mismatch,1.336,0,1,0
+kernel,boundary,F,tool_hash_prefix_truncated,kernel,,error,,tool_hash must be 8 hex chars,1.347,0,1,0
