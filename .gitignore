@@ -12,6 +12,7 @@ __pycache__/
 .vscode/
 !.vscode/
 !.vscode/c_cpp_properties.json
+!.vscode/settings.json
 
 # Client build outputs
 client/bin/*
@@ -36,6 +37,22 @@ kernel-mcp/out/
 *.log
 *.pid
 *.sock
+
+# LaTeX build outputs
+Paper-Latex/*.aux
+Paper-Latex/*.bbl
+Paper-Latex/*.blg
+Paper-Latex/*.fdb_latexmk
+Paper-Latex/*.fls
+Paper-Latex/*.lof
+Paper-Latex/*.lot
+Paper-Latex/*.out
+Paper-Latex/*.synctex.gz
+Paper-Latex/*.toc
+Paper-Latex/*.xdv
+Paper-Latex/contents/*.aux
+Paper-Latex/appendices/*.aux
+Paper-Latex/main.pdf
 
 # Runtime-created demo note records
 tool-app/demo_data/notes/*/*.json

@@ -140,8 +140,6 @@ The detailed semantics of these decisions are described in Section~\ref{fig:chap
 
 Depending on the kernel’s decision, \texttt{mcpd} either forwards the request to the tool service, terminates the invocation with an error, or transitions the request into a pending state awaiting external approval.
 After the tool service returns a result, \texttt{mcpd} issues \texttt{TOOL\_COMPLETE} to the kernel, closing the invocation lifecycle in the control plane’s view.
-After the tool service returns a result, \texttt{mcpd} issues
-\texttt{TOOL\_COMPLETE} to the kernel, closing the invocation lifecycle in the control plane's view.
 
 This workflow has a concrete security consequence: the kernel both opens and closes every invocation.
 An invocation that never reaches \texttt{TOOL\_COMPLETE}---whether due to daemon failure or tool timeout---persists as an open entry in kernel state and remains inspectable via \texttt{sysfs}.
@@ -156,12 +154,12 @@ Tying identity to transport details---socket paths, port numbers, endpoint URIs-
 If identity is too coarse, the system cannot distinguish a tool that has been semantically modified from one that has simply been redeployed at a different address.
 
 \texttt{linux-mcp} resolves this by separating semantic identity from transport location.
-Each tool is described by a JSON manifest containing logical attributes: tool identifier, tool name, application identifier, risk tags, description, input schema, and examples.
+Each tool is described by a JSON manifest containing logical attributes: tool identifier, tool name, application identifier, application name, risk tags, description, input schema, examples, path semantics, and approval policy.
 These fields describe what the tool is intended to do, not where it runs.
 \texttt{mcpd} canonicalizes the semantically relevant field subset into a stable JSON representation, computes a SHA-256 digest over it, and uses a truncated prefix of this digest as the tool's semantic hash.
 Crucially, the Unix domain socket endpoint is excluded from the hash computation.
 A tool may therefore be redeployed to a new socket path without changing its logical identity, provided the semantic fields in the manifest remain unchanged.
-Conversely, any modification to a semantically significant field---the input schema, risk tags, or description---yields a different hash, which the kernel detects as a mismatch upon the next \texttt{TOOL\_REQUEST}.
+Conversely, any modification to a semantically significant field---the input schema, risk tags, description, approval policy, or path semantics---yields a different hash, which the kernel detects as a mismatch upon the next \texttt{TOOL\_REQUEST}.
 
 This separation matters for admission control because the kernel and the daemon can only meaningfully agree on whether a request is legitimate if they share a common notion of tool identity.
 The semantic hash is the concrete artefact that makes this agreement possible: it is computed in user space but verified in kernel space, so the daemon cannot substitute a different tool without producing a detectable hash mismatch.
@@ -174,14 +172,14 @@ The semantic hash is the concrete artefact that makes this agreement possible: i
 Approval is one of the more subtle aspects of the control path to get right.
 Deferring and resolving a request is straightforward; ensuring that an approval applies to the exact same session, requester, and operation requires explicit binding and precise state tracking.
 
-In \texttt{linux-mcp}, each session maintained by \texttt{mcpd} is bound to the real peer credentials of its Unix domain socket connection.
+In \texttt{linux-mcp}, each session maintained by \texttt{mcpd} is bound to the real peer credentials of its Unix domain socket connection \cite{stevens2013unix}.
 From these credentials, the daemon derives a \emph{binding hash} and a
 \emph{binding epoch}.
 When a request enters the \texttt{DEFER} state, the kernel creates an approval ticket and associates it with this binding context.
 Upon receiving an \texttt{APPROVAL\_DECIDE} message, the kernel verifies that the binding context stored in the ticket still matches the current session state before permitting the deferred request to proceed.
 
 This binding mechanism ensures that approvals cannot be replayed across sessions or misdirected to structurally similar but distinct requests.
-More importantly, it guarantees that the system state validated at deferral time is identical to the state at execution time, eliminating time-of-check-to-time-of-use (TOCTOU) inconsistencies.
+More importantly, it guarantees that the system state validated at deferral time is identical to the state at execution time, eliminating time-of-check-to-time-of-use (TOCTOU) inconsistencies \cite{bishop2003computer}.
 
 Beyond basic ticket binding, the implementation reveals a more nuanced structure: \texttt{linux-mcp} employs \emph{two layers of arbitration} and supports \emph{two distinct approval paths}.
 
@@ -214,7 +212,7 @@ The critical ordering, as shown in Figure~\ref{fig:chapter3-approval}, is that a
 This mechanism reflects a key design principle in \texttt{linux-mcp}.
 User space is responsible for interpreting semantics---including request structure, tool schemas, and policy hints---while the kernel enforces \emph{minimal, stable invariants} over state transitions.
 The kernel does not need to understand the full meaning of a request; it only needs to ensure that: the binding context is preserved, the approval ticket is valid and unconsumed, and the state transition (\texttt{DEFER} $\rightarrow$ \texttt{ALLOW}) is explicitly authorised.
-By constraining the trusted computing base to these minimal, stable invariants, \texttt{linux-mcp} achieves meaningful safety guarantees without embedding high-level application semantics in kernel space.
+By constraining the trusted computing base to these minimal, stable invariants \cite{saltzer1975protection}, \texttt{linux-mcp} achieves meaningful safety guarantees without embedding high-level application semantics in kernel space.
 
 \begin{figure}[t]
 \centering
@@ -228,8 +226,8 @@ By constraining the trusted computing base to these minimal, stable invariants, 
 \subsection{Kernel Module Design}
 
 The kernel module is implemented as a Generic Netlink family named \texttt{KERNEL\_MCP}.
-The command set covers the full invocation lifecycle: \texttt{TOOL\_REGISTER}, \texttt{AGENT\_REGISTER}, \texttt{TOOL\_REQUEST}, \texttt{TOOL\_COMPLETE}, \texttt{APPROVAL\_DECIDE}, \texttt{RESET\_TOOLS}, and \texttt{LIST\_TOOLS\_DUMP}.
-Generic Netlink was preferred over alternatives such as \texttt{ioctl} or character devices for three reasons: it provides a naturally structured message format, supports dump-style enumeration for registry introspection, and yields a self-describing kernel interface well suited to a research prototype.
+The command set covers the full invocation lifecycle: \texttt{TOOL\_REGISTER}, \texttt{AGENT\_REGISTER}, \texttt{TOOL\_REQUEST}, \texttt{TOOL\_DECISION}, \texttt{TOOL\_COMPLETE}, \texttt{APPROVAL\_DECIDE}, \texttt{RESET\_TOOLS}, and \texttt{LIST\_TOOLS}.
+Generic Netlink was preferred over alternatives such as \texttt{ioctl} or character devices for three reasons: it provides a naturally structured message format, supports dump-style enumeration for registry introspection, and yields a self-describing kernel interface well suited to a research prototype \cite{netlink2026}.
 
 Internally, the module maintains two registries.
 The tool registry maps tool identifiers to their manifest-derived semantic hashes and associated metadata.
@@ -293,7 +291,6 @@ If manifests change between a crash and a restart, the tool hashes registered in
 
 \texttt{linux-mcp} addresses this with a reconciliation path.
 On startup, \texttt{mcpd} issues a \texttt{RESET\_TOOLS} command to clear the kernel-side tool registry, then re-registers the full set of tools from the current manifest state.
-The daemon compares its manifest-derived view against the state returned from \texttt{LIST\_TOOLS\_DUMP} and re-establishes consistency where needed.
 This is a deliberately conservative strategy: the system unconditionally rebuilds state from the manifest source of truth rather than attempting to assess whether residual kernel state remains valid.
 This trade-off is appropriate for a research prototype, where state correctness and auditability take precedence over minimising re-registration overhead.
 
@@ -308,7 +305,7 @@ This behaviour is confirmed in the experimental evaluation: after an induced dae
 
 The architecture of \texttt{linux-mcp} is positioned between two degenerate extremes.
 A purely user-space architecture consolidates policy, state, and execution within a single trust domain---easy to construct, but equally easy to subvert.
-Conversely, a kernel-heavy design that relocates manifest parsing and tool execution into kernel space would be neither safe nor practically deployable:JSON parsing in kernel space introduces an unnecessarily large attack surface,and tool integration belongs in an environment that supports flexible language runtimes and evolving schemas.
+Conversely, a kernel-heavy design that relocates manifest parsing and tool execution into kernel space would be neither safe nor practically deployable: JSON parsing in kernel space introduces an unnecessarily large attack surface, and tool integration belongs in an environment that supports flexible language runtimes and evolving schemas.
 
 The split adopted here avoids both extremes.
 User space retains everything that benefits from flexibility: manifest semantics, payload validation, session logic, and tool execution.
