@@ -252,26 +252,9 @@ def _plot_latency_by_payload_metric(
                 fontsize=8.5,
                 color="#222222",
             )
-        # Pairwise significance asterisks vs userspace baseline.
-        baseline_vals = per_rep.get((baseline_system, payload), [])
-        if baseline_vals:
-            y_top = max(m + eh for m, eh in zip(means, err_his)) * 1.22
-            for idx, system in enumerate(systems):
-                if system == baseline_system:
-                    continue
-                other_vals = per_rep.get((system, payload), [])
-                p = _welch_p(baseline_vals, other_vals)
-                marker = _p_value_marker(p)
-                ax.text(
-                    x_positions[idx],
-                    y_top,
-                    marker,
-                    ha="center",
-                    va="bottom",
-                    fontsize=8.5,
-                    color="#444444",
-                )
-            ax.set_ylim(0, y_top * 1.18 if y_top > 0 else None)
+        y_top = max(m + eh for m, eh in zip(means, err_his)) * 1.22 if means else 0.0
+        if y_top > 0:
+            ax.set_ylim(0, y_top * 1.18)
 
         ax.set_xticks(x_positions)
         ax.set_xticklabels([SYSTEM_LABELS[s] for s in systems])
@@ -447,7 +430,6 @@ def plot_latency_overhead(
         ratios: List[float] = []
         errs_lo: List[float] = []
         errs_hi: List[float] = []
-        markers: List[str] = []
         for payload in payloads:
             base = per_rep_mean.get(("userspace", payload), [])
             other = per_rep_mean.get((system, payload), [])
@@ -455,7 +437,6 @@ def plot_latency_overhead(
                 ratios.append(1.0)
                 errs_lo.append(0.0)
                 errs_hi.append(0.0)
-                markers.append("ns")
                 continue
             base_mean = statistics.fmean(base)
             other_mean = statistics.fmean(other)
@@ -468,7 +449,6 @@ def plot_latency_overhead(
             ratios.append(ratio)
             errs_lo.append(max(ratio - ratio_lo, 0.0))
             errs_hi.append(max(ratio_hi - ratio, 0.0))
-            markers.append(_p_value_marker(_welch_p(base, other)))
             all_values.extend([ratio_lo, ratio_hi])
         offsets = x_positions + (idx - (len(comparators) - 1) / 2) * bar_width
         ax.bar(
@@ -481,12 +461,11 @@ def plot_latency_overhead(
             capsize=3,
             error_kw={"elinewidth": 1.0, "ecolor": "#333333"},
         )
-        for x, ratio, marker in zip(offsets, ratios, markers):
-            y_text = ratio + max(errs_hi) * 1.3 if errs_hi else ratio + 0.03
+        for x, ratio in zip(offsets, ratios):
             ax.text(
                 x,
                 ratio + 0.02,
-                f"{ratio:.2f}\n{marker}",
+                f"{ratio:.2f}",
                 ha="center",
                 va="bottom",
                 fontsize=8,
