@@ -69,14 +69,63 @@ This fragility is particularly relevant in long-running agent systems where exec
 These limitations are not unique to any single framework.
 Rather, they reflect a broader pattern: current agent systems increasingly rely on control plane invariants \cite{anderson1972computer} that are difficult to enforce when confined to user space \cite{garfinkel2003terra, watson2010capsicum}.
 
+\subsection{Attack Classes Outside the Scope of Kernel Admission Control}
+
+Before positioning this work, it is important to delimit which attack classes kernel-level admission control can and cannot address.
+Two dominant attack categories in AI agent systems fall outside the scope of this approach.
+
+\textbf{Prompt injection.}
+In a prompt injection attack, adversarial content embedded in a tool's output or in the environment manipulates the LLM planner into choosing an unintended tool or constructing a malicious payload \cite{greshake2023prompt, liu2023prompt}.
+The attack operates entirely at the semantic layer, before or independently of any \texttt{tool:exec} call reaching the control plane.
+Defending against prompt injection requires defenses at the model or application layer---input sanitisation, output monitoring, sandboxed execution contexts---none of which are provided by admission control at the kernel level.
+\texttt{linux-mcp} does not address prompt injection; it assumes that the payload submitted to \texttt{tool:exec} reflects genuine user or planner intent.
+
+\textbf{Supply-chain compromise of manifests.}
+If an attacker modifies \texttt{tool-app/manifests/*.json} before \texttt{mcpd} starts, the kernel will faithfully enforce the attacker's tool definitions.
+Protecting manifest integrity requires file-system-level mechanisms such as IMA (Integrity Measurement Architecture) or dm-verity, which operate at a different layer and are orthogonal to this work.
+\texttt{linux-mcp} treats on-disk manifests as a trusted input, consistent with the assumption that the host file system is not compromised.
+
 \subsection{Design Positioning}
 
 This observation places the present work between two extremes.
-On one end, AIOS-style proposals advocate for a full rethinking of the operating system around LLM-centric abstractions. 
+On one end, AIOS-style proposals advocate for a full rethinking of the operating system around LLM-centric abstractions.
 On the other, existing agent frameworks operate entirely in user space, relying on application-level logic to enforce correctness and security.
 
-The approach taken here is narrower. 
-Instead of redefining the entire operating system, it focuses on a specific question: which control-plane invariants in MCP-style tool invocation benefit from kernel-level enforcement?
+The approach taken here is narrower.
+Instead of redefining the entire operating system, it focuses on a specific question: which control-plane invariants in MCP-style tool invocation benefit from kernel-level enforcement, given that the gateway and manifests are trusted inputs?
+
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{l p{4.8cm} p{5.2cm}}
+\toprule
+\textbf{Attack class} & \textbf{Representative attack} & \textbf{Defense in \texttt{linux-mcp}} \\
+\midrule
+
+Spoofing 
+& Forged session identity or mismatched tool hash 
+& Kernel-verified identity binding and semantic-hash consistency \\
+
+Replay 
+& Reuse of stale approval tickets or prior requests 
+& Kernel-enforced approval lifecycle with binding and lifetime validation \\
+
+Substitution 
+& Executing a tool diverging from declared semantics 
+& Verification of manifest-derived semantic identity \\
+
+Escalation 
+& Bypassing gateway checks via logic flaws 
+& Mandatory kernel arbitration for all invocations \\
+
+\bottomrule
+\end{tabular}
+\caption{Control-plane threats and defenses (in scope).}
+\label{tab:threat_in_scope}
+\end{table}
+
+
 
 \subsection{Relation to Native Linux Security Mechanisms}
 
@@ -114,33 +163,3 @@ These attack classes and their corresponding defenses are summarized in Table~\r
 The system does not aim to provide complete host security.
 Instead, it ensures that critical control-plane invariants are enforced outside the mutable user-space execution path, making them significantly harder to bypass through gateway-local bugs or weakened mediation logic.
 These attack classes directly inform the design of \texttt{linux-mcp}, and are revisited in the evaluation through targeted adversarial experiments.
-
-\begin{table}[t]
-\centering
-\small
-\begin{tabular}{l p{4.8cm} p{5.2cm}}
-\toprule
-\textbf{Attack class} & \textbf{Representative attack} & \textbf{Defense in \texttt{linux-mcp}} \\
-\midrule
-
-Spoofing 
-& Forged session identity or mismatched tool hash 
-& Kernel-verified identity binding and semantic-hash consistency \\
-
-Replay 
-& Reuse of stale approval tickets or prior requests 
-& Kernel-enforced approval lifecycle with binding and lifetime validation \\
-
-Substitution 
-& Executing a tool diverging from declared semantics 
-& Verification of manifest-derived semantic identity \\
-
-Escalation 
-& Bypassing gateway checks via logic flaws 
-& Mandatory kernel arbitration for all invocations \\
-
-\bottomrule
-\end{tabular}
-\caption{Control-plane threats and defenses (in scope).}
-\label{tab:threat_in_scope}
-\end{table}

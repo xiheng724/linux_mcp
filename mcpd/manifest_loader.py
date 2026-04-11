@@ -74,7 +74,10 @@ def _semantic_hash(tool: Dict[str, Any], path: Path) -> str:
         if field not in tool:
             raise ValueError(f"{path}: missing semantic hash field '{field}'")
         semantic[field] = tool[field]
-    return hashlib.sha256(_canonical_json_bytes(semantic)).hexdigest()[:8]
+    # Full 64-character SHA-256 hex digest (256-bit security, no truncation).
+    # Birthday-bound collision resistance requires the full output; truncating
+    # to 8 chars (32 bits) would allow collisions after ~65k tool registrations.
+    return hashlib.sha256(_canonical_json_bytes(semantic)).hexdigest()
 
 
 def _ensure_non_empty_str_path(name: str, value: Any, path: Path) -> str:

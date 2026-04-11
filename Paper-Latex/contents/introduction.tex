@@ -36,9 +36,12 @@ Tool services execute concrete operations behind Unix domain sockets and are not
 Requests follow a fixed path: \texttt{llm-app} issues a tool invocation to \texttt{mcpd}, which validates and forwards it to the kernel; the kernel returns an allow, deny, or defer decision; allowed requests are executed by tool services, and completion is reported back through the same path. 
 This keeps all control-plane transitions explicit and observable.
 
-By making these invariants kernel-visible, the system can enforce them with higher integrity and improved observability. 
-Semantic consistency is enforced through manifest-derived identifiers, identity binding is anchored in OS-level peer credentials, and approval state is maintained in the kernel across daemon failures. 
-All tool invocations therefore pass through a single mediation path, reducing reliance on in-memory gateway state.
+By making these invariants kernel-visible, the system can enforce them with higher integrity and improved observability.
+Semantic consistency is enforced through manifest-derived identifiers; identity binding is anchored in OS-level peer credentials; approval state is maintained in the kernel across daemon failures.
+All tool invocations pass through a single mediation path, reducing reliance on transient in-memory gateway state.
+
+Critically, this design does not reduce the trusted footprint of \texttt{mcpd}---the gateway remains fully trusted and populates the kernel's registries.
+What it achieves is a \emph{partitioning} of control-plane state: registry entries, approval tickets, and binding checks are held in the kernel under \texttt{CAP\_NET\_ADMIN}-protected Netlink access control, making them durable across daemon failure and inaccessible to unprivileged processes, while semantic parsing and tool execution remain in user space where flexibility matters most.
 
 This design does not move tool execution into the kernel or attempt to replace existing Linux security mechanisms. 
 Instead, it introduces a kernel-assisted control plane that complements user-space flexibility while strengthening enforcement for MCP-style tool invocation.
@@ -102,9 +105,9 @@ Instead, \texttt{linux-mcp} focuses on kernel-assisted control-plane enforcement
 This paper makes the following contributions:
 \begin{itemize}
 
-    \item We design and implement \texttt{linux-mcp}, a kernel-assisted architecture that enforces these invariants through semantic-hash binding, Unix-domain credential binding, and a kernel-managed approval workflow resilient to daemon failure.
-    
-    \item We formulate kernel-assisted control of tool invocation as a systems problem for AI agent workloads on Linux, identifying a mismatch between existing operating system abstractions and agent-centric execution models.
-    
-    \item We conduct a comprehensive evaluation against pure and hardened user-space baselines across latency, throughput, attack resistance, and failure scenarios, showing that \texttt{linux-mcp} eliminates all tested attack classes with negligible overhead.
+    \item We design and implement \texttt{linux-mcp}, a kernel-assisted architecture that partitions control-plane state between kernel and user space: the kernel holds registry entries, approval tickets, and binding checks under \texttt{CAP\_NET\_ADMIN}-enforced Netlink access control, while semantic parsing and tool execution remain in user space. This partitioning makes critical state durable across daemon failure and inaccessible to unprivileged processes, without reducing the trusted footprint of \texttt{mcpd}.
+
+    \item We formulate kernel-assisted control of tool invocation as a systems problem for AI agent workloads on Linux, identifying a mismatch between existing operating system abstractions and agent-centric execution models, and precisely characterising which control-plane invariants benefit from kernel placement.
+
+    \item We conduct a comprehensive evaluation against pure and hardened user-space baselines across latency, throughput, attack resistance, and failure scenarios, showing that \texttt{linux-mcp} eliminates all tested control-plane attack classes with negligible overhead, and that kernel-held approval state survives daemon failure in a way neither baseline can match.
 \end{itemize}

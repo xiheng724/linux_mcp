@@ -11,6 +11,12 @@ This is convenient to construct, but it means that a compromised or misbehaving 
 \texttt{linux-mcp} addresses this by decoupling semantic handling from enforcement: \texttt{mcpd} retains responsibility for manifest parsing, schema validation, session management, and tool routing, while
 \texttt{kernel\_mcp} owns registry state, arbitrates invocation requests, manages approval ticket lifecycles, and surfaces the authoritative control-plane state via \texttt{sysfs}.
 
+It is important to state the trust model precisely.
+\texttt{mcpd} remains a fully trusted component: it populates the kernel's tool and agent registries, computes all semantic hashes, and derives the binding credentials used for identity verification.
+The kernel does not independently re-derive these values from raw sources; it enforces what \texttt{mcpd} has asserted.
+What the kernel \emph{does} provide is a stronger enforcement domain for the state that \texttt{mcpd} has established: registry entries, approval tickets, binding checks, and invocation lifecycle transitions are held in kernel space, protected by \texttt{CAP\_NET\_ADMIN} access control on all registry-mutating Netlink commands, and remain inspectable independently of the daemon's process lifetime.
+This is not a TCB reduction---\texttt{mcpd} is still trusted---but a \emph{TCB partitioning}: state that benefits from durability, independent observability, and protection from unprivileged interference is held in the kernel, while state that requires semantic flexibility remains in the daemon.
+
 
 
 \subsection{Design Goals}
@@ -156,10 +162,11 @@ If identity is too coarse, the system cannot distinguish a tool that has been se
 \texttt{linux-mcp} resolves this by separating semantic identity from transport location.
 Each tool is described by a JSON manifest containing logical attributes: tool identifier, tool name, application identifier, application name, risk tags, description, input schema, examples, path semantics, and approval policy.
 These fields describe what the tool is intended to do, not where it runs.
-\texttt{mcpd} canonicalizes the semantically relevant field subset into a stable JSON representation, computes a SHA-256 digest over it, and uses a truncated prefix of this digest as the tool's semantic hash.
+\texttt{mcpd} canonicalizes the semantically relevant field subset into a stable JSON representation and computes the full 256-bit SHA-256 digest over it, represented as a 64-character hexadecimal string.
+The full digest is used without truncation: a truncated prefix (e.g., 8 hex characters, 32 bits) would allow collisions by the birthday bound after approximately $2^{16}$ tool registrations, which is not a large number in a production system spanning many applications.
 Crucially, the Unix domain socket endpoint is excluded from the hash computation.
 A tool may therefore be redeployed to a new socket path without changing its logical identity, provided the semantic fields in the manifest remain unchanged.
-Conversely, any modification to a semantically significant field---the input schema, risk tags, description, approval policy, or path semantics---yields a different hash, which the kernel detects as a mismatch upon the next \texttt{TOOL\_REQUEST}.
+Conversely, any modification to a semantically significant field---the input schema, risk tags, description, approval policy, or path semantics---produces a different 256-bit digest, which the kernel detects as a mismatch upon the next \texttt{TOOL\_REQUEST}.
 
 This separation matters for admission control because the kernel and the daemon can only meaningfully agree on whether a request is legitimate if they share a common notion of tool identity.
 The semantic hash is the concrete artefact that makes this agreement possible: it is computed in user space but verified in kernel space, so the daemon cannot substitute a different tool without producing a detectable hash mismatch.
@@ -311,3 +318,25 @@ The split adopted here avoids both extremes.
 User space retains everything that benefits from flexibility: manifest semantics, payload validation, session logic, and tool execution.
 The kernel retains the smaller, more stable set of operations that benefit from stronger authority and independently inspectable state: which tools and agents are registered, whether a given request may advance, whether an approval ticket is valid and unconsumed, and whether an invocation has been formally closed.
 This constitutes the central implementation claim of the system, and it is precisely what the evaluation presented in the following chapter is designed to validate.
+
+\paragraph{Design alternatives considered.}
+
+Three kernel-interface alternatives were considered before settling on a Generic Netlink family.
+
+\textbf{Linux Security Module (LSM) hooks.}
+LSM hooks attach to VFS and socket operations at fixed kernel hook points~\cite{lsm2026}.
+They can enforce access control over file opens, socket sends, and process creation, but they cannot natively express the notion of ``this Netlink message carries a valid semantic hash for this registered tool.''
+Maintaining a dynamically populated, per-tool hash registry at LSM hook granularity would require storing tool state in LSM blob storage and correlating it with Netlink message content at hook time---a design that is both complex and fragile, since LSM hooks fire at the system-call boundary rather than at the application-protocol boundary where tool identity is meaningful.
+
+\textbf{eBPF programs attached to the Netlink socket.}
+An eBPF program can filter socket operations and enforce byte-level policies with very low overhead~\cite{seccomp2026}.
+However, the eBPF verifier's memory and loop restrictions make it impractical to maintain a dynamic hash registry inside a BPF map and perform variable-length string comparisons at hook time without significant complexity.
+More importantly, eBPF programs cannot issue Netlink replies or manage kernel-side lifecycle state (approval tickets, counters) without a userspace control plane---which reintroduces the dependency on user-space correctness that the design aims to reduce.
+
+\textbf{Capsicum-style capability model.}
+A Capsicum-style design~\cite{watson2010capsicum} could scope each tool invocation to a capability derived from the tool's identity, preventing escalation across tool boundaries.
+This approach would require tool services to be written against a capability API, violating the design goal of tool-author transparency: existing tool services should require no modification to participate in the control plane.
+
+A Generic Netlink family avoids all three limitations.
+It provides a structured, self-describing message format; supports dump-style enumeration for registry introspection; allows the kernel module to maintain full lifecycle state (registries, tickets, counters) without verifier constraints; and imposes no interface requirements on tool authors.
+The cost is that it requires a loadable kernel module rather than a policy layer attached to existing hooks---a trade-off that is appropriate for a research prototype but would need careful security review for production use.

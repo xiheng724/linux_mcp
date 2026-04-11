@@ -7,13 +7,18 @@
 This project examined a focused systems question: whether the control-plane invariants of MCP-style tool invocation are better enforced in the kernel than in a user-space gateway alone. 
 The design, implementation, and evaluation of \texttt{linux-mcp} together support an affirmative answer.
 
-The main outcome of the project is not simply a working prototype, but a more precise architectural argument. Rather than treating AI-agent tool use purely as an application-layer integration problem, \texttt{linux-mcp} shows that a small but consequential part of the control plane benefits from operating-system-level support. 
-Admission decisions, approval-ticket state, binding checks, and authoritative registry state all gain from being placed in a stronger enforcement domain than a mutable user-space mediator can provide. 
-By contrast, semantic parsing, schema validation, session logic, and tool execution remain in user space, where flexibility and evolvability are more important than privilege.
+The main outcome of the project is not simply a working prototype, but a more precise architectural argument.
+Rather than treating AI-agent tool use purely as an application-layer integration problem, \texttt{linux-mcp} shows that a small but consequential part of the control plane benefits from operating-system-level support.
 
-This split is the central result of the project. It shows that stronger control does not require relocating the entire agent stack into the kernel. 
-A narrow kernel role is sufficient to make the most critical state transitions---semantic identity, requester binding, approval validity, and invocation completion---explicit, authoritative, and independently inspectable.
-In this sense, \texttt{linux-mcp} does not argue for a kernel-heavy AI operating system; it argues for careful placement of a small set of control-plane invariants.
+The design partitions control-plane state rather than reducing the trusted footprint of the gateway.
+\texttt{mcpd} remains fully trusted: it populates the kernel's registries, computes semantic hashes, and derives the session-bound credentials used for identity verification.
+What the kernel provides is a stronger enforcement domain for the state that \texttt{mcpd} has established: registry entries, approval tickets, and binding checks are protected by \texttt{CAP\_NET\_ADMIN}-enforced Netlink access control, survive daemon failure, and remain inspectable independently of the daemon's process lifetime.
+Semantic parsing, schema validation, session logic, and tool execution remain in user space, where flexibility and evolvability are more important than privilege.
+
+This partitioning is the central result of the project.
+It shows that stronger control does not require relocating the entire agent stack into the kernel.
+A narrow kernel role is sufficient to make the most critical state transitions---semantic identity, requester binding, approval validity, and invocation completion---explicit, durable, and independently inspectable.
+In this sense, \texttt{linux-mcp} does not argue for a kernel-heavy AI operating system; it argues for careful, precisely scoped placement of a small set of control-plane invariants.
 
 The evaluation further shows that this design choice is practically viable.
 The kernel-assisted path blocks the tested classes of control-plane attack that continue to affect both the plain and hardened user-space baselines, while also preserving approval state across daemon failure in a way that neither baseline can match. 

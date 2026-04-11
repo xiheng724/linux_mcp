@@ -15,7 +15,7 @@
 #include <linux/kernel_mcp_schema.h>
 
 #define KERNEL_MCP_TOOL_NAME_MAX 128
-#define KERNEL_MCP_TOOL_HASH_MAX 17
+#define KERNEL_MCP_TOOL_HASH_MAX 65	/* full SHA-256: 64 hex chars + NUL */
 #define KERNEL_MCP_AGENT_ID_MAX 64
 #define KERNEL_MCP_REASON_MAX 256
 #define KERNEL_MCP_APPROVER_MAX 64
@@ -146,7 +146,7 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_MAX + 1] = {
 	[KERNEL_MCP_ATTR_DECISION] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_TOOL_HASH] = {
 		.type = NLA_NUL_STRING,
-		.len = KERNEL_MCP_TOOL_HASH_MAX - 1,
+		.len = KERNEL_MCP_TOOL_HASH_MAX - 1,	/* validated against 64-char full SHA-256 */
 	},
 	[KERNEL_MCP_ATTR_EXEC_MS] = { .type = NLA_U32 },
 	[KERNEL_MCP_ATTR_TOOL_RISK_FLAGS] = { .type = NLA_U32 },
@@ -1192,13 +1192,15 @@ dump_nla_fail:
 
 static const struct genl_ops kernel_mcp_genl_ops[] = {
 	{
+		/* Registry mutation: only mcpd (root/CAP_NET_ADMIN) may register tools. */
 		.cmd = KERNEL_MCP_CMD_TOOL_REGISTER,
-		.flags = 0,
+		.flags = GENL_ADMIN_PERM,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_tool_register,
 	},
 	{
+		/* Catalog read: any process may enumerate registered tools. */
 		.cmd = KERNEL_MCP_CMD_LIST_TOOLS,
 		.flags = 0,
 		.policy = kernel_mcp_policy,
@@ -1206,36 +1208,41 @@ static const struct genl_ops kernel_mcp_genl_ops[] = {
 		.dumpit = kernel_mcp_cmd_list_tools_dump,
 	},
 	{
+		/* Registry mutation: only mcpd (root/CAP_NET_ADMIN) may register agents. */
 		.cmd = KERNEL_MCP_CMD_AGENT_REGISTER,
-		.flags = 0,
+		.flags = GENL_ADMIN_PERM,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_agent_register,
 	},
 	{
+		/* Admission: open to registered callers; binding_hash check enforces identity. */
 		.cmd = KERNEL_MCP_CMD_TOOL_REQUEST,
-		.flags = 0,
+		.flags = GENL_ADMIN_PERM,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_tool_request,
 	},
 	{
+		/* Lifecycle close: only mcpd (root/CAP_NET_ADMIN) may close an invocation. */
 		.cmd = KERNEL_MCP_CMD_TOOL_COMPLETE,
-		.flags = 0,
+		.flags = GENL_ADMIN_PERM,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_tool_complete,
 	},
 	{
+		/* Approval resolution: only mcpd (root/CAP_NET_ADMIN) may resolve tickets. */
 		.cmd = KERNEL_MCP_CMD_APPROVAL_DECIDE,
-		.flags = 0,
+		.flags = GENL_ADMIN_PERM,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_approval_decide,
 	},
 	{
+		/* Registry reset: only mcpd (root/CAP_NET_ADMIN) may clear the tool registry. */
 		.cmd = KERNEL_MCP_CMD_RESET_TOOLS,
-		.flags = 0,
+		.flags = GENL_ADMIN_PERM,
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_reset_tools,
