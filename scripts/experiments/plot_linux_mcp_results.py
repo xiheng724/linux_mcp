@@ -166,7 +166,13 @@ def plot_breakdown(rows: List[Dict[str, str]], out_path: Path) -> None:
         bottoms = [bottoms[idx] + values[idx] for idx in range(len(values))]
     ax.set_ylabel("mean latency (ms)")
     ax.grid(axis="y", alpha=0.25)
-    ax.legend()
+    # Place legend above axes to avoid bar overlap.
+    ax.legend(
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.02),
+        ncol=3,
+        frameon=False,
+    )
     fig.tight_layout()
     fig.savefig(out_path, dpi=180)
     plt.close(fig)

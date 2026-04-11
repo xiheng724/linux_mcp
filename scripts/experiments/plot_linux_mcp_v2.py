@@ -403,11 +403,19 @@ def plot_latency_breakdown(
         ax.grid(axis="y", which="both", alpha=0.25, linestyle=":")
         # Give headroom for the rotated numeric labels.
         top_value = max(stage_max_per_group) if stage_max_per_group else 1.0
-        ax.set_ylim(top=top_value * 6.0)
+        ax.set_ylim(1e-3, top_value * 6.0)
 
     axes[0].set_ylabel("mean stage latency (ms, log)")
-    axes[0].legend(loc="upper left", ncols=1)
-    fig.tight_layout()
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        ncols=len(handles),
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.99),
+    )
     _save(fig, out_dir, "figure_latency_breakdown")
 
 
@@ -590,8 +598,16 @@ def plot_latency_cdf(
         ax.xaxis.set_major_formatter(mticker.FormatStrFormatter("%g"))
 
     axes[0].set_ylabel("quantile")
-    axes[0].legend(loc="upper left")
-    fig.tight_layout()
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        ncols=len(handles),
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.99),
+    )
     _save(fig, out_dir, "figure_latency_cdf")
 
 
@@ -795,8 +811,16 @@ def plot_scalability_throughput(
         ax.grid(which="both", alpha=0.25, linestyle=":")
 
     axes[0].set_ylabel("throughput (ops/sec)")
-    axes[0].legend(loc="lower left")
-    fig.tight_layout()
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        ncols=len(handles),
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.99),
+    )
     _save(fig, out_dir, "figure_scalability_throughput")
 
 
@@ -849,8 +873,16 @@ def plot_scalability_p95(
         ax.grid(which="both", alpha=0.25, linestyle=":")
 
     axes[0].set_ylabel("p95 latency (ms, log)")
-    axes[0].legend(loc="upper left")
-    fig.tight_layout()
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        ncols=len(handles),
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.99),
+    )
     _save(fig, out_dir, "figure_scalability_p95")
 
 
