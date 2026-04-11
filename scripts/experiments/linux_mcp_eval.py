@@ -36,6 +36,7 @@ from security_eval import (
     open_session_details,
     run_daemon_compromise,
     scenario_approval_forgery,
+    scenario_boundary_conditions,
     scenario_compromised_mediator,
     scenario_metadata_tampering,
     scenario_session_forgery,
@@ -742,6 +743,62 @@ def run_attack_experiment(
     return raw_rows, matrix_rows
 
 
+def run_boundary_experiment(
+    *,
+    system: SystemVariant,
+    tools: Sequence[ToolCase],
+    timeout_s: float,
+    repeats: int,
+) -> tuple[list[Dict[str, Any]], list[Dict[str, Any]]]:
+    """Standalone phase for group-F boundary-condition probes.
+
+    Produces two outputs:
+      * raw rows (same shape as attack_samples) with scenario_group="F"
+      * a summary matrix aggregated per attack_case (not per category), since group F
+        tests case-by-case invariants that don't map onto the original 4 categories.
+
+    The boundary phase does NOT use ATTACK_PROFILES weakening. It runs against the normal
+    mcpd configuration of each system so any bypasses reflect genuine boundary weaknesses
+    rather than instrumented tamper paths.
+    """
+    safe_tool = choose_safe_tool(tools)
+    risky_tool = choose_risky_tool(tools)
+    raw_rows: list[Dict[str, Any]] = []
+    matrix_rows: list[Dict[str, Any]] = []
+    with managed_mcpd(system, attack_profile="", timeout_s=timeout_s) as sock_path:
+        rows = scenario_boundary_conditions(
+            sock_path=sock_path,
+            timeout_s=timeout_s,
+            mode=system.label,
+            attack_profile="",
+            safe_tool=safe_tool,
+            risky_tool=risky_tool,
+            all_tools=tools,
+            repeats=repeats,
+        )
+    for row in rows:
+        raw_rows.append({"system": system.label, "attack_type": "boundary", **row})
+    case_rows: dict[str, list[Dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        case_rows[str(row.get("attack_case", ""))].append(row)
+    for case_name in sorted(case_rows.keys()):
+        items = case_rows[case_name]
+        attempts = len(items)
+        successes = sum(int(item.get("unauthorized_success", 0)) for item in items)
+        success_rate = round(successes / max(attempts, 1), 6)
+        matrix_rows.append(
+            {
+                "system": system.label,
+                "attack_case": case_name,
+                "attempts": attempts,
+                "successes": successes,
+                "success_rate": success_rate,
+                "outcome": _attack_outcome(success_rate),
+            }
+        )
+    return raw_rows, matrix_rows
+
+
 def run_budget_experiment(
     *,
     system: SystemVariant,
@@ -1108,6 +1165,12 @@ def main() -> int:
     parser.add_argument("--timeout-s", type=float, default=10.0)
     parser.add_argument("--latency-requests", type=int, default=2000)
     parser.add_argument("--attack-repeats", type=int, default=10)
+    parser.add_argument(
+        "--boundary-repeats",
+        type=int,
+        default=0,
+        help="Repeats for the standalone group-F boundary-condition probes. 0 disables the phase.",
+    )
     parser.add_argument("--agents", type=str, default="1,5,10,20,50")
     parser.add_argument("--concurrency", type=str, default="1,10,50,100")
     parser.add_argument("--max-tools", type=int, default=20)
@@ -1143,6 +1206,8 @@ def main() -> int:
     attack_raw_rows: list[Dict[str, Any]] = []
     attack_matrix_rows: list[Dict[str, Any]] = []
     attack_case_summary_rows: list[Dict[str, Any]] = []
+    boundary_raw_rows: list[Dict[str, Any]] = []
+    boundary_matrix_rows: list[Dict[str, Any]] = []
     budget_raw_rows: list[Dict[str, Any]] = []
     budget_summary_rows: list[Dict[str, Any]] = []
     daemon_rows: list[Dict[str, Any]] = []
@@ -1254,6 +1319,28 @@ def main() -> int:
                     risky_tool=risky_tool,
                 )
 
+    if args.boundary_repeats > 0:
+        for system in active_systems:
+            with managed_tool_services(
+                sandboxed=system.sandboxed_tools,
+                sandbox_fsize_bytes=args.sandbox_fsize_bytes,
+            ):
+                # Need a live mcpd once to enrich tool hashes from the canonical catalog.
+                with managed_mcpd(system, timeout_s=args.timeout_s) as sock_path:
+                    boundary_tools = enrich_hash_from_mcpd(
+                        load_manifest_tools(),
+                        sock_path,
+                        args.timeout_s,
+                    )
+                boundary_raw, boundary_matrix = run_boundary_experiment(
+                    system=system,
+                    tools=boundary_tools,
+                    timeout_s=args.timeout_s,
+                    repeats=args.boundary_repeats,
+                )
+                boundary_raw_rows.extend(boundary_raw)
+                boundary_matrix_rows.extend(boundary_matrix)
+
     latency_summary_rows, breakdown_summary_rows = aggregate_latency(latency_rep_rows)
     scalability_summary_rows = aggregate_scalability(scalability_rep_rows)
 
@@ -1269,6 +1356,7 @@ def main() -> int:
             "agents": agent_counts,
             "concurrency": concurrency_levels,
             "attack_repeats": args.attack_repeats,
+            "boundary_repeats": args.boundary_repeats,
             "budget_max_calls": args.budget_max_calls,
             "budget_requests": args.budget_requests,
             "repetitions": args.repetitions,
@@ -1284,6 +1372,7 @@ def main() -> int:
         "scalability_summary": scalability_summary_rows,
         "attack_matrix": attack_matrix_rows,
         "attack_case_summary": attack_case_summary_rows,
+        "boundary_matrix": boundary_matrix_rows,
         "budget_summary": budget_summary_rows,
         "daemon_failure": daemon_rows,
     }
@@ -1348,6 +1437,16 @@ def main() -> int:
         run_dir / "attack_case_summary.csv",
         attack_case_summary_rows,
         ["system", "attack_type", "attack_case", "attempts", "successes", "success_rate"],
+    )
+    write_csv(
+        run_dir / "boundary_samples.csv",
+        boundary_raw_rows,
+        ["system", "attack_type", "scenario_group", "attack_case", "mode", "attack_profile", "status", "decision", "error", "latency_ms", "unauthorized_success", "expected_reject", "invariant_violated"],
+    )
+    write_csv(
+        run_dir / "boundary_matrix.csv",
+        boundary_matrix_rows,
+        ["system", "attack_case", "attempts", "successes", "success_rate", "outcome"],
     )
     write_csv(
         run_dir / "budget_samples.csv",

@@ -940,6 +940,269 @@ def scenario_compromised_mediator(
     return rows
 
 
+def _flip_low_bit_hex(hex_str: str) -> str:
+    """Return hex_str with its last nibble XOR'd by 0x1 (minimum-distance value change)."""
+    if not hex_str:
+        return hex_str
+    tail = hex_str[-1]
+    try:
+        flipped = format(int(tail, 16) ^ 0x1, "x")
+    except ValueError:
+        return hex_str
+    return hex_str[:-1] + flipped
+
+
+def scenario_boundary_conditions(
+    *,
+    sock_path: str,
+    timeout_s: float,
+    mode: str,
+    attack_profile: str,
+    safe_tool: ToolCase,
+    risky_tool: ToolCase | None,
+    all_tools: Sequence[ToolCase],
+    repeats: int,
+) -> List[Dict[str, Any]]:
+    """Group F: boundary-condition probes that target the edges of the specified invariants.
+
+    These cases are designed to expose failures that category-level attack scripts (groups A-E)
+    would not find: minimum-distance value forgeries (bit flips, off-by-one, prefix truncation),
+    minimum-distance hash forgeries (single-nibble flip, prefix truncation), and a TOCTOU race
+    on the approval-ticket consume path. Each case is deliberately reachable only through the
+    mcpd JSON RPC surface; raw-netlink fuzzing is out of scope because it requires privilege the
+    threat model already excludes.
+
+    Cases considered but not included:
+      * Unicode-homoglyph / null-byte client names. We verified against the mcpd session store
+        that agent_id is generated server-side as f"ag_{uid:x}_{pid:x}_{random}" and does not
+        incorporate client_name at all; an attacker cannot therefore cause identity collapse via
+        a homoglyph or null-byte suffix in the client_name field. The probe does not apply to
+        this system's identity design.
+      * mcpd crash/reconciliation race. Requires SIGKILL capability on the mcpd process, which
+        lies outside the unprivileged-local-adversary threat model.
+      * Raw generic-netlink fuzzing. Requires CAP_NET_ADMIN to open the netlink family, which
+        is already excluded by the threat model.
+    """
+    rows: List[Dict[str, Any]] = []
+    for i in range(repeats):
+        # --- F1/F2/F3: ticket_id forgery variants ------------------------------------------
+        # Acquire a live approved ticket so we can send a request carrying a *mutated*
+        # ticket_id and verify kernel rejects (the real ticket remains intact).
+        details = open_session_details(sock_path, timeout_s, f"security-boundary-ticket-{i}")
+        session_id = str(details["session_id"])
+        agent_id = str(details["agent_id"])
+        binding_hash = int(details["binding_hash"])
+        binding_epoch = int(details["binding_epoch"])
+        if risky_tool is not None:
+            ticket_id = get_ticket_for_risky_tool(
+                sock_path=sock_path,
+                timeout_s=timeout_s,
+                session_id=session_id,
+                tool=risky_tool,
+                req_id=60000 + i,
+            )
+            if ticket_id > 0:
+                approval_resp = approval_decide(
+                    sock_path=sock_path,
+                    timeout_s=timeout_s,
+                    ticket_id=ticket_id,
+                    decision="approve",
+                    operator=agent_id,
+                    agent_id=agent_id,
+                    ttl_ms=5000,
+                    binding_hash=binding_hash,
+                    binding_epoch=binding_epoch,
+                )
+                if approval_resp.get("status") == "ok":
+                    # F1: flip bit 0 of the real ticket_id
+                    mutated_id = ticket_id ^ 0x1
+                    if mutated_id == ticket_id:
+                        mutated_id = ticket_id + 1
+                    flipped_req = build_exec_req(
+                        req_id=60100 + i,
+                        session_id=session_id,
+                        tool=risky_tool,
+                        tool_hash=risky_tool.manifest_hash,
+                        approval_ticket_id=mutated_id,
+                    )
+                    flipped_resp, flipped_lat = invoke_mcpd(sock_path=sock_path, timeout_s=timeout_s, req=flipped_req)
+                    rows.append(
+                        make_attack_row(
+                            scenario_group="F",
+                            attack_case="ticket_id_bitflip",
+                            mode=mode,
+                            attack_profile=attack_profile,
+                            resp=flipped_resp,
+                            latency_ms=flipped_lat,
+                        )
+                    )
+                    # F2: off-by-one neighbor (probes whether kernel ever accepts adjacent ids)
+                    neighbor_req = build_exec_req(
+                        req_id=60200 + i,
+                        session_id=session_id,
+                        tool=risky_tool,
+                        tool_hash=risky_tool.manifest_hash,
+                        approval_ticket_id=ticket_id + 1,
+                    )
+                    neighbor_resp, neighbor_lat = invoke_mcpd(sock_path=sock_path, timeout_s=timeout_s, req=neighbor_req)
+                    rows.append(
+                        make_attack_row(
+                            scenario_group="F",
+                            attack_case="ticket_id_off_by_one",
+                            mode=mode,
+                            attack_profile=attack_profile,
+                            resp=neighbor_resp,
+                            latency_ms=neighbor_lat,
+                        )
+                    )
+                    # F3: boundary values (0 and UINT63_MAX)
+                    for extreme_case, extreme_value in (
+                        ("ticket_id_zero", 0),
+                        ("ticket_id_max", (1 << 63) - 1),
+                    ):
+                        extreme_req = build_exec_req(
+                            req_id=60300 + i,
+                            session_id=session_id,
+                            tool=risky_tool,
+                            tool_hash=risky_tool.manifest_hash,
+                            approval_ticket_id=extreme_value,
+                        )
+                        extreme_resp, extreme_lat = invoke_mcpd(sock_path=sock_path, timeout_s=timeout_s, req=extreme_req)
+                        rows.append(
+                            make_attack_row(
+                                scenario_group="F",
+                                attack_case=extreme_case,
+                                mode=mode,
+                                attack_profile=attack_profile,
+                                resp=extreme_resp,
+                                latency_ms=extreme_lat,
+                            )
+                        )
+        # --- F8: approval-ticket consume race (TOCTOU) ------------------------------------
+        # Open a FRESH session so the race probe is not contaminated by the F1-F3 state we just
+        # left behind on the current session. IMPORTANT: approval tickets are bound to the
+        # EXACT req_id of the request that issued them (verified in both mcpd and kernel
+        # consume paths). The race replay must therefore reuse the issuing req_id.
+        if risky_tool is not None:
+            race_session_details = open_session_details(
+                sock_path, timeout_s, f"security-boundary-race-{i}"
+            )
+            race_session_id = str(race_session_details["session_id"])
+            race_agent_id = str(race_session_details["agent_id"])
+            race_binding_hash = int(race_session_details["binding_hash"])
+            race_binding_epoch = int(race_session_details["binding_epoch"])
+            race_issuing_req_id = 60400 + i
+            race_ticket = get_ticket_for_risky_tool(
+                sock_path=sock_path,
+                timeout_s=timeout_s,
+                session_id=race_session_id,
+                tool=risky_tool,
+                req_id=race_issuing_req_id,
+            )
+            if race_ticket > 0:
+                race_approve = approval_decide(
+                    sock_path=sock_path,
+                    timeout_s=timeout_s,
+                    ticket_id=race_ticket,
+                    decision="approve",
+                    operator=race_agent_id,
+                    agent_id=race_agent_id,
+                    ttl_ms=5000,
+                    binding_hash=race_binding_hash,
+                    binding_epoch=race_binding_epoch,
+                )
+                if race_approve.get("status") == "ok":
+                    barrier = threading.Barrier(2)
+
+                    def _race_worker(worker_idx: int) -> tuple[Dict[str, Any], float]:
+                        # Both workers must reuse the exact issuing req_id so the kernel
+                        # consume path accepts the ticket scope check. The race then tests
+                        # whether the consume itself is atomic under concurrency.
+                        req = build_exec_req(
+                            req_id=race_issuing_req_id,
+                            session_id=race_session_id,
+                            tool=risky_tool,
+                            tool_hash=risky_tool.manifest_hash,
+                            approval_ticket_id=race_ticket,
+                        )
+                        barrier.wait()
+                        return invoke_mcpd(sock_path=sock_path, timeout_s=timeout_s, req=req)
+
+                    with ThreadPoolExecutor(max_workers=2) as pool:
+                        futs = [pool.submit(_race_worker, w) for w in (0, 1)]
+                        race_results = [fut.result() for fut in futs]
+                    # Record per-thread rows. The invariant under test is at-most-one consume:
+                    # if both threads return status=ok, the ticket was double-consumed and the
+                    # second row is a bypass. Otherwise worker0's ok is the intended consume
+                    # and we relabel it so the matrix does not count it as unauthorized.
+                    ok_count = sum(1 for resp, _ in race_results if resp.get("status") == "ok")
+                    for worker_idx, (worker_resp, worker_lat) in enumerate(race_results):
+                        annotated_resp = dict(worker_resp)
+                        if ok_count >= 2 and worker_idx == 1:
+                            # double-consume detected; keep status=ok so make_attack_row marks
+                            # this worker1 row as unauthorized_success=1.
+                            pass
+                        elif annotated_resp.get("status") == "ok":
+                            # sole legitimate consume; relabel so it is not counted as a bypass.
+                            annotated_resp["status"] = "ok_legitimate_consume"
+                        rows.append(
+                            make_attack_row(
+                                scenario_group="F",
+                                attack_case=f"ticket_race_double_consume_w{worker_idx}",
+                                mode=mode,
+                                attack_profile=attack_profile,
+                                resp=annotated_resp,
+                                latency_ms=worker_lat,
+                            )
+                        )
+
+        # --- F6/F7: hash value-adjacency forgeries ----------------------------------------
+        hash_session = open_session_details(sock_path, timeout_s, f"boundary-hash-{i}")
+        hash_session_id = str(hash_session["session_id"])
+        # F6: flip low nibble of the manifest hash
+        flipped_hash = _flip_low_bit_hex(safe_tool.manifest_hash)
+        if flipped_hash == safe_tool.manifest_hash:
+            # Degenerate: fall back to prepending 'f' to guarantee a difference.
+            flipped_hash = "f" + safe_tool.manifest_hash[1:]
+        bitflip_req = build_exec_req(
+            req_id=60600 + i,
+            session_id=hash_session_id,
+            tool=safe_tool,
+            tool_hash=flipped_hash,
+        )
+        bitflip_resp, bitflip_lat = invoke_mcpd(sock_path=sock_path, timeout_s=timeout_s, req=bitflip_req)
+        rows.append(
+            make_attack_row(
+                scenario_group="F",
+                attack_case="tool_hash_one_char_flip",
+                mode=mode,
+                attack_profile=attack_profile,
+                resp=bitflip_resp,
+                latency_ms=bitflip_lat,
+            )
+        )
+        # F7: drop the last character of the manifest hash (length/content mismatch).
+        truncated_hash = safe_tool.manifest_hash[:-1] if safe_tool.manifest_hash else ""
+        truncated_req = build_exec_req(
+            req_id=60700 + i,
+            session_id=hash_session_id,
+            tool=safe_tool,
+            tool_hash=truncated_hash,
+        )
+        truncated_resp, truncated_lat = invoke_mcpd(sock_path=sock_path, timeout_s=timeout_s, req=truncated_req)
+        rows.append(
+            make_attack_row(
+                scenario_group="F",
+                attack_case="tool_hash_prefix_truncated",
+                mode=mode,
+                attack_profile=attack_profile,
+                resp=truncated_resp,
+                latency_ms=truncated_lat,
+            )
+        )
+    return rows
+
+
 def scenario_direct_bypass(
     *,
     timeout_s: float,

@@ -1,0 +1,4 @@
+system,max_calls,requests,allowed,denied,first_reject_at,status,note
+userspace,50,100,50,50,51,ok,
+seccomp,50,100,50,50,51,ok,
+kernel,50,100,0,0,0,skipped,reload kernel_mcp with agent_max_calls=<N> to enable kernel budget enforcement

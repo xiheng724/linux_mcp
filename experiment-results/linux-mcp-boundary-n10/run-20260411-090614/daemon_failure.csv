@@ -1,0 +1,1 @@
+mode,scenario,ticket_id,approval_state_preserved,session_state_preserved,approval_error,replay_error,approval_latency_ms,replay_latency_ms,pre_crash_agent_visible,post_crash_agent_visible

@@ -1,0 +1,4 @@
+repetition,system,agents,concurrency,measurement_seconds,requests,errors,error_rate,throughput_rps,throughput_std_rps,latency_avg_ms,latency_p50_ms,latency_p95_ms,latency_p99_ms
+1,userspace,1,1,2.0,2147,0,0.0,1073.5,36.062,0.927,0.912,1.007,1.084
+1,seccomp,1,1,2.0,2155,0,0.0,1077.5,2.121,0.923,0.931,1.012,1.066
+1,kernel,1,1,2.0,2140,0,0.0,1070.0,1.414,0.931,0.942,1.019,1.071

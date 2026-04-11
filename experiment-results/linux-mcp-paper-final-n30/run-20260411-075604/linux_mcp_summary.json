@@ -1,0 +1,1437 @@
+{
+  "meta": {
+    "run_ts": "run-20260411-075604",
+    "systems": [
+      "userspace",
+      "seccomp",
+      "kernel"
+    ],
+    "environment": {
+      "timestamp_utc": "2026-04-11T07:56:04Z",
+      "hostname": "lixiheng-server",
+      "cpu_model": "Apple aarch64",
+      "cpu_cores_per_socket": "4",
+      "cpu_threads": "4",
+      "cpu_freq_mhz": "unavailable-in-guest",
+      "memory_total": "8109868 kB",
+      "os_release": "Ubuntu 24.04",
+      "kernel_release": "6.8.0-107-generic",
+      "python_version": "3.12.3",
+      "virtualization": "vmware",
+      "numa_nodes": "1",
+      "cpu_governor": "",
+      "intel_no_turbo": "",
+      "aslr": "2",
+      "uds_rcvbuf_default": "212992",
+      "uds_sndbuf_default": "212992",
+      "is_root": false,
+      "machine_note": "vmware"
+    },
+    "latency_requests": 2000,
+    "payloads": [
+      {
+        "label": "small",
+        "bytes": 100,
+        "display": "100 B"
+      },
+      {
+        "label": "medium",
+        "bytes": 10240,
+        "display": "10 KB (10,240 B)"
+      },
+      {
+        "label": "large",
+        "bytes": 1048576,
+        "display": "1 MB (1,048,576 B)"
+      }
+    ],
+    "agents": [
+      1
+    ],
+    "concurrency": [
+      1
+    ],
+    "attack_repeats": 10,
+    "budget_max_calls": 50,
+    "budget_requests": 100,
+    "repetitions": 30,
+    "repeat_sleep_s": 5.0,
+    "warmup_seconds": 5.0,
+    "measure_seconds": 5.0,
+    "random_seed": 20260405,
+    "system_order_by_repetition": [
+      {
+        "repetition": 1,
+        "system_order": [
+          "userspace",
+          "seccomp",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 2,
+        "system_order": [
+          "kernel",
+          "seccomp",
+          "userspace"
+        ]
+      },
+      {
+        "repetition": 3,
+        "system_order": [
+          "kernel",
+          "userspace",
+          "seccomp"
+        ]
+      },
+      {
+        "repetition": 4,
+        "system_order": [
+          "seccomp",
+          "kernel",
+          "userspace"
+        ]
+      },
+      {
+        "repetition": 5,
+        "system_order": [
+          "seccomp",
+          "userspace",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 6,
+        "system_order": [
+          "seccomp",
+          "kernel",
+          "userspace"
+        ]
+      },
+      {
+        "repetition": 7,
+        "system_order": [
+          "userspace",
+          "kernel",
+          "seccomp"
+        ]
+      },
+      {
+        "repetition": 8,
+        "system_order": [
+          "userspace",
+          "seccomp",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 9,
+        "system_order": [
+          "kernel",
+          "seccomp",
+          "userspace"
+        ]
+      },
+      {
+        "repetition": 10,
+        "system_order": [
+          "userspace",
+          "seccomp",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 11,
+        "system_order": [
+          "seccomp",
+          "userspace",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 12,
+        "system_order": [
+          "seccomp",
+          "kernel",
+          "userspace"
+        ]
+      },
+      {
+        "repetition": 13,
+        "system_order": [
+          "userspace",
+          "kernel",
+          "seccomp"
+        ]
+      },
+      {
+        "repetition": 14,
+        "system_order": [
+          "kernel",
+          "seccomp",
+          "userspace"
+        ]
+      },
+      {
+        "repetition": 15,
+        "system_order": [
+          "seccomp",
+          "userspace",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 16,
+        "system_order": [
+          "userspace",
+          "seccomp",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 17,
+        "system_order": [
+          "kernel",
+          "userspace",
+          "seccomp"
+        ]
+      },
+      {
+        "repetition": 18,
+        "system_order": [
+          "seccomp",
+          "userspace",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 19,
+        "system_order": [
+          "userspace",
+          "seccomp",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 20,
+        "system_order": [
+          "kernel",
+          "userspace",
+          "seccomp"
+        ]
+      },
+      {
+        "repetition": 21,
+        "system_order": [
+          "seccomp",
+          "kernel",
+          "userspace"
+        ]
+      },
+      {
+        "repetition": 22,
+        "system_order": [
+          "kernel",
+          "userspace",
+          "seccomp"
+        ]
+      },
+      {
+        "repetition": 23,
+        "system_order": [
+          "seccomp",
+          "kernel",
+          "userspace"
+        ]
+      },
+      {
+        "repetition": 24,
+        "system_order": [
+          "userspace",
+          "kernel",
+          "seccomp"
+        ]
+      },
+      {
+        "repetition": 25,
+        "system_order": [
+          "kernel",
+          "userspace",
+          "seccomp"
+        ]
+      },
+      {
+        "repetition": 26,
+        "system_order": [
+          "userspace",
+          "seccomp",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 27,
+        "system_order": [
+          "userspace",
+          "seccomp",
+          "kernel"
+        ]
+      },
+      {
+        "repetition": 28,
+        "system_order": [
+          "kernel",
+          "seccomp",
+          "userspace"
+        ]
+      },
+      {
+        "repetition": 29,
+        "system_order": [
+          "kernel",
+          "userspace",
+          "seccomp"
+        ]
+      },
+      {
+        "repetition": 30,
+        "system_order": [
+          "kernel",
+          "userspace",
+          "seccomp"
+        ]
+      }
+    ],
+    "selected_tools": {
+      "userspace": {
+        "latency_tool": {
+          "tool_id": 7,
+          "tool_name": "write_document"
+        },
+        "safe_tool": {
+          "tool_id": 12,
+          "tool_name": "desktop_snapshot"
+        },
+        "risky_tool": {
+          "tool_id": 43,
+          "tool_name": "write_host_text_file"
+        }
+      },
+      "seccomp": {
+        "latency_tool": {
+          "tool_id": 7,
+          "tool_name": "write_document"
+        },
+        "safe_tool": {
+          "tool_id": 12,
+          "tool_name": "desktop_snapshot"
+        },
+        "risky_tool": {
+          "tool_id": 43,
+          "tool_name": "write_host_text_file"
+        }
+      },
+      "kernel": {
+        "latency_tool": {
+          "tool_id": 7,
+          "tool_name": "write_document"
+        },
+        "safe_tool": {
+          "tool_id": 12,
+          "tool_name": "desktop_snapshot"
+        },
+        "risky_tool": {
+          "tool_id": 43,
+          "tool_name": "write_host_text_file"
+        }
+      }
+    }
+  },
+  "latency_summary": [
+    {
+      "system": "kernel",
+      "payload_label": "small",
+      "payload_bytes": 100,
+      "payload_display": "100 B",
+      "runs": 30,
+      "requests_per_run": 2000,
+      "errors_total": 0,
+      "latency_avg_ms": 0.854,
+      "latency_avg_std_ms": 0.044,
+      "latency_avg_ci_lo_ms": 0.838,
+      "latency_avg_ci_hi_ms": 0.87,
+      "latency_p50_ms": 0.816,
+      "latency_p50_std_ms": 0.025,
+      "latency_p50_ci_lo_ms": 0.807,
+      "latency_p50_ci_hi_ms": 0.825,
+      "latency_p95_ms": 1.026,
+      "latency_p95_std_ms": 0.142,
+      "latency_p95_ci_lo_ms": 0.975,
+      "latency_p95_ci_hi_ms": 1.077,
+      "latency_p99_ms": 1.25,
+      "latency_p99_std_ms": 0.533,
+      "latency_p99_ci_lo_ms": 1.059,
+      "latency_p99_ci_hi_ms": 1.441,
+      "session_lookup_ms_mean": 0.004,
+      "session_lookup_ms_std": 0.001,
+      "session_lookup_ms_ci_lo": 0.004,
+      "session_lookup_ms_ci_hi": 0.005,
+      "arbitration_ms_mean": 0.028,
+      "arbitration_ms_std": 0.001,
+      "arbitration_ms_ci_lo": 0.028,
+      "arbitration_ms_ci_hi": 0.029,
+      "tool_exec_ms_mean": 0.269,
+      "tool_exec_ms_std": 0.019,
+      "tool_exec_ms_ci_lo": 0.262,
+      "tool_exec_ms_ci_hi": 0.275,
+      "total_ms_mean": 0.707,
+      "total_ms_std": 0.034,
+      "total_ms_ci_lo": 0.695,
+      "total_ms_ci_hi": 0.719,
+      "tool_exec_share_pct_mean": 37.795,
+      "tool_exec_share_pct_std": 0.477,
+      "tool_exec_share_pct_ci_lo": 37.624,
+      "tool_exec_share_pct_ci_hi": 37.966,
+      "latency_avg_pvalue_vs_userspace": 0.983638,
+      "latency_p95_pvalue_vs_userspace": 0.512879
+    },
+    {
+      "system": "kernel",
+      "payload_label": "medium",
+      "payload_bytes": 10240,
+      "payload_display": "10 KB (10,240 B)",
+      "runs": 30,
+      "requests_per_run": 2000,
+      "errors_total": 0,
+      "latency_avg_ms": 0.899,
+      "latency_avg_std_ms": 0.1,
+      "latency_avg_ci_lo_ms": 0.863,
+      "latency_avg_ci_hi_ms": 0.934,
+      "latency_p50_ms": 0.855,
+      "latency_p50_std_ms": 0.02,
+      "latency_p50_ci_lo_ms": 0.848,
+      "latency_p50_ci_hi_ms": 0.862,
+      "latency_p95_ms": 1.066,
+      "latency_p95_std_ms": 0.23,
+      "latency_p95_ci_lo_ms": 0.984,
+      "latency_p95_ci_hi_ms": 1.148,
+      "latency_p99_ms": 1.404,
+      "latency_p99_std_ms": 1.046,
+      "latency_p99_ci_lo_ms": 1.03,
+      "latency_p99_ci_hi_ms": 1.778,
+      "session_lookup_ms_mean": 0.004,
+      "session_lookup_ms_std": 0.0,
+      "session_lookup_ms_ci_lo": 0.004,
+      "session_lookup_ms_ci_hi": 0.004,
+      "arbitration_ms_mean": 0.028,
+      "arbitration_ms_std": 0.002,
+      "arbitration_ms_ci_lo": 0.028,
+      "arbitration_ms_ci_hi": 0.029,
+      "tool_exec_ms_mean": 0.295,
+      "tool_exec_ms_std": 0.055,
+      "tool_exec_ms_ci_lo": 0.275,
+      "tool_exec_ms_ci_hi": 0.315,
+      "total_ms_mean": 0.727,
+      "total_ms_std": 0.083,
+      "total_ms_ci_lo": 0.697,
+      "total_ms_ci_hi": 0.756,
+      "tool_exec_share_pct_mean": 39.844,
+      "tool_exec_share_pct_std": 0.563,
+      "tool_exec_share_pct_ci_lo": 39.643,
+      "tool_exec_share_pct_ci_hi": 40.046,
+      "latency_avg_pvalue_vs_userspace": 0.09721,
+      "latency_p95_pvalue_vs_userspace": 0.159764
+    },
+    {
+      "system": "kernel",
+      "payload_label": "large",
+      "payload_bytes": 1048576,
+      "payload_display": "1 MB (1,048,576 B)",
+      "runs": 30,
+      "requests_per_run": 2000,
+      "errors_total": 0,
+      "latency_avg_ms": 7.487,
+      "latency_avg_std_ms": 0.291,
+      "latency_avg_ci_lo_ms": 7.383,
+      "latency_avg_ci_hi_ms": 7.591,
+      "latency_p50_ms": 7.212,
+      "latency_p50_std_ms": 0.126,
+      "latency_p50_ci_lo_ms": 7.167,
+      "latency_p50_ci_hi_ms": 7.257,
+      "latency_p95_ms": 8.422,
+      "latency_p95_std_ms": 0.598,
+      "latency_p95_ci_lo_ms": 8.208,
+      "latency_p95_ci_hi_ms": 8.636,
+      "latency_p99_ms": 10.694,
+      "latency_p99_std_ms": 2.895,
+      "latency_p99_ci_lo_ms": 9.658,
+      "latency_p99_ci_hi_ms": 11.73,
+      "session_lookup_ms_mean": 0.006,
+      "session_lookup_ms_std": 0.001,
+      "session_lookup_ms_ci_lo": 0.005,
+      "session_lookup_ms_ci_hi": 0.006,
+      "arbitration_ms_mean": 0.038,
+      "arbitration_ms_std": 0.003,
+      "arbitration_ms_ci_lo": 0.037,
+      "arbitration_ms_ci_hi": 0.039,
+      "tool_exec_ms_mean": 3.883,
+      "tool_exec_ms_std": 0.155,
+      "tool_exec_ms_ci_lo": 3.827,
+      "tool_exec_ms_ci_hi": 3.938,
+      "total_ms_mean": 4.351,
+      "total_ms_std": 0.179,
+      "total_ms_ci_lo": 4.287,
+      "total_ms_ci_hi": 4.414,
+      "tool_exec_share_pct_mean": 89.254,
+      "tool_exec_share_pct_std": 0.145,
+      "tool_exec_share_pct_ci_lo": 89.202,
+      "tool_exec_share_pct_ci_hi": 89.306,
+      "latency_avg_pvalue_vs_userspace": 0.00027,
+      "latency_p95_pvalue_vs_userspace": 0.048701
+    },
+    {
+      "system": "seccomp",
+      "payload_label": "small",
+      "payload_bytes": 100,
+      "payload_display": "100 B",
+      "runs": 30,
+      "requests_per_run": 2000,
+      "errors_total": 0,
+      "latency_avg_ms": 0.867,
+      "latency_avg_std_ms": 0.065,
+      "latency_avg_ci_lo_ms": 0.844,
+      "latency_avg_ci_hi_ms": 0.891,
+      "latency_p50_ms": 0.82,
+      "latency_p50_std_ms": 0.032,
+      "latency_p50_ci_lo_ms": 0.808,
+      "latency_p50_ci_hi_ms": 0.831,
+      "latency_p95_ms": 1.022,
+      "latency_p95_std_ms": 0.077,
+      "latency_p95_ci_lo_ms": 0.995,
+      "latency_p95_ci_hi_ms": 1.05,
+      "latency_p99_ms": 1.281,
+      "latency_p99_std_ms": 0.41,
+      "latency_p99_ci_lo_ms": 1.134,
+      "latency_p99_ci_hi_ms": 1.428,
+      "session_lookup_ms_mean": 0.004,
+      "session_lookup_ms_std": 0.001,
+      "session_lookup_ms_ci_lo": 0.004,
+      "session_lookup_ms_ci_hi": 0.005,
+      "arbitration_ms_mean": 0.005,
+      "arbitration_ms_std": 0.0,
+      "arbitration_ms_ci_lo": 0.005,
+      "arbitration_ms_ci_hi": 0.005,
+      "tool_exec_ms_mean": 0.277,
+      "tool_exec_ms_std": 0.033,
+      "tool_exec_ms_ci_lo": 0.265,
+      "tool_exec_ms_ci_hi": 0.288,
+      "total_ms_mean": 0.701,
+      "total_ms_std": 0.053,
+      "total_ms_ci_lo": 0.681,
+      "total_ms_ci_hi": 0.72,
+      "tool_exec_share_pct_mean": 38.875,
+      "tool_exec_share_pct_std": 0.52,
+      "tool_exec_share_pct_ci_lo": 38.689,
+      "tool_exec_share_pct_ci_hi": 39.061,
+      "latency_avg_pvalue_vs_userspace": 0.475016,
+      "latency_p95_pvalue_vs_userspace": 0.404175
+    },
+    {
+      "system": "seccomp",
+      "payload_label": "medium",
+      "payload_bytes": 10240,
+      "payload_display": "10 KB (10,240 B)",
+      "runs": 30,
+      "requests_per_run": 2000,
+      "errors_total": 0,
+      "latency_avg_ms": 0.922,
+      "latency_avg_std_ms": 0.062,
+      "latency_avg_ci_lo_ms": 0.899,
+      "latency_avg_ci_hi_ms": 0.944,
+      "latency_p50_ms": 0.877,
+      "latency_p50_std_ms": 0.025,
+      "latency_p50_ci_lo_ms": 0.868,
+      "latency_p50_ci_hi_ms": 0.886,
+      "latency_p95_ms": 1.078,
+      "latency_p95_std_ms": 0.127,
+      "latency_p95_ci_lo_ms": 1.033,
+      "latency_p95_ci_hi_ms": 1.124,
+      "latency_p99_ms": 1.41,
+      "latency_p99_std_ms": 0.692,
+      "latency_p99_ci_lo_ms": 1.162,
+      "latency_p99_ci_hi_ms": 1.658,
+      "session_lookup_ms_mean": 0.007,
+      "session_lookup_ms_std": 0.017,
+      "session_lookup_ms_ci_lo": 0.001,
+      "session_lookup_ms_ci_hi": 0.013,
+      "arbitration_ms_mean": 0.005,
+      "arbitration_ms_std": 0.0,
+      "arbitration_ms_ci_lo": 0.005,
+      "arbitration_ms_ci_hi": 0.005,
+      "tool_exec_ms_mean": 0.291,
+      "tool_exec_ms_std": 0.021,
+      "tool_exec_ms_ci_lo": 0.284,
+      "tool_exec_ms_ci_hi": 0.298,
+      "total_ms_mean": 0.727,
+      "total_ms_std": 0.047,
+      "total_ms_ci_lo": 0.71,
+      "total_ms_ci_hi": 0.744,
+      "tool_exec_share_pct_mean": 39.93,
+      "tool_exec_share_pct_std": 0.411,
+      "tool_exec_share_pct_ci_lo": 39.783,
+      "tool_exec_share_pct_ci_hi": 40.077,
+      "latency_avg_pvalue_vs_userspace": 0.000206,
+      "latency_p95_pvalue_vs_userspace": 0.006356
+    },
+    {
+      "system": "seccomp",
+      "payload_label": "large",
+      "payload_bytes": 1048576,
+      "payload_display": "1 MB (1,048,576 B)",
+      "runs": 30,
+      "requests_per_run": 2000,
+      "errors_total": 0,
+      "latency_avg_ms": 9.843,
+      "latency_avg_std_ms": 0.335,
+      "latency_avg_ci_lo_ms": 9.723,
+      "latency_avg_ci_hi_ms": 9.963,
+      "latency_p50_ms": 9.549,
+      "latency_p50_std_ms": 0.164,
+      "latency_p50_ci_lo_ms": 9.49,
+      "latency_p50_ci_hi_ms": 9.608,
+      "latency_p95_ms": 10.903,
+      "latency_p95_std_ms": 0.64,
+      "latency_p95_ci_lo_ms": 10.674,
+      "latency_p95_ci_hi_ms": 11.132,
+      "latency_p99_ms": 13.282,
+      "latency_p99_std_ms": 2.975,
+      "latency_p99_ci_lo_ms": 12.217,
+      "latency_p99_ci_hi_ms": 14.347,
+      "session_lookup_ms_mean": 0.006,
+      "session_lookup_ms_std": 0.001,
+      "session_lookup_ms_ci_lo": 0.006,
+      "session_lookup_ms_ci_hi": 0.006,
+      "arbitration_ms_mean": 0.007,
+      "arbitration_ms_std": 0.001,
+      "arbitration_ms_ci_lo": 0.007,
+      "arbitration_ms_ci_hi": 0.007,
+      "tool_exec_ms_mean": 3.868,
+      "tool_exec_ms_std": 0.159,
+      "tool_exec_ms_ci_lo": 3.811,
+      "tool_exec_ms_ci_hi": 3.925,
+      "total_ms_mean": 6.333,
+      "total_ms_std": 0.227,
+      "total_ms_ci_lo": 6.251,
+      "total_ms_ci_hi": 6.414,
+      "tool_exec_share_pct_mean": 60.942,
+      "tool_exec_share_pct_std": 0.288,
+      "tool_exec_share_pct_ci_lo": 60.839,
+      "tool_exec_share_pct_ci_hi": 61.046,
+      "latency_avg_pvalue_vs_userspace": 0.0,
+      "latency_p95_pvalue_vs_userspace": 0.0
+    },
+    {
+      "system": "userspace",
+      "payload_label": "small",
+      "payload_bytes": 100,
+      "payload_display": "100 B",
+      "runs": 30,
+      "requests_per_run": 2000,
+      "errors_total": 0,
+      "latency_avg_ms": 0.854,
+      "latency_avg_std_ms": 0.077,
+      "latency_avg_ci_lo_ms": 0.826,
+      "latency_avg_ci_hi_ms": 0.882,
+      "latency_p50_ms": 0.789,
+      "latency_p50_std_ms": 0.024,
+      "latency_p50_ci_lo_ms": 0.78,
+      "latency_p50_ci_hi_ms": 0.797,
+      "latency_p95_ms": 1.056,
+      "latency_p95_std_ms": 0.208,
+      "latency_p95_ci_lo_ms": 0.981,
+      "latency_p95_ci_hi_ms": 1.131,
+      "latency_p99_ms": 1.613,
+      "latency_p99_std_ms": 1.209,
+      "latency_p99_ci_lo_ms": 1.18,
+      "latency_p99_ci_hi_ms": 2.046,
+      "session_lookup_ms_mean": 0.005,
+      "session_lookup_ms_std": 0.001,
+      "session_lookup_ms_ci_lo": 0.004,
+      "session_lookup_ms_ci_hi": 0.005,
+      "arbitration_ms_mean": 0.004,
+      "arbitration_ms_std": 0.001,
+      "arbitration_ms_ci_lo": 0.004,
+      "arbitration_ms_ci_hi": 0.005,
+      "tool_exec_ms_mean": 0.281,
+      "tool_exec_ms_std": 0.033,
+      "tool_exec_ms_ci_lo": 0.269,
+      "tool_exec_ms_ci_hi": 0.293,
+      "total_ms_mean": 0.71,
+      "total_ms_std": 0.06,
+      "total_ms_ci_lo": 0.688,
+      "total_ms_ci_hi": 0.731,
+      "tool_exec_share_pct_mean": 39.225,
+      "tool_exec_share_pct_std": 0.644,
+      "tool_exec_share_pct_ci_lo": 38.994,
+      "tool_exec_share_pct_ci_hi": 39.455,
+      "latency_avg_pvalue_vs_userspace": "",
+      "latency_p95_pvalue_vs_userspace": ""
+    },
+    {
+      "system": "userspace",
+      "payload_label": "medium",
+      "payload_bytes": 10240,
+      "payload_display": "10 KB (10,240 B)",
+      "runs": 30,
+      "requests_per_run": 2000,
+      "errors_total": 0,
+      "latency_avg_ms": 0.863,
+      "latency_avg_std_ms": 0.06,
+      "latency_avg_ci_lo_ms": 0.842,
+      "latency_avg_ci_hi_ms": 0.885,
+      "latency_p50_ms": 0.821,
+      "latency_p50_std_ms": 0.017,
+      "latency_p50_ci_lo_ms": 0.815,
+      "latency_p50_ci_hi_ms": 0.827,
+      "latency_p95_ms": 1.003,
+      "latency_p95_std_ms": 0.08,
+      "latency_p95_ci_lo_ms": 0.975,
+      "latency_p95_ci_hi_ms": 1.032,
+      "latency_p99_ms": 1.268,
+      "latency_p99_std_ms": 0.427,
+      "latency_p99_ci_lo_ms": 1.115,
+      "latency_p99_ci_hi_ms": 1.421,
+      "session_lookup_ms_mean": 0.004,
+      "session_lookup_ms_std": 0.0,
+      "session_lookup_ms_ci_lo": 0.004,
+      "session_lookup_ms_ci_hi": 0.004,
+      "arbitration_ms_mean": 0.004,
+      "arbitration_ms_std": 0.0,
+      "arbitration_ms_ci_lo": 0.004,
+      "arbitration_ms_ci_hi": 0.004,
+      "tool_exec_ms_mean": 0.29,
+      "tool_exec_ms_std": 0.029,
+      "tool_exec_ms_ci_lo": 0.28,
+      "tool_exec_ms_ci_hi": 0.301,
+      "total_ms_mean": 0.701,
+      "total_ms_std": 0.049,
+      "total_ms_ci_lo": 0.683,
+      "total_ms_ci_hi": 0.718,
+      "tool_exec_share_pct_mean": 41.064,
+      "tool_exec_share_pct_std": 0.449,
+      "tool_exec_share_pct_ci_lo": 40.904,
+      "tool_exec_share_pct_ci_hi": 41.225,
+      "latency_avg_pvalue_vs_userspace": "",
+      "latency_p95_pvalue_vs_userspace": ""
+    },
+    {
+      "system": "userspace",
+      "payload_label": "large",
+      "payload_bytes": 1048576,
+      "payload_display": "1 MB (1,048,576 B)",
+      "runs": 30,
+      "requests_per_run": 2000,
+      "errors_total": 0,
+      "latency_avg_ms": 7.748,
+      "latency_avg_std_ms": 0.263,
+      "latency_avg_ci_lo_ms": 7.654,
+      "latency_avg_ci_hi_ms": 7.842,
+      "latency_p50_ms": 7.497,
+      "latency_p50_std_ms": 0.127,
+      "latency_p50_ci_lo_ms": 7.452,
+      "latency_p50_ci_hi_ms": 7.543,
+      "latency_p95_ms": 8.716,
+      "latency_p95_std_ms": 0.556,
+      "latency_p95_ci_lo_ms": 8.517,
+      "latency_p95_ci_hi_ms": 8.915,
+      "latency_p99_ms": 10.741,
+      "latency_p99_std_ms": 2.44,
+      "latency_p99_ci_lo_ms": 9.868,
+      "latency_p99_ci_hi_ms": 11.614,
+      "session_lookup_ms_mean": 0.006,
+      "session_lookup_ms_std": 0.001,
+      "session_lookup_ms_ci_lo": 0.006,
+      "session_lookup_ms_ci_hi": 0.006,
+      "arbitration_ms_mean": 0.006,
+      "arbitration_ms_std": 0.001,
+      "arbitration_ms_ci_lo": 0.005,
+      "arbitration_ms_ci_hi": 0.006,
+      "tool_exec_ms_mean": 3.869,
+      "tool_exec_ms_std": 0.148,
+      "tool_exec_ms_ci_lo": 3.816,
+      "tool_exec_ms_ci_hi": 3.922,
+      "total_ms_mean": 4.301,
+      "total_ms_std": 0.164,
+      "total_ms_ci_lo": 4.242,
+      "total_ms_ci_hi": 4.36,
+      "tool_exec_share_pct_mean": 89.938,
+      "tool_exec_share_pct_std": 0.103,
+      "tool_exec_share_pct_ci_lo": 89.902,
+      "tool_exec_share_pct_ci_hi": 89.975,
+      "latency_avg_pvalue_vs_userspace": "",
+      "latency_p95_pvalue_vs_userspace": ""
+    }
+  ],
+  "breakdown_summary": [
+    {
+      "system": "kernel",
+      "payload_label": "small",
+      "payload_bytes": 100,
+      "payload_display": "100 B",
+      "runs": 30,
+      "session_lookup_ms": 0.004,
+      "arbitration_ms": 0.028,
+      "tool_exec_ms": 0.269,
+      "total_ms": 0.707,
+      "tool_exec_share_pct": 37.795
+    },
+    {
+      "system": "kernel",
+      "payload_label": "medium",
+      "payload_bytes": 10240,
+      "payload_display": "10 KB (10,240 B)",
+      "runs": 30,
+      "session_lookup_ms": 0.004,
+      "arbitration_ms": 0.028,
+      "tool_exec_ms": 0.295,
+      "total_ms": 0.727,
+      "tool_exec_share_pct": 39.844
+    },
+    {
+      "system": "kernel",
+      "payload_label": "large",
+      "payload_bytes": 1048576,
+      "payload_display": "1 MB (1,048,576 B)",
+      "runs": 30,
+      "session_lookup_ms": 0.006,
+      "arbitration_ms": 0.038,
+      "tool_exec_ms": 3.883,
+      "total_ms": 4.351,
+      "tool_exec_share_pct": 89.254
+    },
+    {
+      "system": "seccomp",
+      "payload_label": "small",
+      "payload_bytes": 100,
+      "payload_display": "100 B",
+      "runs": 30,
+      "session_lookup_ms": 0.004,
+      "arbitration_ms": 0.005,
+      "tool_exec_ms": 0.277,
+      "total_ms": 0.701,
+      "tool_exec_share_pct": 38.875
+    },
+    {
+      "system": "seccomp",
+      "payload_label": "medium",
+      "payload_bytes": 10240,
+      "payload_display": "10 KB (10,240 B)",
+      "runs": 30,
+      "session_lookup_ms": 0.007,
+      "arbitration_ms": 0.005,
+      "tool_exec_ms": 0.291,
+      "total_ms": 0.727,
+      "tool_exec_share_pct": 39.93
+    },
+    {
+      "system": "seccomp",
+      "payload_label": "large",
+      "payload_bytes": 1048576,
+      "payload_display": "1 MB (1,048,576 B)",
+      "runs": 30,
+      "session_lookup_ms": 0.006,
+      "arbitration_ms": 0.007,
+      "tool_exec_ms": 3.868,
+      "total_ms": 6.333,
+      "tool_exec_share_pct": 60.942
+    },
+    {
+      "system": "userspace",
+      "payload_label": "small",
+      "payload_bytes": 100,
+      "payload_display": "100 B",
+      "runs": 30,
+      "session_lookup_ms": 0.005,
+      "arbitration_ms": 0.004,
+      "tool_exec_ms": 0.281,
+      "total_ms": 0.71,
+      "tool_exec_share_pct": 39.225
+    },
+    {
+      "system": "userspace",
+      "payload_label": "medium",
+      "payload_bytes": 10240,
+      "payload_display": "10 KB (10,240 B)",
+      "runs": 30,
+      "session_lookup_ms": 0.004,
+      "arbitration_ms": 0.004,
+      "tool_exec_ms": 0.29,
+      "total_ms": 0.701,
+      "tool_exec_share_pct": 41.064
+    },
+    {
+      "system": "userspace",
+      "payload_label": "large",
+      "payload_bytes": 1048576,
+      "payload_display": "1 MB (1,048,576 B)",
+      "runs": 30,
+      "session_lookup_ms": 0.006,
+      "arbitration_ms": 0.006,
+      "tool_exec_ms": 3.869,
+      "total_ms": 4.301,
+      "tool_exec_share_pct": 89.938
+    }
+  ],
+  "scalability_summary": [
+    {
+      "system": "kernel",
+      "agents": 1,
+      "concurrency": 1,
+      "runs": 30,
+      "measurement_seconds": 5.0,
+      "requests_mean": 5279.0,
+      "errors_mean": 0.0,
+      "throughput_rps": 1055.8,
+      "throughput_rps_std": 25.805,
+      "throughput_rps_ci_lo": 1046.566,
+      "throughput_rps_ci_hi": 1065.034,
+      "latency_avg_ms": 0.943,
+      "latency_avg_ms_std": 0.024,
+      "latency_avg_ms_ci_lo": 0.935,
+      "latency_avg_ms_ci_hi": 0.952,
+      "latency_p50_ms": 0.941,
+      "latency_p50_ms_std": 0.005,
+      "latency_p50_ms_ci_lo": 0.939,
+      "latency_p50_ms_ci_hi": 0.943,
+      "latency_p95_ms": 1.037,
+      "latency_p95_ms_std": 0.042,
+      "latency_p95_ms_ci_lo": 1.022,
+      "latency_p95_ms_ci_hi": 1.052,
+      "latency_p99_ms": 1.215,
+      "latency_p99_ms_std": 0.342,
+      "latency_p99_ms_ci_lo": 1.093,
+      "latency_p99_ms_ci_hi": 1.337,
+      "error_rate": 0.0,
+      "error_rate_std": 0.0,
+      "error_rate_ci_lo": 0.0,
+      "error_rate_ci_hi": 0.0,
+      "throughput_pvalue_vs_userspace": 0.0023,
+      "latency_p95_pvalue_vs_userspace": 0.09082
+    },
+    {
+      "system": "seccomp",
+      "agents": 1,
+      "concurrency": 1,
+      "runs": 30,
+      "measurement_seconds": 5.0,
+      "requests_mean": 5235.733,
+      "errors_mean": 0.0,
+      "throughput_rps": 1047.147,
+      "throughput_rps_std": 47.837,
+      "throughput_rps_ci_lo": 1030.028,
+      "throughput_rps_ci_hi": 1064.265,
+      "latency_avg_ms": 0.953,
+      "latency_avg_ms_std": 0.05,
+      "latency_avg_ms_ci_lo": 0.935,
+      "latency_avg_ms_ci_hi": 0.97,
+      "latency_p50_ms": 0.938,
+      "latency_p50_ms_std": 0.007,
+      "latency_p50_ms_ci_lo": 0.935,
+      "latency_p50_ms_ci_hi": 0.94,
+      "latency_p95_ms": 1.071,
+      "latency_p95_ms_std": 0.188,
+      "latency_p95_ms_ci_lo": 1.004,
+      "latency_p95_ms_ci_hi": 1.139,
+      "latency_p99_ms": 1.288,
+      "latency_p99_ms_std": 0.445,
+      "latency_p99_ms_ci_lo": 1.129,
+      "latency_p99_ms_ci_hi": 1.447,
+      "error_rate": 0.0,
+      "error_rate_std": 0.0,
+      "error_rate_ci_lo": 0.0,
+      "error_rate_ci_hi": 0.0,
+      "throughput_pvalue_vs_userspace": 0.002552,
+      "latency_p95_pvalue_vs_userspace": 0.120112
+    },
+    {
+      "system": "userspace",
+      "agents": 1,
+      "concurrency": 1,
+      "runs": 30,
+      "measurement_seconds": 5.0,
+      "requests_mean": 5396.333,
+      "errors_mean": 0.0,
+      "throughput_rps": 1079.267,
+      "throughput_rps_std": 33.343,
+      "throughput_rps_ci_lo": 1067.335,
+      "throughput_rps_ci_hi": 1091.198,
+      "latency_avg_ms": 0.923,
+      "latency_avg_ms_std": 0.029,
+      "latency_avg_ms_ci_lo": 0.913,
+      "latency_avg_ms_ci_hi": 0.933,
+      "latency_p50_ms": 0.905,
+      "latency_p50_ms_std": 0.005,
+      "latency_p50_ms_ci_lo": 0.903,
+      "latency_p50_ms_ci_hi": 0.907,
+      "latency_p95_ms": 1.016,
+      "latency_p95_ms_std": 0.055,
+      "latency_p95_ms_ci_lo": 0.996,
+      "latency_p95_ms_ci_hi": 1.036,
+      "latency_p99_ms": 1.29,
+      "latency_p99_ms_std": 0.323,
+      "latency_p99_ms_ci_lo": 1.175,
+      "latency_p99_ms_ci_hi": 1.406,
+      "error_rate": 0.0,
+      "error_rate_std": 0.0,
+      "error_rate_ci_lo": 0.0,
+      "error_rate_ci_hi": 0.0,
+      "throughput_pvalue_vs_userspace": "",
+      "latency_p95_pvalue_vs_userspace": ""
+    }
+  ],
+  "attack_matrix": [
+    {
+      "attack_type": "spoof",
+      "system": "userspace",
+      "attempts": 30,
+      "successes": 20,
+      "success_rate": 0.666667,
+      "outcome": "UNDETECTED"
+    },
+    {
+      "attack_type": "replay",
+      "system": "userspace",
+      "attempts": 40,
+      "successes": 40,
+      "success_rate": 1.0,
+      "outcome": "UNDETECTED"
+    },
+    {
+      "attack_type": "substitute",
+      "system": "userspace",
+      "attempts": 30,
+      "successes": 30,
+      "success_rate": 1.0,
+      "outcome": "UNDETECTED"
+    },
+    {
+      "attack_type": "escalation",
+      "system": "userspace",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0,
+      "outcome": "UNDETECTED"
+    },
+    {
+      "attack_type": "spoof",
+      "system": "seccomp",
+      "attempts": 30,
+      "successes": 20,
+      "success_rate": 0.666667,
+      "outcome": "UNDETECTED"
+    },
+    {
+      "attack_type": "replay",
+      "system": "seccomp",
+      "attempts": 40,
+      "successes": 0,
+      "success_rate": 0.0,
+      "outcome": "BLOCKED"
+    },
+    {
+      "attack_type": "substitute",
+      "system": "seccomp",
+      "attempts": 30,
+      "successes": 20,
+      "success_rate": 0.666667,
+      "outcome": "UNDETECTED"
+    },
+    {
+      "attack_type": "escalation",
+      "system": "seccomp",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0,
+      "outcome": "BLOCKED"
+    },
+    {
+      "attack_type": "spoof",
+      "system": "kernel",
+      "attempts": 30,
+      "successes": 0,
+      "success_rate": 0.0,
+      "outcome": "BLOCKED"
+    },
+    {
+      "attack_type": "replay",
+      "system": "kernel",
+      "attempts": 40,
+      "successes": 0,
+      "success_rate": 0.0,
+      "outcome": "BLOCKED"
+    },
+    {
+      "attack_type": "substitute",
+      "system": "kernel",
+      "attempts": 30,
+      "successes": 0,
+      "success_rate": 0.0,
+      "outcome": "BLOCKED"
+    },
+    {
+      "attack_type": "escalation",
+      "system": "kernel",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0,
+      "outcome": "BLOCKED"
+    }
+  ],
+  "attack_case_summary": [
+    {
+      "system": "kernel",
+      "attack_type": "escalation",
+      "attack_case": "approval_required_bypass",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "escalation",
+      "attack_case": "invalid_session_hash_bypass",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "replay",
+      "attack_case": "cross_agent_ticket_reuse",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "replay",
+      "attack_case": "cross_tool_ticket_reuse",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "replay",
+      "attack_case": "denied_ticket_reuse",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "replay",
+      "attack_case": "expired_ticket_replay",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "replay",
+      "attack_case": "forged_approval_ticket",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "spoof",
+      "attack_case": "expired_session",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "spoof",
+      "attack_case": "fake_session_id",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "spoof",
+      "attack_case": "session_token_theft",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "substitute",
+      "attack_case": "hash_mismatch",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "substitute",
+      "attack_case": "stale_catalog_replay",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "kernel",
+      "attack_type": "substitute",
+      "attack_case": "wrong_app_binding",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "escalation",
+      "attack_case": "approval_required_bypass",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "escalation",
+      "attack_case": "invalid_session_hash_bypass",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "replay",
+      "attack_case": "cross_agent_ticket_reuse",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "replay",
+      "attack_case": "cross_tool_ticket_reuse",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "replay",
+      "attack_case": "denied_ticket_reuse",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "replay",
+      "attack_case": "expired_ticket_replay",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "replay",
+      "attack_case": "forged_approval_ticket",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "spoof",
+      "attack_case": "expired_session",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "spoof",
+      "attack_case": "fake_session_id",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "spoof",
+      "attack_case": "session_token_theft",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "substitute",
+      "attack_case": "hash_mismatch",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "substitute",
+      "attack_case": "stale_catalog_replay",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "seccomp",
+      "attack_type": "substitute",
+      "attack_case": "wrong_app_binding",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "escalation",
+      "attack_case": "approval_required_bypass",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "escalation",
+      "attack_case": "invalid_session_hash_bypass",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "replay",
+      "attack_case": "cross_agent_ticket_reuse",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "replay",
+      "attack_case": "cross_tool_ticket_reuse",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "replay",
+      "attack_case": "denied_ticket_reuse",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "replay",
+      "attack_case": "expired_ticket_replay",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "replay",
+      "attack_case": "forged_approval_ticket",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "spoof",
+      "attack_case": "expired_session",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "spoof",
+      "attack_case": "fake_session_id",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "spoof",
+      "attack_case": "session_token_theft",
+      "attempts": 10,
+      "successes": 0,
+      "success_rate": 0.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "substitute",
+      "attack_case": "hash_mismatch",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "substitute",
+      "attack_case": "stale_catalog_replay",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    },
+    {
+      "system": "userspace",
+      "attack_type": "substitute",
+      "attack_case": "wrong_app_binding",
+      "attempts": 10,
+      "successes": 10,
+      "success_rate": 1.0
+    }
+  ],
+  "budget_summary": [
+    {
+      "system": "userspace",
+      "max_calls": 50,
+      "requests": 100,
+      "allowed": 50,
+      "denied": 50,
+      "first_reject_at": 51,
+      "status": "ok",
+      "note": ""
+    },
+    {
+      "system": "seccomp",
+      "max_calls": 50,
+      "requests": 100,
+      "allowed": 50,
+      "denied": 50,
+      "first_reject_at": 51,
+      "status": "ok",
+      "note": ""
+    },
+    {
+      "system": "kernel",
+      "max_calls": 50,
+      "requests": 100,
+      "allowed": 0,
+      "denied": 0,
+      "first_reject_at": 0,
+      "status": "skipped",
+      "note": "reload kernel_mcp with agent_max_calls=<N> to enable kernel budget enforcement"
+    }
+  ],
+  "daemon_failure": [],
+  "report_markdown": "# linux_mcp Experiment Report\n\n## Section 1: \u5b9e\u9a8c\u73af\u5883\n\n- CPU: Apple aarch64 | threads=4 | cores/socket=4 | freq=unavailable-in-guest\n- Memory: 8109868 kB\n- OS: Ubuntu 24.04 | kernel=6.8.0-107-generic\n- Python: 3.12.3 | machine=vmware | NUMA nodes=1\n- Governor: unknown | ASLR=2 | intel_no_turbo=unknown\n- VM note: measurements were collected inside `vmware`; hypervisor scheduling noise may widen CI and tail latency.\n\n## Section 2: \u7cfb\u7edf\u914d\u7f6e\u8bf4\u660e\n\n- `userspace`: mcpd \u8fdb\u884c\u5168\u90e8\u8bed\u4e49\u68c0\u67e5\uff0c\u4e0d\u4f7f\u7528 kernel arbitration\u3002\n- `seccomp`: userspace baseline \u5916\u52a0 sandbox\u3001audit logging\u3001stricter checks\u3002\n- `kernel`: \u5f53\u524d\u9879\u76ee\u7684 kernel_mcp control-plane \u4ef2\u88c1\u8def\u5f84\u3002\n\n- repetitions per config: 30\n- latency requests per run: 2000\n- scalability warmup/measure: 5.0s / 5.0s\n- attack repeats: 10\n- system order randomization seed: 20260405\n- repetition scheduling: each repetition shuffles userspace/seccomp/kernel order before collecting latency and scalability data.\n\n## Section 3: Latency\n\n| system | payload | avg_ms | p95_ms | p99_ms | p95 p-value vs userspace |\n|---|---|---|---|---|---:|\n| kernel | 100 B | 0.854 \u00b1 0.044 (95% CI [0.838, 0.870]) | 1.026 \u00b1 0.142 (95% CI [0.975, 1.077]) | 1.250 \u00b1 0.533 (95% CI [1.059, 1.441]) | 0.512879 |\n| kernel | 10 KB (10,240 B) | 0.899 \u00b1 0.100 (95% CI [0.863, 0.934]) | 1.066 \u00b1 0.230 (95% CI [0.984, 1.148]) | 1.404 \u00b1 1.046 (95% CI [1.030, 1.778]) | 0.159764 |\n| kernel | 1 MB (1,048,576 B) | 7.487 \u00b1 0.291 (95% CI [7.383, 7.591]) | 8.422 \u00b1 0.598 (95% CI [8.208, 8.636]) | 10.694 \u00b1 2.895 (95% CI [9.658, 11.730]) | 0.048701 |\n| seccomp | 100 B | 0.867 \u00b1 0.065 (95% CI [0.844, 0.891]) | 1.022 \u00b1 0.077 (95% CI [0.995, 1.050]) | 1.281 \u00b1 0.410 (95% CI [1.134, 1.428]) | 0.404175 |\n| seccomp | 10 KB (10,240 B) | 0.922 \u00b1 0.062 (95% CI [0.899, 0.944]) | 1.078 \u00b1 0.127 (95% CI [1.033, 1.124]) | 1.410 \u00b1 0.692 (95% CI [1.162, 1.658]) | 0.006356 |\n| seccomp | 1 MB (1,048,576 B) | 9.843 \u00b1 0.335 (95% CI [9.723, 9.963]) | 10.903 \u00b1 0.640 (95% CI [10.674, 11.132]) | 13.282 \u00b1 2.975 (95% CI [12.217, 14.347]) | \u2014 |\n| userspace | 100 B | 0.854 \u00b1 0.077 (95% CI [0.826, 0.882]) | 1.056 \u00b1 0.208 (95% CI [0.981, 1.131]) | 1.613 \u00b1 1.209 (95% CI [1.180, 2.046]) | \u2014 |\n| userspace | 10 KB (10,240 B) | 0.863 \u00b1 0.060 (95% CI [0.842, 0.885]) | 1.003 \u00b1 0.080 (95% CI [0.975, 1.032]) | 1.268 \u00b1 0.427 (95% CI [1.115, 1.421]) | \u2014 |\n| userspace | 1 MB (1,048,576 B) | 7.748 \u00b1 0.263 (95% CI [7.654, 7.842]) | 8.716 \u00b1 0.556 (95% CI [8.517, 8.915]) | 10.741 \u00b1 2.440 (95% CI [9.868, 11.614]) | \u2014 |\n\n## Section 3.1: Latency Breakdown\n\n| system | payload | session_ms | arbitration_ms | tool_exec_ms | total_ms | tool_exec_share |\n|---|---|---:|---:|---:|---:|---:|\n| kernel | 100 B | 0.004 | 0.028 | 0.269 | 0.707 | 37.795% |\n| kernel | 10 KB (10,240 B) | 0.004 | 0.028 | 0.295 | 0.727 | 39.844% |\n| kernel | 1 MB (1,048,576 B) | 0.006 | 0.038 | 3.883 | 4.351 | 89.254% |\n| seccomp | 100 B | 0.004 | 0.005 | 0.277 | 0.701 | 38.875% |\n| seccomp | 10 KB (10,240 B) | 0.007 | 0.005 | 0.291 | 0.727 | 39.93% |\n| seccomp | 1 MB (1,048,576 B) | 0.006 | 0.007 | 3.868 | 6.333 | 60.942% |\n| userspace | 100 B | 0.005 | 0.004 | 0.281 | 0.71 | 39.225% |\n| userspace | 10 KB (10,240 B) | 0.004 | 0.004 | 0.29 | 0.701 | 41.064% |\n| userspace | 1 MB (1,048,576 B) | 0.006 | 0.006 | 3.869 | 4.301 | 89.938% |\n\nLarge payload explanation:\n- userspace 1MB \u65f6 tool_exec \u5360\u603b\u65f6\u5ef6\u7ea6 89.938%\uff0c\u8bf4\u660e\u6267\u884c\u8def\u5f84\u4e3b\u5bfc\u4e86\u7aef\u5230\u7aef\u65f6\u95f4\u3002\n- kernel 1MB \u65f6 tool_exec \u5360\u603b\u65f6\u5ef6\u7ea6 89.254%\uff0c\u56e0\u6b64 arbitration \u7684\u7edd\u5bf9\u5dee\u5f02\u88ab\u5927 payload \u7684 tool execution \u6df9\u6ca1\u3002\n\n## Section 4: Throughput-Latency\n\n| system | agents | concurrency | throughput_rps | error_rate | p95_ms | throughput p-value vs userspace |\n|---|---:|---:|---|---|---|---:|\n| kernel | 1 | 1 | 1055.800 \u00b1 25.805 (95% CI [1046.566, 1065.034]) | 0.000 \u00b1 0.000 (95% CI [0.000, 0.000])% | 1.037 \u00b1 0.042 (95% CI [1.022, 1.052]) | 0.0023 |\n| seccomp | 1 | 1 | 1047.147 \u00b1 47.837 (95% CI [1030.028, 1064.265]) | 0.000 \u00b1 0.000 (95% CI [0.000, 0.000])% | 1.071 \u00b1 0.188 (95% CI [1.004, 1.139]) | 0.002552 |\n| userspace | 1 | 1 | 1079.267 \u00b1 33.343 (95% CI [1067.335, 1091.198]) | 0.000 \u00b1 0.000 (95% CI [0.000, 0.000])% | 1.016 \u00b1 0.055 (95% CI [0.996, 1.036]) | \u2014 |\n\n## Section 5: Attack Resistance\n\n\u5224\u5b9a\u6807\u51c6\uff1a`BLOCKED` = \u653b\u51fb\u5728\u6267\u884c\u524d\u88ab\u62d2\u7edd\uff1b`UNDETECTED` = \u975e\u6388\u6743\u8bf7\u6c42\u88ab\u6267\u884c\u3002\n\n| attack | userspace | seccomp | kernel |\n|---|---|---|---|\n| spoof | UNDETECTED (66.67%, n=30) | UNDETECTED (66.67%, n=30) | BLOCKED (0.00%, n=30) |\n| replay | UNDETECTED (100.00%, n=40) | BLOCKED (0.00%, n=40) | BLOCKED (0.00%, n=40) |\n| substitute | UNDETECTED (100.00%, n=30) | UNDETECTED (66.67%, n=30) | BLOCKED (0.00%, n=30) |\n| escalation | UNDETECTED (100.00%, n=10) | BLOCKED (0.00%, n=10) | BLOCKED (0.00%, n=10) |\n\n[spoof attack]\n- Goal: \u8ba9\u6ca1\u6709\u6709\u6548 session \u7684\u8fdb\u7a0b\u5192\u5145\u5df2\u8ba4\u8bc1 agent \u8c03\u7528\u5de5\u5177\u3002\n- Method: \u5408\u6cd5 agent \u6253\u5f00 session\uff0c\u653b\u51fb\u65b9\u4f2a\u9020\u6216\u7a83\u53d6 session_id\u3002\n- Method: \u653b\u51fb\u65b9\u76f4\u63a5\u53d1\u9001 tool:exec \u8bf7\u6c42\u3002\n- Method: \u7cfb\u7edf\u6821\u9a8c session\u3001peer binding \u548c kernel agent binding\u3002\n- Success criterion: \u5de5\u5177\u88ab\u6267\u884c\u6216\u8fd4\u56de status=ok\u3002\n- Blocked criterion: \u8bf7\u6c42\u5728\u6267\u884c\u524d\u88ab DENY \u6216\u8fd4\u56de session/binding \u9519\u8bef\u3002\n\n[replay attack]\n- Goal: \u91cd\u7528\u65e7 approval ticket\uff0c\u5728\u65b0 session \u6216\u8fc7\u671f\u540e\u7ee7\u7eed\u6267\u884c\u9ad8\u98ce\u9669\u5de5\u5177\u3002\n- Method: \u5148\u89e6\u53d1\u9ad8\u98ce\u9669\u5de5\u5177\u62ff\u5230 approval ticket\u3002\n- Method: \u7136\u540e\u4f2a\u9020 ticket\u3001\u8de8 session \u91cd\u7528\u3001\u6216\u5728 deny/\u8fc7\u671f\u540e\u91cd\u653e\u3002\n- Method: \u7cfb\u7edf\u6821\u9a8c ticket \u7684 session/tool/binding/consumed \u72b6\u6001\u3002\n- Success criterion: \u9ad8\u98ce\u9669\u5de5\u5177\u88ab\u6267\u884c\u3002\n- Blocked criterion: ticket \u88ab\u8bc6\u522b\u4e3a forged\u3001expired\u3001denied \u6216 consumed\u3002\n\n[substitute attack]\n- Goal: \u4f2a\u9020 tool_id\u3001tool_hash \u6216 app \u7ed1\u5b9a\uff0c\u6267\u884c\u4e0e manifest \u4e0d\u4e00\u81f4\u7684\u5de5\u5177\u8bed\u4e49\u3002\n- Method: \u4fdd\u6301 session \u4e0d\u53d8\uff0c\u7be1\u6539 tool_hash\u3001app_id \u6216 stale hash\u3002\n- Method: \u7cfb\u7edf\u6821\u9a8c manifest hash \u548c app/tool binding\u3002\n- Success criterion: \u8bf7\u6c42\u88ab\u63a5\u53d7\u5e76\u6267\u884c\u3002\n- Blocked criterion: hash mismatch \u6216 app/tool binding mismatch\u3002\n\n[escalation attack]\n- Goal: \u8bf7\u6c42\u4f4e\u98ce\u9669\u5165\u53e3\uff0c\u4f46\u8ba9 mediator \u6267\u884c\u9700\u8981 approval \u7684\u9ad8\u98ce\u9669\u884c\u4e3a\u3002\n- Method: \u6784\u9020 compromised mediator \u8def\u5f84\u6216\u4f2a\u9020 approval_ticket_id\u3002\n- Method: \u5c1d\u8bd5\u7ed5\u8fc7 approval gate \u6267\u884c\u9ad8\u98ce\u9669\u5de5\u5177\u3002\n- Success criterion: \u9ad8\u98ce\u9669\u5de5\u5177\u5728\u65e0\u6709\u6548 approval \u4e0b\u6267\u884c\u3002\n- Blocked criterion: \u8bf7\u6c42\u88ab DEFER/DENY\uff0c\u6216 approval gate \u5f3a\u5236\u62e6\u622a\u3002\n\nSpoof case breakdown:\n- userspace: expired_session=100.00%, fake_session_id=100.00%, session_token_theft=0.00%\n- seccomp: expired_session=100.00%, fake_session_id=100.00%, session_token_theft=0.00%\n- kernel: expired_session=0.00%, fake_session_id=0.00%, session_token_theft=0.00%\n- The 66.67% spoof rate in userspace/seccomp comes from three spoof subcases: `fake_session_id` and `expired_session` succeed under the compromised userspace profile, while `session_token_theft` stays blocked by UDS peer credentials.\n\n## Section 6: Budget / Accounting\n\n| system | max_calls | requests | allowed | denied | first_reject_at | status | note |\n|---|---:|---:|---:|---:|---:|---|---|\n| userspace | 50 | 100 | 50 | 50 | 51 | ok |  |\n| seccomp | 50 | 100 | 50 | 50 | 51 | ok |  |\n| kernel | 50 | 100 | 0 | 0 | 0 | skipped | reload kernel_mcp with agent_max_calls=<N> to enable kernel budget enforcement |\n\n## Section 7: Daemon Failure / Recovery\n\n- daemon failure experiment not run\n\n## Section 8: \u7ed3\u8bba\n\n- `kernel` \u7684\u5ef6\u8fdf\u5f00\u9500\u5728 small payload \u4e0b\u53ef\u89c2\u6d4b\uff0c\u4f46 large payload \u4e0b\u4f1a\u88ab tool execution \u4e3b\u5bfc\u65f6\u95f4\u6df9\u6ca1\u3002\n- \u5f3a\u5316 `userspace + seccomp + logging + stricter checks` \u4ecd\u6321\u4e0d\u4f4f spoof / substitution\uff0c\u4e14 latency \u548c throughput \u66f4\u5dee\u3002\n- \u56e0\u6b64 kernel_mcp \u4e0d\u662f optional optimization\uff0c\u800c\u662f\u66f4\u96be\u88ab userspace \u7ed5\u8fc7\u7684\u5fc5\u8981 control-plane mechanism\u3002\n"
+}
