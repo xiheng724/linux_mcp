@@ -279,11 +279,6 @@ def _plot_latency_by_payload_metric(
         ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%g"))
 
     axes[0].set_ylabel(f"{metric_label} (ms)")
-    fig.suptitle(
-        f"Latency by payload size — {metric_label} (n=30, 95% CI, * p<0.05, ** p<0.01, *** p<0.001)",
-        y=1.02,
-        fontsize=10.5,
-    )
     fig.tight_layout()
     _save(fig, out_dir, basename)
 
@@ -412,9 +407,6 @@ def plot_latency_breakdown(
 
     axes[0].set_ylabel("mean stage latency (ms, log)")
     axes[0].legend(loc="upper left", ncols=1)
-    fig.suptitle(
-        "Latency breakdown by stage (mean over n=30 runs)", y=1.04, fontsize=10.5
-    )
     fig.tight_layout()
     _save(fig, out_dir, "figure_latency_breakdown")
 
@@ -497,9 +489,6 @@ def plot_latency_overhead(
     ax.set_xticks(x_positions)
     ax.set_xticklabels([PAYLOAD_DISPLAY.get(p, p) for p in payloads])
     ax.set_ylabel("mean-latency ratio (1.00 = parity)")
-    ax.set_title(
-        "Latency overhead relative to userspace (mean, 95% CI, n=30)"
-    )
     low = min(all_values + [0.9]) if all_values else 0.9
     high = max(all_values + [1.1]) if all_values else 1.1
     pad = (high - low) * 0.25 if high > low else 0.1
@@ -602,11 +591,6 @@ def plot_latency_cdf(
 
     axes[0].set_ylabel("quantile")
     axes[0].legend(loc="upper left")
-    fig.suptitle(
-        "Per-quantile latency (mean ± 95% CI over n=30 runs)",
-        y=1.04,
-        fontsize=10.5,
-    )
     fig.tight_layout()
     _save(fig, out_dir, "figure_latency_cdf")
 
@@ -651,7 +635,6 @@ def plot_attack_matrix(
     )
     ax.set_xticks(range(len(systems)), [SYSTEM_LABELS[s] for s in systems])
     ax.set_yticks(range(len(attack_types)), attack_types)
-    ax.set_title("Attack bypass rate by category × system")
     # Text color contrasts with cividis_r: use white on dark (high value) and
     # black on light (low value).
     for r_idx, row_values in enumerate(values):
@@ -717,7 +700,6 @@ def plot_boundary_matrix(
     )
     ax.set_xticks(range(len(systems)), [SYSTEM_LABELS[s] for s in systems])
     ax.set_yticks(range(len(cases)), cases)
-    ax.set_title("Boundary-condition supplement bypass rate")
     for r_idx, row_values in enumerate(values):
         for c_idx, val in enumerate(row_values):
             color = "#ffffff" if val > 0.6 else "#111111"
@@ -814,11 +796,6 @@ def plot_scalability_throughput(
 
     axes[0].set_ylabel("throughput (ops/sec)")
     axes[0].legend(loc="lower left")
-    fig.suptitle(
-        "Steady-state throughput by agent count and concurrency",
-        y=1.04,
-        fontsize=10.5,
-    )
     fig.tight_layout()
     _save(fig, out_dir, "figure_scalability_throughput")
 
@@ -873,9 +850,6 @@ def plot_scalability_p95(
 
     axes[0].set_ylabel("p95 latency (ms, log)")
     axes[0].legend(loc="upper left")
-    fig.suptitle(
-        "p95 latency under steady-state load", y=1.04, fontsize=10.5
-    )
     fig.tight_layout()
     _save(fig, out_dir, "figure_scalability_p95")
 
