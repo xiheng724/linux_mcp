@@ -621,31 +621,28 @@ def plot_attack_matrix(
         values.append(row_values)
         cells.append(row_cells)
 
-    fig, ax = plt.subplots(figsize=(5.8, 3.6))
+    fig, ax = plt.subplots(figsize=(8.0, 4.8))
     image = ax.imshow(
         values,
-        cmap="cividis_r",
+        cmap="RdYlGn_r",
         vmin=0.0,
         vmax=1.0,
         aspect="auto",
     )
     ax.set_xticks(range(len(systems)), [SYSTEM_LABELS[s] for s in systems])
     ax.set_yticks(range(len(attack_types)), attack_types)
-    # Text color contrasts with cividis_r: use white on dark (high value) and
-    # black on light (low value).
     for r_idx, row_values in enumerate(values):
         for c_idx, val in enumerate(row_values):
             cell_text = cells[r_idx][c_idx]
             pct = f"{val * 100:.0f}%"
-            color = "#ffffff" if val > 0.6 else "#111111"
             ax.text(
                 c_idx,
                 r_idx,
                 f"{cell_text}\n({pct})",
                 ha="center",
                 va="center",
-                color=color,
-                fontsize=9,
+                color="#111111",
+                fontsize=11,
                 fontweight="bold",
             )
     colorbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
@@ -686,10 +683,10 @@ def plot_boundary_matrix(
         values.append(row_values)
         cells.append(row_cells)
 
-    fig, ax = plt.subplots(figsize=(5.8, max(3.4, 0.38 * len(cases) + 1.6)))
+    fig, ax = plt.subplots(figsize=(8.0, max(4.0, 0.45 * len(cases) + 2.0)))
     image = ax.imshow(
         values,
-        cmap="cividis_r",
+        cmap="RdYlGn_r",
         vmin=0.0,
         vmax=1.0,
         aspect="auto",
@@ -698,15 +695,15 @@ def plot_boundary_matrix(
     ax.set_yticks(range(len(cases)), cases)
     for r_idx, row_values in enumerate(values):
         for c_idx, val in enumerate(row_values):
-            color = "#ffffff" if val > 0.6 else "#111111"
             ax.text(
                 c_idx,
                 r_idx,
                 cells[r_idx][c_idx],
                 ha="center",
                 va="center",
-                color=color,
-                fontsize=8.5,
+                color="#111111",
+                fontsize=10,
+                fontweight="bold",
             )
     colorbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
     colorbar.set_label("bypass rate")
