@@ -241,20 +241,21 @@ def _plot_latency_by_payload_metric(
             capsize=3,
             error_kw={"elinewidth": 1.0, "ecolor": "#333333"},
         )
-        # Annotate each bar with its mean value.
-        for x, mean in zip(x_positions, means):
+        # Annotate each bar with its mean value, placed above the error bar.
+        max_top = max((m + eh) for m, eh in zip(means, err_his)) if means else 0.0
+        label_pad = max_top * 0.04 if max_top > 0 else 0.01
+        for x, mean, eh in zip(x_positions, means, err_his):
             ax.text(
                 x,
-                mean * 1.02 if mean > 0 else 0.01,
+                mean + eh + label_pad,
                 f"{mean:.3f}",
                 ha="center",
                 va="bottom",
                 fontsize=8.5,
                 color="#222222",
             )
-        y_top = max(m + eh for m, eh in zip(means, err_his)) * 1.22 if means else 0.0
-        if y_top > 0:
-            ax.set_ylim(0, y_top * 1.18)
+        if max_top > 0:
+            ax.set_ylim(0, max_top * 1.25)
 
         ax.set_xticks(x_positions)
         ax.set_xticklabels([SYSTEM_LABELS[s] for s in systems])
@@ -461,10 +462,10 @@ def plot_latency_overhead(
             capsize=3,
             error_kw={"elinewidth": 1.0, "ecolor": "#333333"},
         )
-        for x, ratio in zip(offsets, ratios):
+        for x, ratio, eh in zip(offsets, ratios, errs_hi):
             ax.text(
                 x,
-                ratio + 0.02,
+                ratio + eh + 0.025,
                 f"{ratio:.2f}",
                 ha="center",
                 va="bottom",
@@ -478,8 +479,8 @@ def plot_latency_overhead(
     ax.set_ylabel("mean-latency ratio (1.00 = parity)")
     low = min(all_values + [0.9]) if all_values else 0.9
     high = max(all_values + [1.1]) if all_values else 1.1
-    pad = (high - low) * 0.25 if high > low else 0.1
-    ax.set_ylim(max(0, low - pad), high + pad)
+    pad = (high - low) * 0.35 if high > low else 0.1
+    ax.set_ylim(max(0, low - pad * 0.5), high + pad)
     ax.legend(loc="upper left")
     fig.tight_layout()
     _save(fig, out_dir, "figure_latency_overhead")
