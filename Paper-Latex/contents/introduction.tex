@@ -2,7 +2,7 @@
 \setcounter{section}{1} \setcounter{subsection}{0}
 \phantomsection \addcontentsline{toc}{section}{\textit{Chapter 1: Introduction}}
 
-In recent years, LLMs have become the cornerstone of conversational AI, enabling a wide range of AI agents \cite{park2023generative, qin2024toolllm}. 
+In recent years, LLMs have become the cornerstone of conversational AI, enabling a wide range of AI agents \cite{park2023generative, qin2024toolllm}.
 Much like the steam engine in the Second Industrial Revolution, LLMs serve as a general-purpose driving force, powering the emergence of diverse agentic applications.
 Recent advances in LLM capabilities have enabled instruction following, reasoning, and interaction with external environments, forming the foundation for agentic systems \cite{yao2023react, wang2024agentbench, schick2023toolformer}.
 As a result, emergent AI agents can present strong task fulfillment abilities in diverse environments, ranging from direct acting assistants to more sophisticated reasoning and problem-solving systems \cite{mei2024aios,liu2026agentos}.
@@ -18,12 +18,12 @@ A single gateway process is typically responsible for interpreting tool manifest
 Such a design introduces a single point of failure and expands the trusted computing base, making it vulnerable to crashes, logic bugs, or compromised control paths~\cite{baumann2014arrakis}.
 As a result, critical safety properties become difficult to guarantee, including ensuring that executed tools match approved semantics, that requests remain bound to a trusted identity, and that approval state persists across failures \cite{greshake2023prompt, qin2024toolllm}.
 
-These observations motivate a key question: which control plane invariants in tool invocation fundamentally benefit from kernel-level enforcement, and can such enforcement improve security and observability without sacrificing performance?
+This motivates a focused question: which control-plane invariants in tool invocation fundamentally benefit from kernel-level enforcement, and can such enforcement improve security and resilience without sacrificing performance?
 
 \subsection{Our Solution}
 
-To mitigate the above-mentioned problems, we introduce \texttt{linux-mcp}, which isolates a smaller kernel responsibility: enforcing control-plane invariants for tool invocation. 
-Rather than proposing a full AI-native operating system, \texttt{linux-mcp} keeps semantic parsing and tool execution in user space while moving admission control, approval state, binding checks, and durable observability into a Linux kernel module.
+\texttt{linux-mcp} addresses this by isolating a narrow kernel responsibility: enforcing control-plane invariants for tool invocation.
+It keeps semantic parsing and tool execution in user space while moving admission control, approval state, binding checks, and durable observability into a Linux kernel module---without proposing a full AI-native operating system.
 
 The design follows a simple placement principle: the kernel holds the control plane, while user space retains the execution plane. 
 This avoids pushing complex semantics or application logic into the kernel, while still allowing critical control decisions to be enforced outside the gateway process.
@@ -40,7 +40,7 @@ By making these invariants kernel-visible, the system can enforce them with high
 Semantic consistency is enforced through manifest-derived identifiers; identity binding is anchored in OS-level peer credentials; approval state is maintained in the kernel across daemon failures.
 All tool invocations pass through a single mediation path, reducing reliance on transient in-memory gateway state.
 
-Critically, this design does not reduce the trusted footprint of \texttt{mcpd}---the gateway remains fully trusted and populates the kernel's registries.
+This design does not reduce the trusted footprint of \texttt{mcpd}---the gateway remains fully trusted and populates the kernel's registries.
 What it achieves is a \emph{partitioning} of control-plane state: registry entries, approval tickets, and binding checks are held in the kernel under \texttt{CAP\_NET\_ADMIN}-protected Netlink access control, making them durable across daemon failure and inaccessible to unprivileged processes, while semantic parsing and tool execution remain in user space where flexibility matters most.
 
 This design does not move tool execution into the kernel or attempt to replace existing Linux security mechanisms. 
@@ -77,9 +77,9 @@ Failure resilience
 & State persists in kernel 
 & Lost on gateway failure \\
 
-Security model 
-& Minimal TCB (kernel invariants) 
-& Large TCB (gateway-dependent) \\
+Security model
+& TCB partitioned, not reduced
+& Monolithic gateway state \\
 
 \bottomrule
 \end{tabular}

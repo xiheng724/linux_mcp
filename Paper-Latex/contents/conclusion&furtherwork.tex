@@ -4,29 +4,20 @@
 
 \subsection{Conclusion}
 
-This project examined a focused systems question: whether the control-plane invariants of MCP-style tool invocation are better enforced in the kernel than in a user-space gateway alone. 
-The design, implementation, and evaluation of \texttt{linux-mcp} together support an affirmative answer.
+The project clarified something that was not obvious at the outset: the hardest design decision was not what to move into the kernel, but what to leave out.
+Manifest parsing, schema validation, session management, and tool execution all belong in user space---not merely for convenience, but because a kernel component that evolves with application semantics is harder to reason about and, ultimately, harder to trust.
+The question the project forced into the open was more specific: given a fixed set of control-plane invariants---semantic identity binding, approval ticket lifecycle, agent registration---is there a kernel placement that enforces them without the guarantees depending on the daemon's correctness?
+The answer is yes---and more specific than the platitude ``put security in the kernel.''
 
-The main outcome of the project is not simply a working prototype, but a more precise architectural argument.
-Rather than treating AI-agent tool use purely as an application-layer integration problem, \texttt{linux-mcp} shows that a small but consequential part of the control plane benefits from operating-system-level support.
+The evaluation shows that this precision has a measurable payoff.
+The security improvement is structural: because approval tickets and semantic hashes are held in kernel memory under privilege-controlled access, a user-space process cannot modify or bypass them without escalating privileges beyond the stated threat model.
+The seccomp baseline's 36.4\% bypass rate makes this concrete---adding syscall filtering tightens the surface but leaves the admission decision and its state in a mutable process.
+The performance result at large payloads adds a less expected finding: kernel arbitration can be \emph{faster} than BPF-based syscall filtering because the per-syscall filtering cost scales with payload size while kernel arbitration does not.
+Kernel placement does not always cost more.
 
-The design partitions control-plane state rather than reducing the trusted footprint of the gateway.
-\texttt{mcpd} remains fully trusted: it populates the kernel's registries, computes semantic hashes, and derives the session-bound credentials used for identity verification.
-What the kernel provides is a stronger enforcement domain for the state that \texttt{mcpd} has established: registry entries, approval tickets, and binding checks are protected by \texttt{CAP\_NET\_ADMIN}-enforced Netlink access control, survive daemon failure, and remain inspectable independently of the daemon's process lifetime.
-Semantic parsing, schema validation, session logic, and tool execution remain in user space, where flexibility and evolvability are more important than privilege.
-
-This partitioning is the central result of the project.
-It shows that stronger control does not require relocating the entire agent stack into the kernel.
-A narrow kernel role is sufficient to make the most critical state transitions---semantic identity, requester binding, approval validity, and invocation completion---explicit, durable, and independently inspectable.
-In this sense, \texttt{linux-mcp} does not argue for a kernel-heavy AI operating system; it argues for careful, precisely scoped placement of a small set of control-plane invariants.
-
-The evaluation further shows that this design choice is practically viable.
-The kernel-assisted path blocks the tested classes of control-plane attack that continue to affect both the plain and hardened user-space baselines, while also preserving approval state across daemon failure in a way that neither baseline can match. 
-These gains come at low cost: latency remains close to the user-space baselines, and throughput stays within the same practical range under the tested multi-agent workloads.
-
-Taken together, these results suggest a broader conclusion. AI-agent systems do not necessarily require a fully redesigned operating-system substrate in order to obtain meaningful systems-level guarantees. 
-A more grounded and deployable approach is to identify the invariants that matter most for safety and correctness, and to place only those in a stronger enforcement domain.
-\texttt{linux-mcp} is therefore both a working prototype and a design claim: for MCP-style tool invocation, kernel-assisted control can improve integrity and resilience without sacrificing the extensibility that user space provides.
+The broader implication is not that AI-agent systems require a new operating-system substrate.
+The existing OS already provides primitives---state durability, privilege separation, independent observability---that can be applied to agent workloads without a full-stack redesign.
+How far this approach generalises---to execution budgets, cross-tool provenance, multi-agent coordination---is the open question that follows from this work, not one it resolves.
 
 \subsection{Reflection}
 
@@ -56,12 +47,12 @@ Once an agent can invoke external capabilities, failures in mediation may affect
 Approval correctness, auditability, and graceful failure handling are therefore not secondary details, but part of responsible system design. 
 Throughout the project, I tried to keep the threat model precise, avoid overstating what the prototype guarantees, and distinguish clearly between the attack classes the system addresses and those that remain out of scope.
 
-This project also made me more cautious about how such work should be presented.
-It is easy to make strong claims around AI safety or operating-system support without equally strong evidence. \texttt{linux-mcp} improves a specific part of the control plane; it does not solve the full security problem of AI agents, and it does not address unsafe tool semantics, poor policy choices, or compromise outside the assumed threat model. Stating those limits clearly is part of good research practice.
+The project also reinforced caution about how such work should be presented.
+Strong claims around AI safety or operating-system support are easy to make without equally strong evidence. \texttt{linux-mcp} improves a specific part of the control plane; it does not solve the full security problem of AI agents, and it does not address unsafe tool semantics, poor policy choices, or compromise outside the assumed threat model. Stating those limits clearly is part of good research practice.
 
-Finally, the project highlighted a practical engineering principle that I expect to remain useful beyond this dissertation: better security is not always achieved by adding more machinery. 
-In this case, the most effective step was to isolate a small set of authority-bearing state transitions and move them to a stronger enforcement domain. 
-That is a modest conclusion, but a precise one, and it suggests that operating-system support for AI agents may be most valuable when it is targeted, limited in scope, and built around explicit invariants rather than ambitious but diffuse redesign.
+Finally, the project reinforced a practical engineering principle: better security is not always achieved by adding more machinery.
+Isolating a small set of authority-bearing state transitions and moving them to a stronger enforcement domain was more effective than expanding the kernel's role.
+That is a modest conclusion, but a concrete one, and it suggests that operating-system support for AI agents is most valuable when it is targeted, limited in scope, and built around explicit invariants rather than ambitious but diffuse redesign.
 
 \subsection{Further Work}
 
@@ -85,10 +76,10 @@ support the main claim of the project, but they remain limited in scale and
 environment. Future work should include bare-metal evaluation, heavier concurrency, larger tool registries, and more heterogeneous tool workloads, including tools whose execution time is variable or network-dependent.
 Comparison against additional hardened user-space designs would also help sharpen the argument by separating the benefits of kernel placement from those achievable through improved user-space engineering alone.
 
-Finally, this work opens a broader research question: which other agent-oriented abstractions deserve operating-system support? 
-This project focuses on admission control for tool invocation, but similar arguments may extend to execution budgets, provenance across tool chains, durable approval logs, or agent-scoped resource accounting. 
-Exploring these directions would help clarify whether support for AI agents should be understood as entirely new operating-system substrates, or as conventional systems extended with a small number of carefully scoped, agent-aware mechanisms. 
-In that sense, the contribution of \texttt{linux-mcp} is best read as a first step rather than a complete answer.
+Finally, this work opens a broader research question: which other agent-oriented abstractions deserve operating-system support?
+This project focuses on admission control for tool invocation, but the same reasoning---identify the invariants that cannot be reliably held in user space, and place only those in a stronger enforcement domain---may extend to execution budgets, provenance across tool chains, durable approval logs, or agent-scoped resource accounting.
+Exploring these directions would help clarify whether meaningful OS support for AI agents requires new substrates, or whether it is achievable through carefully scoped extensions to existing mechanisms.
+\texttt{linux-mcp} is best understood as a targeted case study rather than a general solution: it confirms that kernel-assisted enforcement can work for this class of problem, and it raises the question of where the same approach is and is not applicable.
 
 \vspace{\baselineskip}
 \noindent\textbf{NOTE: The total length of the report up to this point should be between 30 and 50 pages.}

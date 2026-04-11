@@ -25,7 +25,7 @@ The design is oriented around three concerns that arise from the problem of medi
 
 The foremost requirement is that admission control must not reduce to a user-space daemon unilaterally deciding whether to forward a request.
 The admissibility of a tool invocation is determined solely by explicit kernel-resident state: the registration status of the requesting agent, the presence of the target tool in the registry, and the consistency of its semantic identity with the registered manifest.
-Anchoring this decision in the kernel ensures it cannot be silently circumvented by tampering with the daemon or by injecting a forged request that the daemon would otherwise accept~\cite{narayan2020shreds}.
+Anchoring this decision in the kernel ensures it cannot be silently circumvented by tampering with the daemon or by injecting a forged request that the daemon would otherwise accept~\cite{narayan2020shreds, spencer1999flask}.
 This aligns with observations from modern container and system security studies, where enforcing security boundaries outside application logic significantly reduces the attack surface~\cite{xu2021container}.
 
 At the same time, the system must remain compatible with ordinary user-space tools.
@@ -186,7 +186,7 @@ When a request enters the \texttt{DEFER} state, the kernel creates an approval t
 Upon receiving an \texttt{APPROVAL\_DECIDE} message, the kernel verifies that the binding context stored in the ticket still matches the current session state before permitting the deferred request to proceed.
 
 This binding mechanism ensures that approvals cannot be replayed across sessions or misdirected to structurally similar but distinct requests.
-More importantly, it guarantees that the system state validated at deferral time is identical to the state at execution time, eliminating time-of-check-to-time-of-use (TOCTOU) inconsistencies \cite{bishop2003computer}.
+More importantly, it guarantees that the system state validated at deferral time is identical to the state at execution time, eliminating time-of-check-to-time-of-use (TOCTOU) inconsistencies \cite{bishop2003computer, bishop1996racecond}.
 
 Beyond basic ticket binding, the implementation reveals a more nuanced structure: \texttt{linux-mcp} employs \emph{two layers of arbitration} and supports \emph{two distinct approval paths}.
 
@@ -320,6 +320,7 @@ The kernel retains the smaller, more stable set of operations that benefit from 
 This constitutes the central implementation claim of the system, and it is precisely what the evaluation presented in the following chapter is designed to validate.
 
 \paragraph{Design alternatives considered.}
+\label{sec:design-alternatives}
 
 Three kernel-interface alternatives were considered before settling on a Generic Netlink family.
 

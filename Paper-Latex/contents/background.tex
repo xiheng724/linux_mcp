@@ -19,6 +19,7 @@ Recent work reflects this shift.
 Systems such as generative agents demonstrate long-lived entities capable of maintaining memory and coordinating workflows \cite{park2023generative}, while tool-oriented LLM systems show that performance depends critically on structured access to external capabilities \cite{qin2024toolllm}.
 More recent autonomous agents, such as Manus\cite{mei2024aios,liu2026agentos}, further illustrate that agents can plan, execute, and verify complex tasks through multi-agent decomposition. 
 In these settings, the system must preserve consistency between tool descriptions, permissions, and runtime behaviour not directly captured by traditional OS abstractions.
+That mismatch is the starting point for the present work, motivating the question of which consistency guarantees are better placed in the kernel rather than delegated to a user-space layer.
 
 
 
@@ -37,8 +38,9 @@ Similarly, commercial platforms such as Apple Intelligence\cite{apple2024pcc} in
 At the same time, industrial systems are beginning to integrate AI agents more tightly into operating environments. 
 These developments suggest that agent execution is increasingly becoming an operating-system concern rather than a purely application-level feature.
 
-Despite differences in implementation, these systems share a common trend: they introduce an additional control layer that mediates between user intent, model reasoning, and tool execution. 
+Despite differences in implementation, these systems share a common trend: they introduce an additional control layer that mediates between user intent, model reasoning, and tool execution.
 This layer increasingly resembles operating-system functionality, even when implemented entirely in user space.
+\texttt{linux-mcp} takes a more conservative premise: rather than rethinking the operating system for agents, it asks which specific invariants from that emerging control layer benefit from kernel placement, and whether placing only those invariants in the kernel is sufficient to obtain meaningful guarantees.
 
 
 
@@ -51,6 +53,7 @@ The host coordinates sessions and mediates access, while servers implement capab
 This separation simplifies interoperability and modularity. 
 However, it also concentrates responsibility in the host: identity management, approval decisions, and consistency between tool descriptions and execution all depend on correct host behaviour.
 MCP defines how components communicate, but does not specify how a local system should enforce these properties.
+\texttt{linux-mcp} implements the enforcement layer that MCP leaves unspecified: it provides the local mechanism that turns the protocol's abstract trust model into a set of kernel-verified invariants.
 
 \subsection{Limits of User-space Mediation}
 
@@ -67,11 +70,12 @@ Finally, durability becomes problematic when control-plane state is held only in
 Approval decisions and pending requests may be lost on crash or restart, leaving no authoritative state that other components can consult.
 This fragility is particularly relevant in long-running agent systems where execution spans multiple steps and decisions \cite{wang2023voyager, yang2024swe}.
 These limitations are not unique to any single framework.
-Rather, they reflect a broader pattern: current agent systems increasingly rely on control plane invariants \cite{anderson1972computer} that are difficult to enforce when confined to user space \cite{garfinkel2003terra, watson2010capsicum}.
+Rather, they reflect a broader pattern: current agent systems increasingly rely on control plane invariants \cite{anderson1972computer} that are difficult to enforce when confined to user space \cite{garfinkel2003terra, watson2010capsicum, ji2026seagent, shi2025progent}.
 
 \subsection{Attack Classes Outside the Scope of Kernel Admission Control}
+\label{sec:attack-scope}
 
-Before positioning this work, it is important to delimit which attack classes kernel-level admission control can and cannot address.
+Kernel-level admission control addresses a specific subset of attack classes, and it is worth being explicit about its boundaries before positioning the design.
 Two dominant attack categories in AI agent systems fall outside the scope of this approach.
 
 \textbf{Prompt injection.}
@@ -87,7 +91,7 @@ Protecting manifest integrity requires file-system-level mechanisms such as IMA 
 
 \subsection{Design Positioning}
 
-This observation places the present work between two extremes.
+The present work sits between two extremes.
 On one end, AIOS-style proposals advocate for a full rethinking of the operating system around LLM-centric abstractions.
 On the other, existing agent frameworks operate entirely in user space, relying on application-level logic to enforce correctness and security.
 
@@ -135,8 +139,47 @@ These mechanisms operate at the level of kernel objects and access rights.
 However, they do not capture higher-level concepts such as tool identity, semantic equivalence between a manifest and an execution endpoint, or the scope of an approval decision. 
 For example, they cannot directly express whether a particular tool invocation matches an approved semantic description, or whether a request belongs to a specific agent session.
 
-This gap becomes more pronounced as agent systems evolve toward persistent, autonomous operation with rich tool ecosystems. 
-Addressing it requires introducing a control layer that reasons about semantics and identity before execution reaches user space logic.
+This gap becomes more pronounced as agent systems evolve toward persistent, autonomous operation with rich tool ecosystems.
+Addressing it requires introducing a control layer that reasons about semantics and identity before execution reaches user-space logic.
+
+
+
+\subsection{Related Work}
+\label{sec:related-work}
+
+Several existing mechanisms address related but distinct problems; understanding why they fall short for MCP-style enforcement motivates the present design.
+
+\textbf{Seccomp-BPF.}
+Seccomp-BPF filters system-call arguments at the process boundary \cite{seccomp2026}.
+It can restrict which syscalls a gateway process may issue, but it operates at the level of kernel objects rather than tool identity: it cannot distinguish a legitimate tool invocation from a forged one carrying the same syscall pattern.
+Applied to \texttt{mcpd}, seccomp can reduce the syscall surface but cannot enforce that the semantic hash in a request matches what was registered, nor that an approval ticket is unconsumed.
+That gap is what the seccomp baseline in Chapter~\ref{} exposes: adding stricter syscall filtering reduces the bypass rate but does not eliminate it for attack classes that do not require a privileged syscall.
+
+\textbf{eBPF and LSM hooks.}
+eBPF programs can enforce byte-level socket policies with very low overhead \cite{lsm2026}, and LSM hooks attach to VFS and socket operations at well-defined kernel hook points \cite{krohn2007flume}.
+Neither, however, can natively maintain a dynamic, per-tool hash registry and perform variable-length hash comparisons without significant complexity: the BPF verifier's loop and memory restrictions make runtime registry lookups impractical, and LSM hooks fire at the system-call boundary rather than at the application-protocol boundary where tool identity is meaningful (see Section~\ref{sec:design-alternatives} for a more detailed analysis).
+
+\textbf{Landlock.}
+Landlock provides process-scoped filesystem sandboxing through unprivileged LSM restrictions \cite{landlock2026}.
+It is complementary to this work---a tool service could be Landlock-sandboxed to limit its filesystem reach---but it does not address tool identity, approval binding, or approval-state durability across daemon failures.
+
+\textbf{Capsicum.}
+Capsicum introduces a capability model in which each open file descriptor represents a scoped authority \cite{watson2010capsicum}.
+Adapting this to MCP-style tool invocation would require tool services to be written against a capability API, violating the design goal that tool authors need not be aware of any kernel interface.
+More fundamentally, Capsicum capabilities are per-file-descriptor and cannot natively encode whether a specific tool invocation matches an approved semantic description.
+
+\textbf{AIOS and LLM-as-OS proposals.}
+Several recent systems propose embedding LLM-specific abstractions into a new OS substrate \cite{zhang2024llmos, wu2024oscopilot, packer2024memgpt}.
+These differ from this work in scope: they aim to replace or fundamentally extend the operating system for agent workloads.
+\texttt{linux-mcp} takes the opposite approach---leaving the existing OS unchanged and adding only a narrow kernel module for the invariants that user space cannot reliably hold.
+
+\textbf{MAC frameworks for LLM agents.}
+Recent work has begun applying mandatory access control (MAC) concepts to LLM agent privilege escalation \cite{ji2026seagent} and to programmable privilege control for tool-calling agents \cite{shi2025progent}.
+Both represent application-layer MAC enforced by a modified agent runtime rather than by the OS kernel.
+\texttt{linux-mcp} differs in that its enforcement boundary sits in the kernel itself---relying on \texttt{CAP\_NET\_ADMIN}-protected Netlink access rather than on runtime instrumentation in the agent framework---which makes the enforcement boundary independent of the daemon's correctness. The Flask security architecture \cite{spencer1999flask} and its Linux embodiment \cite{loscocco2001selinux} establish the prior art for policy/mechanism separation at the kernel level; \texttt{linux-mcp} applies the same principle to MCP-style tool admission rather than to traditional file and process access control.
+
+The key observation across all of these is that none addresses the combination of properties the MCP control plane requires: dynamic semantic-hash-based tool identity, session-bound approval tickets with explicit lifecycle state, and durability of that state across daemon failures.
+\texttt{linux-mcp} introduces a minimal kernel module for exactly these invariants.
 
 
 
@@ -145,7 +188,13 @@ Addressing it requires introducing a control layer that reasons about semantics 
 The above limitations suggest that the correctness of MCP-style systems depends on a small set of control-plane invariants, including identity binding, approval validity, and consistency between tool semantics and execution.
 We therefore ground our design in a threat model that focuses on attacks against these invariants in a local-host setting.
 
-We consider a local adversary operating on the same host as the MCP gateway.
+The local-adversary model is appropriate for MCP-style deployments for three reasons.
+First, tool services in a typical deployment run on the same host as the gateway; the attack surface that most immediately needs hardening is therefore local, not remote.
+Second, a remote adversary who has already achieved code execution on the host is, by definition, a local adversary: the local threat model subsumes this class without requiring a separate treatment.
+Third, the two dominant remote-oriented threats in AI agent systems---prompt injection and supply-chain compromise of manifests---are explicitly handled at other layers (Section~\ref{sec:attack-scope}) and fall outside the scope of kernel-level admission control.
+The threat model therefore focuses on what kernel enforcement can actually address: a co-located process that can observe, forge, or replay control-plane messages.
+
+Concretely, we consider a local adversary operating on the same host as the MCP gateway.
 The attacker interacts with the system through exposed user-space interfaces and may craft arbitrary requests, replay previously observed messages, and exploit inconsistencies in user-space state management.
 We assume that the attacker has full knowledge of the system’s protocol, implementation, and manifest structure.
 
