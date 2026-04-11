@@ -14,8 +14,9 @@ It introduces a novel operating system architecture for serving AI agents by kee
 This design enables strong isolation via a unified daemon that mediates all external tool invocations, enforcing a strict OS-tool security boundary with minimal overhead.
 Furthermore, the Model Context Protocol(MCP) abstraction enables seamless tool integration: external tools can be exposed to AI agents by simply specifying their functionality and parameters in a manifest, without additional implementation.
 
-We evaluate \texttt{linux-mcp} against both a pure user-space baseline and a hardened user-space design across latency, throughput, attack resistance, and failure scenarios.
-Our category-level evaluation confirms that the kernel-based design correctly enforces the specified control-plane invariants on every tested attack case (0 of 110 attempts succeed against the kernel path, versus 90.9\% and 36.4\% bypass rates against the two instrumented user-space baselines), and a boundary-condition supplement confirms that these invariants also hold against minimum-distance value forgeries and a concurrent-consume race (0 of 240 additional attempts succeed). The latency cost of kernel placement is small enough to be within the noise envelope of a VMware guest at small and medium payloads and measurably favourable to the kernel path at megabyte-class payloads, and throughput remains within the same practical range as the baselines under the tested multi-agent workloads.
+We evaluate \texttt{linux-mcp} against both a pure user-space baseline and a hardened user-space design across latency, throughput, attack resistance, and failure scenarios. 
+Our evaluation shows that the kernel-based design preserves the intended control-plane invariants across all tested attack cases, including boundary-condition tests for minimum-distance value forgeries and a concurrent-consume race. 
+This stronger enforcement comes at modest cost: latency remains within VMware noise for small and medium payloads, improves on the kernel path for megabyte-class payloads, and throughput stays in the same practical range as the baselines under tested multi-agent workloads.
 The prototype exposes 43 tools across 14 applications and is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
 
 }
