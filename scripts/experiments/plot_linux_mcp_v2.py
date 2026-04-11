@@ -622,15 +622,20 @@ def plot_attack_matrix(
         cells.append(row_cells)
 
     fig, ax = plt.subplots(figsize=(8.0, 4.8))
-    image = ax.imshow(
-        values,
+    image = ax.pcolormesh(
+        np.arange(len(systems) + 1) - 0.5,
+        np.arange(len(attack_types) + 1) - 0.5,
+        np.array(values),
         cmap="RdYlGn_r",
         vmin=0.0,
         vmax=1.0,
-        aspect="auto",
+        edgecolors="white",
+        linewidth=1.0,
     )
     ax.set_xticks(range(len(systems)), [SYSTEM_LABELS[s] for s in systems])
     ax.set_yticks(range(len(attack_types)), attack_types)
+    ax.set_xlim(-0.5, len(systems) - 0.5)
+    ax.set_ylim(len(attack_types) - 0.5, -0.5)
     for r_idx, row_values in enumerate(values):
         for c_idx, val in enumerate(row_values):
             cell_text = cells[r_idx][c_idx]
@@ -684,15 +689,20 @@ def plot_boundary_matrix(
         cells.append(row_cells)
 
     fig, ax = plt.subplots(figsize=(8.0, max(4.0, 0.45 * len(cases) + 2.0)))
-    image = ax.imshow(
-        values,
+    image = ax.pcolormesh(
+        np.arange(len(systems) + 1) - 0.5,
+        np.arange(len(cases) + 1) - 0.5,
+        np.array(values),
         cmap="RdYlGn_r",
         vmin=0.0,
         vmax=1.0,
-        aspect="auto",
+        edgecolors="white",
+        linewidth=1.0,
     )
     ax.set_xticks(range(len(systems)), [SYSTEM_LABELS[s] for s in systems])
     ax.set_yticks(range(len(cases)), cases)
+    ax.set_xlim(-0.5, len(systems) - 0.5)
+    ax.set_ylim(len(cases) - 0.5, -0.5)
     for r_idx, row_values in enumerate(values):
         for c_idx, val in enumerate(row_values):
             ax.text(
