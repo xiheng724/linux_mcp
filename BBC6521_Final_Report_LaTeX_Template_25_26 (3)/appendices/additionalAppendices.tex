@@ -14,14 +14,14 @@ This section provides the complete field specifications and representative imple
 The \texttt{tool:exec} request carries the tool hash as a 64-character hexadecimal string.
 If a prior \texttt{DEFER} decision returned a \texttt{ticket\_id}, the client includes it in a replay request:
 
-\begin{verbatim}
+\begin{lstlisting}[style=codestyle, language=json, caption={tool:exec request and response messages (llm-app $\to$ mcpd).}]
 // tool:exec request
 { "kind": "tool:exec",  "req_id": 42,
   "session_id": "sess-abc", "agent_id": "agent-1",
   "app_id": "sys_app",  "tool_id": 1,
-  "tool_hash": "a3f2...c91b",   // 64-char SHA-256 hex
+  "tool_hash": "a3f2...c91b",        // 64-char SHA-256 hex
   "payload": {"path": "/tmp"},
-  "approval_ticket_id": null }   // set on replay after DEFER
+  "approval_ticket_id": null }       // set on replay after DEFER
 
 // tool:exec response (ALLOW)
 { "req_id": 42, "status": "ok",
@@ -34,16 +34,16 @@ If a prior \texttt{DEFER} decision returned a \texttt{ticket\_id}, the client in
   "result": {}, "error": "deferred pending approval",
   "decision": "DEFER", "reason": "risk_tag:sensitive_read",
   "ticket_id": 7,  "t_ms": 1 }
-\end{verbatim}
+\end{lstlisting}
 
 The \texttt{approval\_reply} message is issued by the client after the user confirms a deferred operation:
 
-\begin{verbatim}
+\begin{lstlisting}[style=codestyle, language=json, caption={approval\_reply message (llm-app $\to$ mcpd, issued after user confirms a deferred operation).}]
 // approval_reply request
 { "sys": "approval_reply",  "session_id": "sess-abc",
   "ticket_id": 7,  "decision": "approve",
   "reason": "user confirmed",  "ttl_ms": 30000 }
-\end{verbatim}
+\end{lstlisting}
 
 \paragraph{Complete Netlink attribute encoding.}
 
@@ -51,13 +51,13 @@ All attributes are 4-byte aligned.
 String attributes are NUL-terminated and passed as raw bytes.
 The following Python fragment shows how \texttt{mcpd} encodes a \texttt{TOOL\_REQUEST} message:
 
-\begin{verbatim}
+\begin{lstlisting}[style=codestyle, language=Python, caption={Python fragment: encoding a \texttt{TOOL\_REQUEST} Generic Netlink message (mcpd $\to$ kernel).}]
 import struct, socket, hashlib
 
-FAMILY_NAME = b"KERNEL_MCP\x00"
-CMD_TOOL_REQUEST = 10
-ATTR_AGENT_ID, ATTR_TOOL_ID = 4, 2
-ATTR_REQ_ID, ATTR_TOOL_HASH = 1, 19
+FAMILY_NAME        = b"KERNEL_MCP\x00"
+CMD_TOOL_REQUEST   = 10
+ATTR_AGENT_ID,   ATTR_TOOL_ID     = 4,  2
+ATTR_REQ_ID,     ATTR_TOOL_HASH   = 1,  19
 ATTR_AGENT_BINDING, ATTR_AGENT_EPOCH = 28, 29
 
 def build_nla(attr_type, data):
@@ -67,26 +67,26 @@ def build_nla(attr_type, data):
     return hdr + data + b"\x00" * pad
 
 def encode_tool_request(agent_id, tool_id, req_id,
-                         tool_hash, binding, epoch):
+                        tool_hash, binding, epoch):
     attrs = (
-        build_nla(ATTR_AGENT_ID,      agent_id.encode() + b"\x00") +
-        build_nla(ATTR_TOOL_ID,       struct.pack("=I", tool_id))  +
-        build_nla(ATTR_REQ_ID,        struct.pack("=Q", req_id))   +
-        build_nla(ATTR_TOOL_HASH,     tool_hash.encode() + b"\x00")+
-        build_nla(ATTR_AGENT_BINDING, struct.pack("=Q", binding))  +
-        build_nla(ATTR_AGENT_EPOCH,   struct.pack("=Q", epoch))
+        build_nla(ATTR_AGENT_ID,       agent_id.encode() + b"\x00") +
+        build_nla(ATTR_TOOL_ID,        struct.pack("=I", tool_id))   +
+        build_nla(ATTR_REQ_ID,         struct.pack("=Q", req_id))    +
+        build_nla(ATTR_TOOL_HASH,      tool_hash.encode() + b"\x00") +
+        build_nla(ATTR_AGENT_BINDING,  struct.pack("=Q", binding))   +
+        build_nla(ATTR_AGENT_EPOCH,    struct.pack("=Q", epoch))
     )
-    # Generic Netlink header: cmd (1), version (1), reserved (2)
+    # Generic Netlink header: cmd (1 B), version (1 B), reserved (2 B)
     genl_hdr = struct.pack("BBH", CMD_TOOL_REQUEST, 1, 0)
     return genl_hdr + attrs
-\end{verbatim}
+\end{lstlisting}
 
 \paragraph{Semantic hash computation.}
 
 The semantic hash used for tool identity is a full 256-bit SHA-256 digest computed over a canonical JSON serialisation of the following manifest fields: \texttt{tool\_id}, \texttt{name}, \texttt{app\_id}, \texttt{app\_name}, \texttt{risk\_tags}, \texttt{description}, \texttt{input\_schema}, \texttt{examples}, \texttt{path\_semantics}, and \texttt{approval\_policy}.
 The \texttt{endpoint} field is deliberately excluded so that redeployment to a new socket path does not invalidate the kernel registration.
 
-\begin{verbatim}
+\begin{lstlisting}[style=codestyle, language=Python, caption={Python fragment: computing the manifest-derived semantic hash used for tool identity.}]
 import json, hashlib
 
 SEMANTIC_FIELDS = [
@@ -101,8 +101,8 @@ def semantic_hash(tool_manifest: dict) -> str:
                       sort_keys=True,
                       separators=(",", ":"),
                       ensure_ascii=True).encode("utf-8")
-    return hashlib.sha256(blob).hexdigest()   # 64-char hex; never truncated
-\end{verbatim}
+    return hashlib.sha256(blob).hexdigest()  # 64-char hex; never truncated
+\end{lstlisting}
 
 The full 64-character digest is used without truncation.
 A 32-bit prefix (8 hex characters) would be vulnerable to birthday collisions after approximately $2^{16}$ distinct tool registrations, which is a realistic size for a production deployment spanning multiple applications.
@@ -111,29 +111,40 @@ A 32-bit prefix (8 hex characters) would be vulnerable to birthday collisions af
 
 \begin{table}[htbp]
 \centering
-\small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{l l l p{6.5cm}}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{l c p{7.8cm}}
 \toprule
-\textbf{Field} & \textbf{Level} & \textbf{In hash?} & \textbf{Description} \\
+\textbf{Field} & \textbf{In hash?} & \textbf{Description} \\
 \midrule
-\texttt{app\_id}          & app  & yes & Unique application identifier string \\
-\texttt{app\_name}        & app  & yes & Human-readable application name \\
-\texttt{transport}        & app  & no  & Must be \texttt{"uds\_rpc"} \\
-\texttt{endpoint}         & app  & no  & Absolute path under \texttt{/tmp/linux-mcp-apps/} \\
-\texttt{tool\_id}         & tool & yes & Numeric identifier, unique within deployment \\
-\texttt{name}             & tool & yes & Tool name presented to the LLM planner \\
-\texttt{description}      & tool & yes & Natural-language description of tool behaviour \\
-\texttt{risk\_tags}       & tool & yes & List of risk labels (e.g., \texttt{"sensitive\_read"}) \\
-\texttt{operation}        & tool & no  & Operation string forwarded to the tool service \\
-\texttt{input\_schema}    & tool & yes & JSON Schema object for payload validation \\
-\texttt{examples}         & tool & yes & List of example invocation payloads \\
-\texttt{path\_semantics}  & tool & yes & Path interpretation hints (e.g., \texttt{"repo\_rel"}) \\
-\texttt{approval\_policy} & tool & yes & Null or policy name triggering kernel DEFER \\
-\texttt{timeout\_ms}      & tool & no  & Per-invocation execution timeout \\
+\multicolumn{3}{l}{\textit{Application-level fields}} \\[2pt]
+\rowcolor{gray!8}
+\texttt{app\_id}          & \ding{51} & Unique application identifier string \\
+\texttt{app\_name}        & \ding{51} & Human-readable application name \\
+\rowcolor{gray!8}
+\texttt{transport}        & \ding{55} & Must be \texttt{"uds\_rpc"} \\
+\texttt{endpoint}         & \ding{55} & Absolute socket path under \texttt{/tmp/linux-mcp-apps/} \\
+\midrule
+\multicolumn{3}{l}{\textit{Tool-level fields}} \\[2pt]
+\rowcolor{gray!8}
+\texttt{tool\_id}         & \ding{51} & Numeric identifier, unique within deployment \\
+\texttt{name}             & \ding{51} & Tool name presented to the LLM planner \\
+\rowcolor{gray!8}
+\texttt{description}      & \ding{51} & Natural-language description of tool behaviour \\
+\texttt{risk\_tags}       & \ding{51} & Risk labels controlling kernel DEFER (e.g., \texttt{"sensitive\_read"}) \\
+\rowcolor{gray!8}
+\texttt{input\_schema}    & \ding{51} & JSON Schema object for payload validation \\
+\texttt{examples}         & \ding{51} & Example invocation payloads \\
+\rowcolor{gray!8}
+\texttt{path\_semantics}  & \ding{51} & Path interpretation hints (e.g., \texttt{"repo\_rel"}) \\
+\texttt{approval\_policy} & \ding{51} & Policy name triggering kernel DEFER; null for unrestricted tools \\
+\rowcolor{gray!8}
+\texttt{operation}        & \ding{55} & Operation string forwarded to the tool service \\
+\texttt{timeout\_ms}      & \ding{55} & Per-invocation execution timeout (operational metadata) \\
 \bottomrule
 \end{tabular}
-\caption{Complete manifest field specification. Fields marked ``In hash: yes'' are included in the SHA-256 computation that produces the tool's semantic identity. Fields marked ``no'' are operational metadata excluded from the hash so that redeployment and timeout tuning do not change tool identity.}
+\caption{Manifest field specification. \ding{51}~= included in the SHA-256 semantic identity hash; \ding{55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt{app\_id}; tool-level fields appear once per tool entry.}
 \label{tab:manifest-fields}
 \end{table}
 
@@ -144,79 +155,59 @@ A 32-bit prefix (8 hex characters) would be vulnerable to birthday collisions af
 
 \begin{table}[htbp]
 \centering
-\small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{p{2.1cm} p{2.4cm} p{2.4cm} p{2.4cm} p{2.2cm} p{1.8cm} p{2.4cm}}
+\footnotesize
+\renewcommand{\arraystretch}{1.35}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{p{2.0cm} p{2.8cm} p{2.6cm} p{2.6cm} p{4.2cm}}
 \toprule
-\textbf{System} &
-\textbf{Control-plane placement} &
-\textbf{Tool identity mechanism} &
-\textbf{Approval / governance} &
-\textbf{Failure resilience} &
-\textbf{Kernel integration} &
-\textbf{Security boundary} \\
+\textbf{System}
+  & \textbf{Control-plane placement}
+  & \textbf{Tool identity}
+  & \textbf{State durability}
+  & \textbf{Trust anchor \& security boundary} \\
 \midrule
 
-\texttt{linux-mcp} (this work)
-& Kernel module (\texttt{kernel\_mcp}) + user-space gateway (\texttt{mcpd})
-& Manifest-derived semantic hash, registered and verified by kernel
-& Kernel-enforced approval tickets with session binding and lifecycle state
-& Approval state survives \texttt{mcpd} crash (kernel holds it)
-& Custom Generic Netlink module; \texttt{CAP\_NET\_ADMIN}-gated
-& Kernel arbitration; enforcement independent of gateway correctness \\
-
-\midrule
+\rowcolor{gray!12}
+\textbf{\texttt{linux-mcp}} \newline\textbf{(this work)}
+  & Kernel module + user-space gateway
+  & SHA-256 of JSON manifest; kernel-verified at every invocation
+  & Approval tickets and registry survive daemon crash (kernel-held)
+  & \textbf{Kernel}; enforcement is independent of gateway correctness \\
 
 \texttt{OpenClaw} \cite{openclaw2026}
-& User-space gateway (persistent process)
-& Skill name and version in gateway registry
-& Application-level permission checks; no durable approval state
-& Lost on process restart; no persistent control-plane state
-& None
-& Gateway process; bypassable via logic flaws \cite{openclaw_security1, openclaw_security2} \\
+  & User-space gateway (persistent process)
+  & Skill name/version string in gateway registry
+  & Lost on process restart
+  & User-space process; bypassable via logic flaws \cite{openclaw_security1, openclaw_security2} \\
 
-\midrule
-
+\rowcolor{gray!12}
 Harness Agent \cite{harness2025}
-& Cloud-hosted pipeline orchestrator
-& Pipeline step identity via RBAC connector
-& Role-based access control, audit log, organisational policies
-& Cloud-hosted; resilient by platform design
-& None (SaaS)
-& Platform RBAC; trust boundary is the SaaS control plane \\
-
-\midrule
+  & Cloud-hosted pipeline orchestrator
+  & Pipeline step + RBAC connector identity
+  & Cloud-hosted; platform-resilient
+  & SaaS control plane; RBAC-based governance \\
 
 AIOS / AgentOS \cite{mei2024aios, liu2026agentos}
-& New OS-level agent kernel (proposed)
-& Agent and tool registration in LLM-centric scheduler
-& Scheduling-layer resource governance
-& Not evaluated; proposal-stage work
-& New kernel substrate (proposed)
-& Full OS redesign; broad scope \\
+  & New OS-level agent kernel (proposed)
+  & Agent/tool registration in LLM scheduler
+  & Not evaluated (proposal stage)
+  & New OS substrate; full redesign \\
 
-\midrule
-
+\rowcolor{gray!12}
 LangChain / LangGraph \cite{langchain2022, langgraph2024}
-& User-space library (in-process)
-& Tool name string; no cryptographic binding
-& None; developer-implemented logic
-& Lost on process crash
-& None
-& Application process; no isolation between tool invocations \\
-
-\midrule
+  & In-process user-space library
+  & Tool name string; no cryptographic binding
+  & Lost on process crash
+  & Application process; no inter-invocation isolation \\
 
 Apple Intelligence \cite{apple2024pcc}
-& On-device OS services + Private Cloud Compute
-& System-managed capability entitlements
-& OS entitlement model + PCC attestation
-& High; system services are OS-persistent
-& Deep OS integration (proprietary)
-& Hardware attestation + OS entitlements; closed ecosystem \\
+  & On-device OS + Private Cloud Compute
+  & OS capability entitlements
+  & High; OS-persistent services
+  & Hardware attestation + OS entitlements; closed ecosystem \\
 
 \bottomrule
 \end{tabular}
-\caption{Comparison of representative agent systems across control-plane and security dimensions.}
+\caption{Comparison of representative agent systems. The key differentiator for \texttt{linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}
 \label{tab:system_comparison}
 \end{table}

@@ -12,49 +12,49 @@
 \contentsline {subsection}{\numberline {2.3}Limits of User-space Mediation}{9}{subsection.2.3}%
 \contentsline {subsection}{\numberline {2.4}Relation to Native Linux Security Mechanisms}{9}{subsection.2.4}%
 \contentsline {subsection}{\numberline {2.5}Related Work}{10}{subsection.2.5}%
-\contentsline {subsection}{\numberline {2.6}Threat Model}{11}{subsection.2.6}%
-\contentsline {section}{\textit {Chapter 3: Design and Implementation}}{14}{section*.5}%
-\contentsline {subsection}{\numberline {3.1}Design Goals}{14}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}System Architecture}{15}{subsection.3.2}%
-\contentsline {subsection}{\numberline {3.3}Control-Plane Workflow}{16}{subsection.3.3}%
-\contentsline {subsection}{\numberline {3.4}Wire Protocols}{17}{subsection.3.4}%
-\contentsline {paragraph}{llm-app to mcpd.}{18}{paragraph*.6}%
-\contentsline {paragraph}{mcpd to tool-app.}{18}{paragraph*.7}%
-\contentsline {paragraph}{mcpd to kernel\_mcp (Generic Netlink).}{18}{paragraph*.8}%
-\contentsline {paragraph}{Tool registration via manifests.}{20}{paragraph*.9}%
-\contentsline {subsection}{\numberline {3.5}Manifest Semantics and Tool Identity}{21}{subsection.3.5}%
-\contentsline {subsection}{\numberline {3.6}Session Management and Approval Binding}{21}{subsection.3.6}%
-\contentsline {subsection}{\numberline {3.7}Kernel Module Design}{22}{subsection.3.7}%
-\contentsline {subsection}{\numberline {3.8}Daemon Implementation}{24}{subsection.3.8}%
-\contentsline {subsection}{\numberline {3.9}Tool-Side RPC and Execution Model}{24}{subsection.3.9}%
-\contentsline {subsection}{\numberline {3.10}State Reconciliation and Recovery}{25}{subsection.3.10}%
-\contentsline {subsection}{\numberline {3.11}Rationale for the Kernel--User-Space Split}{25}{subsection.3.11}%
-\contentsline {subsection}{\numberline {3.12}Limitations and Identified Optimisation Opportunities}{25}{subsection.3.12}%
-\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{26}{section*.10}%
-\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{26}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{27}{subsection.4.2}%
-\contentsline {subsection}{\numberline {4.3}Security Evaluation}{28}{subsection.4.3}%
-\contentsline {subsection}{\numberline {4.4}Daemon Failure and Recovery}{31}{subsection.4.4}%
-\contentsline {subsection}{\numberline {4.5}Discussion}{32}{subsection.4.5}%
-\contentsline {subsection}{\numberline {4.6}Threats to Validity}{33}{subsection.4.6}%
-\contentsline {section}{\textit {Chapter 5: Conclusion and Further Work}}{35}{section*.11}%
-\contentsline {subsection}{\numberline {5.1}Conclusion}{35}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Reflection}{35}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Further Work}{36}{subsection.5.3}%
-\contentsline {section}{\textit {References}}{38}{subsection.5.3}%
-\contentsline {section}{\textit {Acknowledgment}}{42}{section*.12}%
-\contentsline {section}{\textit {Appendices}}{43}{section*.13}%
-\contentsline {subsection}{Disclaimer}{43}{section*.14}%
-\contentsline {subsection}{Acknowledgement of using Generative AI}{44}{section*.15}%
-\contentsline {subsection}{Project specification}{45}{section*.16}%
-\contentsline {subsection}{Early-term progress report}{52}{section*.17}%
-\contentsline {subsection}{Mid-term progress report}{59}{section*.18}%
-\contentsline {subsection}{Supervision log}{66}{section*.19}%
-\contentsline {subsection}{Additional Appendices}{69}{section*.20}%
-\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{69}{section*.21}%
-\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{69}{paragraph*.22}%
-\contentsline {paragraph}{Complete Netlink attribute encoding.}{70}{paragraph*.23}%
-\contentsline {paragraph}{Semantic hash computation.}{70}{paragraph*.24}%
-\contentsline {paragraph}{Complete manifest field specification.}{71}{paragraph*.25}%
+\contentsline {subsection}{\numberline {2.6}Threat Model}{10}{subsection.2.6}%
+\contentsline {section}{\textit {Chapter 3: Design and Implementation}}{13}{section*.5}%
+\contentsline {subsection}{\numberline {3.1}Design Goals}{13}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}System Architecture}{14}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Control-Plane Workflow}{15}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Wire Protocols}{16}{subsection.3.4}%
+\contentsline {paragraph}{llm-app to mcpd.}{17}{paragraph*.6}%
+\contentsline {paragraph}{mcpd to tool-app.}{17}{paragraph*.7}%
+\contentsline {paragraph}{mcpd to kernel\_mcp (Generic Netlink).}{17}{paragraph*.8}%
+\contentsline {paragraph}{Tool registration via manifests.}{19}{paragraph*.9}%
+\contentsline {subsection}{\numberline {3.5}Manifest Semantics and Tool Identity}{20}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Session Management and Approval Binding}{20}{subsection.3.6}%
+\contentsline {subsection}{\numberline {3.7}Kernel Module Design}{21}{subsection.3.7}%
+\contentsline {subsection}{\numberline {3.8}Daemon Implementation}{23}{subsection.3.8}%
+\contentsline {subsection}{\numberline {3.9}Tool-Side RPC and Execution Model}{23}{subsection.3.9}%
+\contentsline {subsection}{\numberline {3.10}State Reconciliation and Recovery}{24}{subsection.3.10}%
+\contentsline {subsection}{\numberline {3.11}Rationale for the Kernel--User-Space Split}{24}{subsection.3.11}%
+\contentsline {subsection}{\numberline {3.12}Limitations and Identified Optimisation Opportunities}{24}{subsection.3.12}%
+\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{25}{section*.10}%
+\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{25}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{26}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Security Evaluation}{27}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Daemon Failure and Recovery}{30}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Discussion}{31}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}Threats to Validity}{32}{subsection.4.6}%
+\contentsline {section}{\textit {Chapter 5: Conclusion and Further Work}}{34}{section*.11}%
+\contentsline {subsection}{\numberline {5.1}Conclusion}{34}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Reflection}{34}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Further Work}{35}{subsection.5.3}%
+\contentsline {section}{\textit {References}}{37}{subsection.5.3}%
+\contentsline {section}{\textit {Acknowledgment}}{41}{section*.12}%
+\contentsline {section}{\textit {Appendices}}{42}{section*.13}%
+\contentsline {subsection}{Disclaimer}{42}{section*.14}%
+\contentsline {subsection}{Acknowledgement of using Generative AI}{43}{section*.15}%
+\contentsline {subsection}{Project specification}{44}{section*.16}%
+\contentsline {subsection}{Early-term progress report}{51}{section*.17}%
+\contentsline {subsection}{Mid-term progress report}{58}{section*.18}%
+\contentsline {subsection}{Supervision log}{65}{section*.19}%
+\contentsline {subsection}{Additional Appendices}{68}{section*.20}%
+\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{68}{section*.21}%
+\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{68}{paragraph*.22}%
+\contentsline {paragraph}{Complete Netlink attribute encoding.}{68}{paragraph*.23}%
+\contentsline {paragraph}{Semantic hash computation.}{69}{paragraph*.24}%
+\contentsline {paragraph}{Complete manifest field specification.}{70}{paragraph*.25}%
 \contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{71}{section*.26}%
-\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{74}{section*.27}%
+\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{72}{section*.27}%

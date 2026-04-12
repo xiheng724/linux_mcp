@@ -244,13 +244,12 @@ The eight commands covering the full invocation lifecycle are listed in Table~\r
 Full attribute encodings and a minimal Python framing implementation are in Appendix~A.1 (Section~\ref{sec:appendix-protocols}).
 
 \paragraph{Tool registration via manifests.}
-Tool services do not self-register.
-Each application is described by a JSON manifest file in \texttt{tool-app/manifests/}; \texttt{mcpd} enumerates and loads all manifests at startup, then issues \texttt{TOOL\_REGISTER} and \texttt{AGENT\_REGISTER} Netlink commands to populate the kernel registries.
-The transport \texttt{endpoint} field is excluded from the semantic hash computation, so a tool service can be redeployed to a different socket path without invalidating its kernel registration.
-A representative manifest is shown below; the complete field specification is in Appendix~A.1 (Table~\ref{tab:manifest-fields}).
+Tool services do not self-register; each application is described by a JSON manifest in \texttt{tool-app/manifests/} from which \texttt{mcpd} derives semantic hashes and issues \texttt{TOOL\_REGISTER} Netlink commands at startup.
+The \texttt{endpoint} field is excluded from the hash so a service can be redeployed to a new socket path without invalidating its registration.
+The complete field specification is in Appendix~A.1 (Table~\ref{tab:manifest-fields}); a representative manifest is shown below.
 
-\begin{minipage}{\linewidth}
-\begin{verbatim}
+\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}[style=codestyle, language=json, caption={Representative tool manifest (JSON). The \texttt{endpoint} field is excluded from the semantic hash; all other fields shown here are included.}]
 {
   "app_id": "sys_app",  "transport": "uds_rpc",
   "endpoint": "/tmp/linux-mcp-apps/sys_app.sock",
@@ -262,7 +261,7 @@ A representative manifest is shown below; the complete field specification is in
     "approval_policy": null,  "examples": [{"payload": {}}]
   }]
 }
-\end{verbatim}
+\end{lstlisting}
 \end{minipage}
 
 

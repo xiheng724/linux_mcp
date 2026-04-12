@@ -5,6 +5,47 @@
 \usepackage{siunitx}
 \usepackage{tabularx}
 \usepackage{float}
+\usepackage{colortbl}
+\usepackage{pifont}
+
+%% ── Code listing styles ──────────────────────────────────────────────────────
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{200,200,200}
+\definecolor{codecomment}{RGB}{120,120,120}
+\definecolor{linenumcol}{RGB}{170,170,170}
+
+\lstdefinestyle{codestyle}{
+  backgroundcolor  = \color{codebg},
+  frame            = single,
+  framerule        = 0.4pt,
+  rulecolor        = \color{codeframe},
+  basicstyle       = \linespread{1.0}\ttfamily\small,
+  keywordstyle     = {},
+  commentstyle     = \color{codecomment}\itshape,
+  stringstyle      = {},
+  numberstyle      = \tiny\color{linenumcol},
+  numbers          = left,
+  numbersep        = 8pt,
+  stepnumber       = 1,
+  breaklines       = true,
+  breakatwhitespace= true,
+  showstringspaces = false,
+  tabsize          = 4,
+  xleftmargin      = 18pt,
+  xrightmargin     = 4pt,
+  aboveskip        = 8pt,
+  belowskip        = 6pt,
+}
+
+\lstdefinelanguage{json}{
+  sensitive        = false,
+  morestring       = [b]",
+  morecomment      = [l]{//},
+  commentstyle     = \color{codecomment}\itshape,
+  stringstyle      = {},
+}
+%% ─────────────────────────────────────────────────────────────────────────────
+
 \begin{document}
 
 \include{cover}

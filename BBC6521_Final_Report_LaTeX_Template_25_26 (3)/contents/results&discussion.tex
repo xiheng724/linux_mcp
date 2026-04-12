@@ -39,15 +39,27 @@ Kernel-side arbitration therefore costs roughly one order of magnitude less than
 
 \begin{table}[H]
 \centering
-\caption{Mean end-to-end latency (ms) by payload size and system ($n = 30$ runs of 2000 requests each). $p$-values are two-sided Welch's $t$-tests on per-run means, comparing each row against the \texttt{userspace} baseline.}
+\caption{Mean end-to-end latency (ms) by payload size ($n = 30$ runs $\times$ 2000 requests). Bold values indicate the lowest latency per row. $p$-values are two-sided Welch's $t$-tests against the \texttt{userspace} baseline; \textsuperscript{ns} = not significant ($p > 0.05$).}
 \label{tab:latency}
-\begin{tabular}{lccccc}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{lrrr@{\hspace{14pt}}rr}
 \toprule
-Payload & \texttt{userspace} & \texttt{seccomp} & \texttt{kernel} & $p$(seccomp) & $p$(kernel) \\
+& \multicolumn{3}{c}{\textbf{Mean latency (ms)}}
+& \multicolumn{2}{c}{\textbf{Welch's $p$-value}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}
+\textbf{Payload}
+  & \texttt{userspace}
+  & \texttt{seccomp}
+  & \texttt{kernel}
+  & vs.\ \texttt{seccomp}
+  & vs.\ \texttt{kernel} \\
 \midrule
-100 B   & 0.854 & 0.867 & 0.854 & 0.475 & 0.984 \\
-10 KB   & 0.863 & 0.922 & 0.899 & 0.000206 & 0.097 \\
-1 MB    & 7.748 & 9.843 & 7.487 & $<\!10^{-4}$ & 0.00027 \\
+\rowcolor{gray!8}
+100\,B  & \textbf{0.854} & 0.867 & \textbf{0.854} & 0.475\textsuperscript{ns}  & 0.984\textsuperscript{ns} \\
+10\,KB  & 0.863          & 0.922 & 0.899          & 0.000206                  & 0.097\textsuperscript{ns} \\
+\rowcolor{gray!8}
+1\,MB   & 7.748          & 9.843 & \textbf{7.487} & ${<}10^{-4}$              & 0.00027 \\
 \bottomrule
 \end{tabular}
 \end{table}

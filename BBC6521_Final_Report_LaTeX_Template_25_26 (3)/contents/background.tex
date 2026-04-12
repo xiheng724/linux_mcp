@@ -73,64 +73,19 @@ This gap motivates introducing a dedicated control layer that validates semantic
 
 Several existing mechanisms address related but distinct problems; understanding why they fall short for MCP-style enforcement motivates the present design.
 
-\vspace{4pt}
-\noindent\textit{Kernel-native enforcement mechanisms.}
+Existing kernel-native mechanisms such as seccomp-BPF, eBPF/LSM hooks, Landlock, and capability-based designs (Capsicum) provide strong control over syscalls, kernel objects, and process-scoped authority \cite{seccomp2026, lsm2026, landlock2026, lefeuvre2024sok, brimhall2023mac}.
+However, they operate below the application-protocol layer and therefore do not natively express MCP-specific concepts such as manifest-derived tool identity, approval-ticket scope, or semantic equivalence between a declared tool and an executed endpoint.
+A tool's identity in this system is a SHA-256 digest of its JSON manifest, a concept that does not exist at the syscall or VFS layer; no hook in seccomp or LSM fires at the point where a JSON-RPC payload is interpreted, and the BPF verifier's loop and memory restrictions make runtime hash-registry lookups impractical (see Section~\ref{sec:design-alternatives}).
+For this reason, these mechanisms can harden the surrounding execution environment, but they do not directly enforce the control-plane invariants targeted in this work.
 
-\textbf{Seccomp-BPF.}
-Seccomp-BPF can filter syscalls and inspect syscall arguments at the process boundary~\cite{seccomp2026}, but tool identity is not expressed at the syscall level; it is embedded in the JSON-RPC payload exchanged over Unix domain sockets.
-Seccomp sees only the \texttt{socket()} and \texttt{sendto()} syscalls; it cannot inspect the message content to verify that a tool invocation matches an approved semantic hash or that an approval ticket is unconsumed.
-This is a layering issue: tool identity is a concept at the protocol layer, not the syscall layer.
-Applied to \texttt{mcpd}, seccomp can reduce the syscall surface but cannot enforce the invariants on which admission control depends.
+Agent frameworks such as LangChain \cite{langchain2022}, LangGraph \cite{langgraph2024}, AutoGPT \cite{autogpt2023}, CrewAI \cite{crewai2024}, Haystack \cite{haystack2023}, and Semantic Kernel \cite{semantickernel2023} locate the full control plane in user space; correctness depends entirely on the in-process runtime remaining uncompromised.
+\texttt{OpenClaw} \cite{openclaw2026} operationalises this pattern at scale, and independent security analyses confirm the resulting vulnerabilities \cite{openclaw_security1, openclaw_security2}.
+Industrial agents such as Harness \cite{harness2025} add governance through platform RBAC, but the trust anchor remains the cloud control plane.
+Recent work on application-layer mandatory access control — including privilege-escalation frameworks for LLM agents \cite{ji2026seagent} and programmable privilege control for tool-calling agents \cite{shi2025progent} — enforces policy inside a modified agent runtime, so invariant correctness depends on the runtime itself remaining intact.
+All of these approaches keep the trust anchor in user space or in a cloud-hosted control plane; their correctness degrades when the runtime or gateway is compromised.
 
-\textbf{eBPF and LSM hooks.}
-eBPF programs can enforce byte-level socket policies with very low overhead \cite{lsm2026}, and LSM hooks attach to VFS and socket operations at well-defined kernel hook points \cite{brimhall2023mac}.
-Neither, however, can natively maintain a dynamic, per-tool hash registry and perform variable-length hash comparisons without significant complexity: the BPF verifier's loop and memory restrictions make runtime registry lookups impractical, and LSM hooks fire at the system-call boundary rather than at the application-protocol boundary where tool identity is meaningful (see Section~\ref{sec:design-alternatives} for a more detailed analysis).
-
-\textbf{Landlock.}
-Landlock provides process-scoped filesystem sandboxing through unprivileged LSM restrictions \cite{landlock2026}.
-It is complementary to this work (a tool service could be Landlock-sandboxed to limit its filesystem reach) but does not address tool identity, approval binding, or approval-state durability across daemon failures.
-
-\textbf{Capsicum.}
-Capability-based designs scope authority to individual file descriptors or object references \cite{lefeuvre2024sok}.
-Adapting this to MCP-style tool invocation would require tool services to be written against a capability API, violating the design goal that tool authors need not be aware of any kernel interface.
-More fundamentally, per-descriptor capabilities cannot natively encode whether a specific tool invocation matches an approved semantic description.
-
-These mechanisms operate below the protocol layer and cannot natively represent tool identity, which is defined by a semantic hash over a JSON manifest.
-
-\vspace{4pt}
-\noindent\textit{Agent runtimes and frameworks.}
-
-\textbf{Agent frameworks.}
-LangChain \cite{langchain2022}, LangGraph \cite{langgraph2024}, AutoGPT \cite{autogpt2023}, CrewAI \cite{crewai2024}, Haystack \cite{haystack2023}, and Semantic Kernel \cite{semantickernel2023} all locate the full control plane in user space.
-They provide no mechanism for durable, kernel-verified approval state; correctness depends entirely on the in-process runtime.
-\texttt{OpenClaw} \cite{openclaw2026} operationalises this pattern at scale, and independent security analyses demonstrate the resulting vulnerabilities \cite{openclaw_security1, openclaw_security2}.
-Industrial CI/CD agents such as Harness \cite{harness2025} add governance through platform RBAC, but their trust anchor remains the cloud control plane rather than any local kernel boundary.
-
-\textbf{MAC frameworks for LLM agents.}
-Recent work has begun applying mandatory access control (MAC) concepts to LLM agent privilege escalation \cite{ji2026seagent} and to programmable privilege control for tool-calling agents \cite{shi2025progent}.
-Both represent application-layer MAC: enforcement lives inside a modified agent runtime, so its correctness depends on the runtime itself remaining uncompromised.
-\texttt{linux-mcp} moves enforcement out of the gateway entirely into a kernel module, so its invariants hold even if the gateway is buggy or partially compromised.
-The two approaches are complementary rather than competing: a runtime-MAC agent framework could run on top of \texttt{linux-mcp}, gaining kernel-level durability without replacing its own semantic enforcement.
-The principle of separating policy from enforcement mechanism at the kernel level is well established in Linux MAC frameworks \cite{brimhall2023mac}; \texttt{linux-mcp} applies the same principle to MCP-style tool admission rather than to traditional file and process access control.
-
-All of these keep the trust anchor in user space; their correctness degrades when the runtime itself is compromised.
-
-\vspace{4pt}
-\noindent\textit{AIOS-style OS proposals.}
-
-Several recent systems propose embedding LLM-specific abstractions into a new OS substrate \cite{wu2024oscopilot, packer2023memgpt, mei2024aios, liu2026agentos}.
-These differ from this work in scope: they aim to replace or fundamentally extend the operating system for agent workloads, managing scheduling, memory, and tool access at the OS level.
-\texttt{linux-mcp} takes the opposite approach, leaving the existing OS unchanged and adding only a narrow kernel module for the invariants that user space cannot reliably hold.
-
-These proposals broaden scope by redesigning OS substrates; \texttt{linux-mcp} instead adds a narrow kernel role to an unchanged Linux.
-
-\vspace{4pt}
-\noindent\textit{Summary.}
-
-Existing Linux mechanisms operate below the protocol layer and cannot express tool identity.
-Existing agent frameworks keep control-plane trust in user space.
-AIOS-style proposals broaden scope by redesigning the OS substrate.
-\texttt{linux-mcp} instead introduces a narrow kernel role for a bounded set of MCP-style control-plane invariants, enforcing all three of the weaknesses identified in Section~\ref{sec:limits-user-space} outside the gateway's own privilege domain; Chapter~\ref{chap:design} describes how it does so with a single, narrow kernel addition.
+AIOS-style proposals such as AIOS, OS-Copilot, MemGPT, and AgentOS \cite{mei2024aios, wu2024oscopilot, packer2023memgpt, liu2026agentos} pursue a broader scope: they embed LLM-specific abstractions — scheduling, memory management, tool access — into a new OS substrate.
+These proposals broaden scope by redesigning OS infrastructure; \texttt{linux-mcp} instead adds a narrow kernel role to an otherwise unchanged Linux system, targeting a bounded set of MCP-style control-plane invariants.
 
 
 \begin{table}[t]
