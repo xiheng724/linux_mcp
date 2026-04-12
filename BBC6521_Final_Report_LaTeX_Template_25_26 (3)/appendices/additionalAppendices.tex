@@ -1,6 +1,146 @@
-\subsection*{Additional appendices (as needed)}
+\subsection*{Additional Appendices}
 \phantomsection
-\addcontentsline{toc}{subsection}{Additional appendices (as needed)}
+\addcontentsline{toc}{subsection}{Additional Appendices}
+
+\subsubsection*{A.1\quad Wire Protocol Reference}
+\phantomsection
+\addcontentsline{toc}{subsubsection}{A.1\quad Wire Protocol Reference}
+\label{sec:appendix-protocols}
+
+This section provides the complete field specifications and representative implementation fragments for the three inter-component protocols described in Section~\ref{sec:wire-protocols}.
+
+\paragraph{Complete llm-app to mcpd message reference.}
+
+The \texttt{tool:exec} request carries the tool hash as a 64-character hexadecimal string.
+If a prior \texttt{DEFER} decision returned a \texttt{ticket\_id}, the client includes it in a replay request:
+
+\begin{verbatim}
+// tool:exec request
+{ "kind": "tool:exec",  "req_id": 42,
+  "session_id": "sess-abc", "agent_id": "agent-1",
+  "app_id": "sys_app",  "tool_id": 1,
+  "tool_hash": "a3f2...c91b",   // 64-char SHA-256 hex
+  "payload": {"path": "/tmp"},
+  "approval_ticket_id": null }   // set on replay after DEFER
+
+// tool:exec response (ALLOW)
+{ "req_id": 42, "status": "ok",
+  "result": {"os": "Linux 6.8", "cpu": "4-core"},
+  "decision": "ALLOW", "reason": "admitted",
+  "ticket_id": 0,  "t_ms": 3 }
+
+// tool:exec response (DEFER)
+{ "req_id": 42, "status": "error",
+  "result": {}, "error": "deferred pending approval",
+  "decision": "DEFER", "reason": "risk_tag:sensitive_read",
+  "ticket_id": 7,  "t_ms": 1 }
+\end{verbatim}
+
+The \texttt{approval\_reply} message is issued by the client after the user confirms a deferred operation:
+
+\begin{verbatim}
+// approval_reply request
+{ "sys": "approval_reply",  "session_id": "sess-abc",
+  "ticket_id": 7,  "decision": "approve",
+  "reason": "user confirmed",  "ttl_ms": 30000 }
+\end{verbatim}
+
+\paragraph{Complete Netlink attribute encoding.}
+
+All attributes are 4-byte aligned.
+String attributes are NUL-terminated and passed as raw bytes.
+The following Python fragment shows how \texttt{mcpd} encodes a \texttt{TOOL\_REQUEST} message:
+
+\begin{verbatim}
+import struct, socket, hashlib
+
+FAMILY_NAME = b"KERNEL_MCP\x00"
+CMD_TOOL_REQUEST = 10
+ATTR_AGENT_ID, ATTR_TOOL_ID = 4, 2
+ATTR_REQ_ID, ATTR_TOOL_HASH = 1, 19
+ATTR_AGENT_BINDING, ATTR_AGENT_EPOCH = 28, 29
+
+def build_nla(attr_type, data):
+    # NLA header: 2-byte length, 2-byte type; 4-byte aligned
+    hdr = struct.pack("HH", len(data) + 4, attr_type)
+    pad = (4 - len(data) % 4) % 4
+    return hdr + data + b"\x00" * pad
+
+def encode_tool_request(agent_id, tool_id, req_id,
+                         tool_hash, binding, epoch):
+    attrs = (
+        build_nla(ATTR_AGENT_ID,      agent_id.encode() + b"\x00") +
+        build_nla(ATTR_TOOL_ID,       struct.pack("=I", tool_id))  +
+        build_nla(ATTR_REQ_ID,        struct.pack("=Q", req_id))   +
+        build_nla(ATTR_TOOL_HASH,     tool_hash.encode() + b"\x00")+
+        build_nla(ATTR_AGENT_BINDING, struct.pack("=Q", binding))  +
+        build_nla(ATTR_AGENT_EPOCH,   struct.pack("=Q", epoch))
+    )
+    # Generic Netlink header: cmd (1), version (1), reserved (2)
+    genl_hdr = struct.pack("BBH", CMD_TOOL_REQUEST, 1, 0)
+    return genl_hdr + attrs
+\end{verbatim}
+
+\paragraph{Semantic hash computation.}
+
+The semantic hash used for tool identity is a full 256-bit SHA-256 digest computed over a canonical JSON serialisation of the following manifest fields: \texttt{tool\_id}, \texttt{name}, \texttt{app\_id}, \texttt{app\_name}, \texttt{risk\_tags}, \texttt{description}, \texttt{input\_schema}, \texttt{examples}, \texttt{path\_semantics}, and \texttt{approval\_policy}.
+The \texttt{endpoint} field is deliberately excluded so that redeployment to a new socket path does not invalidate the kernel registration.
+
+\begin{verbatim}
+import json, hashlib
+
+SEMANTIC_FIELDS = [
+    "tool_id", "name", "app_id", "app_name",
+    "risk_tags", "description", "input_schema",
+    "examples", "path_semantics", "approval_policy",
+]
+
+def semantic_hash(tool_manifest: dict) -> str:
+    canonical = {f: tool_manifest[f] for f in SEMANTIC_FIELDS}
+    blob = json.dumps(canonical,
+                      sort_keys=True,
+                      separators=(",", ":"),
+                      ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()   # 64-char hex; never truncated
+\end{verbatim}
+
+The full 64-character digest is used without truncation.
+A 32-bit prefix (8 hex characters) would be vulnerable to birthday collisions after approximately $2^{16}$ distinct tool registrations, which is a realistic size for a production deployment spanning multiple applications.
+
+\paragraph{Complete manifest field specification.}
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l l l p{6.5cm}}
+\toprule
+\textbf{Field} & \textbf{Level} & \textbf{In hash?} & \textbf{Description} \\
+\midrule
+\texttt{app\_id}          & app  & yes & Unique application identifier string \\
+\texttt{app\_name}        & app  & yes & Human-readable application name \\
+\texttt{transport}        & app  & no  & Must be \texttt{"uds\_rpc"} \\
+\texttt{endpoint}         & app  & no  & Absolute path under \texttt{/tmp/linux-mcp-apps/} \\
+\texttt{tool\_id}         & tool & yes & Numeric identifier, unique within deployment \\
+\texttt{name}             & tool & yes & Tool name presented to the LLM planner \\
+\texttt{description}      & tool & yes & Natural-language description of tool behaviour \\
+\texttt{risk\_tags}       & tool & yes & List of risk labels (e.g., \texttt{"sensitive\_read"}) \\
+\texttt{operation}        & tool & no  & Operation string forwarded to the tool service \\
+\texttt{input\_schema}    & tool & yes & JSON Schema object for payload validation \\
+\texttt{examples}         & tool & yes & List of example invocation payloads \\
+\texttt{path\_semantics}  & tool & yes & Path interpretation hints (e.g., \texttt{"repo\_rel"}) \\
+\texttt{approval\_policy} & tool & yes & Null or policy name triggering kernel DEFER \\
+\texttt{timeout\_ms}      & tool & no  & Per-invocation execution timeout \\
+\bottomrule
+\end{tabular}
+\caption{Complete manifest field specification. Fields marked ``In hash: yes'' are included in the SHA-256 computation that produces the tool's semantic identity. Fields marked ``no'' are operational metadata excluded from the hash so that redeployment and timeout tuning do not change tool identity.}
+\label{tab:manifest-fields}
+\end{table}
+
+\subsubsection*{A.2\quad System Comparison Table}
+\phantomsection
+\addcontentsline{toc}{subsubsection}{A.2\quad System Comparison Table}
+\label{sec:appendix-comparison}
 
 \begin{table}[htbp]
 \centering

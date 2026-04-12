@@ -1,20 +1,10 @@
 \section*{Chapter 3: Design and Implementation}
-\phantomsection \setcounter{section}{3} \setcounter{subsection}{0}
+\phantomsection \label{chap:design} \setcounter{section}{3} \setcounter{subsection}{0}
 \addcontentsline{toc}{section}{\textit{Chapter 3: Design and Implementation}}
 
 This chapter describes the design and implementation of \texttt{linux-mcp}, a kernel-assisted control plane for LLM tool invocation on Linux.
-The central design decision is narrow in scope yet consequential in effect: tool execution remains in user space, while admission control and approval state are delegated to a loadable kernel module.
-
-The fundamental limitation of a wholly user-space tool path is not inherent insecurity per se, but rather the conflation of policy, state, and execution within a single trust domain.
-In typical MCP-style architectures, the same process that parses tool metadata also decides whether a call may proceed, maintains approval state, and forwards the request to the tool~\cite{mickens2019nightwatch}.
-This arrangement is straightforward to construct, but it means that a compromised or misbehaving mediator can influence every stage of the invocation path.
-\texttt{linux-mcp} addresses this by decoupling semantic handling from policy enforcement: \texttt{mcpd} retains responsibility for manifest parsing, schema validation, session management, and tool routing, while \texttt{kernel\_mcp} owns registry state, arbitrates invocation requests, manages approval ticket lifecycles, and surfaces authoritative control-plane state via \texttt{sysfs}.
-
-It is important to state the trust model precisely.
-\texttt{mcpd} remains a fully trusted component: it populates the kernel's tool and agent registries, computes all semantic hashes, and derives the binding credentials used for identity verification.
-The kernel does not independently re-derive these values from raw sources; it enforces the state that \texttt{mcpd} has asserted.
-What the kernel \emph{does} provide is a stronger enforcement domain for that established state: registry entries, approval tickets, binding checks, and invocation lifecycle transitions are held in kernel space, protected by \texttt{CAP\_NET\_ADMIN} access control on all registry-mutating Netlink commands, and remain inspectable independently of the daemon's process lifetime.
-This is not a reduction of the trusted computing base (\texttt{mcpd} is still trusted) but a \emph{partitioning} of it: state that benefits from durability, independent observability, and protection from unprivileged interference is held in the kernel, while state that requires semantic flexibility remains in the daemon.
+The central question driving the design is not how to make the gateway more robust, but which state it should not be solely responsible for holding: \texttt{mcpd} retains everything requiring semantic flexibility, while \texttt{kernel\_mcp} owns the state that must survive gateway failure and remain unreachable by unprivileged processes.
+The three design goals, component responsibilities, and wire protocols are described in the following sections.
 
 
 
@@ -24,12 +14,11 @@ The design is oriented around three concerns that arise from the problem of medi
 
 The foremost requirement is that admission control must not reduce to a user-space daemon unilaterally deciding whether to forward a request.
 The admissibility of a tool invocation is determined solely by explicit kernel-resident state: the registration status of the requesting agent, the presence of the target tool in the registry, and the consistency of its semantic identity with the registered manifest.
-Anchoring this decision in the kernel ensures it cannot be silently circumvented by tampering with the daemon or by injecting a forged request that the daemon would otherwise accept~\cite{narayan2020shreds, brimhall2023mac}.
-This aligns with observations from system security research, where enforcing security boundaries outside application logic significantly reduces the attack surface~\cite{xu2021container}.
+Anchoring this decision in the kernel ensures it cannot be silently circumvented by tampering with the daemon or by injecting a forged request that the daemon would otherwise accept~\cite{chen2016shreds, brimhall2023mac}.
 
 At the same time, the system must remain compatible with ordinary user-space tools.
-Requiring tool authors to expose kernel interfaces or write kernel-facing code would render the system impractical to deploy and would break compatibility with existing tool ecosystems.
-In \texttt{linux-mcp}, a tool is simply a resident user-space service bound to a Unix domain socket under \texttt{/tmp/linux-mcp-apps/}, receiving a structured request payload and returning a structured result, with no kernel-facing obligations imposed on tool authors.
+Requiring tool authors to write against a kernel-facing API would break compatibility with existing tool ecosystems and make incremental deployment impractical.
+Tool services therefore carry no kernel-facing obligations; the protocol they implement is described in Section~\ref{sec:wire-protocols}.
 
 The third concern is observability.
 Admission, approval, and completion events must not be confined to transient entries in a daemon's in-memory state or application-level logs; they must be queryable through the kernel's own interfaces, independently of whether \texttt{mcpd} is currently running.
@@ -42,6 +31,7 @@ What it changes is specifically where admission decisions are made and where app
 
 
 \subsection{System Architecture}
+\label{sec:system-architecture}
 
 \begin{figure}[t]
 \centering
@@ -126,8 +116,7 @@ A request originates in \texttt{llm-app}, which first issues a catalog query tha
 The kernel occupies this path not as a passive observer but as the active arbitration point: \texttt{mcpd} cannot forward a request to a tool without first obtaining an \texttt{ALLOW} decision from the kernel, and it cannot close an invocation without reporting \texttt{TOOL\_COMPLETE} back through the same channel.
 This renders admission and completion as explicit, kernel-visible state transitions rather than implicit control-flow decisions internal to the daemon.
 
-The catalog response includes the tool name, input schema, description, risk tags, examples, and other manifest-derived metadata.
-The client uses this information to construct a structured invocation payload and submits it as a \texttt{tool:exec} call to \texttt{mcpd}.
+The client uses the catalog response to construct a structured invocation payload and submits it as a \texttt{tool:exec} call to \texttt{mcpd} (see Table~\ref{tab:llm-mcpd} for the message format).
 
 Upon receiving the request, \texttt{mcpd} performs a series of user-space checks: it resolves the active session, validates the payload against the declared input schema, identifies the target tool, and retrieves the semantic hash associated with that tool from its manifest-derived state.
 Only upon successful completion of these checks does \texttt{mcpd} issue a \texttt{TOOL\_REQUEST} to the kernel, supplying the agent identifier, tool identifier, and semantic hash as parameters.
@@ -144,6 +133,137 @@ This workflow has a concrete security consequence: the kernel both opens and clo
 An invocation that never reaches \texttt{TOOL\_COMPLETE}, whether due to daemon failure or tool timeout, persists as an open entry in kernel state and remains inspectable via \texttt{sysfs}.
 This contrasts with a purely user-space design, in which the lifecycle of a request is only as durable as the daemon's own in-memory representation.
 
+
+
+\subsection{Wire Protocols}
+\label{sec:wire-protocols}
+
+All inter-component communication in \texttt{linux-mcp} uses Unix domain sockets with a uniform 4-byte big-endian length-prefixed framing: each message is preceded by a 4-byte header encoding the payload size in bytes, followed immediately by a UTF-8-encoded JSON object.
+The same framing is used on both the \texttt{llm-app}--\texttt{mcpd} path and the \texttt{mcpd}--\texttt{tool-app} path, so a single framing library suffices on both sides.
+The kernel control-plane path uses Generic Netlink (TLV-attribute messages) rather than sockets; that interface is described separately below.
+
+\paragraph{llm-app to mcpd.}
+\texttt{llm-app} sends two categories of message to \texttt{mcpd}: system control messages (prefixed with a \texttt{"sys"} key) and tool execution requests (prefixed with \texttt{"kind": "tool:exec"}).
+Table~\ref{tab:llm-mcpd} lists the principal message types and their key fields.
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{l l p{6.5cm}}
+\toprule
+\textbf{Message} & \textbf{Direction} & \textbf{Key fields} \\
+\midrule
+\texttt{list\_apps}       & req  & \texttt{sys: "list\_apps"} \\
+\texttt{list\_tools}      & req  & \texttt{sys: "list\_tools"}, \texttt{app\_id} (optional) \\
+\texttt{open\_session}    & req  & \texttt{sys: "open\_session"}, \texttt{client\_name}, \texttt{ttl\_ms} \\
+\texttt{open\_session}    & resp & \texttt{session\_id}, \texttt{agent\_id}, \texttt{expires\_at\_ms} \\
+\texttt{tool:exec}        & req  & \texttt{kind}, \texttt{req\_id}, \texttt{session\_id}, \texttt{agent\_id}, \texttt{app\_id}, \texttt{tool\_id}, \texttt{tool\_hash}, \texttt{payload} \\
+\texttt{tool:exec}        & resp & \texttt{req\_id}, \texttt{status}, \texttt{result}, \texttt{decision}, \texttt{reason}, \texttt{ticket\_id}, \texttt{t\_ms} \\
+\texttt{approval\_reply}  & req  & \texttt{sys: "approval\_reply"}, \texttt{session\_id}, \texttt{ticket\_id}, \texttt{decision}, \texttt{reason} \\
+\bottomrule
+\end{tabular}
+\caption{Principal messages on the \texttt{llm-app}--\texttt{mcpd} JSON-RPC channel. All messages are framed with a 4-byte big-endian length prefix. The \texttt{tool:exec} response carries the kernel's \texttt{decision} field (\texttt{ALLOW}/\texttt{DENY}/\texttt{DEFER}) and, on deferral, a \texttt{ticket\_id} the client uses to issue the subsequent \texttt{approval\_reply}.}
+\label{tab:llm-mcpd}
+\end{table}
+
+\paragraph{mcpd to tool-app.}
+Once the kernel returns \texttt{ALLOW}, \texttt{mcpd} forwards the request to the relevant tool service over a separate Unix domain socket connection.
+The protocol is deliberately minimal: the tool service need not be aware of sessions, agent identities, or kernel tickets.
+Table~\ref{tab:mcpd-toolapp} lists the five fields in each direction.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}lll p{5.5cm}@{}}
+\toprule
+\textbf{Field} & \textbf{Dir} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\texttt{req\_id}   & req  & \textit{u64}    & Per-invocation correlator \\
+\texttt{agent\_id} & req  & \textit{string} & Requesting agent identifier \\
+\texttt{tool\_id}  & req  & \textit{u32}    & Numeric tool identifier from the manifest \\
+\texttt{operation} & req  & \textit{string} & Operation name within the tool \\
+\texttt{payload}   & req  & \textit{object} & Validated input matching the tool's schema \\
+\midrule
+\texttt{req\_id}   & resp & \textit{u64}    & Must echo the request \texttt{req\_id} \\
+\texttt{status}    & resp & \textit{string} & \texttt{"ok"} or \texttt{"error"} \\
+\texttt{result}    & resp & \textit{object} & Tool output on success; \texttt{\{\}} on failure \\
+\texttt{error}     & resp & \textit{string} & Empty on success; error description on failure \\
+\texttt{t\_ms}     & resp & \textit{u32}    & Tool-side execution time in milliseconds \\
+\bottomrule
+\end{tabular}
+\caption{\texttt{mcpd}--\texttt{tool-app} JSON-RPC message fields. Tool services implement only this contract; they require no knowledge of sessions, kernel tickets, or the Netlink protocol.}
+\label{tab:mcpd-toolapp}
+\end{table}
+
+\paragraph{mcpd to kernel\_mcp (Generic Netlink).}
+The kernel control-plane interface uses the \texttt{KERNEL\_MCP} Generic Netlink family (version~1).
+Messages carry TLV-encoded attributes; all registry-mutating commands require \texttt{CAP\_NET\_ADMIN}.
+The eight commands covering the full invocation lifecycle are listed in Table~\ref{tab:netlink-cmds}, and the principal TLV attributes carried on the critical \texttt{TOOL\_REQUEST}/\texttt{TOOL\_DECISION} path are listed in Table~\ref{tab:netlink-attrs}.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lc p{8.2cm}@{}}
+\toprule
+\textbf{Command} & \textbf{\#} & \textbf{Purpose} \\
+\midrule
+\texttt{TOOL\_REGISTER}   & 3  & Register a tool with its semantic hash and risk flags \\
+\texttt{AGENT\_REGISTER}  & 9  & Register an agent with its PID, UID, and binding credentials \\
+\texttt{TOOL\_REQUEST}    & 10 & Request admission; kernel replies with \texttt{TOOL\_DECISION} \\
+\texttt{TOOL\_DECISION}   & 11 & Kernel response: \texttt{ALLOW}\,(1), \texttt{DENY}\,(2), \texttt{DEFER}\,(3) \\
+\texttt{TOOL\_COMPLETE}   & 12 & Close the invocation; records execution status and latency \\
+\texttt{APPROVAL\_DECIDE} & 13 & Submit a user approval decision against an open ticket \\
+\texttt{RESET\_TOOLS}     & 14 & Clear the kernel-side tool registry (issued on daemon restart) \\
+\texttt{LIST\_TOOLS}      & 8  & Dump all registered tools (\texttt{NLM\_F\_DUMP} mode) \\
+\bottomrule
+\end{tabular}
+\caption{\texttt{KERNEL\_MCP} Generic Netlink command set. All commands except \texttt{LIST\_TOOLS} require \texttt{CAP\_NET\_ADMIN}.}
+\label{tab:netlink-cmds}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lcl p{5.8cm}@{}}
+\toprule
+\textbf{Attribute} & \textbf{\#} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\texttt{REQ\_ID}            & 1  & \textit{u64}    & Per-invocation request identifier \\
+\texttt{TOOL\_ID}           & 2  & \textit{u32}    & Numeric tool identifier \\
+\texttt{AGENT\_ID}          & 4  & \textit{string} & Agent identifier \\
+\texttt{TOOL\_HASH}         & 19 & \textit{string} & 64-char hex SHA-256 of manifest fields \\
+\texttt{DECISION}           & 17 & \textit{u32}    & Kernel verdict: 1=ALLOW, 2=DENY, 3=DEFER \\
+\texttt{TICKET\_ID}         & 22 & \textit{u64}    & Approval ticket handle (DEFER path) \\
+\texttt{APPROVAL\_DECISION} & 23 & \textit{u32}    & 1=approve, 2=deny, 3=revoke \\
+\texttt{AGENT\_BINDING}     & 28 & \textit{u64}    & Session binding hash (UDS peer credentials) \\
+\texttt{AGENT\_EPOCH}       & 29 & \textit{u64}    & Session epoch; prevents cross-session replay \\
+\bottomrule
+\end{tabular}
+\caption{Principal \texttt{KERNEL\_MCP} TLV attributes. All strings are NUL-terminated and 4-byte aligned. \texttt{AGENT\_BINDING} and \texttt{AGENT\_EPOCH} together constitute the session identity embedded in each approval ticket.}
+\label{tab:netlink-attrs}
+\end{table}
+
+Full attribute encodings and a minimal Python framing implementation are in Appendix~A.1 (Section~\ref{sec:appendix-protocols}).
+
+\paragraph{Tool registration via manifests.}
+Tool services do not self-register.
+Each application is described by a JSON manifest file in \texttt{tool-app/manifests/}; \texttt{mcpd} enumerates and loads all manifests at startup, then issues \texttt{TOOL\_REGISTER} and \texttt{AGENT\_REGISTER} Netlink commands to populate the kernel registries.
+The transport \texttt{endpoint} field is excluded from the semantic hash computation, so a tool service can be redeployed to a different socket path without invalidating its kernel registration.
+A representative manifest is shown below; the complete field specification is in Appendix~A.1 (Table~\ref{tab:manifest-fields}).
+
+\begin{minipage}{\linewidth}
+\begin{verbatim}
+{
+  "app_id": "sys_app",  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/sys_app.sock",
+  "tools": [{
+    "tool_id": 1,  "name": "get_system_info",
+    "risk_tags": ["sensitive_read"],
+    "description": "Return OS version, CPU, and memory summary.",
+    "input_schema": {"type": "object", "properties": {}},
+    "approval_policy": null,  "examples": [{"payload": {}}]
+  }]
+}
+\end{verbatim}
+\end{minipage}
 
 
 \subsection{Manifest Semantics and Tool Identity}
@@ -199,18 +319,9 @@ In this case, \texttt{llm-app} may prompt the user for confirmation \emph{before
 If the user declines, the request is rejected locally without entering the kernel arbitration path, and no approval ticket is created.
 This separation allows low-cost semantic checks to be handled in user space while reserving kernel mediation for higher-risk operations.
 
-Figure~\ref{fig:chapter3-approval} illustrates the complete invocation lifecycle spanning both user space and kernel space.
-A request originates in \texttt{llm-app}, which establishes a session and dispatches a \texttt{TOOL\_REQUEST} via \texttt{mcpd}.
-The kernel performs arbitration and returns \texttt{ALLOW}, \texttt{DENY}, or \texttt{DEFER}.
-
-In the \texttt{DEFER} case, the request transitions into a \emph{pending state} and the system waits for an explicit user decision.
-Only after the user approves and \texttt{APPROVAL\_DECIDE} is processed by the kernel does the request re-enter the execution path and reach the tool service.
-The critical ordering, illustrated in Figure~\ref{fig:chapter3-approval}, is that approval resolution occurs \emph{before} tool execution, ensuring that no deferred request can bypass the approval gate and that every execution corresponds to an explicitly validated ticket.
-
-This mechanism reflects a key design principle of \texttt{linux-mcp}.
-User space is responsible for interpreting semantics (request structure, tool schemas, and policy hints), while the kernel enforces \emph{minimal, stable invariants} over state transitions.
-The kernel need not understand the full meaning of a request; it must only ensure that the binding context is preserved, the approval ticket is valid and unconsumed, and the state transition (\texttt{DEFER} $\rightarrow$ \texttt{ALLOW}) is explicitly authorised.
-By constraining the trusted computing base to these minimal, stable invariants~\cite{klein2010sel4}, \texttt{linux-mcp} achieves meaningful safety guarantees without embedding high-level application semantics in kernel space.
+Figure~\ref{fig:chapter3-approval} illustrates the complete state machine across both layers.
+The key invariant is that approval resolution occurs \emph{before} tool execution: no deferred request can bypass the approval gate, and every execution corresponds to an explicitly consumed ticket.
+The kernel need not understand the full meaning of a request; it must only verify that the binding context is preserved, the ticket is valid and unconsumed, and the \texttt{DEFER} $\rightarrow$ \texttt{ALLOW} transition is explicitly authorised~\cite{klein2010sel4}.
 
 \begin{figure}[t]
 \centering
@@ -235,7 +346,6 @@ Approval tickets are heap-allocated kernel objects with explicit lifecycle field
 The arbitration logic is deliberately narrow.
 For a \texttt{TOOL\_REQUEST} to be admitted, three conditions must all hold: the submitting agent must appear in the agent registry, the target tool must appear in the tool registry, and the semantic hash supplied by \texttt{mcpd} must match the hash recorded at registration time.
 If the tool's manifest marks it as requiring explicit approval, the request is deferred rather than immediately allowed.
-The objective of this prototype is not to embed a rich policy language in the kernel, but to demonstrate that the kernel can authoritatively own the state transitions required for admission control (specifically, registry consistency checks and approval-ticket lifecycle management) in a manner that prevents user-space circumvention.
 
 The module also exports state through \texttt{sysfs}.
 Under \texttt{/sys/kernel/mcp/tools/}, each tool has a directory containing its name, hash, and associated metadata.
@@ -249,9 +359,7 @@ This observability is valuable both during development and during evaluation: th
 While the kernel enforces the critical state transitions, \texttt{mcpd} is where the majority of the system's substantive work takes place.
 Its implementation is organised around four modules: manifest loading and semantic hashing, session storage and binding-context management, Netlink communication with the kernel, and request forwarding to tool services.
 
-The manifest loader is the semantic entry point of the system.
-It parses tool description files from \texttt{tool-app/manifests/}, enforces transport constraints (only \texttt{uds\_rpc} transport is currently supported, and endpoints must reside under \texttt{/tmp/linux-mcp-apps/}), and computes semantic hashes.
-The manifest-derived catalog also serves as the authoritative source for what \texttt{llm-app} sees when it issues \texttt{list\_apps} or \texttt{list\_tools} queries.
+The manifest loader is the semantic entry point of the system, producing both the kernel registry entries and the catalog served to \texttt{llm-app} in response to \texttt{list\_apps} and \texttt{list\_tools} queries.
 
 The session store maintains active connections together with their peer-derived binding information and any pending approval context.
 This gives the daemon sufficient information to associate incoming approval decisions with the correct deferred request, without requiring the kernel to store full session semantics.
@@ -267,11 +375,8 @@ The server-facing side of \texttt{mcpd} handles two distinct roles: it exposes t
 
 \subsection{Tool-Side RPC and Execution Model}
 
-The tool-side protocol is intentionally simple.
-Each tool service is a resident process bound to a Unix domain socket, receiving framed JSON messages with a 4-byte big-endian length prefix.
-The length-prefixed framing eliminates stream-parsing ambiguity and keeps the transport entirely independent of the kernel control plane; tool authors need not be aware of Generic Netlink or any kernel interface.
-
-Because each tool executes in an ordinary user-space environment with no kernel-facing obligations, the boundary between admission and execution is unambiguous: the kernel decides whether a request may proceed; everything concerning what the request means and how it is executed remains in user space.
+The tool-side protocol (detailed in Table~\ref{tab:mcpd-toolapp}) is intentionally minimal: each tool service is a resident process bound to a Unix domain socket with no kernel-facing obligations.
+Because the boundary between admission and execution is drawn at the kernel, the boundary within user space is equally unambiguous: the kernel decides whether a request may proceed; everything concerning what the request means and how it is executed remains in user space.
 Failure handling follows naturally from this separation.
 If a tool crashes, times out, or returns an error, \texttt{mcpd} handles the event in user space and reflects it back to the kernel through \texttt{TOOL\_COMPLETE}, marking the invocation lifecycle as closed.
 The kernel requires no visibility into how the tool failed internally.
@@ -279,6 +384,7 @@ The kernel requires no visibility into how the tool failed internally.
 
 
 \subsection{State Reconciliation and Recovery}
+\label{sec:reconciliation}
 
 A design that splits state across the kernel and a user-space daemon must handle the case where the two sides diverge.
 \texttt{mcpd} may restart, intentionally during development or unintentionally following a crash, while the kernel module remains loaded with its existing registry state.
@@ -289,19 +395,15 @@ On startup, \texttt{mcpd} issues a \texttt{RESET\_TOOLS} command to clear the ke
 The system unconditionally rebuilds state from the manifest source of truth rather than attempting to assess whether residual kernel state remains valid.
 This trade-off is appropriate for a research prototype, where state correctness and auditability take precedence over minimising re-registration overhead.
 
-It is worth noting what kernel-held approval state provides in this context.
-After a daemon crash, session state is lost: the binding context for in-progress sessions no longer exists in user space.
-However, approval tickets recorded in the kernel before the crash remain visible through \texttt{sysfs}, enabling post-mortem inspection even in the absence of a running daemon.
-This property is experimentally confirmed in Section~4.4.
+Session state is lost on crash, since the binding context for in-progress sessions exists only in the daemon process; approval tickets and registry state held in the kernel are not.
+The durability of that kernel-held state across daemon failure is verified experimentally in Section~\ref{sec:daemon-failure}.
 
 
 
 \subsection{Rationale for the Kernel--User-Space Split}
+\label{sec:design-alternatives}
 
-The placement of the control plane in the kernel, rather than in a more capable framework or a hardened user-space process, follows from a single constraint: the enforcement boundary must be independent of the component it is enforcing against.
-A user-space mediator that validates its own state provides no structural guarantee; the kernel provides one.
-The scope of kernel placement is deliberately narrow because independence matters most for registry membership, admission decisions, and ticket lifecycle management.
-Everything else remains in user space precisely because the kernel is the wrong place for it: manifest parsing, schema validation, and tool execution all require flexibility and frequent change that kernel code cannot easily accommodate.
+The preceding sections establish what the kernel holds and how it enforces it; this section explains why Generic Netlink was chosen as the kernel interface rather than the three most plausible alternatives.
 
 Three kernel-interface designs were considered before settling on Generic Netlink.
 LSM hooks fire at the syscall boundary and cannot natively correlate a Netlink message with a registered tool hash.
@@ -313,4 +415,5 @@ Generic Netlink supports structured messages, dump-style registry enumeration, a
 
 \subsection{Limitations and Identified Optimisation Opportunities}
 
-The current implementation makes deliberate simplifications appropriate for a prototype but introduces five concrete directions for improvement, elaborated in Chapter~5 (§5.3): (1) replacing the global registry lock with per-tool or per-agent fine-grained locks or an RCU scheme to reduce throughput contention under concurrent load; (2) replacing the unconditional \texttt{RESET\_TOOLS} reconciliation on restart with an incremental hash-comparison path to reduce startup overhead and preserve unchanged ticket state; (3) batching multiple tool registrations into a single Netlink message to reduce per-registration context-switch overhead at startup; (4) adding a \texttt{SIGHUP}-triggered hot-reload path to allow manifest updates without daemon restart; and (5) implementing approval-ticket time-to-live and periodic garbage collection to bound kernel memory consumption from abandoned deferred requests.
+The current implementation makes five deliberate simplifications appropriate for a prototype: a global registry lock, unconditional \texttt{RESET\_TOOLS} reconciliation on restart, per-registration Netlink round-trips, no hot-reload path, and no approval-ticket TTL or garbage collection.
+Each has a natural resolution direction; these are elaborated in Section~\ref{sec:further-work}.

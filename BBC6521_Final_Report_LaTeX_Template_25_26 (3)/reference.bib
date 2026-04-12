@@ -1,11 +1,11 @@
 %% Agent Frameworks
 
-@misc{openharness2025,
+@misc{openharness2026,
   author       = {{HKUDS}},
-  title        = {{OpenHarness}: Open-Source Infrastructure for {LLM} Agent Systems},
-  year         = {2025},
+  title        = {{OpenHarness}: Open Agent Harness with a Built-in Personal Agent---Ohmo!},
+  year         = {2026},
   howpublished = {\url{https://github.com/HKUDS/OpenHarness}},
-  note         = {Accessed: 2026}
+  note         = {Initial open-source release v0.1.0: April 1, 2026}
 }
 
 %% OS Foundations
@@ -16,8 +16,8 @@
              testing the difference between two groups},
   journal = {Annals of Clinical Biochemistry},
   volume  = {58},
-  number  = {6},
-  pages   = {632--637},
+  number  = {4},
+  pages   = {267--269},
   year    = {2021},
   doi     = {10.1177/0004563221992088}
 }
@@ -63,7 +63,7 @@
 
 @article{qin2024toolllm,
   author  = {Yujia Qin and Shihao Liang and Yining Ye and others},
-  title   = {ToolLLM: Facilitating Large Language Models to Master Real-world APIs},
+  title   = {ToolLLM: Facilitating Large Language Models to Master 16000+ Real-world APIs},
   journal = {arXiv preprint arXiv:2307.16789},
   year    = {2024}
 }
@@ -82,9 +82,9 @@
   year={2023}
 }
 
-@article{wang2024agentbench,
+@article{liu2024agentbench,
   title={AgentBench: Evaluating LLMs as agents},
-  author={Wang, Zirui and others},
+  author={Liu, Xiao and Yu, Hao and Zhang, Hanchen and others},
   journal={arXiv preprint arXiv:2308.03688},
   year={2024}
 }
@@ -98,40 +98,27 @@
   year    = {2024}
 }
 
-@article{packer2024memgpt,
+@article{packer2023memgpt,
   author  = {Charles Packer and Vivian Fang and Shishir G. Patil and Kevin Lin and Sarah Wooders and Joseph E. Gonzalez},
   title   = {MemGPT: Towards LLMs as Operating Systems},
   journal = {arXiv preprint arXiv:2310.08560},
-  year    = {2024}
+  year    = {2023}
 }
 
 @article{wu2024oscopilot,
   author  = {Zhiyong Wu and others},
-  title   = {OS-Copilot: Towards Generalist Computer Agents},
+  title   = {OS-Copilot: Towards Generalist Computer Agents with Self-Improvement},
   journal = {arXiv preprint arXiv:2402.07456},
   year    = {2024}
 }
 
 @article{liu2026agentos,
-  author  = {Zelong Li and others},
-  title   = {AgentOS: A Natural Language-driven System Platform},
+  author  = {Rui Liu and Tao Zhe and Dong Wang and others},
+  title   = {AgentOS: From Application Silos to a Natural Language-Driven Data Ecosystem},
   journal = {arXiv preprint arXiv:2603.08938},
   year    = {2026}
 }
 
-@misc{zhang2024llmos,
-  title        = {{LLM-OS}: An operating system for large language models},
-  author       = {Zhang, Wei and others},
-  year         = {2024},
-  note         = {Manuscript in preparation}
-}
-
-@misc{wu2024agentsystems,
-  title        = {Towards general-purpose agent systems},
-  author       = {Wu, Qingyun and others},
-  year         = {2024},
-  note         = {Manuscript in preparation}
-}
 
 %% MCP Protocol
 
@@ -184,14 +171,14 @@
 }
 
 @article{liu2023prompt,
-  author  = {Fang Liu and others},
+  author  = {Yi Liu and others},
   title   = {Prompt Injection Attack against LLM-integrated Applications},
   journal = {arXiv preprint arXiv:2306.05499},
   year    = {2023}
 }
 
 @article{greshake2023prompt,
-  title={Not what you've signed up for: Compromising real-world LLM-integrated applications with prompt injection},
+  title={Not what you've signed up for: Compromising real-world LLM-integrated applications with Indirect Prompt Injection},
   author={Greshake, Kai and others},
   journal={arXiv preprint arXiv:2302.12173},
   year={2023}
@@ -208,7 +195,7 @@
 
 @misc{apple2024pcc,
   author       = {{Apple Inc.}},
-  title        = {Private Cloud Compute: AI Privacy Architecture},
+  title        = {Private Cloud Compute: A new frontier for {AI} privacy in the cloud},
   year         = {2024},
   howpublished = {\url{https://security.apple.com/blog/private-cloud-compute/}}
 }
@@ -267,9 +254,9 @@
   doi     = {10.1145/1743546.1743574}
 }
 
-@inproceedings{baumann2014arrakis,
+@inproceedings{peter2014arrakis,
   title={Arrakis: The operating system is the control plane},
-  author={Baumann, Andrew and others},
+  author={Peter, Simon and Li, Jialin and Zhang, Irene and others},
   booktitle={OSDI},
   year={2014}
 }
@@ -370,19 +357,14 @@
   year={2019}
 }
 
-@inproceedings{narayan2020shreds,
+@inproceedings{chen2016shreds,
   title={Shreds: Fine-grained Execution Units with Private Memory},
-  author={Narayan, Vikas and others},
-  booktitle={Proceedings of the USENIX Annual Technical Conference},
-  year={2020}
+  author={Chen, Yaohui and Reymondjohnson, Sebassujeen and Sun, Zhichuang and Lu, Long},
+  booktitle={Proceedings of the {IEEE} Symposium on Security and Privacy ({S\&P})},
+  year={2016},
+  pages={56--71}
 }
 
-@inproceedings{xu2021container,
-  title={Understanding and hardening container security},
-  author={Xu, Zheng and others},
-  booktitle={Proceedings of the USENIX Security Symposium},
-  year={2021}
-}
 
 %% NEW REFERENCES — appended
 
@@ -483,10 +465,10 @@
   note         = {AI-powered autonomous workers embedded in governed CI/CD pipelines}
 }
 
-@misc{iouring2024,
-  author       = {{Google Security Team}},
-  title        = {Restricting \texttt{io\_uring} Due to Security Vulnerabilities},
-  year         = {2024},
+@misc{iouring2023,
+  author       = {Larabel, Michael},
+  title        = {Google Limiting \texttt{IO\_uring} Use Due To Security Vulnerabilities},
+  year         = {2023},
   howpublished = {\url{https://www.phoronix.com/news/Google-Restricting-IO_uring}},
   note         = {60\% of Google VRP submissions attributed to io\_uring; disabled in
                   Android, ChromeOS, and Google production servers}

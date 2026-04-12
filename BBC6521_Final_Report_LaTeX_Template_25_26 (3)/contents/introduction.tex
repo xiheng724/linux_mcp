@@ -1,52 +1,44 @@
 \section*{Chapter 1: Introduction}
 \setcounter{section}{1} \setcounter{subsection}{0}
-\phantomsection \addcontentsline{toc}{section}{\textit{Chapter 1: Introduction}}
+\phantomsection \label{chap:introduction} \addcontentsline{toc}{section}{\textit{Chapter 1: Introduction}}
 
-Recent advances in Large Language Models (LLMs) have enabled instruction following, reasoning, and interaction with external environments, forming the foundation for autonomous agentic systems \cite{yao2023react, wang2024agentbench, schick2023toolformer}.
+Recent advances in Large Language Models (LLMs) have enabled instruction following, reasoning, and interaction with external environments, forming the foundation for autonomous agentic systems \cite{yao2023react, liu2024agentbench, schick2023toolformer}.
 LLM-based agents are now deployed across a wide range of applications, from direct-acting assistants to sophisticated multi-step reasoning and problem-solving systems \cite{park2023generative, qin2024toolllm, mei2024aios, liu2026agentos}.
 
 \subsection{Problem Statement}
 
-Tool-using, stateful AI agents expose a fundamental mismatch between modern agent frameworks and the abstractions provided by conventional operating systems \cite{zhang2024llmos, wu2024agentsystems}. 
+Tool-using, stateful AI agents expose a fundamental mismatch between modern agent frameworks and the abstractions provided by conventional operating systems \cite{packer2023memgpt, mei2024aios}.
 While conventional operating systems effectively manage processes, files, and network resources, MCP-style workflows are organized around higher-level concepts such as semantic tool descriptions, session context, approval boundaries, and cross-step state.
 This mismatch leads to fragile control planes when enforcement remains entirely in user space. 
 Frameworks such as OpenClaw~\cite{openclaw2026} demonstrate that granting agents execution capability and persistent context can lead to security risks including prompt injection, privilege escalation, and cross-step exploitation. 
 
 A single gateway process is typically responsible for interpreting tool manifests, binding requests to identities, and authorizing execution, effectively placing the control plane in user space. 
-Such a design introduces a single point of failure and expands the trusted computing base, making it vulnerable to crashes, logic bugs, or compromised control paths~\cite{baumann2014arrakis}.
+Such a design introduces a single point of failure and expands the trusted computing base, making it vulnerable to crashes, logic bugs, or compromised control paths~\cite{peter2014arrakis}.
 This makes three properties hard to enforce: semantic consistency between declared and actual tool behaviour, trusted identity binding resilient to replay and session confusion~\cite{greshake2023prompt}, and approval-state persistence across gateway failures~\cite{qin2024toolllm}.
 
 This analysis motivates a central research question: which control-plane invariants in MCP-style tool invocation benefit from kernel-level enforcement, and can such enforcement improve security and resilience without sacrificing performance?
 
 \subsection{Our Solution}
 
-\texttt{linux-mcp} addresses this by isolating a narrow kernel responsibility: enforcing control-plane invariants for tool invocation.
-It keeps semantic parsing and tool execution in user space while moving admission control, approval state, binding checks, and durable observability into a Linux kernel module, without proposing a full AI-native operating system.
+\texttt{linux-mcp} addresses this by moving admission control, approval state, binding checks, and durable observability into a Linux kernel module, while leaving semantic parsing and tool execution in user space.
+This is not a full AI-native operating system (AI-native OS); the kernel role is deliberately narrow, enforcing only the invariants user space cannot reliably hold.
 
-The design follows a simple placement principle: the kernel holds the control plane, while user space retains the execution plane.
-This avoids pushing complex semantics or application logic into the kernel while ensuring critical control decisions are enforced by the kernel, not by the gateway process alone.
-
-The architecture has four layers: an LLM client (\texttt{llm-app}), a manifest-aware gateway (\texttt{mcpd}), a Generic-Netlink-based kernel control plane (\texttt{kernel\_mcp}), and resident tool services over Unix domain sockets. 
-The \texttt{mcpd} gateway loads manifests, computes semantic identifiers, validates requests against schemas, binds sessions to Unix-domain peer credentials, and forwards tool invocations through the kernel mediation path. 
-The kernel module maintains compact tool and agent registries, performs arbitration based on binding and semantic metadata, and manages approval tickets for high-risk operations. 
-Tool services execute concrete operations behind Unix domain sockets and are not directly accessible to the client.
-
-Requests follow a fixed path: \texttt{llm-app} issues a tool invocation to \texttt{mcpd}, which validates and forwards it to the kernel; the kernel returns an allow, deny, or defer decision; allowed requests are executed by tool services, and completion is reported back through the same path. 
-This keeps all control-plane transitions explicit and observable.
-
-Semantic consistency is enforced through manifest-derived identifiers verified by the kernel; identity binding is anchored in OS-level peer credentials; approval state is maintained in the kernel across daemon failures.
-All tool invocations pass through a single kernel-mediated path, reducing reliance on transient in-memory gateway state.
+The architecture has four layers: an LLM client (\texttt{llm-app}), a manifest-aware gateway (\texttt{mcpd}), a Generic-Netlink-based kernel control plane (\texttt{kernel\_mcp}), and resident tool services over Unix domain sockets.
+Every tool invocation follows a fixed path through all four layers; no request reaches a tool service without first obtaining an explicit kernel admission decision.
+The component responsibilities are detailed in \S\ref{sec:system-architecture}, and the rationale for the kernel--user-space split is developed in \S\ref{sec:design-alternatives}.
 
 This design does not reduce the trusted footprint of \texttt{mcpd}: the gateway remains fully trusted and is responsible for populating the kernel registries.
 What it provides instead is a \emph{partitioning} of responsibility: registry entries, approval tickets, and binding checks reside in the kernel, protected by \texttt{CAP\_NET\_ADMIN}-gated Generic Netlink access control, and remain durable across daemon failures and inaccessible to unprivileged processes.
-The consequence is that gateway logic bugs no longer threaten the critical state transitions; the kernel enforces them independently.
-Semantic parsing and tool execution, by contrast, remain in user space, where flexibility is most important.
+Gateway logic bugs therefore no longer threaten the critical state transitions; the kernel enforces them independently of the daemon's correctness.
+Semantic parsing and tool execution remain in user space, where flexibility matters most.
 
 Rather than replacing existing Linux security mechanisms, \texttt{linux-mcp} proposes a kernel-assisted control plane that complements user-space flexibility.
-The central hypothesis is that moving a small set of control-plane invariants into the kernel improves binding safety and failure resilience without imposing prohibitive performance costs—a hypothesis the evaluation in Chapter~4 is designed to test.
+AIOS-style proposals offer strong guarantees at the cost of replacing OS infrastructure; user-space frameworks offer broad deployment at the cost of the structural weaknesses identified in Chapter~\ref{chap:background}.
+The position here is narrower: move only the invariants that require protection from the gateway itself into the kernel, and leave everything else in user space.
+The central hypothesis is that this targeted placement improves binding safety and failure resilience without imposing prohibitive performance costs; Chapter~\ref{chap:evaluation} tests this claim empirically.
 
 \paragraph{Comparison with user-space systems.}
-To contextualise the design, we compare \texttt{linux-mcp} with two representative user-space tool-invocation frameworks: OpenClaw~\cite{openclaw2026}, which uses a monolithic user-space gateway, and OpenHarness~\cite{openharness2025}, which integrates control logic into the agent process itself.
+To contextualise the design, we compare \texttt{linux-mcp} with two representative user-space tool-invocation frameworks: OpenClaw~\cite{openclaw2026}, which uses a monolithic user-space gateway, and OpenHarness~\cite{openharness2026}, which integrates control logic into the agent process itself.
 Table~\ref{tab:comparison} highlights the key architectural differences.
 
 \begin{table}[t]
@@ -111,7 +103,7 @@ This paper makes the following contributions:
     \item We design and implement \texttt{kernel\_mcp}, a Linux kernel module that maintains tool and agent registries, enforces per-invocation admit/deny/defer decisions, and manages approval-ticket lifecycle under \texttt{CAP\_NET\_ADMIN}-gated Generic Netlink access.
     This makes control-plane state durable across daemon failure and unreachable by unprivileged processes, without placing any JSON parsing or tool execution in the kernel.
 
-    \item We design and implement \texttt{mcpd}, a manifest-aware userspace gateway that loads tool manifests, derives semantic hash identifiers, reconciles tool and agent state with the kernel registry, binds sessions to OS-level UDS peer credentials, validates request payloads against JSON schemas, and forwards tool invocations through the kernel mediation path.
+    \item We design and implement \texttt{mcpd}, a manifest-aware user-space gateway that loads tool manifests, derives semantic hash identifiers, reconciles tool and agent state with the kernel registry, binds sessions to OS-level UDS peer credentials, validates request payloads against JSON schemas, and forwards tool invocations through the kernel mediation path.
     \texttt{mcpd} is the sole component that bridges manifest semantics and runtime enforcement, keeping this complexity out of both the kernel and the LLM client.
 
     \item We conduct a controlled functional evaluation against pure and hardened user-space baselines across latency, throughput, attack resistance, and failure scenarios.
