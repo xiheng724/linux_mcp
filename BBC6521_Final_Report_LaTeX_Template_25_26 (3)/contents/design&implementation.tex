@@ -2,9 +2,8 @@
 \phantomsection \label{chap:design} \setcounter{section}{3} \setcounter{subsection}{0}
 \addcontentsline{toc}{section}{\textit{Chapter 3: Design and Implementation}}
 
-This chapter describes the design and implementation of \texttt{linux-mcp}, a kernel-assisted control plane for LLM tool invocation on Linux.
-The central question driving the design is not how to make the gateway more robust, but which state it should not be solely responsible for holding: \texttt{mcpd} retains everything requiring semantic flexibility, while \texttt{kernel\_mcp} owns the state that must survive gateway failure and remain unreachable by unprivileged processes.
-The three design goals, component responsibilities, and wire protocols are described in the following sections.
+The central question driving the design of \texttt{linux-mcp} is not how to make the gateway more robust, but which state the gateway should not be solely responsible for holding.
+\texttt{mcpd} retains everything requiring semantic flexibility; \texttt{kernel\_mcp} owns the state that must survive gateway failure and remain unreachable by unprivileged processes.
 
 
 
@@ -48,11 +47,11 @@ The client has no direct interaction with the kernel module; all control-plane o
 
 \texttt{mcpd} is the user-space gateway and the semantic front-end of the control plane.
 It is responsible for loading and validating tool manifests, computing manifest-derived semantic hashes, managing sessions, exposing catalog APIs (\texttt{list\_apps}, \texttt{list\_tools}), communicating with the kernel over Generic Netlink, and forwarding admitted requests to tool services over Unix domain sockets (UDS).
-As the sole component with visibility into both tool semantics and runtime transport endpoints, \texttt{mcpd} is correspondingly the only component that requires modification when manifests change or endpoints are reconfigured.
+\texttt{mcpd} is the only component that sees both tool semantics and runtime endpoints, so it is the only one that needs changing when manifests or endpoints are reconfigured.
 
 \texttt{kernel\_mcp} is a loadable kernel module implementing the \texttt{KERNEL\_MCP} Generic Netlink family.
 It maintains the tool and agent registries, arbitrates invocation requests, manages approval ticket lifecycles, and exports per-tool and per-agent state through \texttt{sysfs} under \texttt{/sys/kernel/mcp/}.
-It neither parses manifests nor executes tools nor implements a general policy language; its sole responsibility is enforcing the compact set of invariants required for admission control.
+It does not parse manifests, execute tools, or implement a policy language. Its only job is enforcing the admission-control invariants.
 
 \texttt{tool-app} is the execution side: a collection of resident user-space services, each bound to a Unix domain socket.
 When a request is admitted, \texttt{mcpd} forwards the payload to the appropriate tool service, which executes in an ordinary user-space environment and returns its result to \texttt{mcpd}, which then reports completion back to the kernel.
@@ -333,9 +332,9 @@ The kernel need not understand the full meaning of a request; it must only verif
 
 \subsection{Kernel Module Design}
 
-To enforce the state transitions and ticket lifecycle described in the preceding sections, \texttt{kernel\_mcp} is implemented as a loadable kernel module exposing the \texttt{KERNEL\_MCP} Generic Netlink family.
+\texttt{kernel\_mcp} is implemented as a loadable kernel module exposing the \texttt{KERNEL\_MCP} Generic Netlink family.
 The command set covers the full invocation lifecycle: \texttt{TOOL\_REGISTER}, \texttt{AGENT\_REGISTER}, \texttt{TOOL\_REQUEST}, \texttt{TOOL\_DECISION}, \texttt{TOOL\_COMPLETE}, \texttt{APPROVAL\_DECIDE}, \texttt{RESET\_TOOLS}, and \texttt{LIST\_TOOLS}.
-Generic Netlink was preferred over alternatives such as \texttt{ioctl} or character devices for three reasons: it provides a naturally structured message format, supports dump-style enumeration for registry introspection, and yields a self-describing kernel interface well suited to a research prototype~\cite{netlink2026}.
+Generic Netlink was chosen over \texttt{ioctl} or character devices because it provides structured messages, supports dump-style enumeration for registry introspection, and is well suited to a research prototype~\cite{netlink2026}.
 
 Internally, the module maintains two registries.
 The tool registry maps tool identifiers to their manifest-derived semantic hashes and associated metadata.
@@ -355,8 +354,8 @@ This observability is valuable both during development and during evaluation: th
 
 \subsection{Daemon Implementation}
 
-While the kernel enforces the critical state transitions, \texttt{mcpd} is where the majority of the system's substantive work takes place.
-Its implementation is organised around four modules: manifest loading and semantic hashing, session storage and binding-context management, Netlink communication with the kernel, and request forwarding to tool services.
+The kernel enforces the critical state transitions, but \texttt{mcpd} does most of the actual work.
+It is organised around four modules: manifest loading and semantic hashing, session storage and binding-context management, Netlink communication with the kernel, and request forwarding to tool services.
 
 The manifest loader is the semantic entry point of the system, producing both the kernel registry entries and the catalog served to \texttt{llm-app} in response to \texttt{list\_apps} and \texttt{list\_tools} queries.
 
@@ -402,13 +401,25 @@ The durability of that kernel-held state across daemon failure is verified exper
 \subsection{Rationale for the Kernel--User-Space Split}
 \label{sec:design-alternatives}
 
-The preceding sections establish what the kernel holds and how it enforces it; this section explains why Generic Netlink was chosen as the kernel interface rather than the three most plausible alternatives.
+Three kernel-interface designs were tried or seriously considered before settling on Generic Netlink.
 
-Three kernel-interface designs were considered before settling on Generic Netlink.
-LSM hooks fire at the syscall boundary and cannot natively correlate a Netlink message with a registered tool hash.
-eBPF is constrained by the verifier and cannot maintain the ticket lifecycle state the design requires without reintroducing a user-space dependency.
-A capability model would require tool authors to write against a kernel-facing API, violating the goal that tool services need no modification to participate in the control plane.
-Generic Netlink supports structured messages, dump-style registry enumeration, and full lifecycle state management without any of these constraints, at the cost of requiring a loadable module rather than a policy hook.
+The first attempt used eBPF.
+It seemed like a natural fit: lightweight, no full kernel module needed, and increasingly the standard approach for extending kernel behaviour.
+The problem appeared once the approval-ticket lifecycle had to be implemented: a ticket is created on \texttt{DEFER}, updated on \texttt{APPROVAL\_DECIDE}, consumed on the second \texttt{TOOL\_REQUEST}, and eventually expired.
+That is inherently stateful across multiple messages, and the eBPF verifier's restrictions on loops and on persistent mutable state made it impractical to express.
+Keeping the ticket state in a user-space map would have reintroduced exactly the durability problem the kernel placement was meant to solve.
+
+LSM hooks were the second candidate.
+They fire at the syscall boundary, which is the wrong layer: tool identity in this system is a SHA-256 hash of a JSON manifest, not a file path or a socket operation.
+There is no syscall at which the kernel naturally sees a tool hash alongside a request; correlating the two would require injecting application-layer semantics into a mechanism designed for OS-object-level policy.
+The mismatch was fundamental, not a matter of implementation effort.
+
+A capability-based design (in the style of Capsicum) was also considered.
+It would have required tool services to interact with a kernel-facing API to obtain and present capabilities, breaking the goal that tool authors need only write a JSON manifest with no kernel-facing obligations.
+
+Generic Netlink avoids all three problems.
+It supports structured TLV messages, dump-style enumeration for registry introspection, and arbitrary internal state management in a loadable module.
+The cost is that a full kernel module is needed rather than a policy hook or a BPF program, but for a research prototype this is an acceptable trade-off. In practice, the module's role stayed narrow enough that the added complexity remained manageable.
 
 
 

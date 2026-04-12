@@ -14,9 +14,10 @@ Frameworks such as OpenClaw~\cite{openclaw2026} demonstrate that granting agents
 
 A single gateway process is typically responsible for interpreting tool manifests, binding requests to identities, and authorizing execution, effectively placing the control plane in user space. 
 Such a design introduces a single point of failure and expands the trusted computing base, making it vulnerable to crashes, logic bugs, or compromised control paths~\cite{peter2014arrakis}.
-This makes three properties hard to enforce: semantic consistency between declared and actual tool behaviour, trusted identity binding resilient to replay and session confusion~\cite{greshake2023prompt}, and approval-state persistence across gateway failures~\cite{qin2024toolllm}.
+Two properties become hard to enforce: whether a tool's declared behaviour matches what actually runs, and whether approval state survives a gateway crash~\cite{qin2024toolllm}.
+Identity binding under replay and session confusion~\cite{greshake2023prompt} is a third, related problem.
 
-This analysis motivates a central research question: which control-plane invariants in MCP-style tool invocation benefit from kernel-level enforcement, and can such enforcement improve security and resilience without sacrificing performance?
+This leads to a concrete question: which control-plane invariants in MCP-style tool invocation benefit from kernel-level enforcement, and can that enforcement improve security and resilience without making the system unacceptably slow?
 
 \subsection{Our Solution}
 

@@ -15,7 +15,7 @@
 \contentsline {subsection}{\numberline {2.6}Threat Model}{10}{subsection.2.6}%
 \contentsline {section}{\textit {Chapter 3: Design and Implementation}}{13}{section*.5}%
 \contentsline {subsection}{\numberline {3.1}Design Goals}{13}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}System Architecture}{14}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.2}System Architecture}{13}{subsection.3.2}%
 \contentsline {subsection}{\numberline {3.3}Control-Plane Workflow}{15}{subsection.3.3}%
 \contentsline {subsection}{\numberline {3.4}Wire Protocols}{16}{subsection.3.4}%
 \contentsline {paragraph}{llm-app to mcpd.}{17}{paragraph*.6}%
@@ -29,14 +29,14 @@
 \contentsline {subsection}{\numberline {3.9}Tool-Side RPC and Execution Model}{23}{subsection.3.9}%
 \contentsline {subsection}{\numberline {3.10}State Reconciliation and Recovery}{24}{subsection.3.10}%
 \contentsline {subsection}{\numberline {3.11}Rationale for the Kernel--User-Space Split}{24}{subsection.3.11}%
-\contentsline {subsection}{\numberline {3.12}Limitations and Identified Optimisation Opportunities}{24}{subsection.3.12}%
-\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{25}{section*.10}%
-\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{25}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{26}{subsection.4.2}%
-\contentsline {subsection}{\numberline {4.3}Security Evaluation}{27}{subsection.4.3}%
-\contentsline {subsection}{\numberline {4.4}Daemon Failure and Recovery}{30}{subsection.4.4}%
-\contentsline {subsection}{\numberline {4.5}Discussion}{31}{subsection.4.5}%
-\contentsline {subsection}{\numberline {4.6}Threats to Validity}{32}{subsection.4.6}%
+\contentsline {subsection}{\numberline {3.12}Limitations and Identified Optimisation Opportunities}{25}{subsection.3.12}%
+\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{26}{section*.10}%
+\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{26}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{27}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Security Evaluation}{28}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Daemon Failure and Recovery}{31}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Discussion}{32}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}Threats to Validity}{33}{subsection.4.6}%
 \contentsline {section}{\textit {Chapter 5: Conclusion and Further Work}}{34}{section*.11}%
 \contentsline {subsection}{\numberline {5.1}Conclusion}{34}{subsection.5.1}%
 \contentsline {subsection}{\numberline {5.2}Reflection}{34}{subsection.5.2}%

@@ -6,17 +6,18 @@
 {\fontsize{12pt}{18pt}\selectfont
 % replace the paragraph below with your abstract
 
-AI agents increasingly rely on external tools to extend their capabilities, yet existing frameworks lack secure OS-level support for managing tool invocation.
+AI agents increasingly rely on external tools to extend their capabilities, yet existing frameworks lack secure OS-level support for managing tool invocation. 
 When enforcement remains entirely in a user-space gateway, three properties are difficult to guarantee: semantic consistency between a tool's declared and actual behaviour, trusted identity binding resilient to session confusion, and approval-state persistence across gateway failures.
 
-To address this, we present \texttt{linux-mcp}, a kernel-assisted control plane for tool invocation on Linux.
-\texttt{linux-mcp} keeps semantic parsing and tool execution in user space while delegating admission control, approval-ticket lifecycle, and binding verification to a Linux kernel module.
-This partitioning makes approval state durable across daemon failure and inaccessible to unprivileged processes; tool authors need only specify functionality and parameters in a JSON manifest, with no kernel-facing implementation required.
+To address this problem, we present \texttt{linux-mcp}, a kernel-assisted control plane for LLM tool invocation on Linux.
+It moves admission control, approval tickets, and binding verification into a kernel module, while semantic parsing and tool execution stay in user space.
+Tool authors write a JSON manifest describing functionality and parameters; nothing kernel-facing is required.
+The result is that approval state lives in the kernel, durable across daemon failure and out of reach of unprivileged processes.
 
-We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened user-space design across latency, throughput, attack resistance, and failure scenarios.
-The kernel-assisted path blocks all tested control-plane attacks (110 attempts across four categories) while both user-space baselines permit meaningful bypass rates.
-This stronger enforcement comes at modest cost: latency overhead is statistically indistinguishable from the baseline at small and medium payloads and is approximately 3.4\% \emph{lower} at 1~MB payloads; throughput remains within approximately 10\% of the user-space baseline under tested multi-agent workloads.
-The prototype, comprising 43 tools across 14 applications, is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
+We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened (seccomp) variant across latency, throughput, attack resistance, and failure recovery.
+The kernel path blocks all 110 tested control-plane attacks across four categories; both user-space baselines let a meaningful fraction through.
+The overhead is small: latency is within measurement noise of the baseline at small and medium payloads, and roughly 3.4\% \emph{lower} at 1~MB; throughput stays within about 10\% of the user-space peak under multi-agent load.
+The prototype covers 43 tools across 14 applications and is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
 
 }
 \vspace{0.5cm}

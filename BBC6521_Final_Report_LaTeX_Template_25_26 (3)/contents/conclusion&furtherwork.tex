@@ -4,60 +4,44 @@
 
 \subsection{Conclusion}
 
-This project set out to identify which parts of an MCP-style control 
-plane genuinely benefit from kernel-level enforcement. 
-The answer is 
-a small and well-defined set: semantic identity, requester binding, 
-approval validity, and invocation completion. 
-These four invariants 
-are structurally difficult to hold when enforcement is confined to a 
-user-space gateway.
+This project set out to identify which parts of an MCP-style control plane genuinely benefit from kernel-level enforcement.
+The answer is a small and well-defined set: semantic identity, requester binding, approval validity, and invocation completion.
+These four invariants are structurally difficult to hold when enforcement is confined to a user-space gateway.
 
-\texttt{linux-mcp} moves only those invariants into a Linux kernel 
-module, while leaving semantic parsing and tool execution in user 
-space. 
-The gateway remains fully trusted, but the state it establishes 
-now resides in the kernel, beyond the reach of unprivileged processes 
-and durable across daemon failure.
+\texttt{linux-mcp} moves only those invariants into a Linux kernel module, while leaving semantic parsing and tool execution in user space.
+The gateway remains fully trusted, but the state it establishes now resides in the kernel, beyond the reach of unprivileged processes and durable across daemon failure.
 
-In the tested prototype setting, this partitioning blocked the full 
-set of 110 targeted control-plane attack cases in our functional 
-evaluation, where both user-space baselines permitted meaningful 
-bypass rates.
-Latency remained statistically indistinguishable from 
-the user-space baseline at small and medium payloads, was measurably 
-lower at 1\,MB, and throughput stayed within approximately 10\% of 
-the user-space peak. \texttt{linux-mcp} is therefore both a working 
-prototype and a design claim: the enforcement gains are bounded in 
-cost and precise in scope.
+In the tested prototype setting, the kernel path blocked all 110 targeted control-plane attack attempts, where both user-space baselines permitted meaningful bypass rates.
+Latency remained within measurement noise of the user-space baseline at small and medium payloads, and was measurably lower at 1\,MB; throughput stayed within approximately 10\% of the user-space peak.
+The enforcement gains are real, the overhead is small, and the scope is deliberately narrow.
 
 \subsection{Reflection}
 
-The most important question clarified by this project was not simply ``where should code run?'', but ``which invariants must remain trustworthy even when a gateway crashes, is misconfigured, or behaves incorrectly?''
-This reframing shaped the entire design: rather than asking how to make the gateway more secure, the project asked which properties the gateway should not be solely responsible for enforcing.
+The initial framing of this project was too broad: ``making AI tool invocation more secure by putting something in the kernel'' is not a testable claim.
+The work became substantially clearer once the problem was narrowed to a specific question: which invariants break when the gateway crashes or misbehaves, and are those the ones that benefit from kernel enforcement?
+That reframing aligned the threat model, the implementation, and the evaluation criteria.
 
-From a technical standpoint, the project required working across layers that are often studied separately: implementing a Linux kernel module, using Generic Netlink as a structured kernel--user-space control interface, exporting live state through \texttt{sysfs}, and coordinating these pieces with a manifest-aware daemon and UDS tool services.
-This process deepened understanding of interface ownership, failure handling, recovery logic, and the practical cost of crossing privilege boundaries.
-A central lesson of systems work was reinforced: the harder problem is often not adding mechanisms, but deciding what each layer should and should not be responsible for.
+On the technical side, the kernel interface went through several candidates before settling on Generic Netlink.
+eBPF was the first choice, but the approval-ticket lifecycle requires stateful tracking across multiple messages that the verifier's loop and memory restrictions make impractical.
+LSM hooks were also considered, but they operate at the syscall boundary while tool identity is an application-layer concept; the layers do not align.
+Generic Netlink supports the full lifecycle state the design needs, at the cost of requiring a loadable module rather than a policy hook.
 
-A second lesson concerned research discipline.
-Early iterations of this project were formulated around broad claims such as ``putting security in the kernel'' or ``making agents safer''.
-Such claims lack sufficient specificity to be empirically testable.
-The project became considerably stronger once the problem was narrowed to four concrete control-plane properties (semantic identity binding, approval validity, hash consistency, and durable observability), at which point the threat model, implementation choices, and evaluation criteria aligned naturally.
-A systems argument becomes credible only when the claimed benefit is specific enough to be tested directly.
+Working across the kernel--user-space boundary was technically demanding.
+Attribute packing bugs in Netlink do not produce compiler errors; they silently corrupt fields, with failures only appearing as unexpected kernel decisions deep into a test run.
+The most useful mitigation was building standalone per-command test scripts before integrating with \texttt{mcpd}, which made failures easier to isolate.
 
-The project also reinforced the value of restraint in privileged-system design.
-The temptation to move more logic into the kernel was real: every additional check the kernel performs is one the gateway cannot bypass.
-But manifest parsing, schema validation, and tool execution all belong in user space, where iteration is fast and debugging does not require a VM reboot.
-A privileged component that does too much is harder to reason about and harder to trust---the small kernel role here was not a limitation but a feature.
+The evaluation also required care in experimental configuration.
+During early attack runs, some expected failures did not appear, which turned out to be a harness misconfiguration: the tamper modes had not been enabled, so the baseline was running with its normal checks intact.
+This is a reminder that a reassuring result is not always a correct one.
 
-One practical consequence of this project is an appreciation of how much the framing of a security claim matters.
-\texttt{linux-mcp} improves a specific part of the control plane; it does not address unsafe tool semantics, poor policy choices, or compromise outside the assumed threat model.
-Getting the scope right was not just a methodological exercise: a system that claims to solve the full AI-agent security problem is harder to evaluate, harder to trust, and ultimately harder to deploy than one that solves a precise sub-problem well.
-The hardest part was resisting the temptation to widen the scope as the implementation took shape.
+The most persistent design tension was the temptation to move more logic into the kernel.
+Each additional check there is one the gateway cannot bypass, which is attractive.
+But manifest parsing, schema validation, and tool execution belong in user space, where iteration is fast and debugging does not require a module reload.
+The narrow kernel role was not a limitation of the design; it was the point.
 
-The broader lesson is simply that better security is not always achieved by adding more machinery.
-Moving a small set of authority-bearing state transitions into a stronger enforcement domain turned out to be more tractable, and arguably more useful, than attempting a fuller redesign.
+More broadly, the scope of a security claim matters as much as the claim itself.
+Framing \texttt{linux-mcp} as protecting four specific control-plane properties against a local unprivileged adversary made the evaluation honest and the argument defensible.
+A system that claims to solve the full AI-agent security problem is harder to evaluate and harder to trust than one that solves a well-defined sub-problem and says so clearly.
 
 \subsection{Further Work}
 \label{sec:further-work}
@@ -86,4 +70,3 @@ Finally, this work opens a broader research question: which other agent-oriented
 \texttt{linux-mcp} shows that a small but consequential part of the MCP control plane benefits from OS-level support without requiring AI agents to become first-class OS citizens or requiring a new OS substrate.
 This project focuses on admission control for tool invocation, but similar arguments may extend to execution budgets, provenance across tool chains, durable approval logs, or agent-scoped resource accounting.
 Exploring these directions would help clarify whether support for AI agents should be understood as entirely new operating-system substrates, or as conventional systems extended with a small number of carefully scoped, agent-aware mechanisms.
-In that sense, the contribution of \texttt{linux-mcp} is best read as a precise first step rather than a complete answer.
