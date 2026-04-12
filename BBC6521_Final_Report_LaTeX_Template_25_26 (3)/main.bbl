@@ -1,0 +1,246 @@
+\begin{thebibliography}{10}
+
+\bibitem{yao2023react}
+Yao S, Zhao J, Yu D, et~al.
+\newblock ReAct: Synergizing reasoning and acting in language models.
+\newblock arXiv preprint arXiv:221003629. 2023.
+
+\bibitem{wang2024agentbench}
+Wang Z, et~al.
+\newblock AgentBench: Evaluating LLMs as agents.
+\newblock arXiv preprint arXiv:230803688. 2024.
+
+\bibitem{schick2023toolformer}
+Schick T, Dwivedi-Yu J, et~al.
+\newblock Toolformer: Language models can teach themselves to use tools.
+\newblock arXiv preprint arXiv:230204761. 2023.
+
+\bibitem{park2023generative}
+Park JS, O'Brien J, Cai CJ, Morris MR, Liang P, Bernstein MS.
+\newblock Generative Agents: Interactive Simulacra of Human Behavior.
+\newblock In: UIST; 2023. .
+
+\bibitem{qin2024toolllm}
+Qin Y, Liang S, Ye Y, et~al.
+\newblock ToolLLM: Facilitating Large Language Models to Master Real-world APIs.
+\newblock arXiv preprint arXiv:230716789. 2024.
+
+\bibitem{mei2024aios}
+Mei K, et~al.
+\newblock AIOS: LLM Agent Operating System.
+\newblock arXiv preprint arXiv:240316971. 2024.
+
+\bibitem{liu2026agentos}
+Li Z, et~al.
+\newblock AgentOS: A Natural Language-driven System Platform.
+\newblock arXiv preprint arXiv:260308938. 2026.
+
+\bibitem{zhang2024llmos}
+Zhang W, et~al.. {LLM-OS}: An operating system for large language models; 2024.
+\newblock Manuscript in preparation.
+
+\bibitem{wu2024agentsystems}
+Wu Q, et~al.. Towards general-purpose agent systems; 2024.
+\newblock Manuscript in preparation.
+
+\bibitem{openclaw2026}
+Steinberger P. OpenClaw: Open-source Autonomous AI Agent; 2026.
+\newblock \url{https://openclaw.ai}.
+
+\bibitem{baumann2014arrakis}
+Baumann A, et~al.
+\newblock Arrakis: The operating system is the control plane.
+\newblock In: OSDI; 2014. .
+
+\bibitem{greshake2023prompt}
+Greshake K, et~al.
+\newblock Not what you've signed up for: Compromising real-world LLM-integrated applications with prompt injection.
+\newblock arXiv preprint arXiv:230212173. 2023.
+
+\bibitem{openharness2025}
+{HKUDS}. {OpenHarness}: Open-Source Infrastructure for {LLM} Agent Systems; 2025.
+\newblock Accessed: 2026.
+\newblock \url{https://github.com/HKUDS/OpenHarness}.
+
+\bibitem{tanenbaum2022}
+Tanenbaum AS, Bos H.
+\newblock Modern Operating Systems.
+\newblock 5th ed. Pearson; 2022.
+
+\bibitem{langchain2022}
+Chase H. {LangChain}; 2022.
+\newblock Open-source LLM application framework.
+\newblock \url{https://github.com/langchain-ai/langchain}.
+
+\bibitem{langgraph2024}
+{LangChain AI}. {LangGraph}: A Framework for Building Stateful Multi-Actor {LLM} Applications; 2024.
+\newblock Open-source agent orchestration framework.
+\newblock \url{https://github.com/langchain-ai/langgraph}.
+
+\bibitem{autogpt2023}
+Gravitas S. {AutoGPT}: An Autonomous {GPT}-4 Experiment; 2023.
+\newblock Open-source autonomous agent framework.
+\newblock \url{https://github.com/Significant-Gravitas/AutoGPT}.
+
+\bibitem{crewai2024}
+{CrewAI Inc }. {CrewAI}: Framework for Orchestrating Role-Playing Autonomous {AI} Agents; 2024.
+\newblock Open-source multi-agent collaboration platform.
+\newblock \url{https://crewai.com}.
+
+\bibitem{haystack2023}
+{deepset GmbH}. Haystack: Open-Source {LLM} Orchestration Framework; 2023.
+\newblock Open-source AI pipeline and agent framework.
+\newblock \url{https://haystack.deepset.ai}.
+
+\bibitem{semantickernel2023}
+{Microsoft Corporation}. Semantic Kernel: Open-Source {SDK} for {LLM} Integration; 2023.
+\newblock Released publicly March 2023; reached v1.0 in early 2024.
+\newblock \url{https://github.com/microsoft/semantic-kernel}.
+
+\bibitem{packer2024memgpt}
+Packer C, Fang V, Patil SG, Lin K, Wooders S, Gonzalez JE.
+\newblock MemGPT: Towards LLMs as Operating Systems.
+\newblock arXiv preprint arXiv:231008560. 2024.
+
+\bibitem{wu2024oscopilot}
+Wu Z, et~al.
+\newblock OS-Copilot: Towards Generalist Computer Agents.
+\newblock arXiv preprint arXiv:240207456. 2024.
+
+\bibitem{harness2025}
+{Harness Inc }. Harness {AI} {DevOps} Agent; 2025.
+\newblock AI-powered autonomous workers embedded in governed CI/CD pipelines.
+\newblock \url{https://developer.harness.io/docs/platform/harness-aida/ai-devops/}.
+
+\bibitem{apple2024pcc}
+{Apple Inc }. Private Cloud Compute: AI Privacy Architecture; 2024.
+\newblock \url{https://security.apple.com/blog/private-cloud-compute/}.
+
+\bibitem{mcp2025}
+{Model Context Protocol}. Architecture Specification; 2025.
+\newblock \url{https://modelcontextprotocol.io/specification/2025-06-18/architecture}.
+
+\bibitem{patil2023gorilla}
+Patil SG, Zhang T, Wang X, Gonzalez JE. Gorilla: Large Language Model Connected with Massive {API}s; 2023.
+
+\bibitem{liu2023prompt}
+Liu F, et~al.
+\newblock Prompt Injection Attack against LLM-integrated Applications.
+\newblock arXiv preprint arXiv:230605499. 2023.
+
+\bibitem{openclaw_security1}
+Wang Z, Tu H, Zhang L, et~al.
+\newblock Your Agent, Their Asset: A Real-World Safety Analysis of OpenClaw.
+\newblock arXiv preprint arXiv:260404759. 2026.
+
+\bibitem{openclaw_security2}
+Wang Y, Gao H, et~al.
+\newblock A Systematic Security Evaluation of OpenClaw and Its Variants.
+\newblock arXiv preprint arXiv:260403131. 2026.
+
+\bibitem{wang2023voyager}
+Wang G, Xie Y, Jiang Y, Mandlekar A, Xiao C, Zhu Y, et~al.. Voyager: An Open-Ended Embodied Agent with Large Language Models; 2023.
+
+\bibitem{yang2024swe}
+Yang J, Jimenez CE, Wettig A, Lieret K, Yao S, Narasimhan K, et~al.. {SWE}-agent: Agent-Computer Interfaces Enable Automated Software Engineering; 2024.
+
+\bibitem{lim2024compartmentalization}
+Lim SY, Agrawal S, Han X, Eyers D, O'Keeffe D, Pasquier T.
+\newblock Securing Monolithic Kernels using Compartmentalization.
+\newblock arXiv preprint arXiv:240408716. 2024.
+
+\bibitem{schneider2022sok}
+Schneider M, Masti RJ, Shinde S, Capkun S, Perez R.
+\newblock {SoK}: Hardware-supported Trusted Execution Environments.
+\newblock arXiv preprint arXiv:220512742. 2022.
+
+\bibitem{lefeuvre2024sok}
+Lefeuvre H, Dautenhahn N, Chisnall D, Olivier P.
+\newblock {SoK}: Software Compartmentalization.
+\newblock arXiv preprint arXiv:241008434. 2024.
+
+\bibitem{ji2026seagent}
+Ji Z, Wu D, Jiang W, Ma P, Li Z, Gao Y, et~al.
+\newblock Taming Various Privilege Escalation in {LLM}-Based Agent Systems: A Mandatory Access Control Framework.
+\newblock arXiv preprint arXiv:260111893. 2026.
+
+\bibitem{shi2025progent}
+Shi T, He J, Wang Z, Wu L, Li H, Guo W, et~al.
+\newblock Progent: Programmable Privilege Control for {LLM} Agents.
+\newblock arXiv preprint arXiv:250411703. 2025.
+
+\bibitem{seccomp2026}
+{Linux Kernel Documentation}. Seccomp BPF; 2026.
+\newblock \url{https://docs.kernel.org/userspace-api/seccomp_filter.html}.
+
+\bibitem{lsm2026}
+{Linux Kernel Documentation}. Linux Security Modules (LSM); 2026.
+\newblock \url{https://docs.kernel.org/admin-guide/LSM/index.html}.
+
+\bibitem{apparmor2026}
+{Linux Kernel Documentation}. AppArmor; 2026.
+\newblock \url{https://docs.kernel.org/admin-guide/LSM/apparmor.html}.
+
+\bibitem{selinux2026}
+{Linux Kernel Documentation}. SELinux; 2026.
+\newblock \url{https://docs.kernel.org/admin-guide/LSM/SELinux.html}.
+
+\bibitem{landlock2026}
+{Linux Kernel Documentation}. Landlock; 2026.
+\newblock \url{https://docs.kernel.org/userspace-api/landlock.html}.
+
+\bibitem{iouring2024}
+{Google Security Team}. Restricting \texttt{io\_uring} Due to Security Vulnerabilities; 2024.
+\newblock 60\% of Google VRP submissions attributed to io\_uring; disabled in Android, ChromeOS, and Google production servers.
+\newblock \url{https://www.phoronix.com/news/Google-Restricting-IO_uring}.
+
+\bibitem{brimhall2023mac}
+Brimhall B, Garrard J, de~la Garza C, Coffman J.
+\newblock A Comparative Analysis of {Linux} Mandatory Access Control Policy Enforcement Mechanisms.
+\newblock In: Proceedings of the 16th European Workshop on System Security ({EuroSec}); 2023. .
+
+\bibitem{mickens2019nightwatch}
+Mickens J, et~al.
+\newblock Nightwatch: Efficient Access Control for Cloud Applications.
+\newblock In: Proceedings of the USENIX Annual Technical Conference; 2019. .
+
+\bibitem{narayan2020shreds}
+Narayan V, et~al.
+\newblock Shreds: Fine-grained Execution Units with Private Memory.
+\newblock In: Proceedings of the USENIX Annual Technical Conference; 2020. .
+
+\bibitem{xu2021container}
+Xu Z, et~al.
+\newblock Understanding and hardening container security.
+\newblock In: Proceedings of the USENIX Security Symposium; 2021. .
+
+\bibitem{stevens2013unix}
+Stevens WR, Rago SA.
+\newblock Advanced Programming in the {UNIX} Environment.
+\newblock 3rd ed. Addison-Wesley; 2013.
+
+\bibitem{bishop2003computer}
+Bishop M.
+\newblock Computer Security: Art and Science.
+\newblock Addison-Wesley; 2003.
+
+\bibitem{lee2021exprace}
+Lee Y, Min C, Lee B.
+\newblock {ExpRace}: Exploiting Kernel Races through Raising Interrupts.
+\newblock In: Proceedings of the 30th {USENIX} Security Symposium. Vancouver, BC; 2021. p. 2363-80.
+
+\bibitem{klein2010sel4}
+Klein G, Andronick J, Elphinstone K, Heiser G, Cock D, Derrin P, et~al.
+\newblock {seL4}: Formal Verification of an {Operating-System} Kernel.
+\newblock Communications of the {ACM}. 2010;53(6):107-15.
+
+\bibitem{netlink2026}
+{Linux Kernel Documentation}. Netlink Socket Family; 2026.
+\newblock \url{https://docs.kernel.org/userspace-api/netlink/intro.html}.
+
+\bibitem{west2021welch}
+West RM.
+\newblock Best practice in statistics: {U}se the {W}elch $t$-test when testing the difference between two groups.
+\newblock Annals of Clinical Biochemistry. 2021;58(6):632-7.
+
+\end{thebibliography}

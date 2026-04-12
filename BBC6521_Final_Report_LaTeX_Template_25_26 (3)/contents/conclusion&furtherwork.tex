@@ -30,47 +30,47 @@ A more grounded and deployable approach is to identify the invariants that matte
 
 \subsection{Reflection}
 
-The most important question clarified by this project was not simply "where should code run?", but "which invariants must remain trustworthy even when a gateway crashes, is misconfigured, or behaves incorrectly?"
-That shift in perspective shaped the entire design.
+The most important question clarified by this project was not simply ``where should code run?'', but ``which invariants must remain trustworthy even when a gateway crashes, is misconfigured, or behaves incorrectly?''
+This reframing shaped the entire design: rather than asking how to make the gateway more secure, the project asked which properties the gateway should not be solely responsible for enforcing.
 
-From a technical standpoint, the project required me to work across layers that are often studied separately: implementing a Linux kernel module, using Generic Netlink as a structured kernel--user-space control interface, exporting live state through \texttt{sysfs}, and coordinating these pieces with a manifest-aware daemon and UDS tool services. 
-This process deepened not only my implementation skills but also my understanding of interface ownership, failure handling, recovery logic, and the practical cost of crossing privilege boundaries.
-More generally, it reinforced a central lesson of systems work: the harder problem is often not adding mechanisms, but deciding what each layer should---and should not---be responsible for.
+From a technical standpoint, the project required working across layers that are often studied separately: implementing a Linux kernel module, using Generic Netlink as a structured kernel--user-space control interface, exporting live state through \texttt{sysfs}, and coordinating these pieces with a manifest-aware daemon and UDS tool services.
+This process deepened understanding of interface ownership, failure handling, recovery logic, and the practical cost of crossing privilege boundaries.
+A central lesson of systems work was reinforced: the harder problem is often not adding mechanisms, but deciding what each layer should---and should not---be responsible for.
 
-A second lesson concerned research discipline. Early versions of the project could easily have been framed around broad claims such as "putting security in the kernel" or "making agents safer". 
-In practice, such framing is too broad to be convincing. 
-The project became much stronger once the problem was narrowed to a specific set of control-plane properties: semantic identity binding, approval validity, hash consistency, and durable observability. 
-Once those invariants were explicit, the threat model, implementation choices, and evaluation criteria aligned much more naturally. 
-This was an important lesson for me: a systems argument becomes credible only when the claimed benefit is specific enough to be tested directly.
+A second lesson concerned research discipline.
+Early iterations of this project were formulated around broad claims such as ``putting security in the kernel'' or ``making agents safer''.
+Such claims lack sufficient specificity to be empirically testable.
+The project became considerably stronger once the problem was narrowed to four concrete control-plane properties---semantic identity binding, approval validity, hash consistency, and durable observability---at which point the threat model, implementation choices, and evaluation criteria aligned naturally.
+A systems argument becomes credible only when the claimed benefit is specific enough to be tested directly.
 
 The project also reinforced the value of restraint in privileged-system design.
-A natural temptation is to move more logic into the kernel in order to claim stronger protection. 
-In this case, that would have been the wrong direction.
-Parsing manifests, interpreting rich schemas, and executing tools all belong in user-space, where change is frequent and debugging is tractable. 
-Keeping the kernel role small was therefore not just an engineering convenience; it was part of the design argument itself. 
+The temptation to move more logic into the kernel in order to claim stronger protection would have been counterproductive.
+Parsing manifests, interpreting rich schemas, and executing tools all belong in user space, where change is frequent and debugging is tractable.
+Keeping the kernel role small was therefore not merely an engineering convenience; it was part of the design argument itself.
 A privileged component that does too much becomes harder to reason about and, ultimately, harder to trust.
 
-These technical choices also connect to broader ethical and professional issues.
-Tool-using AI agents are not only language systems; they are action-taking systems. 
-Once an agent can invoke external capabilities, failures in mediation may affect privacy, data integrity, or real-world operations. 
-Approval correctness, auditability, and graceful failure handling are therefore not secondary details, but part of responsible system design. 
-Throughout the project, I tried to keep the threat model precise, avoid overstating what the prototype guarantees, and distinguish clearly between the attack classes the system addresses and those that remain out of scope.
+These technical choices also connect to broader ethical and professional considerations.
+Tool-using AI agents are not only language systems; they are action-taking systems.
+Once an agent can invoke external capabilities, failures in mediation may affect privacy, data integrity, or real-world operations.
+Approval correctness, auditability, and graceful failure handling are therefore not secondary details but constituents of responsible system design.
+Throughout this project, the aim has been to keep the threat model precise, avoid overstating what the prototype guarantees, and distinguish clearly between the attack classes the system addresses and those that remain out of scope.
 
-This project also made me more cautious about how such work should be presented.
-It is easy to make strong claims around AI safety or operating-system support without equally strong evidence. \texttt{linux-mcp} improves a specific part of the control plane; it does not solve the full security problem of AI agents, and it does not address unsafe tool semantics, poor policy choices, or compromise outside the assumed threat model. Stating those limits clearly is part of good research practice.
+Strong claims about AI safety or operating-system support often outpace the available evidence.
+\texttt{linux-mcp} improves a specific part of the control plane; it does not solve the full security problem of AI agents, and it does not address unsafe tool semantics, poor policy choices, or compromise outside the assumed threat model.
+Stating those limits clearly is a component of good research practice.
 
-Finally, the project highlighted a practical engineering principle that I expect to remain useful beyond this dissertation: better security is not always achieved by adding more machinery. 
-In this case, the most effective step was to isolate a small set of authority-bearing state transitions and move them to a stronger enforcement domain. 
-That is a modest conclusion, but a precise one, and it suggests that operating-system support for AI agents may be most valuable when it is targeted, limited in scope, and built around explicit invariants rather than ambitious but diffuse redesign.
+Finally, the project highlighted a general engineering principle: better security is not always achieved by adding more machinery.
+The most effective step here was to isolate a small set of authority-bearing state transitions and move them to a stronger enforcement domain.
+This is a modest conclusion, but a precise one, and it suggests that operating-system support for AI agents may be most valuable when it is targeted, limited in scope, and built around explicit invariants rather than ambitious but diffuse redesign.
 
 \subsection{Further Work}
 
 Several directions follow naturally from the current prototype.
 
-First, the current kernel arbitration logic is intentionally minimal. 
+First, the current kernel arbitration logic is intentionally minimal.
 It verifies tool identity, agent identity, semantic-hash consistency, and approval-ticket validity, but it does not implement a richer policy framework.
-A natural next step is to support more expressive admission policies, such as per-tool permissions, role-scoped access control, rate limits, execution budgets, or policies conditioned on risk tags and request context. 
-The challenge will be to extend policy expressiveness without turning the kernel into a semantic decision engine.
+A natural next step is to support more expressive admission policies, such as per-tool permissions, role-scoped access control, rate limits (e.g., $N$ requests per minute per agent), or execution budgets (e.g., total time per session).
+The design principle should be maintained: the kernel verifies policy membership but does not compute policy decisions, which remain in user space, preserving the narrow-kernel invariant.
 
 Second, the approval mechanism can be developed into a more complete governance path. 
 The present design supports defer-and-decide control for sensitive operations, but real deployments may require approval delegation, bounded approval scope, revocation, expiry policies, and richer audit trails linking each decision to a concrete execution context. 
@@ -80,9 +80,9 @@ Third, recovery behaviour can be improved further. The current prototype already
 A more mature design could provide more systematic restart handling, richer recovery metadata, and clearer support for interrupted or partially completed requests.
 This becomes particularly important for long-running agent workflows, where failure and restart are routine rather than exceptional.
 
-Fourth, the evaluation can be extended substantially. The current experiments
-support the main claim of the project, but they remain limited in scale and
-environment. Future work should include bare-metal evaluation, heavier concurrency, larger tool registries, and more heterogeneous tool workloads, including tools whose execution time is variable or network-dependent.
+Fourth, the evaluation can be extended substantially.
+Future work should include bare-metal evaluation to eliminate hypervisor timing noise, concurrency levels well beyond the current maximum of 100 concurrent requests (e.g., 500 or 1000), tool registries an order of magnitude larger than those used here, and heterogeneous tool workloads with variable or network-dependent execution times.
+Tail-latency characterisation ($p_{99}$, $p_{95}$) under sustained load is a particularly important gap.
 Comparison against additional hardened user-space designs would also help sharpen the argument by separating the benefits of kernel placement from those achievable through improved user-space engineering alone.
 
 Finally, this work opens a broader research question: which other agent-oriented abstractions deserve operating-system support? 

@@ -1,13 +1,25 @@
+%% Agent Frameworks
+
+@misc{openharness2025,
+  author       = {{HKUDS}},
+  title        = {{OpenHarness}: Open-Source Infrastructure for {LLM} Agent Systems},
+  year         = {2025},
+  howpublished = {\url{https://github.com/HKUDS/OpenHarness}},
+  note         = {Accessed: 2026}
+}
+
 %% OS Foundations
 
-@article{welch1947,
-  author  = {Welch, Bernard Lewis},
-  title   = {The Generalization of ``Student's'' Problem when Several Different Population Variances are Involved},
-  journal = {Biometrika},
-  volume  = {34},
-  number  = {1--2},
-  pages   = {28--35},
-  year    = {1947}
+@article{west2021welch,
+  author  = {West, Robert M.},
+  title   = {Best practice in statistics: {U}se the {W}elch $t$-test when
+             testing the difference between two groups},
+  journal = {Annals of Clinical Biochemistry},
+  volume  = {58},
+  number  = {6},
+  pages   = {632--637},
+  year    = {2021},
+  doi     = {10.1177/0004563221992088}
 }
 
 @book{bishop2003computer,
@@ -58,21 +70,21 @@
 
 @article{yao2023react,
   title={ReAct: Synergizing reasoning and acting in language models},
-  author={Yao, Shunyu and Zhao, Jeffrey and Yu, Dian and et al.},
+  author={Yao, Shunyu and Zhao, Jeffrey and Yu, Dian and others},
   journal={arXiv preprint arXiv:2210.03629},
   year={2023}
 }
 
 @article{schick2023toolformer,
   title={Toolformer: Language models can teach themselves to use tools},
-  author={Schick, Timo and Dwivedi-Yu, Jane and et al.},
+  author={Schick, Timo and Dwivedi-Yu, Jane and others},
   journal={arXiv preprint arXiv:2302.04761},
   year={2023}
 }
 
 @article{wang2024agentbench,
   title={AgentBench: Evaluating LLMs as agents},
-  author={Wang, Zirui and et al.},
+  author={Wang, Zirui and others},
   journal={arXiv preprint arXiv:2308.03688},
   year={2024}
 }
@@ -109,14 +121,14 @@
 
 @misc{zhang2024llmos,
   title        = {{LLM-OS}: An operating system for large language models},
-  author       = {Zhang, et al.},
+  author       = {Zhang, Wei and others},
   year         = {2024},
   note         = {Manuscript in preparation}
 }
 
 @misc{wu2024agentsystems,
   title        = {Towards general-purpose agent systems},
-  author       = {Wu, Qingyun and et al.},
+  author       = {Wu, Qingyun and others},
   year         = {2024},
   note         = {Manuscript in preparation}
 }
@@ -180,14 +192,14 @@
 
 @article{greshake2023prompt,
   title={Not what you've signed up for: Compromising real-world LLM-integrated applications with prompt injection},
-  author={Greshake, Kai and et al.},
+  author={Greshake, Kai and others},
   journal={arXiv preprint arXiv:2302.12173},
   year={2023}
 }
 
 @article{zou2023universal,
   title={Universal and transferable adversarial attacks on aligned language models},
-  author={Zou, Andy and et al.},
+  author={Zou, Andy and others},
   journal={arXiv preprint arXiv:2307.15043},
   year={2023}
 }
@@ -240,16 +252,24 @@
 
 %% Security
 
-@inproceedings{saltzer1975protection,
-  title={The protection of information in computer systems},
-  author={Saltzer, Jerome and Schroeder, Michael},
-  booktitle={Proceedings of the IEEE},
-  year={1975}
+@article{klein2010sel4,
+  author  = {Klein, Gerwin and Andronick, June and Elphinstone, Kevin and
+             Heiser, Gernot and Cock, David and Derrin, Philip and
+             Elkaduwe, Dhammika and Engelhardt, Kai and Kolanski, Rafal and
+             Norrish, Michael and Sewell, Thomas and Tuch, Harvey and
+             Winwood, Simon},
+  title   = {{seL4}: Formal Verification of an {Operating-System} Kernel},
+  journal = {Communications of the {ACM}},
+  volume  = {53},
+  number  = {6},
+  pages   = {107--115},
+  year    = {2010},
+  doi     = {10.1145/1743546.1743574}
 }
 
 @inproceedings{baumann2014arrakis,
   title={Arrakis: The operating system is the control plane},
-  author={Baumann, Andrew and et al.},
+  author={Baumann, Andrew and others},
   booktitle={OSDI},
   year={2014}
 }
@@ -316,14 +336,12 @@
 }
 
 %% Control-plane invariants: OS security foundations
-@techreport{anderson1972computer,
-  author      = {Anderson, James P.},
-  title       = {Computer Security Technology Planning Study},
-  institution = {Deputy for Command and Management Systems,
-                 HQ Electronic Systems Division (AFSC)},
-  year        = {1972},
-  number      = {ESD-TR-73-51},
-  note        = {Introduced the reference monitor concept}
+@article{lim2024compartmentalization,
+  author  = {Lim, Soo Yee and Agrawal, Sidhartha and Han, Xueyuan and
+             Eyers, David and O'Keeffe, Dan and Pasquier, Thomas},
+  title   = {Securing Monolithic Kernels using Compartmentalization},
+  journal = {arXiv preprint arXiv:2404.08716},
+  year    = {2024}
 }
 
 @inproceedings{garfinkel2003terra,
@@ -348,20 +366,128 @@
 @inproceedings{mickens2019nightwatch,
   title={Nightwatch: Efficient Access Control for Cloud Applications},
   author={Mickens, James and others},
-  booktitle={OSDI},
+  booktitle={Proceedings of the USENIX Annual Technical Conference},
   year={2019}
 }
 
 @inproceedings{narayan2020shreds,
   title={Shreds: Fine-grained Execution Units with Private Memory},
   author={Narayan, Vikas and others},
-  booktitle={OSDI},
+  booktitle={Proceedings of the USENIX Annual Technical Conference},
   year={2020}
 }
 
 @inproceedings{xu2021container,
   title={Understanding and hardening container security},
   author={Xu, Zheng and others},
-  booktitle={USENIX Security},
+  booktitle={Proceedings of the USENIX Security Symposium},
   year={2021}
+}
+
+%% NEW REFERENCES — appended
+
+@inproceedings{brimhall2023mac,
+  author    = {Brimhall, Brennon and Garrard, Justin and de la Garza, Christopher
+               and Coffman, Joel},
+  title     = {A Comparative Analysis of {Linux} Mandatory Access Control
+               Policy Enforcement Mechanisms},
+  booktitle = {Proceedings of the 16th European Workshop on System Security
+               ({EuroSec})},
+  year      = {2023},
+  doi       = {10.1145/3578357.3589454}
+}
+
+@inproceedings{lee2021exprace,
+  author    = {Lee, Yoochan and Min, Changwoo and Lee, Byoungyoung},
+  title     = {{ExpRace}: Exploiting Kernel Races through Raising Interrupts},
+  booktitle = {Proceedings of the 30th {USENIX} Security Symposium},
+  year      = {2021},
+  pages     = {2363--2380},
+  address   = {Vancouver, BC}
+}
+
+@article{schneider2022sok,
+  author  = {Schneider, Moritz and Masti, Ramya Jayaram and Shinde, Shweta
+             and Capkun, Srdjan and Perez, Ronald},
+  title   = {{SoK}: Hardware-supported Trusted Execution Environments},
+  journal = {arXiv preprint arXiv:2205.12742},
+  year    = {2022}
+}
+
+@article{lefeuvre2024sok,
+  author  = {Lefeuvre, Hugo and Dautenhahn, Nathan and Chisnall, David
+             and Olivier, Pierre},
+  title   = {{SoK}: Software Compartmentalization},
+  journal = {arXiv preprint arXiv:2410.08434},
+  year    = {2024}
+}
+
+@article{ji2026seagent,
+  author  = {Ji, Zimo and Wu, Daoyuan and Jiang, Wenyuan and Ma, Pingchuan
+             and Li, Zongjie and Gao, Yudong and Wang, Shuai and Li, Yingjiu},
+  title   = {Taming Various Privilege Escalation in {LLM}-Based Agent
+             Systems: A Mandatory Access Control Framework},
+  journal = {arXiv preprint arXiv:2601.11893},
+  year    = {2026}
+}
+
+@article{shi2025progent,
+  author  = {Shi, Tianneng and He, Jingxuan and Wang, Zhun and Wu, Linyu
+             and Li, Hongwei and Guo, Wenbo and Song, Dawn},
+  title   = {Progent: Programmable Privilege Control for {LLM} Agents},
+  journal = {arXiv preprint arXiv:2504.11703},
+  year    = {2025}
+}
+
+%% NEW REFERENCES — appended by background revision
+
+@misc{langgraph2024,
+  author       = {{LangChain AI}},
+  title        = {{LangGraph}: A Framework for Building Stateful Multi-Actor
+                  {LLM} Applications},
+  year         = {2024},
+  howpublished = {\url{https://github.com/langchain-ai/langgraph}},
+  note         = {Open-source agent orchestration framework}
+}
+
+@misc{crewai2024,
+  author       = {{CrewAI Inc.}},
+  title        = {{CrewAI}: Framework for Orchestrating Role-Playing
+                  Autonomous {AI} Agents},
+  year         = {2024},
+  howpublished = {\url{https://crewai.com}},
+  note         = {Open-source multi-agent collaboration platform}
+}
+
+@misc{haystack2023,
+  author       = {{deepset GmbH}},
+  title        = {Haystack: Open-Source {LLM} Orchestration Framework},
+  year         = {2023},
+  howpublished = {\url{https://haystack.deepset.ai}},
+  note         = {Open-source AI pipeline and agent framework}
+}
+
+@misc{semantickernel2023,
+  author       = {{Microsoft Corporation}},
+  title        = {Semantic Kernel: Open-Source {SDK} for {LLM} Integration},
+  year         = {2023},
+  howpublished = {\url{https://github.com/microsoft/semantic-kernel}},
+  note         = {Released publicly March 2023; reached v1.0 in early 2024}
+}
+
+@misc{harness2025,
+  author       = {{Harness Inc.}},
+  title        = {Harness {AI} {DevOps} Agent},
+  year         = {2025},
+  howpublished = {\url{https://developer.harness.io/docs/platform/harness-aida/ai-devops/}},
+  note         = {AI-powered autonomous workers embedded in governed CI/CD pipelines}
+}
+
+@misc{iouring2024,
+  author       = {{Google Security Team}},
+  title        = {Restricting \texttt{io\_uring} Due to Security Vulnerabilities},
+  year         = {2024},
+  howpublished = {\url{https://www.phoronix.com/news/Google-Restricting-IO_uring}},
+  note         = {60\% of Google VRP submissions attributed to io\_uring; disabled in
+                  Android, ChromeOS, and Google production servers}
 }

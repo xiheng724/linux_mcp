@@ -1,0 +1,82 @@
+\subsection*{Additional appendices (as needed)}
+\phantomsection
+\addcontentsline{toc}{subsection}{Additional appendices (as needed)}
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{p{2.1cm} p{2.4cm} p{2.4cm} p{2.4cm} p{2.2cm} p{1.8cm} p{2.4cm}}
+\toprule
+\textbf{System} &
+\textbf{Control-plane placement} &
+\textbf{Tool identity mechanism} &
+\textbf{Approval / governance} &
+\textbf{Failure resilience} &
+\textbf{Kernel integration} &
+\textbf{Security boundary} \\
+\midrule
+
+\texttt{linux-mcp} (this work)
+& Kernel module (\texttt{kernel\_mcp}) + user-space gateway (\texttt{mcpd})
+& Manifest-derived semantic hash, registered and verified by kernel
+& Kernel-enforced approval tickets with session binding and lifecycle state
+& Approval state survives \texttt{mcpd} crash (kernel holds it)
+& Custom Generic Netlink module; \texttt{CAP\_NET\_ADMIN}-gated
+& Kernel arbitration; enforcement independent of gateway correctness \\
+
+\midrule
+
+\texttt{OpenClaw} \cite{openclaw2026}
+& User-space gateway (persistent process)
+& Skill name and version in gateway registry
+& Application-level permission checks; no durable approval state
+& Lost on process restart; no persistent control-plane state
+& None
+& Gateway process; bypassable via logic flaws \cite{openclaw_security1, openclaw_security2} \\
+
+\midrule
+
+Harness Agent \cite{harness2025}
+& Cloud-hosted pipeline orchestrator
+& Pipeline step identity via RBAC connector
+& Role-based access control, audit log, organisational policies
+& Cloud-hosted; resilient by platform design
+& None (SaaS)
+& Platform RBAC; trust boundary is the SaaS control plane \\
+
+\midrule
+
+AIOS / AgentOS \cite{mei2024aios, liu2026agentos}
+& New OS-level agent kernel (proposed)
+& Agent and tool registration in LLM-centric scheduler
+& Scheduling-layer resource governance
+& Not evaluated; proposal-stage work
+& New kernel substrate (proposed)
+& Full OS redesign; broad scope \\
+
+\midrule
+
+LangChain / LangGraph \cite{langchain2022, langgraph2024}
+& User-space library (in-process)
+& Tool name string; no cryptographic binding
+& None; developer-implemented logic
+& Lost on process crash
+& None
+& Application process; no isolation between tool invocations \\
+
+\midrule
+
+Apple Intelligence \cite{apple2024pcc}
+& On-device OS services + Private Cloud Compute
+& System-managed capability entitlements
+& OS entitlement model + PCC attestation
+& High; system services are OS-persistent
+& Deep OS integration (proprietary)
+& Hardware attestation + OS entitlements; closed ecosystem \\
+
+\bottomrule
+\end{tabular}
+\caption{Comparison of representative agent systems across control-plane and security dimensions.}
+\label{tab:system_comparison}
+\end{table}

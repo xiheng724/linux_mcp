@@ -1,0 +1,104 @@
+This is BibTeX, Version 0.99d (TeX Live 2024)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main.aux
+The style file: vancouver.bst
+A level-1 auxiliary file: cover.aux
+Reallocated glb_str_ptr (elt_size=4) to 20 items from 10.
+Reallocated global_strs (elt_size=200001) to 20 items from 10.
+Reallocated glb_str_end (elt_size=4) to 20 items from 10.
+Reallocated wiz_functions (elt_size=4) to 6000 items from 3000.
+Database file #1: reference.bib
+Warning--empty pages in park2023generative
+Warning--empty author and editor in zhang2024llmos
+Warning--missing publisher in zhang2024llmos
+Warning--empty author and editor in wu2024agentsystems
+Warning--missing publisher in wu2024agentsystems
+Warning--empty author and editor in openclaw2026
+Warning--missing publisher in openclaw2026
+Warning--empty pages in baumann2014arrakis
+Warning--empty author and editor in openharness2025
+Warning--missing publisher in openharness2025
+Warning--empty author and editor in langchain2022
+Warning--missing publisher in langchain2022
+Warning--empty author and editor in langgraph2024
+Warning--missing publisher in langgraph2024
+Warning--empty author and editor in autogpt2023
+Warning--missing publisher in autogpt2023
+Warning--empty author and editor in crewai2024
+Warning--missing publisher in crewai2024
+Warning--empty author and editor in haystack2023
+Warning--missing publisher in haystack2023
+Warning--empty author and editor in semantickernel2023
+Warning--missing publisher in semantickernel2023
+Warning--empty author and editor in harness2025
+Warning--missing publisher in harness2025
+Warning--empty author and editor in apple2024pcc
+Warning--missing publisher in apple2024pcc
+Warning--empty author and editor in mcp2025
+Warning--missing publisher in mcp2025
+Warning--empty author and editor in patil2023gorilla
+Warning--missing publisher in patil2023gorilla
+Warning--empty author and editor in wang2023voyager
+Warning--missing publisher in wang2023voyager
+Warning--empty author and editor in yang2024swe
+Warning--missing publisher in yang2024swe
+Warning--empty author and editor in seccomp2026
+Warning--missing publisher in seccomp2026
+Warning--empty author and editor in lsm2026
+Warning--missing publisher in lsm2026
+Warning--empty author and editor in apparmor2026
+Warning--missing publisher in apparmor2026
+Warning--empty author and editor in selinux2026
+Warning--missing publisher in selinux2026
+Warning--empty author and editor in landlock2026
+Warning--missing publisher in landlock2026
+Warning--empty author and editor in iouring2024
+Warning--missing publisher in iouring2024
+Warning--empty pages in brimhall2023mac
+Warning--empty pages in mickens2019nightwatch
+Warning--empty pages in narayan2020shreds
+Warning--empty pages in xu2021container
+Warning--empty author and editor in netlink2026
+Warning--missing publisher in netlink2026
+You've used 52 entries,
+            3507 wiz_defined-function locations,
+            918 strings with 12854 characters,
+and the built_in function-call counts, 64095 in all, are:
+= -- 7686
+> -- 586
+< -- 61
++ -- 300
+- -- 142
+* -- 4940
+:= -- 7065
+add.period$ -- 161
+call.type$ -- 52
+change.case$ -- 29
+chr.to.int$ -- 136
+cite$ -- 104
+duplicate$ -- 5421
+empty$ -- 6235
+format.name$ -- 171
+if$ -- 15076
+int.to.chr$ -- 0
+int.to.str$ -- 52
+missing$ -- 427
+newline$ -- 246
+num.names$ -- 52
+pop$ -- 1047
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 983
+stack$ -- 0
+substring$ -- 11212
+swap$ -- 915
+text.length$ -- 24
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 0
+warning$ -- 52
+while$ -- 348
+width$ -- 54
+write$ -- 517
+(There were 52 warnings)

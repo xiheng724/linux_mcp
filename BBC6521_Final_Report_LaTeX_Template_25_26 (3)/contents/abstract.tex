@@ -1,0 +1,33 @@
+\onehalfspacing
+\phantomsection % this is to manually fix anchor
+\addcontentsline{toc}{section}{\textit{Abstract}}
+{\fontsize{16pt}{30pt}\selectfont \noindent\textbf{Abstract}}
+\vspace{0.5cm}
+{\fontsize{12pt}{18pt}\selectfont
+% replace the paragraph below with your abstract
+
+AI agents increasingly rely on external tools to extend their capabilities, yet existing frameworks lack secure OS-level support for managing tool invocation.
+When enforcement remains entirely in a user-space gateway, three properties are difficult to guarantee: semantic consistency between a tool's declared and actual behaviour, trusted identity binding resilient to session confusion, and approval-state persistence across gateway failures.
+
+To address this, we present \texttt{linux-mcp}, a kernel-assisted control plane for tool invocation on Linux.
+\texttt{linux-mcp} keeps semantic parsing and tool execution in user space while delegating admission control, approval-ticket lifecycle, and binding verification to a Linux kernel module.
+This partitioning makes approval state durable across daemon failure and inaccessible to unprivileged processes; tool authors need only specify functionality and parameters in a JSON manifest, with no kernel-facing implementation required.
+
+We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened user-space design across latency, throughput, attack resistance, and failure scenarios.
+The kernel-assisted path blocks all tested control-plane attacks (110 attempts across four categories) while both user-space baselines permit meaningful bypass rates.
+This stronger enforcement comes at modest cost: latency overhead is statistically indistinguishable from the baseline at small and medium payloads and is approximately 3.4\% \emph{lower} at 1~MB payloads; throughput remains within approximately 10\% of the user-space baseline under tested multi-agent workloads.
+The prototype, comprising 43 tools across 14 applications, is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
+
+}
+\vspace{0.5cm}
+\addcontentsline{toc}{section}{\textit{Keywords}}
+{\fontsize{16pt}{30pt}\selectfont \noindent\textbf{Keywords}}
+\vspace{0.5cm}
+{\fontsize{12pt}{18pt}\selectfont
+% replace the paragraph below with your keywords
+
+AI Agents, Operating Systems, Tool Invocation, System Security
+
+}
+
+
