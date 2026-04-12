@@ -19,8 +19,8 @@ Recent work reflects this shift.
 Systems such as generative agents demonstrate long-lived entities capable of maintaining memory and coordinating workflows \cite{park2023generative}, while tool-oriented LLM systems show that performance depends critically on structured access to external capabilities \cite{qin2024toolllm}.
 Frameworks such as LangChain \cite{langchain2022}, LangGraph \cite{langgraph2024}, AutoGPT \cite{autogpt2023}, CrewAI \cite{crewai2024}, Haystack \cite{haystack2023}, and Microsoft Semantic Kernel \cite{semantickernel2023} have emerged to structure this interaction, each providing an abstraction for composing LLM calls with tool invocations in multi-step pipelines.
 More recent proposals demonstrate that agents can plan, execute, and verify complex tasks through multi-agent decomposition \cite{mei2024aios, liu2026agentos}.
-In these settings, the system must preserve consistency between tool descriptions, permissions, and runtime behaviour---consistency requirements that traditional OS abstractions (process isolation, file access controls, inter-process messaging) do not directly address.
-That mismatch is the starting point for the present work. All of the systems surveyed in the following section locate the control plane entirely in user space. Section~\ref{sec:limits-user-space} argues that three structural weaknesses---semantic drift, identity anchoring, and durability---cannot be fully addressed within a single trust domain, motivating a minimal kernel placement for the invariants that most require it.
+In these settings, the system must preserve consistency between tool descriptions, permissions, and runtime behaviour, a requirement that traditional OS abstractions (process isolation, file access controls, inter-process messaging) do not directly address.
+That mismatch is the starting point for the present work. All of the systems surveyed in the following section locate the control plane entirely in user space. Section~\ref{sec:limits-user-space} argues that three structural weaknesses (semantic drift, identity anchoring, and durability) cannot be fully addressed within a single trust domain, motivating a minimal kernel placement for the invariants that most require it.
 
 
 
@@ -37,7 +37,7 @@ It exposes capabilities through a gateway and modular skills, effectively acting
 Industrial CI/CD platforms such as Harness \cite{harness2025} have similarly evolved to include AI agents embedded within governed pipeline stages, with every tool action logged, auditable, and subject to role-based access control. This trend indicates that agent governance is becoming a first-class platform concern even in software delivery contexts.
 Commercial platforms such as Apple Intelligence \cite{apple2024pcc} integrate AI agents deeply into the operating environment, combining on-device models with system services to provide personalised, context-aware assistance across applications, with a dedicated private-cloud compute layer to enforce data isolation.
 
-A comparison of representative systems across the dimensions most relevant to control-plane placement---where enforcement resides, how tool identity is established, failure behaviour, and kernel integration---reveals a consistent pattern: existing systems either push all enforcement logic into user space, limiting durability and tamper-resistance, or propose a wholesale replacement of OS abstractions for agent workloads (see Table~\ref{tab:system_comparison} in the Additional Appendices).
+A comparison of representative systems across the dimensions most relevant to control-plane placement (where enforcement resides, how tool identity is established, failure behaviour, and kernel integration) reveals a consistent pattern: existing systems either push all enforcement logic into user space, limiting durability and tamper-resistance, or propose a wholesale replacement of OS abstractions for agent workloads (see Table~\ref{tab:system_comparison} in the Additional Appendices).
 
 Despite differences in implementation, these systems share a common trend: they introduce an additional control layer mediating between user intent, model reasoning, and tool execution.
 This layer increasingly resembles operating-system functionality, even when implemented entirely in user space.
@@ -63,7 +63,7 @@ In most existing systems, including \texttt{OpenClaw} and LangChain-style archit
 This design enables rapid development and flexible integration, but introduces several structural weaknesses.
 
 \textbf{Semantic drift.}
-Because tool invocation depends on semantically rich manifests---combining natural-language descriptions, schemas, and examples \cite{schick2023toolformer, patil2023gorilla, mcp2025}---there is an implicit assumption that these descriptions remain aligned with the underlying implementation.
+Because tool invocation depends on semantically rich manifests combining natural-language descriptions, schemas, and examples \cite{schick2023toolformer, patil2023gorilla, mcp2025}, there is an implicit assumption that these descriptions remain aligned with the underlying implementation.
 When both interpretation and enforcement reside in a mutable user-space process, inconsistencies can arise \cite{liu2023prompt}.
 A change in implementation or a weakened control path may result in executing a capability that no longer matches the approved semantics.
 
@@ -88,9 +88,9 @@ Two dominant attack categories in AI agent systems fall outside the scope of thi
 
 \textbf{Prompt injection.}
 In a prompt injection attack, adversarial content embedded in a tool's output or in the environment manipulates the LLM planner into choosing an unintended tool or constructing a malicious payload \cite{greshake2023prompt, liu2023prompt}.
-Prompt injection attacks operate at the semantic layer of the agent's planning loop---manipulating the model's reasoning through adversarial input, either in the environment or in tool outputs, to cause it to choose an unintended tool or construct a malicious payload.
+Prompt injection attacks operate at the semantic layer of the agent's planning loop, manipulating the model's reasoning through adversarial input to cause it to choose an unintended tool or construct a malicious payload.
 This is independent of the tool execution mechanism: kernel-level admission control operates only at the point when a specific \texttt{tool:exec} request is submitted and cannot intervene in the model's reasoning process.
-Defending against prompt injection requires defences at the model or application layer---input sanitisation, output monitoring, sandboxed execution contexts---none of which are provided by admission control at the kernel level.
+Defending against prompt injection requires defences at the model or application layer (input sanitisation, output monitoring, sandboxed execution contexts), none of which are provided by admission control at the kernel level.
 \texttt{linux-mcp} does not address prompt injection; it assumes that the payload submitted to \texttt{tool:exec} reflects genuine user or planner intent.
 
 \textbf{Supply-chain compromise of manifests.}
@@ -104,12 +104,12 @@ Attacks involving filesystem modification via rootkit or IMA bypass fall outside
 The present work occupies a deliberate position between two extremes.
 On one end, AIOS-style proposals advocate a wholesale redesign of the operating system around LLM-centric abstractions~\cite{mei2024aios, liu2026agentos}.
 Such designs may provide strong guarantees, but they require replacing or significantly extending existing OS infrastructure, making them difficult to deploy incrementally alongside existing tools and frameworks.
-On the other end, existing agent frameworks---LangChain, AutoGPT, CrewAI, OpenClaw---operate entirely in user space, which permits rapid iteration and wide deployment but leaves the three structural weaknesses identified in Section~\ref{sec:limits-user-space} unaddressed.
+On the other end, existing agent frameworks (LangChain, AutoGPT, CrewAI, OpenClaw) operate entirely in user space, which permits rapid iteration and wide deployment but leaves the three structural weaknesses identified in Section~\ref{sec:limits-user-space} unaddressed.
 
 The position taken here is narrower and more targeted.
 Rather than redesigning the OS or accepting user-space fragility, the approach asks: which specific control-plane invariants are both critical for safety and structurally difficult to enforce from user space?
 The answer, developed in Chapter~3, is a small set: semantic-hash-based tool identity verification, session-bound approval-ticket lifecycle management, and approval-state durability across gateway failures.
-These invariants share a common property---they require protection from the very process (the gateway) that might be compromised or buggy---making kernel placement not merely preferable but structurally necessary.
+These invariants share a common property: they require protection from the very process (the gateway) that might be compromised or buggy, making kernel placement not merely preferable but structurally necessary.
 All other functionality (manifest parsing, schema validation, tool routing, session logic) remains in user space, where flexibility and evolvability are more important than privilege.
 
 
@@ -123,7 +123,7 @@ The \texttt{io\_uring} subsystem further illustrates the ongoing tension between
 
 However, none of these mechanisms capture higher-level concepts such as tool identity, semantic equivalence between a manifest and an execution endpoint, or the scope of an approval decision.
 The root cause is a layer mismatch: existing mechanisms enforce policy at the level of kernel objects (files, processes, syscalls), whereas tool identity is an application-layer concept defined by a semantic hash of a JSON manifest.
-Extending these mechanisms to enforce tool-identity would require either encoding tool hashes into LSM policy---conflicting with the goal of protocol-layer independence---or hooking into the application-protocol layer, which breaks the principle that LSM hooks attach to kernel operations, not to application messages.
+Extending these mechanisms to enforce tool-identity would require either encoding tool hashes into LSM policy (conflicting with the goal of protocol-layer independence) or hooking into the application-protocol layer, which breaks the principle that LSM hooks attach to kernel operations, not to application messages.
 
 This gap motivates introducing a dedicated control layer that validates semantic and identity invariants at the point of tool execution, outside the mutable execution path of the user-space gateway.
 
@@ -135,7 +135,7 @@ This gap motivates introducing a dedicated control layer that validates semantic
 Several existing mechanisms address related but distinct problems; understanding why they fall short for MCP-style enforcement motivates the present design.
 
 \textbf{Seccomp-BPF.}
-Seccomp-BPF can filter syscalls and inspect syscall arguments at the process boundary~\cite{seccomp2026}, but tool identity is not expressed at the syscall level---it is embedded in the JSON-RPC payload exchanged over Unix domain sockets.
+Seccomp-BPF can filter syscalls and inspect syscall arguments at the process boundary~\cite{seccomp2026}, but tool identity is not expressed at the syscall level; it is embedded in the JSON-RPC payload exchanged over Unix domain sockets.
 Seccomp sees only the \texttt{socket()} and \texttt{sendto()} syscalls; it cannot inspect the message content to verify that a tool invocation matches an approved semantic hash or that an approval ticket is unconsumed.
 This is a layering issue: tool identity is a concept at the protocol layer, not the syscall layer.
 Applied to \texttt{mcpd}, seccomp can reduce the syscall surface but cannot enforce the invariants on which admission control depends.
@@ -146,7 +146,7 @@ Neither, however, can natively maintain a dynamic, per-tool hash registry and pe
 
 \textbf{Landlock.}
 Landlock provides process-scoped filesystem sandboxing through unprivileged LSM restrictions \cite{landlock2026}.
-It is complementary to this work---a tool service could be Landlock-sandboxed to limit its filesystem reach---but it does not address tool identity, approval binding, or approval-state durability across daemon failures.
+It is complementary to this work (a tool service could be Landlock-sandboxed to limit its filesystem reach) but does not address tool identity, approval binding, or approval-state durability across daemon failures.
 
 \textbf{Capsicum.}
 Capability-based designs scope authority to individual file descriptors or object references \cite{lefeuvre2024sok}.
@@ -156,7 +156,7 @@ More fundamentally, per-descriptor capabilities cannot natively encode whether a
 \textbf{AIOS and LLM-as-OS proposals.}
 Several recent systems propose embedding LLM-specific abstractions into a new OS substrate \cite{zhang2024llmos, wu2024oscopilot, packer2024memgpt}.
 These differ from this work in scope: they aim to replace or fundamentally extend the operating system for agent workloads.
-\texttt{linux-mcp} takes the opposite approach---leaving the existing OS unchanged and adding only a narrow kernel module for the invariants that user space cannot reliably hold.
+\texttt{linux-mcp} takes the opposite approach, leaving the existing OS unchanged and adding only a narrow kernel module for the invariants that user space cannot reliably hold.
 
 \textbf{Agent frameworks.}
 LangChain \cite{langchain2022}, LangGraph \cite{langgraph2024}, AutoGPT \cite{autogpt2023}, CrewAI \cite{crewai2024}, Haystack \cite{haystack2023}, and Semantic Kernel \cite{semantickernel2023} all locate the full control plane in user space.
@@ -169,12 +169,12 @@ Recent work has begun applying mandatory access control (MAC) concepts to LLM ag
 Both represent application-layer MAC: enforcement is implemented inside a modified agent runtime or framework, so the correctness of the boundary depends on the runtime itself remaining uncompromised.
 \texttt{linux-mcp} and runtime-MAC approaches differ in where enforcement happens: runtime-MAC is embedded inside a modified agent framework, so the correctness of its boundary depends on the framework itself remaining uncompromised.
 \texttt{linux-mcp} moves enforcement out of the gateway entirely, into a kernel module, meaning its invariants hold even if the gateway is buggy or partially compromised.
-The two approaches are complementary rather than competing---a runtime-MAC agent framework could run on top of \texttt{linux-mcp}, gaining kernel-level durability without replacing its own semantic enforcement.
+The two approaches are complementary rather than competing: a runtime-MAC agent framework could run on top of \texttt{linux-mcp}, gaining kernel-level durability without replacing its own semantic enforcement.
 The principle of separating policy from enforcement mechanism at the kernel level is well established in Linux MAC frameworks \cite{brimhall2023mac}; \texttt{linux-mcp} applies the same principle to MCP-style tool admission rather than to traditional file and process access control.
 
 The key observation is that existing approaches conflate two orthogonal concerns: \emph{which} invariants matter for safety, and \emph{where} those invariants should be enforced.
 Most prior work assumes enforcement location is secondary.
-What the present work argues is that for MCP-style tool invocation, three specific invariants---tool-identity hash consistency, session-bound approval-ticket lifecycle, and approval-state durability---require enforcement \emph{outside} the gateway's privilege domain to be resilient against gateway compromise or failure.
+What the present work argues is that for MCP-style tool invocation, three specific invariants (tool-identity hash consistency, session-bound approval-ticket lifecycle, and approval-state durability) require enforcement \emph{outside} the gateway's privilege domain to be resilient against gateway compromise or failure.
 \texttt{linux-mcp} introduces a minimal kernel module for precisely these three properties.
 
 
@@ -187,11 +187,11 @@ We therefore ground our design in a threat model that focuses on attacks against
 The local-adversary model is appropriate for MCP-style deployments for three reasons.
 First, tool services in a typical deployment run on the same host as the gateway; the attack surface that most immediately needs hardening is therefore local, not remote.
 Second, a remote adversary who has already achieved code execution on the host is, by definition, a local adversary: the local threat model subsumes this class without requiring a separate treatment.
-Third, the two dominant remote-oriented threats in AI agent systems---prompt injection and supply-chain compromise of manifests---are explicitly handled at other layers (Section~\ref{sec:attack-scope}) and fall outside the scope of kernel-level admission control.
+Third, the two dominant remote-oriented threats in AI agent systems (prompt injection and supply-chain compromise of manifests) are explicitly handled at other layers (Section~\ref{sec:attack-scope}) and fall outside the scope of kernel-level admission control.
 The threat model therefore focuses on what kernel enforcement can actually address: a co-located process that can observe, forge, or replay control-plane messages.
 
 Concretely, the adversary model has the following capabilities: (1) arbitrary code execution on the host as an unprivileged process; (2) access to Unix domain sockets exposed by the gateway; (3) ability to observe, craft, and replay JSON-RPC messages; and (4) full knowledge of the MCP protocol, tool manifests, and \texttt{linux-mcp} implementation (consistent with Kerckhoffs's principle).
-The attacker interacts exclusively through the \texttt{mcpd} JSON-RPC surface and holds no elevated capabilities---specifically, no \texttt{CAP\_NET\_ADMIN} (required to invoke the kernel module via Netlink), no \texttt{ptrace} access to \texttt{mcpd}, and no write access to manifest files.
+The attacker interacts exclusively through the \texttt{mcpd} JSON-RPC surface and holds no elevated capabilities: specifically, no \texttt{CAP\_NET\_ADMIN} (required to invoke the kernel module via Netlink), no \texttt{ptrace} access to \texttt{mcpd}, and no write access to manifest files.
 These three boundaries are critical: \texttt{CAP\_NET\_ADMIN} is the interface to kernel enforcement; \texttt{ptrace} would allow process manipulation; manifest write would break the trusted-input assumption.
 
 Out of scope: attacks requiring manifest modification or gateway configuration changes; process-level attacks on the gateway (ptrace-based code injection, memory corruption, LD\_PRELOAD hijacking); and kernel-level attacks (rootkits, kernel module vulnerabilities, hardware side-channels).

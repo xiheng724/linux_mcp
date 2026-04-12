@@ -27,27 +27,26 @@
 \contentsline {subsection}{\numberline {3.8}Tool-Side RPC and Execution Model}{24}{subsection.3.8}%
 \contentsline {subsection}{\numberline {3.9}State Reconciliation and Recovery}{25}{subsection.3.9}%
 \contentsline {subsection}{\numberline {3.10}Rationale for the Kernel--User-Space Split}{25}{subsection.3.10}%
-\contentsline {paragraph}{Design alternatives considered.}{26}{paragraph*.6}%
 \contentsline {subsection}{\numberline {3.11}Limitations and Identified Optimisation Opportunities}{26}{subsection.3.11}%
-\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{28}{section*.7}%
-\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{28}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{30}{subsection.4.2}%
-\contentsline {subsection}{\numberline {4.3}Security Evaluation}{31}{subsection.4.3}%
-\contentsline {subsection}{\numberline {4.4}Daemon Failure and Recovery}{34}{subsection.4.4}%
-\contentsline {subsection}{\numberline {4.5}Discussion}{34}{subsection.4.5}%
-\contentsline {subsection}{\numberline {4.6}Threats to Validity}{35}{subsection.4.6}%
-\contentsline {section}{\textit {Chapter 5: Conclusion and Further Work}}{36}{section*.8}%
-\contentsline {subsection}{\numberline {5.1}Conclusion}{36}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Reflection}{37}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Further Work}{38}{subsection.5.3}%
-\contentsline {section}{\textit {References}}{40}{subsection.5.3}%
-\contentsline {section}{\textit {Acknowledgment}}{44}{section*.9}%
-\contentsline {section}{\textit {Appendices}}{45}{section*.10}%
-\contentsline {subsection}{Disclaimer}{45}{section*.11}%
-\contentsline {subsection}{Acknowledgement of using Generative AI}{46}{section*.12}%
-\contentsline {subsection}{Project specification}{47}{section*.13}%
-\contentsline {subsection}{Early-term progress report}{54}{section*.14}%
-\contentsline {subsection}{Mid-term progress report}{61}{section*.15}%
-\contentsline {subsection}{Supervision log}{68}{section*.16}%
-\contentsline {subsection}{Additional appendices (as needed)}{71}{section*.17}%
-\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{72}{section*.18}%
+\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{27}{section*.6}%
+\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{27}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{29}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Security Evaluation}{30}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Daemon Failure and Recovery}{33}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Discussion}{33}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}Threats to Validity}{34}{subsection.4.6}%
+\contentsline {section}{\textit {Chapter 5: Conclusion and Further Work}}{35}{section*.7}%
+\contentsline {subsection}{\numberline {5.1}Conclusion}{35}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Reflection}{36}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Further Work}{37}{subsection.5.3}%
+\contentsline {section}{\textit {References}}{39}{subsection.5.3}%
+\contentsline {section}{\textit {Acknowledgment}}{43}{section*.8}%
+\contentsline {section}{\textit {Appendices}}{44}{section*.9}%
+\contentsline {subsection}{Disclaimer}{44}{section*.10}%
+\contentsline {subsection}{Acknowledgement of using Generative AI}{45}{section*.11}%
+\contentsline {subsection}{Project specification}{46}{section*.12}%
+\contentsline {subsection}{Early-term progress report}{53}{section*.13}%
+\contentsline {subsection}{Mid-term progress report}{60}{section*.14}%
+\contentsline {subsection}{Supervision log}{67}{section*.15}%
+\contentsline {subsection}{Additional appendices (as needed)}{70}{section*.16}%
+\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{71}{section*.17}%

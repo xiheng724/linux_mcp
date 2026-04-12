@@ -26,12 +26,12 @@ The modest speedup relative to plain user-space most likely reflects early-rejec
 
 Stage-level breakdown in Figure~\ref{fig:chapter4-breakdown} confirms that kernel arbitration is a minor contributor at all payload sizes.
 Mean arbitration time is \num{0.028}~ms at 100~B and 10~KB, and \num{0.038}~ms at 1~MB.
-At 1~MB, tool execution accounts for \num{89.3}\% of total end-to-end time on the kernel path (\num{89.9}\% on the user-space path); the entire control-plane machinery---Generic Netlink round-trip, session lookup, and arbitration---accounts for the remaining \num{10.7}\%, with the arbitration contribution within that fraction less than four hundredths of a millisecond.
+At 1~MB, tool execution accounts for \num{89.3}\% of total end-to-end time on the kernel path (\num{89.9}\% on the user-space path); the entire control-plane machinery (Generic Netlink round-trip, session lookup, and arbitration) accounts for the remaining \num{10.7}\%, with the arbitration contribution within that fraction less than four hundredths of a millisecond.
 
 A supplementary microbenchmark (Figure~\ref{fig:chapter4-netlink-rtt}) isolates the Generic Netlink layer.
 Bare round-trip time averages \num{8.196}~$\mu$s; the full \texttt{TOOL\_REQUEST} path, which includes tool and agent registry lookups, averages \num{9.315}~$\mu$s.
 The lookup overhead is approximately \num{1.1}~$\mu$s, or 12\% of the bare RTT.
-Kernel-side arbitration therefore costs roughly one order of magnitude less than the control-plane overhead visible in end-to-end measurements, confirming that the dominant cost on the kernel path originates in user-space components---session management, payload serialisation, and socket I/O---rather than in the kernel module itself.
+Kernel-side arbitration therefore costs roughly one order of magnitude less than the control-plane overhead visible in end-to-end measurements, confirming that the dominant cost on the kernel path originates in user-space components (session management, payload serialisation, and socket I/O) rather than in the kernel module itself.
 
 \begin{table}[htbp]
 \centering
@@ -127,8 +127,8 @@ System & Bypasses & Total & Bypass rate \\
 
 The plain user-space baseline fails to block 100 of 110 attempts (90.9\% bypass rate).
 This result requires careful interpretation: the harness does not attack an arbitrary user-space mediator, but one whose code paths are deliberately weakened in per-category instrumented modes (\texttt{tamper\_session}, \texttt{tamper\_approval}, \texttt{tamper\_metadata}, \texttt{compromised\_userspace}) so that each test case exercises the specific check it is designed to evade.
-The 90.9\% figure therefore reflects what a user-space mediator cannot structurally protect against when its own state is under attack---not what a fully hardened user-space system could achieve if those checks were unrelaxed.
-The hardened variant reduces the bypass rate to 36.4\% through stricter checks and a reduced syscall surface, but because admission remains a user-space decision, attacks that need not cross a privilege boundary---particularly substitution and spoofing---still succeed at meaningful rates.
+The 90.9\% figure therefore reflects what a user-space mediator cannot structurally protect against when its own state is under attack, not what a fully hardened user-space system could achieve if those checks were unrelaxed.
+The hardened variant reduces the bypass rate to 36.4\% through stricter checks and a reduced syscall surface, but because admission remains a user-space decision, attacks that need not cross a privilege boundary (particularly substitution and spoofing) still succeed at meaningful rates.
 
 The kernel path blocks all 110 attempts.
 Spoofing fails because agent identity is tied to a kernel-registered identifier that the control plane verifies independently of the daemon's session state.
@@ -141,12 +141,12 @@ A replay consume attempt that reuses a different \texttt{req\_id} returns \textt
 
 Three caveats bound the interpretation of Table~\ref{tab:attacks}.
 First, all 110 attack attempts were authored by the same person who built the defences, and each category maps one-to-one onto an enforcement mechanism in the kernel module.
-A 0\% bypass rate on the kernel path is therefore a functional-correctness test of four specified invariants against inputs constructed to exercise exactly those invariants---not evidence of adversarial robustness against unknown attacks.
+A 0\% bypass rate on the kernel path is therefore a functional-correctness test of four specified invariants against inputs constructed to exercise exactly those invariants, not evidence of adversarial robustness against unknown attacks.
 
 Second, the combined attack set is scoped to the stated control-plane invariants and does not include: attacks assuming compromise of the kernel module itself; attacks exploiting semantic vulnerabilities in tool logic; attacks requiring already-obtained privileged capabilities (such as \texttt{CAP\_NET\_ADMIN}); or attacks against the LLM prompt-construction pipeline.
 The 0\% bypass rate is a statement about the specified control-plane invariants, not about the full attack surface of an LLM-integrated system.
 
-Third, the user-space baseline figures require equally honest framing: those systems reach 90.9\% and 36.4\% bypass because the harness deliberately switches \texttt{mcpd} into instrumented tamper modes that relax specific checks, reflecting what a user-space mediator cannot structurally protect against when asked to validate its own state---not what a fully hardened user-space implementation would achieve.
+Third, the user-space baseline figures require equally honest framing: those systems reach 90.9\% and 36.4\% bypass because the harness deliberately switches \texttt{mcpd} into instrumented tamper modes that relax specific checks, reflecting what a user-space mediator cannot structurally protect against when asked to validate its own state, not what a fully hardened user-space implementation would achieve.
 
 
 
@@ -160,12 +160,12 @@ After restart, none of this state is externally accessible; recovery amounts to 
 
 In the kernel path, the picture is different in a practically important way.
 Approval tickets, the tool registry, and agent registrations survive the failure intact and remain inspectable via \texttt{sysfs} without any daemon involvement.
-Session state is not preserved---the binding context for active sessions is owned by the daemon process and is lost with it---but this is expected, since session state is inherently tied to an active connection.
+Session state is not preserved, since the binding context for active sessions is owned by the daemon process and is lost with it, but this is expected as session state is inherently tied to an active connection.
 The durability of deferred approvals and registry state allows \texttt{mcpd} to reconcile its manifest-derived view against the kernel-held view on restart and re-establish a consistent catalogue without issuing duplicate registrations.
 
 The current reconciliation path is deliberately conservative: on startup, \texttt{mcpd} issues a \texttt{RESET\_TOOLS} command to clear the kernel-side tool registry, then re-registers the full set of tools from the current manifest.
 This strategy rebuilds from the manifest source of truth rather than attempting to assess whether residual kernel state remains valid, keeping recovery logic straightforward and avoiding reasoning about partial updates.
-An incremental approach---comparing kernel-held hashes against manifest-derived hashes and re-registering only tools whose hash has changed---would reduce restart overhead and is a natural direction for future work.
+An incremental approach, comparing kernel-held hashes against manifest-derived hashes and re-registering only tools whose hash has changed, would reduce restart overhead and is a natural direction for future work.
 
 
 \subsection{Discussion}

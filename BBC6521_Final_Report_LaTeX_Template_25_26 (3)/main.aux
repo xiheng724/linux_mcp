@@ -113,38 +113,33 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.8}Tool-Side RPC and Execution Model}{24}{subsection.3.8}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.9}State Reconciliation and Recovery}{25}{subsection.3.9}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.10}Rationale for the Kernel--User-Space Split}{25}{subsection.3.10}\protected@file@percent }
-\citation{lsm2026}
-\citation{seccomp2026}
-\citation{lefeuvre2024sok}
-\@writefile{toc}{\contentsline {paragraph}{Design alternatives considered.}{26}{paragraph*.6}\protected@file@percent }
-\newlabel{sec:design-alternatives}{{3.10}{26}{Design alternatives considered}{paragraph*.6}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.11}Limitations and Identified Optimisation Opportunities}{26}{subsection.3.11}\protected@file@percent }
 \citation{west2021welch}
-\@writefile{toc}{\contentsline {section}{\textit  {Chapter 4: Results and Discussion}}{28}{section*.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{28}{subsection.4.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KiB are not flattened by the much larger absolute values at 1~MiB. Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt  {userspace} baseline.}}{29}{figure.4}\protected@file@percent }
-\newlabel{fig:chapter4-latency}{{4}{29}{Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KiB are not flattened by the much larger absolute values at 1~MiB. Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt {userspace} baseline}{figure.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Mean end-to-end latency (ms) by payload size and system ($n = 30$ runs of 2000 requests each). $p$-values are two-sided Welch's $t$-tests on per-run means, comparing each row against the \texttt  {userspace} baseline.}}{29}{table.4}\protected@file@percent }
-\newlabel{tab:latency}{{4}{29}{Mean end-to-end latency (ms) by payload size and system ($n = 30$ runs of 2000 requests each). $p$-values are two-sided Welch's $t$-tests on per-run means, comparing each row against the \texttt {userspace} baseline}{table.4}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Mean-latency ratio of each hardened variant to the plain \texttt  {userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KiB visible alongside the larger effect at 1~MiB. The \texttt  {seccomp} path is significantly slower at every payload size; the \texttt  {kernel} path is statistically indistinguishable from \texttt  {userspace} at small and medium payloads and measurably faster at 1~MiB.}}{30}{figure.5}\protected@file@percent }
-\newlabel{fig:chapter4-overhead}{{5}{30}{Mean-latency ratio of each hardened variant to the plain \texttt {userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KiB visible alongside the larger effect at 1~MiB. The \texttt {seccomp} path is significantly slower at every payload size; the \texttt {kernel} path is statistically indistinguishable from \texttt {userspace} at small and medium payloads and measurably faster at 1~MiB}{figure.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{30}{subsection.4.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Invocation-stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes session\_lookup (around 4~\textmu s) visible alongside tool\_exec (around 4~ms). The \texttt  {kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num {0.04}~ms and is invisible relative to the tool-execution component.}}{31}{figure.6}\protected@file@percent }
-\newlabel{fig:chapter4-breakdown}{{6}{31}{Invocation-stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes session\_lookup (around 4~\textmu s) visible alongside tool\_exec (around 4~ms). The \texttt {kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num {0.04}~ms and is invisible relative to the tool-execution component}{figure.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Security Evaluation}{31}{subsection.4.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Generic Netlink microbenchmark: bare round-trip time versus the full \texttt  {TOOL\_REQUEST} path. Adding tool and agent registry lookups increases latency by approximately \num {1.1}~$\mu $s, keeping the full path within the same microsecond-scale range as the bare RTT.}}{32}{figure.7}\protected@file@percent }
-\newlabel{fig:chapter4-netlink-rtt}{{7}{32}{Generic Netlink microbenchmark: bare round-trip time versus the full \texttt {TOOL\_REQUEST} path. Adding tool and agent registry lookups increases latency by approximately \num {1.1}~$\mu $s, keeping the full path within the same microsecond-scale range as the bare RTT}{figure.7}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Category-level attack outcomes by system (110 attempts each: 3 spoof, 4 replay, 3 substitution, 1 escalation, $\times $ 10 repeats). The bypass rate measures the fraction of attempts that succeeded in circumventing the intended control. The user-space bypass rates reflect deliberate per-category instrumented weakening of the mediator and do not represent the performance of a fully hardened user-space implementation.}}{32}{table.5}\protected@file@percent }
-\newlabel{tab:attacks}{{5}{32}{Category-level attack outcomes by system (110 attempts each: 3 spoof, 4 replay, 3 substitution, 1 escalation, $\times $ 10 repeats). The bypass rate measures the fraction of attempts that succeeded in circumventing the intended control. The user-space bypass rates reflect deliberate per-category instrumented weakening of the mediator and do not represent the performance of a fully hardened user-space implementation}{table.5}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt  {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax.}}{33}{figure.8}\protected@file@percent }
-\newlabel{fig:chapter4-security}{{8}{33}{Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax}{figure.8}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Daemon Failure and Recovery}{34}{subsection.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Discussion}{34}{subsection.4.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Threats to Validity}{35}{subsection.4.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\textit  {Chapter 5: Conclusion and Further Work}}{36}{section*.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Conclusion}{36}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Reflection}{37}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Further Work}{38}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {Chapter 4: Results and Discussion}}{27}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{27}{subsection.4.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KiB are not flattened by the much larger absolute values at 1~MiB. Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt  {userspace} baseline.}}{28}{figure.4}\protected@file@percent }
+\newlabel{fig:chapter4-latency}{{4}{28}{Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KiB are not flattened by the much larger absolute values at 1~MiB. Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt {userspace} baseline}{figure.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Mean end-to-end latency (ms) by payload size and system ($n = 30$ runs of 2000 requests each). $p$-values are two-sided Welch's $t$-tests on per-run means, comparing each row against the \texttt  {userspace} baseline.}}{28}{table.4}\protected@file@percent }
+\newlabel{tab:latency}{{4}{28}{Mean end-to-end latency (ms) by payload size and system ($n = 30$ runs of 2000 requests each). $p$-values are two-sided Welch's $t$-tests on per-run means, comparing each row against the \texttt {userspace} baseline}{table.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Mean-latency ratio of each hardened variant to the plain \texttt  {userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KiB visible alongside the larger effect at 1~MiB. The \texttt  {seccomp} path is significantly slower at every payload size; the \texttt  {kernel} path is statistically indistinguishable from \texttt  {userspace} at small and medium payloads and measurably faster at 1~MiB.}}{29}{figure.5}\protected@file@percent }
+\newlabel{fig:chapter4-overhead}{{5}{29}{Mean-latency ratio of each hardened variant to the plain \texttt {userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KiB visible alongside the larger effect at 1~MiB. The \texttt {seccomp} path is significantly slower at every payload size; the \texttt {kernel} path is statistically indistinguishable from \texttt {userspace} at small and medium payloads and measurably faster at 1~MiB}{figure.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{29}{subsection.4.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Invocation-stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes session\_lookup (around 4~\textmu s) visible alongside tool\_exec (around 4~ms). The \texttt  {kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num {0.04}~ms and is invisible relative to the tool-execution component.}}{30}{figure.6}\protected@file@percent }
+\newlabel{fig:chapter4-breakdown}{{6}{30}{Invocation-stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes session\_lookup (around 4~\textmu s) visible alongside tool\_exec (around 4~ms). The \texttt {kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num {0.04}~ms and is invisible relative to the tool-execution component}{figure.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Security Evaluation}{30}{subsection.4.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Generic Netlink microbenchmark: bare round-trip time versus the full \texttt  {TOOL\_REQUEST} path. Adding tool and agent registry lookups increases latency by approximately \num {1.1}~$\mu $s, keeping the full path within the same microsecond-scale range as the bare RTT.}}{31}{figure.7}\protected@file@percent }
+\newlabel{fig:chapter4-netlink-rtt}{{7}{31}{Generic Netlink microbenchmark: bare round-trip time versus the full \texttt {TOOL\_REQUEST} path. Adding tool and agent registry lookups increases latency by approximately \num {1.1}~$\mu $s, keeping the full path within the same microsecond-scale range as the bare RTT}{figure.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Category-level attack outcomes by system (110 attempts each: 3 spoof, 4 replay, 3 substitution, 1 escalation, $\times $ 10 repeats). The bypass rate measures the fraction of attempts that succeeded in circumventing the intended control. The user-space bypass rates reflect deliberate per-category instrumented weakening of the mediator and do not represent the performance of a fully hardened user-space implementation.}}{31}{table.5}\protected@file@percent }
+\newlabel{tab:attacks}{{5}{31}{Category-level attack outcomes by system (110 attempts each: 3 spoof, 4 replay, 3 substitution, 1 escalation, $\times $ 10 repeats). The bypass rate measures the fraction of attempts that succeeded in circumventing the intended control. The user-space bypass rates reflect deliberate per-category instrumented weakening of the mediator and do not represent the performance of a fully hardened user-space implementation}{table.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt  {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax.}}{32}{figure.8}\protected@file@percent }
+\newlabel{fig:chapter4-security}{{8}{32}{Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax}{figure.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Daemon Failure and Recovery}{33}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Discussion}{33}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Threats to Validity}{34}{subsection.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {Chapter 5: Conclusion and Further Work}}{35}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Conclusion}{35}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Reflection}{36}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Further Work}{37}{subsection.5.3}\protected@file@percent }
 \bibdata{reference}
 \bibcite{yao2023react}{{1}{}{{}}{{}}}
 \bibcite{wang2024agentbench}{{2}{}{{}}{{}}}
@@ -163,7 +158,7 @@
 \bibcite{langchain2022}{{15}{}{{}}{{}}}
 \bibcite{langgraph2024}{{16}{}{{}}{{}}}
 \bibcite{autogpt2023}{{17}{}{{}}{{}}}
-\@writefile{toc}{\contentsline {section}{\textit  {References}}{40}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {References}}{39}{subsection.5.3}\protected@file@percent }
 \bibcite{crewai2024}{{18}{}{{}}{{}}}
 \bibcite{haystack2023}{{19}{}{{}}{{}}}
 \bibcite{semantickernel2023}{{20}{}{{}}{{}}}
@@ -199,25 +194,25 @@
 \bibcite{klein2010sel4}{{50}{}{{}}{{}}}
 \bibcite{netlink2026}{{51}{}{{}}{{}}}
 \bibcite{west2021welch}{{52}{}{{}}{{}}}
-\@writefile{toc}{\contentsline {section}{\textit  {Acknowledgment}}{44}{section*.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\textit  {Appendices}}{45}{section*.10}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Disclaimer}{45}{section*.11}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Acknowledgement of using Generative AI}{46}{section*.12}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Project specification}{47}{section*.13}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Early-term progress report}{54}{section*.14}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Mid-term progress report}{61}{section*.15}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Supervision log}{68}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {Acknowledgment}}{43}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {Appendices}}{44}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Disclaimer}{44}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Acknowledgement of using Generative AI}{45}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Project specification}{46}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Early-term progress report}{53}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Mid-term progress report}{60}{section*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Supervision log}{67}{section*.15}\protected@file@percent }
 \citation{openclaw2026}
 \citation{openclaw_security1,openclaw_security2}
 \citation{harness2025}
 \citation{mei2024aios,liu2026agentos}
 \citation{langchain2022,langgraph2024}
 \citation{apple2024pcc}
-\@writefile{toc}{\contentsline {subsection}{Additional appendices (as needed)}{71}{section*.17}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Comparison of representative agent systems across control-plane and security dimensions.}}{71}{table.6}\protected@file@percent }
-\newlabel{tab:system_comparison}{{6}{71}{Comparison of representative agent systems across control-plane and security dimensions}{table.6}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{72}{section*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Additional appendices (as needed)}{70}{section*.16}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Comparison of representative agent systems across control-plane and security dimensions.}}{70}{table.6}\protected@file@percent }
+\newlabel{tab:system_comparison}{{6}{70}{Comparison of representative agent systems across control-plane and security dimensions}{table.6}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{71}{section*.17}\protected@file@percent }
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{74}{table.7}\protected@file@percent }
-\newlabel{tab:risk_assessment}{{7}{74}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.7}{}}
-\gdef \@abspage@last{75}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{73}{table.7}\protected@file@percent }
+\newlabel{tab:risk_assessment}{{7}{73}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.7}{}}
+\gdef \@abspage@last{74}

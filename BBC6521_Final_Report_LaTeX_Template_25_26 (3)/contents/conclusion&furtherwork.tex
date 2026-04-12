@@ -17,7 +17,7 @@ Semantic parsing, schema validation, session logic, and tool execution remain in
 
 This partitioning is the central result of the project.
 It shows that stronger control does not require relocating the entire agent stack into the kernel.
-A narrow kernel role is sufficient to make the most critical state transitions---semantic identity, requester binding, approval validity, and invocation completion---explicit, durable, and independently inspectable.
+A narrow kernel role is sufficient to make the most critical state transitions (semantic identity, requester binding, approval validity, and invocation completion) explicit, durable, and independently inspectable.
 In this sense, \texttt{linux-mcp} does not argue for a kernel-heavy AI operating system; it argues for careful, precisely scoped placement of a small set of control-plane invariants.
 
 The evaluation further shows that this design choice is practically viable.
@@ -35,12 +35,12 @@ This reframing shaped the entire design: rather than asking how to make the gate
 
 From a technical standpoint, the project required working across layers that are often studied separately: implementing a Linux kernel module, using Generic Netlink as a structured kernel--user-space control interface, exporting live state through \texttt{sysfs}, and coordinating these pieces with a manifest-aware daemon and UDS tool services.
 This process deepened understanding of interface ownership, failure handling, recovery logic, and the practical cost of crossing privilege boundaries.
-A central lesson of systems work was reinforced: the harder problem is often not adding mechanisms, but deciding what each layer should---and should not---be responsible for.
+A central lesson of systems work was reinforced: the harder problem is often not adding mechanisms, but deciding what each layer should and should not be responsible for.
 
 A second lesson concerned research discipline.
 Early iterations of this project were formulated around broad claims such as ``putting security in the kernel'' or ``making agents safer''.
 Such claims lack sufficient specificity to be empirically testable.
-The project became considerably stronger once the problem was narrowed to four concrete control-plane properties---semantic identity binding, approval validity, hash consistency, and durable observability---at which point the threat model, implementation choices, and evaluation criteria aligned naturally.
+The project became considerably stronger once the problem was narrowed to four concrete control-plane properties (semantic identity binding, approval validity, hash consistency, and durable observability), at which point the threat model, implementation choices, and evaluation criteria aligned naturally.
 A systems argument becomes credible only when the claimed benefit is specific enough to be tested directly.
 
 The project also reinforced the value of restraint in privileged-system design.
@@ -89,6 +89,3 @@ Finally, this work opens a broader research question: which other agent-oriented
 This project focuses on admission control for tool invocation, but similar arguments may extend to execution budgets, provenance across tool chains, durable approval logs, or agent-scoped resource accounting. 
 Exploring these directions would help clarify whether support for AI agents should be understood as entirely new operating-system substrates, or as conventional systems extended with a small number of carefully scoped, agent-aware mechanisms. 
 In that sense, the contribution of \texttt{linux-mcp} is best read as a first step rather than a complete answer.
-
-\vspace{\baselineskip}
-\noindent\textbf{NOTE: The total length of the report up to this point should be between 30 and 50 pages.}
