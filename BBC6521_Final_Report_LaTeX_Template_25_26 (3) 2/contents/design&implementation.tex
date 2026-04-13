@@ -8,6 +8,7 @@ The central question driving the design of \texttt{linux-mcp} is not how to make
 
 
 \subsection{Design Goals}
+\label{sec:design-goals}
 
 The design is oriented around three concerns that arise from the problem of mediating LLM tool invocations in a trustworthy manner.
 
@@ -19,8 +20,8 @@ At the same time, the system must remain compatible with ordinary user-space too
 Requiring tool authors to write against a kernel-facing API would break compatibility with existing tool ecosystems and make incremental deployment impractical.
 Tool services therefore carry no kernel-facing obligations; the protocol they implement is described in Section~\ref{sec:wire-protocols}.
 
-The third concern is observability.
-Admission, approval, and completion events must not be confined to transient entries in a daemon's in-memory state or application-level logs; they must be queryable through the kernel's own interfaces, independently of whether \texttt{mcpd} is currently running.
+Another concern is observability.
+Admission, approval, and completion events must not be confined to transient entries in a daemon's in-memory state or application-level logs. They must be queryable through the kernel's own interfaces, independently of whether \texttt{mcpd} is currently running.
 This property is particularly relevant in the context of daemon failure: if \texttt{mcpd} crashes, the kernel-held state must remain inspectable without relying on any daemon-side representation.
 
 These goals impose an explicit scope boundary on the design.
@@ -113,7 +114,7 @@ The end-to-end request path is:
 Figure~\ref{fig:chapter3-lifecycle} illustrates this path as a sequence diagram.
 A request originates in \texttt{llm-app}, which first issues a catalog query that \texttt{mcpd} satisfies from its manifest-derived in-memory state.
 The kernel occupies this path not as a passive observer but as the active arbitration point: \texttt{mcpd} cannot forward a request to a tool without first obtaining an \texttt{ALLOW} decision from the kernel, and it cannot close an invocation without reporting \texttt{TOOL\_COMPLETE} back through the same channel.
-This renders admission and completion as explicit, kernel-visible state transitions rather than implicit control-flow decisions internal to the daemon.
+Admission and completion are explicit, kernel-visible state transitions; the daemon no longer makes these decisions in private.
 
 The client uses the catalog response to construct a structured invocation payload and submits it as a \texttt{tool:exec} call to \texttt{mcpd} (see Table~\ref{tab:llm-mcpd} for the message format).
 
@@ -137,12 +138,14 @@ This contrasts with a purely user-space design, in which the lifecycle of a requ
 \subsection{Wire Protocols}
 \label{sec:wire-protocols}
 
-All inter-component communication in \texttt{linux-mcp} uses Unix domain sockets with a uniform 4-byte big-endian length-prefixed framing: each message is preceded by a 4-byte header encoding the payload size in bytes, followed immediately by a UTF-8-encoded JSON object.
-The same framing is used on both the \texttt{llm-app}--\texttt{mcpd} path and the \texttt{mcpd}--\texttt{tool-app} path, so a single framing library suffices on both sides.
-The kernel control-plane path uses Generic Netlink (TLV-attribute messages) rather than sockets; that interface is described separately below.
+\texttt{linux-mcp} uses two transport mechanisms: Unix domain sockets (UDS) for all user-space communication, and Generic Netlink for the kernel control-plane path.
+The UDS paths between \texttt{llm-app} and \texttt{mcpd}, and between \texttt{mcpd} and each tool service share a uniform framing: a 4-byte big-endian length prefix followed by a UTF-8-encoded JSON object.
+A single framing routine therefore suffices on both user-space endpoints.
+The Netlink path carries TLV-encoded attributes rather than JSON and is described at the end of this subsection.
 
 \paragraph{llm-app to mcpd.}
-\texttt{llm-app} sends two categories of message to \texttt{mcpd}: system control messages (prefixed with a \texttt{"sys"} key) and tool execution requests (prefixed with \texttt{"kind": "tool:exec"}).
+\texttt{llm-app} sends two categories of message to \texttt{mcpd}: system control messages keyed by \texttt{"sys"} (session open, catalog queries, approval replies) and tool execution requests keyed by \texttt{"kind": "tool:exec"}.
+The two categories are distinguished by the top-level JSON key alone; \texttt{tool:exec} dominates in typical workloads, with \texttt{sys} messages appearing only at session boundaries.
 Table~\ref{tab:llm-mcpd} lists the principal message types and their key fields.
 
 \begin{table}[htbp]
@@ -167,9 +170,10 @@ Table~\ref{tab:llm-mcpd} lists the principal message types and their key fields.
 \end{table}
 
 \paragraph{mcpd to tool-app.}
-Once the kernel returns \texttt{ALLOW}, \texttt{mcpd} forwards the request to the relevant tool service over a separate Unix domain socket connection.
-The protocol is deliberately minimal: the tool service need not be aware of sessions, agent identities, or kernel tickets.
-Table~\ref{tab:mcpd-toolapp} lists the five fields in each direction.
+Once the kernel returns \texttt{ALLOW}, \texttt{mcpd} forwards the request to the relevant tool service over a per-application UDS connection.
+The protocol is deliberately minimal, consistent with the design goal in \ref{sec:design-goals} that tool authors should not need to reason about the control plane, so the tool service need not be aware of sessions, agent identities, or kernel tickets.
+Table~\ref{tab:mcpd-toolapp} lists the five fields exchanged in each direction.
+
 
 \begin{table}[htbp]
 \centering\small
@@ -195,9 +199,10 @@ Table~\ref{tab:mcpd-toolapp} lists the five fields in each direction.
 \end{table}
 
 \paragraph{mcpd to kernel\_mcp (Generic Netlink).}
-The kernel control-plane interface uses the \texttt{KERNEL\_MCP} Generic Netlink family (version~1).
-Messages carry TLV-encoded attributes; all registry-mutating commands require \texttt{CAP\_NET\_ADMIN}.
-The eight commands covering the full invocation lifecycle are listed in Table~\ref{tab:netlink-cmds}, and the principal TLV attributes carried on the critical \texttt{TOOL\_REQUEST}/\texttt{TOOL\_DECISION} path are listed in Table~\ref{tab:netlink-attrs}.
+The kernel control-plane interface uses the \texttt{KERNEL\_MCP} Generic Netlink family.
+Messages carry TLV-encoded attributes, and each message type is registered as a Netlink \emph{command}; all registry-mutating commands require \texttt{CAP\_NET\_ADMIN}.
+The commands covering the full invocation lifecycle are listed in Table~\ref{tab:netlink-cmds}, and the principal attributes carried on the critical \texttt{TOOL\_REQUEST}/\texttt{TOOL\_DECISION} path are listed in Table~\ref{tab:netlink-attrs}.
+Full attribute encodings and a reference Python framing routine are given in Appendix~A.1
 
 \begin{table}[H]
 \centering\small
@@ -240,8 +245,6 @@ The eight commands covering the full invocation lifecycle are listed in Table~\r
 \label{tab:netlink-attrs}
 \end{table}
 
-Full attribute encodings and a minimal Python framing implementation are in Appendix~A.1 (Section~\ref{sec:appendix-protocols}).
-
 \paragraph{Tool registration via manifests.}
 Tool services do not self-register; each application is described by a JSON manifest in \texttt{tool-app/manifests/} from which \texttt{mcpd} derives semantic hashes and issues \texttt{TOOL\_REGISTER} Netlink commands at startup.
 The \texttt{endpoint} field is excluded from the hash so a service can be redeployed to a new socket path without invalidating its registration.
@@ -266,22 +269,22 @@ The complete field specification is in Appendix~A.1 (Table~\ref{tab:manifest-fie
 
 \subsection{Manifest Semantics and Tool Identity}
 
-A control plane that arbitrates based on tool identity requires a stable definition of what constitutes the logical identity of a tool.
-Tying identity to transport details (socket paths, port numbers, or endpoint URIs) causes routine operational changes to generate spurious re-registration events and demands policy reconciliation on every redeployment.
-Conversely, if identity is defined too coarsely, the system cannot distinguish a tool that has been semantically modified from one that has simply been redeployed at a different address.
+Defining tool identity at the right granularity is a delicate balance.
+Binding identity to transport details such as socket paths or process identifiers makes routine operational changes, including redeployments, restarts, and reconfiguration, invalidate registry state even when the tool itself has not changed. 
+If identity is defined too coarsely, however, the system can no longer distinguish a semantically modified tool from one that has merely been redeployed at a different address.
 
 \texttt{linux-mcp} resolves this tension by separating semantic identity from transport location.
-Each tool is described by a JSON manifest containing logical attributes: tool identifier, tool name, application identifier, application name, risk tags, description, input schema, examples, path semantics, and approval policy.
-These fields describe what the tool is intended to do, not where it runs.
-\texttt{mcpd} canonicalises the semantically relevant field subset into a stable JSON representation and computes the full 256-bit SHA-256 digest over it, represented as a 64-character hexadecimal string.
-The full digest is used without truncation: a truncated prefix (e.g., 8 hex characters, 32 bits) would allow collisions by the birthday bound after approximately $2^{16}$ tool registrations, which is not a large number in a production deployment spanning many applications.
-Crucially, the Unix domain socket endpoint is excluded from the hash computation.
-A tool may therefore be redeployed to a new socket path without altering its logical identity, provided the semantic fields in the manifest remain unchanged.
-Conversely, any modification to a semantically significant field (the input schema, risk tags, description, approval policy, or path semantics) produces a different 256-bit digest, which the kernel detects as a mismatch upon the next \texttt{TOOL\_REQUEST}.
+Each tool is described by a JSON manifest whose logical attributes are: tool identifier, tool name, application identifier, application name, risk tags, description, input schema, examples, path semantics, and approval policy; these attributes describe what the tool is intended to do, not where it runs.
+\texttt{mcpd} canonicalises these fields into a stable JSON serialisation and computes its SHA-256 digest, represented as a 64-character hexadecimal string.
+The full digest is used without truncation: a 32-bit prefix would reach a 50\% collision probability at roughly $2^{16}$ registrations by the birthday bound, and meaningful collision risk appears far earlier---a few thousand tools already put the probability in the $10^{-5}$ range, which is unacceptable for a primitive the kernel treats as a unique identity.
 
-This separation is essential for admission control: the kernel and the daemon can only meaningfully agree on whether a request is legitimate if they share a common, stable notion of tool identity.
-The semantic hash is the concrete artefact that makes this agreement possible: computed in user space but verified in kernel space, so the daemon cannot substitute a different tool without producing a detectable mismatch.
+One field is deliberately excluded from the hash: the Unix domain socket endpoint.
+A tool may therefore be redeployed to a new socket path without altering its logical identity, as long as the semantic fields remain unchanged.
+Any modification to a semantically significant field, including the input schema, risk tags, description, approval policy, or path semantics, produces a different digest, which the kernel detects as a mismatch on the next \texttt{TOOL\_REQUEST}.
 
+This separation is what makes kernel-side admission control meaningful in the first place.
+The kernel and the daemon can only agree on whether a request is legitimate if they share a stable notion of tool identity, and that notion has to be verifiable on both sides of the privilege boundary.
+The semantic hash is the concrete artefact that bridges the two: computed in user space from the manifest, but recorded in and checked by the kernel, so a daemon bug or a tampered manifest cannot quietly substitute one tool for another.
 
 
 
@@ -390,7 +393,7 @@ If manifests change between a crash and a restart, the tool hashes registered in
 
 \texttt{linux-mcp} addresses this with a conservative reconciliation strategy.
 On startup, \texttt{mcpd} issues a \texttt{RESET\_TOOLS} command to clear the kernel-side tool registry, then re-registers the full set of tools from the current manifest state.
-The system unconditionally rebuilds state from the manifest source of truth rather than attempting to assess whether residual kernel state remains valid.
+The system unconditionally rebuilds state from the manifest source of truth; no attempt is made to assess whether residual kernel state is still valid.
 This trade-off is appropriate for a research prototype, where state correctness and auditability take precedence over minimising re-registration overhead.
 
 Session state is lost on crash, since the binding context for in-progress sessions exists only in the daemon process; approval tickets and registry state held in the kernel are not.
@@ -419,7 +422,7 @@ It would have required tool services to interact with a kernel-facing API to obt
 
 Generic Netlink avoids all three problems.
 It supports structured TLV messages, dump-style enumeration for registry introspection, and arbitrary internal state management in a loadable module.
-The cost is that a full kernel module is needed rather than a policy hook or a BPF program, but for a research prototype this is an acceptable trade-off. In practice, the module's role stayed narrow enough that the added complexity remained manageable.
+The cost is that a full kernel module is needed, where a policy hook or a BPF program would have sufficed for simpler designs. For a research prototype this is an acceptable trade-off, and in practice the module's role stayed narrow enough that the added complexity remained manageable.
 
 
 

@@ -11,9 +11,9 @@ Database file #1: reference.bib
 Warning--empty pages in park2023generative
 Warning--empty author and editor in openclaw2026
 Warning--missing publisher in openclaw2026
+Warning--empty author and editor in nousresearch2026hermesagent
+Warning--missing publisher in nousresearch2026hermesagent
 Warning--empty pages in peter2014arrakis
-Warning--empty author and editor in openharness2026
-Warning--missing publisher in openharness2026
 Warning--empty author and editor in langchain2022
 Warning--missing publisher in langchain2022
 Warning--empty author and editor in langgraph2024
@@ -24,12 +24,16 @@ Warning--empty author and editor in crewai2024
 Warning--missing publisher in crewai2024
 Warning--empty author and editor in semantickernel2023
 Warning--missing publisher in semantickernel2023
+Warning--empty author and editor in openharness2026
+Warning--missing publisher in openharness2026
 Warning--empty author and editor in harness2025
 Warning--missing publisher in harness2025
 Warning--empty author and editor in apple2024pcc
 Warning--missing publisher in apple2024pcc
 Warning--empty author and editor in mcp2025
 Warning--missing publisher in mcp2025
+Warning--empty author and editor in mcp_anniversary_2025
+Warning--missing publisher in mcp_anniversary_2025
 Warning--empty author and editor in patil2023gorilla
 Warning--missing publisher in patil2023gorilla
 Warning--empty author and editor in wang2023voyager
@@ -46,50 +50,49 @@ Warning--empty author and editor in selinux2026
 Warning--missing publisher in selinux2026
 Warning--empty author and editor in landlock2026
 Warning--missing publisher in landlock2026
+Warning--empty pages in watson2010capsicum
 Warning--empty pages in brimhall2023mac
-Warning--empty author and editor in haystack2023
-Warning--missing publisher in haystack2023
 Warning--empty author and editor in netlink2026
 Warning--missing publisher in netlink2026
-You've used 47 entries,
+You've used 49 entries,
             3507 wiz_defined-function locations,
-            899 strings with 12426 characters,
-and the built_in function-call counts, 63006 in all, are:
-= -- 7554
-> -- 587
+            908 strings with 12821 characters,
+and the built_in function-call counts, 65371 in all, are:
+= -- 7837
+> -- 607
 < -- 76
-+ -- 299
-- -- 142
-* -- 4896
-:= -- 6906
-add.period$ -- 148
-call.type$ -- 47
-change.case$ -- 22
++ -- 311
+- -- 147
+* -- 5088
+:= -- 7168
+add.period$ -- 154
+call.type$ -- 49
+change.case$ -- 25
 chr.to.int$ -- 166
-cite$ -- 90
-duplicate$ -- 5291
-empty$ -- 6117
-format.name$ -- 166
-if$ -- 14821
+cite$ -- 95
+duplicate$ -- 5474
+empty$ -- 6350
+format.name$ -- 172
+if$ -- 15373
 int.to.chr$ -- 0
-int.to.str$ -- 47
-missing$ -- 401
-newline$ -- 223
-num.names$ -- 47
-pop$ -- 986
+int.to.str$ -- 49
+missing$ -- 416
+newline$ -- 233
+num.names$ -- 49
+pop$ -- 1025
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 920
+skip$ -- 954
 stack$ -- 0
-substring$ -- 11257
-swap$ -- 867
+substring$ -- 11684
+swap$ -- 902
 text.length$ -- 31
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
-warning$ -- 43
-while$ -- 337
-width$ -- 49
-write$ -- 469
-(There were 43 warnings)
+warning$ -- 46
+while$ -- 348
+width$ -- 51
+write$ -- 490
+(There were 46 warnings)

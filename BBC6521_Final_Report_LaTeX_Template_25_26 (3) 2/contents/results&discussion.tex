@@ -110,7 +110,7 @@ The user-space baseline achieves the highest peak throughput, ranging from \num{
 The kernel path ranges from \num{1003} to \num{1137}~RPS, and the seccomp path from \num{1020} to \num{1200}~RPS.
 At a representative operating point (one agent, concurrency 50), userspace achieves \num{1215.6}~RPS, seccomp \num{1123.5}~RPS, and the kernel path \num{1096.2}~RPS.
 The kernel path is approximately 10\% slower than the user-space peak, consistent with the additional Generic Netlink round-trip and the serialisation of admission decisions through the kernel module.
-(These figures are drawn from an earlier $n = 5$ pilot run; the $n = 30$ study focused exclusively on latency and did not repeat the concurrency sweep. The throughput results should therefore be interpreted as exploratory evidence of practical viability rather than a definitive performance characterisation: they establish that the kernel-assisted path does not collapse under concurrency, but the specific figures carry wider uncertainty than the latency results.)
+(These figures are drawn from an earlier $n = 5$ pilot run; the $n = 30$ study focused exclusively on latency and did not repeat the concurrency sweep. The throughput results should therefore be read as exploratory evidence of practical viability; the specific figures carry wider uncertainty than the latency results, and a definitive performance characterisation would require a dedicated concurrency sweep.)
 
 The figures report mean throughput only; tail-latency evolution under sustained load ($p_{99}$, $p_{95}$) would require a separate concurrency sweep and is not characterised here.
 Within the tested range, the kernel path adds roughly 10\% overhead. It does not collapse. That is enough to establish practical viability, though not a definitive ceiling.
@@ -196,21 +196,31 @@ An incremental approach that re-registers only changed tools would reduce restar
 
 \subsection{Discussion}
 
-The security and performance results are linked, and the link is architectural.
-The seccomp baseline narrows the syscall surface but keeps the admission decision inside a mutable user-space process, which is precisely why it achieves only 36.4\% attack resistance despite its overhead: adding BPF filters does not change where trust is anchored.
+Looking at the three sets of results together, the security and performance numbers make more sense as a pair than separately.
+
+The seccomp baseline is instructive here.
+It does more work than the plain userspace baseline: tighter syscall filtering, extra validation, audit logging.
+Yet it still permits 36.4\% of attack attempts.
+The reason is that adding filters around a mutable user-space process does not move where the trust decision lives.
 The kernel path achieves 0\% bypass not because it filters more aggressively, but because the state that determines admission simply cannot be reached by an unprivileged process.
-The same property explains the 1~MB latency inversion: BPF filtering accumulates cost per syscall as payload size grows; kernel arbitration cost does not scale with payload size.
-The overhead is bounded, not additive.
+That is a qualitatively different property, and no amount of user-space hardening can substitute for it.
 
-Approval tickets and registry state surviving daemon failure is not an optimisation.
-It is just what happens when the state lives in the kernel.
-A user-space design would need an external persistence layer to get the same property, and that brings back the consistency and recovery problems the kernel path avoids.
-This matters most in the scenario that is probably most common in practice: a daemon crash or forced restart mid-workflow.
+The 1~MB latency result is a side effect of the same architectural difference, which was not something anticipated going into the evaluation.
+BPF filtering accumulates per-syscall cost as payload size grows; kernel arbitration does not scale with payload size.
+So the seccomp baseline gets progressively slower on large payloads while the kernel path stays flat.
+At 1~MB this produces a measurable inversion: the stronger enforcement boundary is actually faster.
 
-The main open question is scalability.
-The global registry lock holds at the concurrency levels tested here.
-Whether it holds at 500 or 1000 concurrent requests with many simultaneously deferred approvals is unknown.
-Per-tool or per-agent lock decomposition is the natural next step, but that is future work, not a gap in what is evaluated here.
+The durability result is less dramatic to present but arguably the most practically important of the three.
+When the daemon crashes, a user-space design loses everything it was holding: pending tickets, session context, registry state.
+Recovery means starting over.
+The kernel-path equivalent is just a daemon restart with reconciliation, because the state that matters was never in the daemon to begin with.
+This is not an optimisation or a clever trick; it falls out automatically from where the state lives.
+The scenario it addresses, a crash or forced restart mid-workflow, is probably more common in practice than the controlled attack attempts the security evaluation tests.
+
+One thing the results do not settle is how the system behaves under heavier load.
+The concurrency sweep went up to 100 concurrent requests and showed no throughput collapse, but the global registry lock is a real bottleneck waiting to be found.
+At 500 or 1000 concurrent requests, particularly with many simultaneously deferred approvals, it could become a problem.
+Per-tool or per-agent lock decomposition is the obvious direction, but it is not something the current prototype implements, and the evaluation does not characterise that regime.
 
 
 

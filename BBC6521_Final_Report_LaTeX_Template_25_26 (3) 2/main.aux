@@ -12,19 +12,19 @@
 \citation{park2023generative,qin2024toolllm,mei2024aios,liu2026agentos}
 \citation{packer2023memgpt,mei2024aios}
 \citation{openclaw2026}
+\citation{nousresearch2026hermesagent}
 \citation{peter2014arrakis}
-\citation{qin2024toolllm}
-\citation{greshake2023prompt}
+\citation{qin2024toolllm,greshake2023prompt}
 \newlabel{chap:introduction}{{}{5}{}{section*.2}{}}
 \@writefile{toc}{\contentsline {section}{\textit  {Chapter 1: Introduction}}{5}{section*.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.1}Problem Statement}{5}{subsection.1.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Our Solution}{5}{subsection.1.2}\protected@file@percent }
 \citation{openclaw2026}
-\citation{openharness2026}
+\citation{nousresearch2026hermesagent}
 \@writefile{toc}{\contentsline {paragraph}{Comparison with user-space systems.}{6}{paragraph*.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.3}Main Contributions}{6}{subsection.1.3}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Key design differences between \texttt  {linux-mcp}, OpenClaw, and OpenHarness.}}{7}{table.1}\protected@file@percent }
-\newlabel{tab:comparison}{{1}{7}{Key design differences between \texttt {linux-mcp}, OpenClaw, and OpenHarness}{table.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Key design differences between \texttt  {linux-mcp}, OpenClaw, and Hermes Agent.}}{7}{table.1}\protected@file@percent }
+\newlabel{tab:comparison}{{1}{7}{Key design differences between \texttt {linux-mcp}, OpenClaw, and Hermes Agent}{table.1}{}}
 \citation{tanenbaum2022}
 \citation{park2023generative}
 \citation{langchain2022}
@@ -34,16 +34,19 @@
 \citation{semantickernel2023}
 \citation{packer2023memgpt,wu2024oscopilot,mei2024aios,liu2026agentos}
 \citation{openclaw2026}
+\citation{openharness2026}
+\citation{nousresearch2026hermesagent}
 \citation{harness2025}
 \citation{apple2024pcc}
 \citation{mcp2025}
-\citation{mcp2025}
+\citation{mcp_anniversary_2025}
+\citation{schick2023toolformer,patil2023gorilla,mcp2025}
+\citation{liu2023prompt}
 \newlabel{chap:background}{{1.3}{8}{}{section*.4}{}}
 \@writefile{toc}{\contentsline {section}{\textit  {Chapter 2: Background}}{8}{section*.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Agent Systems and the Limits of User-space Control Planes}{8}{subsection.2.1}\protected@file@percent }
+\newlabel{sec:agent-systems}{{2.1}{8}{Agent Systems and the Limits of User-space Control Planes}{subsection.2.1}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.2}What MCP Provides}{8}{subsection.2.2}\protected@file@percent }
-\citation{schick2023toolformer,patil2023gorilla,mcp2025}
-\citation{liu2023prompt}
 \citation{yao2023react,autogpt2023,park2023generative}
 \citation{greshake2023prompt,openclaw_security1,openclaw_security2}
 \citation{packer2023memgpt}
@@ -54,19 +57,13 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Limits of User-space Mediation}{9}{subsection.2.3}\protected@file@percent }
 \newlabel{sec:limits-user-space}{{2.3}{9}{Limits of User-space Mediation}{subsection.2.3}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Relation to Native Linux Security Mechanisms}{9}{subsection.2.4}\protected@file@percent }
-\citation{seccomp2026,lsm2026,landlock2026,lefeuvre2024sok,brimhall2023mac}
-\citation{langchain2022}
-\citation{langgraph2024}
-\citation{autogpt2023}
-\citation{crewai2024}
-\citation{haystack2023}
-\citation{semantickernel2023}
+\citation{seccomp2026,lsm2026,landlock2026,watson2010capsicum,brimhall2023mac,lefeuvre2024sok}
 \citation{openclaw2026}
 \citation{openclaw_security1,openclaw_security2}
 \citation{harness2025}
 \citation{ji2026seagent}
 \citation{shi2025progent}
-\citation{mei2024aios,wu2024oscopilot,packer2023memgpt,liu2026agentos}
+\citation{mei2024aios,liu2026agentos,packer2023memgpt,wu2024oscopilot}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Related Work}{10}{subsection.2.5}\protected@file@percent }
 \newlabel{sec:related-work}{{2.5}{10}{Related Work}{subsection.2.5}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.6}Threat Model}{10}{subsection.2.6}\protected@file@percent }
@@ -77,6 +74,7 @@
 \newlabel{chap:design}{{2.6}{13}{}{section*.5}{}}
 \@writefile{toc}{\contentsline {section}{\textit  {Chapter 3: Design and Implementation}}{13}{section*.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Design Goals}{13}{subsection.3.1}\protected@file@percent }
+\newlabel{sec:design-goals}{{3.1}{13}{Design Goals}{subsection.3.1}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.2}System Architecture}{13}{subsection.3.2}\protected@file@percent }
 \newlabel{sec:system-architecture}{{3.2}{13}{System Architecture}{subsection.3.2}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overall architecture of \texttt  {linux-mcp}.}}{14}{figure.1}\protected@file@percent }
@@ -143,12 +141,12 @@
 \@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt  {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax.}}{33}{figure.9}\protected@file@percent }
 \newlabel{fig:chapter4-security}{{9}{33}{Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax}{figure.9}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Threats to Validity}{33}{subsection.4.6}\protected@file@percent }
-\newlabel{chap:conclusion}{{4.6}{34}{}{section*.11}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Chapter 5: Conclusion and Further Work}}{34}{section*.11}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Conclusion}{34}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Reflection}{34}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Further Work}{35}{subsection.5.3}\protected@file@percent }
-\newlabel{sec:further-work}{{5.3}{35}{Further Work}{subsection.5.3}{}}
+\newlabel{chap:conclusion}{{4.6}{35}{}{section*.11}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Chapter 5: Conclusion and Further Work}}{35}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Conclusion}{35}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Reflection}{36}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Further Work}{37}{subsection.5.3}\protected@file@percent }
+\newlabel{sec:further-work}{{5.3}{37}{Further Work}{subsection.5.3}{}}
 \bibdata{reference}
 \bibcite{yao2023react}{{1}{}{{}}{{}}}
 \bibcite{liu2024agentbench}{{2}{}{{}}{{}}}
@@ -159,78 +157,80 @@
 \bibcite{liu2026agentos}{{7}{}{{}}{{}}}
 \bibcite{packer2023memgpt}{{8}{}{{}}{{}}}
 \bibcite{openclaw2026}{{9}{}{{}}{{}}}
-\bibcite{peter2014arrakis}{{10}{}{{}}{{}}}
-\bibcite{greshake2023prompt}{{11}{}{{}}{{}}}
-\bibcite{openharness2026}{{12}{}{{}}{{}}}
+\bibcite{nousresearch2026hermesagent}{{10}{}{{}}{{}}}
+\bibcite{peter2014arrakis}{{11}{}{{}}{{}}}
+\bibcite{greshake2023prompt}{{12}{}{{}}{{}}}
 \bibcite{tanenbaum2022}{{13}{}{{}}{{}}}
 \bibcite{langchain2022}{{14}{}{{}}{{}}}
 \bibcite{langgraph2024}{{15}{}{{}}{{}}}
-\@writefile{toc}{\contentsline {section}{\textit  {References}}{37}{subsection.5.3}\protected@file@percent }
 \bibcite{autogpt2023}{{16}{}{{}}{{}}}
+\@writefile{toc}{\contentsline {section}{\textit  {References}}{38}{subsection.5.3}\protected@file@percent }
 \bibcite{crewai2024}{{17}{}{{}}{{}}}
 \bibcite{semantickernel2023}{{18}{}{{}}{{}}}
 \bibcite{wu2024oscopilot}{{19}{}{{}}{{}}}
-\bibcite{harness2025}{{20}{}{{}}{{}}}
-\bibcite{apple2024pcc}{{21}{}{{}}{{}}}
-\bibcite{mcp2025}{{22}{}{{}}{{}}}
-\bibcite{patil2023gorilla}{{23}{}{{}}{{}}}
-\bibcite{liu2023prompt}{{24}{}{{}}{{}}}
-\bibcite{openclaw_security1}{{25}{}{{}}{{}}}
-\bibcite{openclaw_security2}{{26}{}{{}}{{}}}
-\bibcite{wang2023voyager}{{27}{}{{}}{{}}}
-\bibcite{yang2024swe}{{28}{}{{}}{{}}}
-\bibcite{lim2024compartmentalization}{{29}{}{{}}{{}}}
-\bibcite{schneider2022sok}{{30}{}{{}}{{}}}
-\bibcite{lefeuvre2024sok}{{31}{}{{}}{{}}}
-\bibcite{ji2026seagent}{{32}{}{{}}{{}}}
-\bibcite{shi2025progent}{{33}{}{{}}{{}}}
-\bibcite{seccomp2026}{{34}{}{{}}{{}}}
-\bibcite{lsm2026}{{35}{}{{}}{{}}}
-\bibcite{apparmor2026}{{36}{}{{}}{{}}}
-\bibcite{selinux2026}{{37}{}{{}}{{}}}
-\bibcite{landlock2026}{{38}{}{{}}{{}}}
-\bibcite{brimhall2023mac}{{39}{}{{}}{{}}}
-\bibcite{haystack2023}{{40}{}{{}}{{}}}
-\bibcite{chen2016shreds}{{41}{}{{}}{{}}}
-\bibcite{stevens2013unix}{{42}{}{{}}{{}}}
-\bibcite{bishop2003computer}{{43}{}{{}}{{}}}
-\bibcite{lee2021exprace}{{44}{}{{}}{{}}}
-\bibcite{klein2010sel4}{{45}{}{{}}{{}}}
-\bibcite{netlink2026}{{46}{}{{}}{{}}}
-\bibcite{west2021welch}{{47}{}{{}}{{}}}
-\@writefile{toc}{\contentsline {section}{\textit  {Acknowledgment}}{41}{section*.12}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\textit  {Appendices}}{42}{section*.13}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Disclaimer}{42}{section*.14}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Acknowledgement of using Generative AI}{43}{section*.15}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Project specification}{44}{section*.16}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Early-term progress report}{51}{section*.17}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Mid-term progress report}{58}{section*.18}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Supervision log}{65}{section*.19}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Additional Appendices}{68}{section*.20}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{68}{section*.21}\protected@file@percent }
-\newlabel{sec:appendix-protocols}{{5.3}{68}{}{section*.21}{}}
-\@writefile{toc}{\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{68}{paragraph*.22}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}tool:exec request and response messages (llm-app $\to $ mcpd).}{68}{lstlisting.2}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3}approval\_reply message (llm-app $\to $ mcpd, issued after user confirms a deferred operation).}{68}{lstlisting.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Complete Netlink attribute encoding.}{68}{paragraph*.23}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {4}Python fragment: encoding a \texttt  {TOOL\_REQUEST} Generic Netlink message (mcpd $\to $ kernel).}{69}{lstlisting.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Semantic hash computation.}{69}{paragraph*.24}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {5}Python fragment: computing the manifest-derived semantic hash used for tool identity.}{69}{lstlisting.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Complete manifest field specification.}{70}{paragraph*.25}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Manifest field specification. {\Pifont {pzd}\char 51}~= included in the SHA-256 semantic identity hash; {\Pifont {pzd}\char 55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt  {app\_id}; tool-level fields appear once per tool entry.}}{70}{table.10}\protected@file@percent }
-\newlabel{tab:manifest-fields}{{10}{70}{Manifest field specification. \ding {51}~= included in the SHA-256 semantic identity hash; \ding {55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt {app\_id}; tool-level fields appear once per tool entry}{table.10}{}}
+\bibcite{openharness2026}{{20}{}{{}}{{}}}
+\bibcite{harness2025}{{21}{}{{}}{{}}}
+\bibcite{apple2024pcc}{{22}{}{{}}{{}}}
+\bibcite{mcp2025}{{23}{}{{}}{{}}}
+\bibcite{mcp_anniversary_2025}{{24}{}{{}}{{}}}
+\bibcite{patil2023gorilla}{{25}{}{{}}{{}}}
+\bibcite{liu2023prompt}{{26}{}{{}}{{}}}
+\bibcite{openclaw_security1}{{27}{}{{}}{{}}}
+\bibcite{openclaw_security2}{{28}{}{{}}{{}}}
+\bibcite{wang2023voyager}{{29}{}{{}}{{}}}
+\bibcite{yang2024swe}{{30}{}{{}}{{}}}
+\bibcite{lim2024compartmentalization}{{31}{}{{}}{{}}}
+\bibcite{schneider2022sok}{{32}{}{{}}{{}}}
+\bibcite{lefeuvre2024sok}{{33}{}{{}}{{}}}
+\bibcite{ji2026seagent}{{34}{}{{}}{{}}}
+\bibcite{shi2025progent}{{35}{}{{}}{{}}}
+\bibcite{seccomp2026}{{36}{}{{}}{{}}}
+\bibcite{lsm2026}{{37}{}{{}}{{}}}
+\bibcite{apparmor2026}{{38}{}{{}}{{}}}
+\bibcite{selinux2026}{{39}{}{{}}{{}}}
+\bibcite{landlock2026}{{40}{}{{}}{{}}}
+\bibcite{watson2010capsicum}{{41}{}{{}}{{}}}
+\bibcite{brimhall2023mac}{{42}{}{{}}{{}}}
+\bibcite{chen2016shreds}{{43}{}{{}}{{}}}
+\bibcite{stevens2013unix}{{44}{}{{}}{{}}}
+\bibcite{bishop2003computer}{{45}{}{{}}{{}}}
+\bibcite{lee2021exprace}{{46}{}{{}}{{}}}
+\bibcite{klein2010sel4}{{47}{}{{}}{{}}}
+\bibcite{netlink2026}{{48}{}{{}}{{}}}
+\bibcite{west2021welch}{{49}{}{{}}{{}}}
+\@writefile{toc}{\contentsline {section}{\textit  {Acknowledgment}}{42}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {Appendices}}{43}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Disclaimer}{43}{section*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Acknowledgement of using Generative AI}{44}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Project specification}{45}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Early-term progress report}{52}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Mid-term progress report}{59}{section*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Supervision log}{66}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Additional Appendices}{69}{section*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{69}{section*.21}\protected@file@percent }
+\newlabel{sec:appendix-protocols}{{5.3}{69}{}{section*.21}{}}
+\@writefile{toc}{\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{69}{paragraph*.22}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}tool:exec request and response messages (llm-app $\to $ mcpd).}{69}{lstlisting.2}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3}approval\_reply message (llm-app $\to $ mcpd, issued after user confirms a deferred operation).}{69}{lstlisting.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Complete Netlink attribute encoding.}{69}{paragraph*.23}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {4}Python fragment: encoding a \texttt  {TOOL\_REQUEST} Generic Netlink message (mcpd $\to $ kernel).}{70}{lstlisting.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Semantic hash computation.}{70}{paragraph*.24}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {5}Python fragment: computing the manifest-derived semantic hash used for tool identity.}{70}{lstlisting.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Complete manifest field specification.}{71}{paragraph*.25}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Manifest field specification. {\Pifont {pzd}\char 51}~= included in the SHA-256 semantic identity hash; {\Pifont {pzd}\char 55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt  {app\_id}; tool-level fields appear once per tool entry.}}{71}{table.10}\protected@file@percent }
+\newlabel{tab:manifest-fields}{{10}{71}{Manifest field specification. \ding {51}~= included in the SHA-256 semantic identity hash; \ding {55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt {app\_id}; tool-level fields appear once per tool entry}{table.10}{}}
 \citation{openclaw2026}
 \citation{openclaw_security1,openclaw_security2}
 \citation{harness2025}
 \citation{mei2024aios,liu2026agentos}
 \citation{langchain2022,langgraph2024}
 \citation{apple2024pcc}
-\@writefile{toc}{\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{71}{section*.26}\protected@file@percent }
-\newlabel{sec:appendix-comparison}{{5.3}{71}{}{section*.26}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Comparison of representative agent systems. The key differentiator for \texttt  {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{71}{table.11}\protected@file@percent }
-\newlabel{tab:system_comparison}{{11}{71}{Comparison of representative agent systems. The key differentiator for \texttt {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.11}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{72}{section*.27}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{72}{section*.26}\protected@file@percent }
+\newlabel{sec:appendix-comparison}{{5.3}{72}{}{section*.26}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Comparison of representative agent systems. The key differentiator for \texttt  {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{72}{table.11}\protected@file@percent }
+\newlabel{tab:system_comparison}{{11}{72}{Comparison of representative agent systems. The key differentiator for \texttt {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.11}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{73}{section*.27}\protected@file@percent }
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{74}{table.12}\protected@file@percent }
-\newlabel{tab:risk_assessment}{{12}{74}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.12}{}}
-\gdef \@abspage@last{75}
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{75}{table.12}\protected@file@percent }
+\newlabel{tab:risk_assessment}{{12}{75}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.12}{}}
+\gdef \@abspage@last{76}

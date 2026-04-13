@@ -44,6 +44,11 @@ Packer C, Fang V, Patil SG, Lin K, Wooders S, Gonzalez JE.
 Steinberger P. OpenClaw: Open-source Autonomous AI Agent; 2026.
 \newblock \url{https://openclaw.ai}.
 
+\bibitem{nousresearch2026hermesagent}
+{Nous Research}. Hermes Agent; 2026.
+\newblock GitHub repository, accessed April 13, 2026.
+\newblock \url{https://github.com/nousresearch/hermes-agent}.
+
 \bibitem{peter2014arrakis}
 Peter S, Li J, Zhang I, et~al.
 \newblock Arrakis: The operating system is the control plane.
@@ -53,11 +58,6 @@ Peter S, Li J, Zhang I, et~al.
 Greshake K, et~al.
 \newblock Not what you've signed up for: Compromising real-world LLM-integrated applications with Indirect Prompt Injection.
 \newblock arXiv preprint arXiv:230212173. 2023.
-
-\bibitem{openharness2026}
-{HKUDS}. {OpenHarness}: Open Agent Harness with a Built-in Personal Agent---Ohmo!; 2026.
-\newblock Initial open-source release v0.1.0: April 1, 2026.
-\newblock \url{https://github.com/HKUDS/OpenHarness}.
 
 \bibitem{tanenbaum2022}
 Tanenbaum AS, Bos H.
@@ -94,6 +94,11 @@ Wu Z, et~al.
 \newblock OS-Copilot: Towards Generalist Computer Agents with Self-Improvement.
 \newblock arXiv preprint arXiv:240207456. 2024.
 
+\bibitem{openharness2026}
+{HKUDS}. {OpenHarness}: Open Agent Harness with a Built-in Personal Agent---Ohmo!; 2026.
+\newblock Initial open-source release v0.1.0: April 1, 2026.
+\newblock \url{https://github.com/HKUDS/OpenHarness}.
+
 \bibitem{harness2025}
 {Harness Inc }. Harness {AI} {DevOps} Agent; 2025.
 \newblock AI-powered autonomous workers embedded in governed CI/CD pipelines.
@@ -106,6 +111,11 @@ Wu Z, et~al.
 \bibitem{mcp2025}
 {Model Context Protocol}. Architecture Specification; 2025.
 \newblock \url{https://modelcontextprotocol.io/specification/2025-06-18/architecture}.
+
+\bibitem{mcp_anniversary_2025}
+{MCP Core Maintainers}. One Year of MCP: November 2025 Spec Release; 2025.
+\newblock Model Context Protocol Blog, accessed April 13, 2026.
+\newblock \url{https://blog.modelcontextprotocol.io/posts/2025-11-25-first-mcp-anniversary/}.
 
 \bibitem{patil2023gorilla}
 Patil SG, Zhang T, Wang X, Gonzalez JE. Gorilla: Large Language Model Connected with Massive {API}s; 2023.
@@ -176,15 +186,15 @@ Shi T, He J, Wang Z, Wu L, Li H, Guo W, et~al.
 {Linux Kernel Documentation}. Landlock; 2026.
 \newblock \url{https://docs.kernel.org/userspace-api/landlock.html}.
 
+\bibitem{watson2010capsicum}
+Watson RNM, Anderson J, Laurie B, Kennaway K.
+\newblock Capsicum: Practical Capabilities for {UNIX}.
+\newblock In: Proceedings of the USENIX Security Symposium; 2010. .
+
 \bibitem{brimhall2023mac}
 Brimhall B, Garrard J, de~la Garza C, Coffman J.
 \newblock A Comparative Analysis of {Linux} Mandatory Access Control Policy Enforcement Mechanisms.
 \newblock In: Proceedings of the 16th European Workshop on System Security ({EuroSec}); 2023. .
-
-\bibitem{haystack2023}
-{deepset GmbH}. Haystack: Open-Source {LLM} Orchestration Framework; 2023.
-\newblock Open-source AI pipeline and agent framework.
-\newblock \url{https://haystack.deepset.ai}.
 
 \bibitem{chen2016shreds}
 Chen Y, Reymondjohnson S, Sun Z, Lu L.

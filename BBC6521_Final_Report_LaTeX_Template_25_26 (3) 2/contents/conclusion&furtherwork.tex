@@ -4,29 +4,39 @@
 
 \subsection{Conclusion}
 
-This project set out to identify which parts of an MCP-style control plane genuinely benefit from kernel-level enforcement.
-The answer is a small and well-defined set: semantic identity, requester binding, approval validity, and invocation completion.
-These four invariants are structurally difficult to hold when enforcement is confined to a user-space gateway.
+The broader question behind this project is what a traditional Linux system actually needs in order to host AI agents well.
+This work takes the narrower angle of asking it through the MCP protocol: if an agent's interaction with the outside world flows through a standardised tool-invocation layer, which parts of that layer genuinely need operating-system support, and which are fine where they are?
 
-\texttt{linux-mcp} moves only those invariants into a Linux kernel module, while leaving semantic parsing and tool execution in user space.
-The gateway remains fully trusted, but the state it establishes now resides in the kernel, beyond the reach of unprivileged processes and durable across daemon failure.
+The answer, at least for the control-plane side of MCP, is a small set of invariants: semantic consistency between a registered tool and the one actually executed, identity binding between a request and the session that made it, approval validity across the defer--approve--execute lifecycle, and state durability across gateway failure.
+These four properties are structurally hard to hold in a user-space gateway, because every one of them has to survive the failure or compromise of the very process that enforces them.
+Everything else has no such requirement and belongs in user space, where flexibility matters and mistakes are cheap to fix.
 
-In the tested prototype setting, the kernel path blocked all 110 targeted control-plane attack attempts, where both user-space baselines permitted meaningful bypass rates.
-Latency remained within measurement noise of the user-space baseline at small and medium payloads, and was measurably lower at 1\,MB; throughput stayed within approximately 10\% of the user-space peak.
-The enforcement gains are real, the overhead is small, and the scope is deliberately narrow.
+\texttt{linux-mcp} is one concrete shape this split can take.
+A small Linux kernel module holds the registries, arbitrates admission, and owns the approval-ticket lifecycle behind a \texttt{CAP\_NET\_ADMIN}-gated Netlink interface; a user-space daemon loads manifests, derives semantic hashes, binds sessions to UDS peer credentials, and forwards admitted requests to tool services.
+The gateway is still fully trusted to populate the kernel's view of the world, but once that view is populated, its integrity no longer depends on the daemon staying alive or staying correct.
+Approval tickets and registry entries sit in kernel memory, out of reach of unprivileged processes, and still there after a daemon crash.
+
+In the tested prototype, the kernel path enforced all specified control-plane invariants across the targeted attack set, while both user-space baselines permitted meaningful bypass rates; latency and throughput remained close to the user-space baseline throughout. 
+These results are not intended as a claim of adversarial robustness or production-scale performance, since the attack set was authored by the same person who built the defences and the evaluation was conducted inside a single VM. 
+They are nevertheless sufficient to show that the split is workable: the enforcement gains are real, the overhead is small, and neither the LLM client nor tool authors need to change anything beyond providing a JSON manifest.
+
+The position this work ends up arguing for is narrower than AIOS-style proposals that rebuild OS infrastructure around LLM abstractions, and less trusting than user-space frameworks that accept gateway correctness as a given.
+Whether AI agents eventually deserve a full operating system of their own is an open question and probably a long way off.
+In the meantime, a useful intermediate answer is that a conventional Linux system, extended with a small number of carefully scoped agent-aware mechanisms, can already host an MCP control plane that neither a user-space gateway nor existing Linux security primitives can match on its own.
+\texttt{linux-mcp} is one such mechanism, for one such concern.
+Finding the others is the actual long-term project.
 
 \subsection{Reflection}
 
-The initial framing of this project was too broad: ``making AI tool invocation more secure by putting something in the kernel'' is not a testable claim.
-The work became substantially clearer once the problem was narrowed to a specific question: which invariants break when the gateway crashes or misbehaves, and are those the ones that benefit from kernel enforcement?
+The initial framing of this project was too broad, the work became substantially clearer once the problem was narrowed to a specific question: which invariants break when the gateway crashes or misbehaves, and are those the ones that benefit from kernel enforcement?
 That reframing aligned the threat model, the implementation, and the evaluation criteria.
 
 On the technical side, the kernel interface went through several candidates before settling on Generic Netlink.
 eBPF was the first choice, but the approval-ticket lifecycle requires stateful tracking across multiple messages that the verifier's loop and memory restrictions make impractical.
 LSM hooks were also considered, but they operate at the syscall boundary while tool identity is an application-layer concept; the layers do not align.
-Generic Netlink supports the full lifecycle state the design needs, at the cost of requiring a loadable module rather than a policy hook.
+Generic Netlink supports the full lifecycle state the design needs, though it requires a loadable module where a simple policy hook would have been lighter.
 
-Working across the kernel--user-space boundary was technically demanding.
+Working across the kernel, user-space boundary was technically demanding.
 Attribute packing bugs in Netlink do not produce compiler errors; they silently corrupt fields, with failures only appearing as unexpected kernel decisions deep into a test run.
 The most useful mitigation was building standalone per-command test scripts before integrating with \texttt{mcpd}, which made failures easier to isolate.
 
@@ -50,7 +60,7 @@ Several directions follow naturally from the current prototype.
 
 First, the current kernel arbitration logic is intentionally minimal.
 It verifies tool identity, agent identity, semantic-hash consistency, and approval-ticket validity, but it does not implement a richer policy framework.
-A natural next step is to support more expressive admission policies, such as per-tool permissions, role-scoped access control, rate limits (e.g., $N$ requests per minute per agent), or execution budgets (e.g., total time per session).
+The next step is to support more expressive admission policies, such as per-tool permissions, role-scoped access control, rate limits, or execution budgets.
 The design principle should be maintained: the kernel verifies policy membership but does not compute policy decisions, which remain in user space, preserving the narrow-kernel invariant.
 
 Second, the approval mechanism can be developed into a more complete governance path. 
@@ -59,14 +69,14 @@ Strengthening this path would make \texttt{linux-mcp} more suitable for environm
 
 Third, recovery behaviour can be improved further. The current prototype already preserves kernel-held registry and approval state across daemon failure, but reconciliation is deliberately conservative and session-level state is rebuilt after restart. 
 A more mature design could provide more systematic restart handling, richer recovery metadata, and clearer support for interrupted or partially completed requests.
-This becomes particularly important for long-running agent workflows, where failure and restart are routine rather than exceptional.
+This becomes particularly important for long-running agent workflows, where failure and restart are routine occurrences.
 
 Fourth, the evaluation can be extended substantially.
-Future work should include bare-metal evaluation to eliminate hypervisor timing noise, concurrency levels well beyond the current maximum of 100 concurrent requests (e.g., 500 or 1000), tool registries an order of magnitude larger than those used here, and heterogeneous tool workloads with variable or network-dependent execution times.
+Future work should include bare-metal evaluation to eliminate hypervisor timing noise, concurrency levels well beyond the current maximum of 100 concurrent requests, tool registries an order of magnitude larger than those used here, and heterogeneous tool workloads with variable or network-dependent execution times.
 $p_{95}$ latency is characterised in Chapter~\ref{chap:evaluation}; $p_{99}$ under sustained concurrency remains unmeasured and is a natural next step.
 Comparison against additional hardened user-space designs would also help sharpen the argument by separating the benefits of kernel placement from those achievable through improved user-space engineering alone.
 
 Finally, this work opens a broader research question: which other agent-oriented abstractions deserve operating-system support?
 \texttt{linux-mcp} shows that a small but consequential part of the MCP control plane benefits from OS-level support without requiring AI agents to become first-class OS citizens or requiring a new OS substrate.
 This project focuses on admission control for tool invocation, but similar arguments may extend to execution budgets, provenance across tool chains, durable approval logs, or agent-scoped resource accounting.
-Exploring these directions would help clarify whether support for AI agents should be understood as entirely new operating-system substrates, or as conventional systems extended with a small number of carefully scoped, agent-aware mechanisms.
+Exploring these directions would help clarify whether support for AI agents should be understood as entirely new operating system substrates.
