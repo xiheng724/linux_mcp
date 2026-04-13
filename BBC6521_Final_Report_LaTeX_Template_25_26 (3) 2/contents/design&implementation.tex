@@ -171,7 +171,7 @@ Table~\ref{tab:llm-mcpd} lists the principal message types and their key fields.
 
 \paragraph{mcpd to tool-app.}
 Once the kernel returns \texttt{ALLOW}, \texttt{mcpd} forwards the request to the relevant tool service over a per-application UDS connection.
-The protocol is deliberately minimal, consistent with the design goal in \ref{sec:design-goals} that tool authors should not need to reason about the control plane, so the tool service need not be aware of sessions, agent identities, or kernel tickets.
+The protocol is deliberately minimal, consistent with the design goal in Section~\ref{sec:design-goals} that tool authors should not need to reason about the control plane, so the tool service need not be aware of sessions, agent identities, or kernel tickets.
 Table~\ref{tab:mcpd-toolapp} lists the five fields exchanged in each direction.
 
 
@@ -202,7 +202,7 @@ Table~\ref{tab:mcpd-toolapp} lists the five fields exchanged in each direction.
 The kernel control-plane interface uses the \texttt{KERNEL\_MCP} Generic Netlink family.
 Messages carry TLV-encoded attributes, and each message type is registered as a Netlink \emph{command}; all registry-mutating commands require \texttt{CAP\_NET\_ADMIN}.
 The commands covering the full invocation lifecycle are listed in Table~\ref{tab:netlink-cmds}, and the principal attributes carried on the critical \texttt{TOOL\_REQUEST}/\texttt{TOOL\_DECISION} path are listed in Table~\ref{tab:netlink-attrs}.
-Full attribute encodings and a reference Python framing routine are given in Appendix~A.1
+Full attribute encodings and a reference Python framing routine are given in Appendix~A.1.
 
 \begin{table}[H]
 \centering\small
@@ -276,7 +276,7 @@ If identity is defined too coarsely, however, the system can no longer distingui
 \texttt{linux-mcp} resolves this tension by separating semantic identity from transport location.
 Each tool is described by a JSON manifest whose logical attributes are: tool identifier, tool name, application identifier, application name, risk tags, description, input schema, examples, path semantics, and approval policy; these attributes describe what the tool is intended to do, not where it runs.
 \texttt{mcpd} canonicalises these fields into a stable JSON serialisation and computes its SHA-256 digest, represented as a 64-character hexadecimal string.
-The full digest is used without truncation: a 32-bit prefix would reach a 50\% collision probability at roughly $2^{16}$ registrations by the birthday bound, and meaningful collision risk appears far earlier---a few thousand tools already put the probability in the $10^{-5}$ range, which is unacceptable for a primitive the kernel treats as a unique identity.
+The full digest is used without truncation: a 32-bit prefix would reach a 50\% collision probability at roughly $2^{16}$ registrations by the birthday bound, and meaningful collision risk appears far earlier---even a few thousand tools put the collision probability well above acceptable thresholds for a primitive the kernel treats as a unique identity.
 
 One field is deliberately excluded from the hash: the Unix domain socket endpoint.
 A tool may therefore be redeployed to a new socket path without altering its logical identity, as long as the semantic fields remain unchanged.
@@ -327,7 +327,7 @@ The kernel need not understand the full meaning of a request; it must only verif
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth,trim=0.5cm 2cm 0cm 2cm,clip]{figures/linux-mcp-approval.pdf}
-\caption{Approval-ticket flow in \texttt{linux-mcp}: the \texttt{DEFER}--\texttt{APPROVE}--\texttt{ALLOW} state machine enforced by the kernel module.}
+\caption{Approval-ticket flow in \texttt{linux-mcp}: the \texttt{ALLOW}/\texttt{DENY}/\texttt{DEFER} state machine enforced by the kernel module.}
 \label{fig:chapter3-approval}
 \end{figure}
 

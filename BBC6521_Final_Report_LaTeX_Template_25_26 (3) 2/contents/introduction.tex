@@ -25,7 +25,7 @@ This is not a full AI-native operating system; the kernel role is deliberately n
 
 The architecture has four layers: an LLM client (\texttt{llm-app}), a manifest-aware gateway (\texttt{mcpd}), a Generic-Netlink-based kernel control plane (\texttt{kernel\_mcp}), and resident tool services over Unix domain sockets.
 Every tool invocation follows a fixed path through all four layers; no request reaches a tool service without first obtaining an explicit kernel admission decision.
-The component responsibilities are detailed in \ref{sec:system-architecture}, and the rationale for the kernel--user-space split is developed in \ref{sec:design-alternatives}.
+The component responsibilities are detailed in Section~\ref{sec:system-architecture}, and the rationale for the kernel--user-space split is developed in Section~\ref{sec:design-alternatives}.
 
 This split does not shrink the trusted footprint of \texttt{mcpd}.
 The gateway remains fully trusted and is responsible for populating the kernel registries in the first place.
@@ -34,10 +34,10 @@ Gateway logic bugs therefore no longer threaten the critical state transitions; 
 
 This position is deliberately narrower than either extreme in prior work.
 AIOS-style proposals offer strong guarantees by replacing OS infrastructure, at the cost of deployability on existing systems.
-User-space frameworks preserve deployment flexibility but inherit the structural weaknesses identified in Chapter~\ref{chap:background}.
+User-space frameworks preserve deployment flexibility but inherit the structural weaknesses identified in Chapter~2.
 \texttt{linux-mcp} instead moves only those invariants that require protection \emph{from the gateway itself} into the kernel, leaving semantic parsing, tool execution, and everything else in user space.
 Nor does it replace existing Linux security mechanisms such as seccomp or LSM; it complements them at a layer those mechanisms cannot reach.
-The central hypothesis is that this targeted placement improves binding safety and failure resilience at acceptable performance cost; Chapter~\ref{chap:evaluation} tests this claim empirically.
+The central hypothesis is that this targeted placement improves binding safety and failure resilience at acceptable performance cost; Chapter~4 tests this claim empirically.
 
 \paragraph{Comparison with user-space systems.}
 To contextualise the design, we compare \texttt{linux-mcp} with two representative user-space tool-invocation frameworks: OpenClaw~\cite{openclaw2026}, which uses a monolithic user-space gateway, and Hermes Agent~\cite{nousresearch2026hermesagent}, which runs the entire control and execution pipeline inside a single Python process.

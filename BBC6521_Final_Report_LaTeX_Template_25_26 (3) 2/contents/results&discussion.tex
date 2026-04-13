@@ -1,6 +1,7 @@
 \section*{Chapter 4: Results and Discussion}
 \setcounter{section}{4} \setcounter{subsection}{0}
-\phantomsection \label{chap:evaluation} \addcontentsline{toc}{section}{\textit{Chapter 4: Results and Discussion}}
+\addcontentsline{toc}{section}{\textit{Chapter 4: Results and Discussion}}
+\phantomsection \label{chap:evaluation}
 
 \texttt{linux-mcp} is evaluated along four dimensions: control-plane latency and its breakdown across invocation stages, throughput under concurrent load, resistance to a representative set of control-plane attacks, and system behaviour under daemon failure and restart.
 The central claim under test is that relocating admission-control state into the kernel strengthens enforcement without making the tool invocation path prohibitively expensive.
@@ -16,6 +17,7 @@ All reported $p$-values are two-sided Welch's $t$-tests \cite{west2021welch} com
 \subsection{Latency and Control-Plane Overhead}
 
 Table~\ref{tab:latency} and Figure~\ref{fig:chapter4-latency} report mean end-to-end latency for each system at three payload sizes.
+The 100~B and 10~KB points correspond to typical MCP tool invocations (short JSON commands and small structured responses), while the 1~MB point is a contrived stress case rather than a representative workload: it is used solely to probe how the control plane behaves when the payload dominates the cost of a request, and is not intended to reflect everyday tool traffic.
 At 100~B, the kernel path and the user-space baseline are within measurement noise: both at \num{0.854}~ms ($p = 0.984$).
 At 10~KB the kernel path is nominally slower (\num{0.899}~ms versus \num{0.863}~ms, +4.2\%), but the difference does not reach significance ($p = 0.097$), a sub-millisecond effect lost in the timing noise of a VMware guest at $n = 30$.
 
@@ -68,7 +70,7 @@ Kernel-side arbitration therefore costs roughly one order of magnitude less than
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/figure_latency_mean_by_payload.pdf}
-\caption{Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KiB are not flattened by the much larger absolute values at 1~MiB. 
+\caption{Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KB are not flattened by the much larger absolute values at 1~MB.
 Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt{userspace} baseline.}
 \label{fig:chapter4-latency}
 \end{figure}
@@ -76,7 +78,7 @@ Error bars show 95\% confidence intervals across $n = 30$ independent runs; sign
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\linewidth]{figures/figure_latency_overhead.pdf}
-\caption{Mean-latency ratio of each hardened variant to the plain \texttt{userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KiB visible alongside the larger effect at 1~MiB. The \texttt{seccomp} path is significantly slower at every payload size; the \texttt{kernel} path is statistically indistinguishable from \texttt{userspace} at small and medium payloads and measurably faster at 1~MiB.}
+\caption{Mean-latency ratio of each hardened variant to the plain \texttt{userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KB visible alongside the larger effect at 1~MB. The \texttt{seccomp} path is significantly slower at every payload size; the \texttt{kernel} path is statistically indistinguishable from \texttt{userspace} at small and medium payloads and measurably faster at 1~MB.}
 \label{fig:chapter4-overhead}
 \end{figure}
 
@@ -112,7 +114,7 @@ At a representative operating point (one agent, concurrency 50), userspace achie
 The kernel path is approximately 10\% slower than the user-space peak, consistent with the additional Generic Netlink round-trip and the serialisation of admission decisions through the kernel module.
 (These figures are drawn from an earlier $n = 5$ pilot run; the $n = 30$ study focused exclusively on latency and did not repeat the concurrency sweep. The throughput results should therefore be read as exploratory evidence of practical viability; the specific figures carry wider uncertainty than the latency results, and a definitive performance characterisation would require a dedicated concurrency sweep.)
 
-The figures report mean throughput only; tail-latency evolution under sustained load ($p_{99}$, $p_{95}$) would require a separate concurrency sweep and is not characterised here.
+The figures report mean throughput only; tail-latency evolution under sustained load (for instance $p_{99}$) would require a separate concurrency sweep and is not characterised here.
 Within the tested range, the kernel path adds roughly 10\% overhead. It does not collapse. That is enough to establish practical viability, though not a definitive ceiling.
 
 
@@ -120,7 +122,7 @@ Within the tested range, the kernel path adds roughly 10\% overhead. It does not
 
 Performance matters, but the real question is whether kernel placement actually stops attacks.
 
-The evaluation targets four categories from the threat model in Chapter~\ref{chap:background}: identity spoofing (forging session identity to impersonate a registered agent), replay (reusing a stale approval ticket), substitution (tampering with \texttt{tool\_id} or \texttt{tool\_hash} to redirect execution), and escalation (bypassing the approval gate on a high-risk invocation).
+The evaluation targets four categories from the threat model in Chapter~2: identity spoofing (forging session identity to impersonate a registered agent), replay (reusing a stale approval ticket), substitution (tampering with \texttt{tool\_id} or \texttt{tool\_hash} to redirect execution), and escalation (bypassing the approval gate on a high-risk invocation).
 
 Each system received 110 attack attempts in total (11 distinct cases $\times$ 10 repeats: 3 spoof, 4 replay, 3 substitution, 1 escalation).
 Outcomes are summarised in Table~\ref{tab:attacks} and Figure~\ref{fig:chapter4-security}.
@@ -164,7 +166,7 @@ One implementation detail of the ticket lifecycle strengthens the replay defence
 A replay consume attempt that reuses a different \texttt{req\_id} returns \texttt{approval\_ticket\_scope\_mismatch}, making it substantially harder to exploit a stolen ticket identifier in a fresh request context.
 
 Three caveats bound the interpretation of Table~\ref{tab:attacks}.
-First, all 110 attack attempts were authored by the same person who built the defences, and each category maps one-to-one onto an enforcement mechanism in the kernel module.
+First, each attack category maps one-to-one onto an enforcement mechanism in the kernel module.
 A 0\% bypass rate on the kernel path is therefore a functional-correctness test of four specified invariants against inputs constructed to exercise exactly those invariants, not evidence of adversarial robustness against unknown attacks.
 
 Second, the combined attack set is scoped to the stated control-plane invariants and does not include: attacks assuming compromise of the kernel module itself; attacks exploiting semantic vulnerabilities in tool logic; attacks requiring already-obtained privileged capabilities (such as \texttt{CAP\_NET\_ADMIN}); or attacks against the LLM prompt-construction pipeline.
@@ -226,4 +228,4 @@ Per-tool or per-agent lock decomposition is the obvious direction, but it is not
 
 \subsection{Threats to Validity}
 
-The results should be interpreted within four scope limitations: all experiments ran in a single VMware guest on an aarch64 host, so latency figures are environment-specific and generalisation to bare-metal or different kernel configurations is not established; the evaluation uses demonstration tools with predictable execution times and does not characterise tail latency under sustained load; the attack study is a controlled functional-correctness test of the four explicitly identified invariants, with all attempts authored by the same person who built the defences, and does not constitute a robustness assessment against unknown attacks, prompt injection, or privileged adversaries; and kernel-level admission control addresses only one layer of an AI-agent system, leaving semantic tool vulnerabilities, unsafe policy choices, and compromise outside the stated threat model unaddressed.
+The results should be interpreted within four scope limitations: all experiments ran in a single VMware guest on an aarch64 host, so latency figures are environment-specific and generalisation to bare-metal or different kernel configurations is not established; the evaluation uses demonstration tools with predictable execution times and does not characterise tail latency under sustained load; the attack study is a controlled functional-correctness test of the four explicitly identified invariants and does not constitute a robustness assessment against unknown attacks, prompt injection, or privileged adversaries; and kernel-level admission control addresses only one layer of an AI-agent system, leaving semantic tool vulnerabilities, unsafe policy choices, and compromise outside the stated threat model unaddressed.
