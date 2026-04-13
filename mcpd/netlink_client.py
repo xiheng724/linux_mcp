@@ -440,6 +440,23 @@ class KernelMcpNetlinkClient:
             need_ack=True,
         )
 
+    def noop(self, *, req_id: int = 0) -> int:
+        """Send a KERNEL_MCP_CMD_NOOP round-trip and return the echoed req_id.
+
+        Used by latency microbenchmarks as a measured noise floor: the command
+        does not touch any registry, lock, or sysfs state on the kernel side.
+        """
+        attrs = [(ATTR["REQ_ID"], struct.pack("=Q", req_id))]
+        genl_cmd, resp_attrs = self._request(
+            msg_type=self._family_id,
+            cmd=CMD["NOOP"],
+            attrs=attrs,
+            need_ack=False,
+        )
+        if genl_cmd != CMD["NOOP"]:
+            raise RuntimeError(f"unexpected response cmd for NOOP: {genl_cmd}")
+        return _attr_u64(resp_attrs, ATTR["REQ_ID"]) if ATTR["REQ_ID"] in resp_attrs else 0
+
     def tool_complete(
         self,
         *,

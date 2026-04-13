@@ -17,6 +17,14 @@ CMD: Final[dict[str, int]] = {
     "TOOL_COMPLETE": 12,
     "APPROVAL_DECIDE": 13,
     "RESET_TOOLS": 14,
+    "NOOP": 15,
+}
+
+EXPERIMENT_FLAGS: Final[dict[str, int]] = {
+    "SKIP_LOOKUPS": 1 << 0,
+    "SKIP_HASH": 1 << 1,
+    "SKIP_BINDING": 1 << 2,
+    "SKIP_TICKET": 1 << 3,
 }
 
 ATTR: Final[dict[str, int]] = {

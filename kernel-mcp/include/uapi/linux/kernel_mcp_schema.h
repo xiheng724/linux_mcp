@@ -14,7 +14,8 @@
 #define KERNEL_MCP_CMD_TOOL_COMPLETE 12
 #define KERNEL_MCP_CMD_APPROVAL_DECIDE 13
 #define KERNEL_MCP_CMD_RESET_TOOLS 14
-#define KERNEL_MCP_CMD_MAX KERNEL_MCP_CMD_RESET_TOOLS
+#define KERNEL_MCP_CMD_NOOP 15
+#define KERNEL_MCP_CMD_MAX KERNEL_MCP_CMD_NOOP
 
 /* Attributes: stable numeric IDs, append-only. */
 #define KERNEL_MCP_ATTR_UNSPEC 0
@@ -41,8 +42,22 @@
 #define KERNEL_MCP_ATTR_EXPERIMENT_FLAGS 30
 #define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_EXPERIMENT_FLAGS
 
-/* Optional experiment flags for microbenchmarks. */
+/* Optional experiment flags for microbenchmarks.
+ *
+ * SKIP_LOOKUPS short-circuits before any tool/agent table touch (existing
+ * "bare" microbench path). The SKIP_HASH / SKIP_BINDING / SKIP_TICKET flags
+ * are single-stage ablation knobs: they perform the full request path except
+ * for the one stage they name, so the per-stage cost can be isolated by
+ * subtraction against the full path. They are intended only for experimental
+ * measurements and MUST NOT be set by production mcpd.
+ */
 #define KERNEL_MCP_EXPERIMENT_SKIP_LOOKUPS (1U << 0)
+#define KERNEL_MCP_EXPERIMENT_SKIP_HASH    (1U << 1)
+#define KERNEL_MCP_EXPERIMENT_SKIP_BINDING (1U << 2)
+#define KERNEL_MCP_EXPERIMENT_SKIP_TICKET  (1U << 3)
+#define KERNEL_MCP_EXPERIMENT_ALL_MASK                                           \
+	(KERNEL_MCP_EXPERIMENT_SKIP_LOOKUPS | KERNEL_MCP_EXPERIMENT_SKIP_HASH |   \
+	 KERNEL_MCP_EXPERIMENT_SKIP_BINDING | KERNEL_MCP_EXPERIMENT_SKIP_TICKET)
 
 /* Static tool risk flags, set from manifest risk_tags by user-space. */
 #define KERNEL_MCP_RISK_FILESYSTEM_WRITE (1U << 0)

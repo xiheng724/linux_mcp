@@ -425,6 +425,121 @@ def run_scenario(
     return out
 
 
+@dataclass
+class SustainedResult:
+    system: str
+    concurrency: int
+    duration_s: float
+    warmup_s: float
+    payload_bytes: int
+    requests: int
+    errors: int
+    latency_samples_ms: List[float]
+    per_second_throughput: List[int]
+    start_ts: float
+    end_ts: float
+
+
+def run_sustained_load(
+    *,
+    system: str,
+    concurrency: int,
+    duration_s: float,
+    warmup_s: float,
+    payload_bytes: int,
+    request_fn: Any,
+    reservoir_cap: int = 5000,
+    rng_seed: int = 0,
+) -> SustainedResult:
+    """Drive wall-clock-bounded load.
+
+    request_fn(worker_id, req_index) must return (status_ok: bool, latency_ms: float).
+    It is responsible for opening its own session if required — this helper only
+    schedules and collects samples so it can be reused across mcpd / direct paths
+    (and by the --dry-run synthetic stub in overload_eval.py).
+    """
+    if concurrency <= 0:
+        raise ValueError("concurrency must be positive")
+    reservoir: List[float] = []
+    reservoir_seen = 0
+    reservoir_lock = __import__("threading").Lock()
+    rnd = random.Random(rng_seed)
+
+    per_second_bucket_count = max(int(math.ceil(duration_s)), 1)
+    per_second: List[int] = [0] * per_second_bucket_count
+    errors_total = 0
+    requests_total = 0
+    errors_lock = __import__("threading").Lock()
+
+    barrier = __import__("threading").Barrier(concurrency)
+    start_ref = time.perf_counter() + 0.05  # small slack so all workers see the same t0
+
+    def _worker(worker_id: int) -> None:
+        nonlocal errors_total, requests_total, reservoir_seen
+        local_rnd = random.Random(rng_seed + worker_id + 1)
+        barrier.wait()
+        measure_start = start_ref + warmup_s
+        measure_end = measure_start + duration_s
+        # Spin until measurement window opens.
+        while time.perf_counter() < measure_start:
+            try:
+                request_fn(worker_id, -1)
+            except Exception:
+                pass
+        req_index = 0
+        while True:
+            now = time.perf_counter()
+            if now >= measure_end:
+                break
+            try:
+                status_ok, latency_ms = request_fn(worker_id, req_index)
+            except Exception:
+                status_ok = False
+                latency_ms = (time.perf_counter() - now) * 1000.0
+            bucket_idx = int(now - measure_start)
+            with errors_lock:
+                requests_total += 1
+                if not status_ok:
+                    errors_total += 1
+                if 0 <= bucket_idx < per_second_bucket_count:
+                    per_second[bucket_idx] += 1
+            with reservoir_lock:
+                reservoir_seen += 1
+                if len(reservoir) < reservoir_cap:
+                    reservoir.append(latency_ms)
+                else:
+                    # Reservoir sampling (Algorithm R).
+                    j = local_rnd.randint(0, reservoir_seen - 1)
+                    if j < reservoir_cap:
+                        reservoir[j] = latency_ms
+            req_index += 1
+
+    threads = [
+        __import__("threading").Thread(target=_worker, args=(wid,), daemon=True)
+        for wid in range(concurrency)
+    ]
+    t_wall_start = time.time()
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    t_wall_end = time.time()
+
+    return SustainedResult(
+        system=system,
+        concurrency=concurrency,
+        duration_s=duration_s,
+        warmup_s=warmup_s,
+        payload_bytes=payload_bytes,
+        requests=requests_total,
+        errors=errors_total,
+        latency_samples_ms=reservoir,
+        per_second_throughput=per_second,
+        start_ts=t_wall_start,
+        end_ts=t_wall_end,
+    )
+
+
 def run_negative_controls(
     *,
     tool: ToolCase,

@@ -958,13 +958,15 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 						      decision, reason, ticket_id);
 	}
 
-	if (hash_mismatch) {
+	if (hash_mismatch &&
+	    !(experiment_flags & KERNEL_MCP_EXPERIMENT_SKIP_HASH)) {
 		decision = KERNEL_MCP_DECISION_DENY;
 		reason = "hash_mismatch";
 		goto out_accounting;
 	}
-	if (agent->binding_hash != binding_hash ||
-	    agent->binding_epoch != binding_epoch) {
+	if ((agent->binding_hash != binding_hash ||
+	     agent->binding_epoch != binding_epoch) &&
+	    !(experiment_flags & KERNEL_MCP_EXPERIMENT_SKIP_BINDING)) {
 		decision = KERNEL_MCP_DECISION_DENY;
 		reason = "binding_mismatch";
 		goto out_accounting;
@@ -976,7 +978,8 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 		goto out_accounting;
 	}
 
-	if (risk_flags & KERNEL_MCP_APPROVAL_REQUIRED_FLAGS) {
+	if ((risk_flags & KERNEL_MCP_APPROVAL_REQUIRED_FLAGS) &&
+	    !(experiment_flags & KERNEL_MCP_EXPERIMENT_SKIP_TICKET)) {
 		if (kernel_mcp_consume_approval_ticket(ticket_id, agent_id,
 						      binding_hash,
 						      binding_epoch, tool_id,
@@ -1149,6 +1152,48 @@ static int kernel_mcp_cmd_reset_tools(struct sk_buff *skb,
 	return 0;
 }
 
+/*
+ * KERNEL_MCP_CMD_NOOP — minimum Generic Netlink round-trip used as a measured
+ * noise floor for latency microbenchmarks. Does not touch any registry, lock,
+ * sysfs object, or approval state. The reply copies back REQ_ID when present
+ * so user space can correlate samples on a shared socket.
+ */
+static int kernel_mcp_cmd_noop(struct sk_buff *skb, struct genl_info *info)
+{
+	struct sk_buff *reply_skb;
+	void *reply_hdr;
+	u64 req_id = 0;
+	int ret;
+
+	(void)skb;
+	if (!info)
+		return -EINVAL;
+	if (info->attrs[KERNEL_MCP_ATTR_REQ_ID])
+		req_id = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_REQ_ID]);
+
+	reply_skb = genlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!reply_skb)
+		return -ENOMEM;
+
+	reply_hdr = genlmsg_put_reply(reply_skb, info, &kernel_mcp_genl_family, 0,
+				      KERNEL_MCP_CMD_NOOP);
+	if (!reply_hdr) {
+		nlmsg_free(reply_skb);
+		return -EMSGSIZE;
+	}
+
+	ret = nla_put_u64_64bit(reply_skb, KERNEL_MCP_ATTR_REQ_ID, req_id,
+				KERNEL_MCP_ATTR_UNSPEC);
+	if (ret) {
+		genlmsg_cancel(reply_skb, reply_hdr);
+		nlmsg_free(reply_skb);
+		return ret;
+	}
+
+	genlmsg_end(reply_skb, reply_hdr);
+	return genlmsg_reply(reply_skb, info);
+}
+
 static int kernel_mcp_cmd_list_tools_dump(struct sk_buff *skb,
 					  struct netlink_callback *cb)
 {
@@ -1260,6 +1305,13 @@ static const struct genl_ops kernel_mcp_genl_ops[] = {
 		.policy = kernel_mcp_policy,
 		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_reset_tools,
+	},
+	{
+		.cmd = KERNEL_MCP_CMD_NOOP,
+		.flags = 0,
+		.policy = kernel_mcp_policy,
+		.maxattr = KERNEL_MCP_ATTR_MAX,
+		.doit = kernel_mcp_cmd_noop,
 	},
 };
 

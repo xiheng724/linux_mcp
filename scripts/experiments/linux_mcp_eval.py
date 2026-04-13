@@ -24,6 +24,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Sequence
 
 from benchmark_suite import (
     ToolCase,
+    call_tool_direct,
     enrich_hash_from_mcpd,
     load_manifest_tools,
     percentile,
@@ -77,6 +78,10 @@ SYSTEMS = (
         audit_logging=True,
     ),
     SystemVariant("kernel", "kernel_mcp", "normal", False, "/tmp/mcpd-kernel-eval.sock"),
+    # E6: direct-UDS raw baseline. mode="direct" signals the runner to bypass mcpd
+    # and talk to the tool-app UDS endpoint from the manifest. sock_path is a placeholder;
+    # direct mode never binds it. Not selected by default — opt in via --systems=...,direct.
+    SystemVariant("direct", "direct-uds raw baseline", "direct", False, "/tmp/mcpd-direct-eval.sock"),
 )
 
 LATENCY_PAYLOADS = (
@@ -450,9 +455,15 @@ def run_latency_repetition(
     system_label: str,
     repetition: int,
     requests: int,
+    direct_mode: bool = False,
 ) -> tuple[list[Dict[str, Any]], list[Dict[str, Any]]]:
-    session = open_session_details(sock_path, 20.0, f"latency-{system_label}-rep-{repetition}")
-    session_id = str(session["session_id"])
+    # direct_mode bypasses mcpd entirely — talk to tool.endpoint directly. No
+    # session, no arbitration, no hashes. Used only by the E6 raw-baseline variant.
+    if direct_mode:
+        session_id = ""
+    else:
+        session = open_session_details(sock_path, 20.0, f"latency-{system_label}-rep-{repetition}")
+        session_id = str(session["session_id"])
     raw_rows: list[Dict[str, Any]] = []
     summary_rows: list[Dict[str, Any]] = []
     for payload_label, payload_size in LATENCY_PAYLOADS:
@@ -465,18 +476,31 @@ def run_latency_repetition(
         errors = 0
         for req_index in range(requests):
             payload = build_latency_payload(tool, size_bytes=payload_size, req_index=req_index)
-            req = build_exec_req(
-                req_id=1000000 + repetition * 100000 + req_index,
-                session_id=session_id,
-                tool=tool,
-                payload=payload,
-                tool_hash=tool.manifest_hash,
-            )
-            resp, latency_ms = invoke_mcpd(sock_path=sock_path, timeout_s=30.0, req=req)
+            if direct_mode:
+                t0 = time.perf_counter()
+                try:
+                    resp = call_tool_direct(
+                        tool,
+                        payload,
+                        30.0,
+                        req_id=1000000 + repetition * 100000 + req_index,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    resp = {"status": "error", "error": str(exc)}
+                latency_ms = (time.perf_counter() - t0) * 1000.0
+            else:
+                req = build_exec_req(
+                    req_id=1000000 + repetition * 100000 + req_index,
+                    session_id=session_id,
+                    tool=tool,
+                    payload=payload,
+                    tool_hash=tool.manifest_hash,
+                )
+                resp, latency_ms = invoke_mcpd(sock_path=sock_path, timeout_s=30.0, req=req)
             timing = resp.get("timing_ms", {}) if isinstance(resp.get("timing_ms", {}), dict) else {}
             session_lookup_ms = float(timing.get("session_lookup", 0.0))
             arbitration_ms = float(timing.get("arbitration", 0.0))
-            tool_exec_ms = float(timing.get("tool_exec", 0.0))
+            tool_exec_ms = float(timing.get("tool_exec", latency_ms if direct_mode else 0.0))
             total_ms = float(timing.get("total", latency_ms))
             latencies.append(latency_ms)
             session_lookup_values.append(session_lookup_ms)
@@ -536,6 +560,7 @@ def _steady_state_worker(
     barrier: Barrier,
     warmup_s: float,
     measure_s: float,
+    direct_mode: bool = False,
 ) -> list[Dict[str, Any]]:
     rows: list[Dict[str, Any]] = []
     barrier.wait()
@@ -547,13 +572,26 @@ def _steady_state_worker(
         start_ts = time.perf_counter()
         if start_ts >= measure_end:
             break
-        req = build_exec_req(
-            req_id=request_id_base + req_index,
-            session_id=session_id,
-            tool=tool,
-            tool_hash=tool.manifest_hash,
-        )
-        resp, latency_ms = invoke_mcpd(sock_path=sock_path, timeout_s=20.0, req=req)
+        if direct_mode:
+            t0 = time.perf_counter()
+            try:
+                resp = call_tool_direct(
+                    tool,
+                    dict(tool.payloads[0]) if tool.payloads else {},
+                    20.0,
+                    req_id=request_id_base + req_index,
+                )
+            except Exception as exc:  # noqa: BLE001
+                resp = {"status": "error", "error": str(exc)}
+            latency_ms = (time.perf_counter() - t0) * 1000.0
+        else:
+            req = build_exec_req(
+                req_id=request_id_base + req_index,
+                session_id=session_id,
+                tool=tool,
+                tool_hash=tool.manifest_hash,
+            )
+            resp, latency_ms = invoke_mcpd(sock_path=sock_path, timeout_s=20.0, req=req)
         end_ts = time.perf_counter()
         if start_ts >= measure_start and start_ts < measure_end:
             rows.append(
@@ -581,15 +619,20 @@ def run_scalability_repetition(
     concurrency_levels: Sequence[int],
     warmup_s: float,
     measure_s: float,
+    direct_mode: bool = False,
 ) -> tuple[list[Dict[str, Any]], list[Dict[str, Any]], list[Dict[str, Any]]]:
     raw_rows: list[Dict[str, Any]] = []
     summary_rows: list[Dict[str, Any]] = []
     bucket_rows: list[Dict[str, Any]] = []
     for agent_count in agent_counts:
-        sessions = [
-            str(open_session_details(sock_path, 20.0, f"scale-{system_label}-{repetition}-{agent_idx}")["session_id"])
-            for agent_idx in range(agent_count)
-        ]
+        if direct_mode:
+            # No mcpd sessions in direct mode — each "agent" slot is just a logical worker.
+            sessions = ["" for _ in range(agent_count)]
+        else:
+            sessions = [
+                str(open_session_details(sock_path, 20.0, f"scale-{system_label}-{repetition}-{agent_idx}")["session_id"])
+                for agent_idx in range(agent_count)
+            ]
         for concurrency in concurrency_levels:
             worker_count = max(1, concurrency)
             barrier = Barrier(worker_count)
@@ -608,6 +651,7 @@ def run_scalability_repetition(
                             barrier=barrier,
                             warmup_s=warmup_s,
                             measure_s=measure_s,
+                            direct_mode=direct_mode,
                         )
                     )
                 for fut in as_completed(futures):
@@ -1229,10 +1273,65 @@ def main() -> int:
             }
         )
         for system in repetition_systems:
+            direct_mode = system.mode == "direct"
             with managed_tool_services(
                 sandboxed=system.sandboxed_tools,
                 sandbox_fsize_bytes=args.sandbox_fsize_bytes,
             ):
+                if direct_mode:
+                    # Use a throwaway userspace mcpd only to enrich tool hashes and preflight;
+                    # the actual latency/scalability sweep then bypasses mcpd entirely.
+                    helper = SystemVariant(
+                        label="direct-preflight",
+                        display_name="direct preflight helper",
+                        mode="userspace_semantic_plane",
+                        sandboxed_tools=False,
+                        sock_path="/tmp/mcpd-direct-preflight.sock",
+                    )
+                    with managed_mcpd(helper, timeout_s=args.timeout_s) as helper_sock:
+                        tools = enrich_hash_from_mcpd(load_manifest_tools(), helper_sock, args.timeout_s)
+                        selected = preflight_tools(
+                            tools,
+                            mcpd_sock=helper_sock,
+                            timeout_s=args.timeout_s,
+                            include_write=True,
+                            max_tools=args.max_tools,
+                        )
+                        if not selected:
+                            raise RuntimeError(f"no tools passed preflight for {system.label}")
+                        latency_tool = choose_latency_tool(selected)
+                        safe_tool = choose_safe_tool(selected)
+                        risky_tool = choose_risky_tool(tools)
+                    selected_tools[system.label] = {
+                        "latency_tool": {"tool_id": latency_tool.tool_id, "tool_name": latency_tool.tool_name},
+                        "safe_tool": {"tool_id": safe_tool.tool_id, "tool_name": safe_tool.tool_name},
+                        "risky_tool": {"tool_id": risky_tool.tool_id, "tool_name": risky_tool.tool_name},
+                    }
+                    lat_raw, lat_rep = run_latency_repetition(
+                        sock_path="",
+                        tool=latency_tool,
+                        system_label=system.label,
+                        repetition=repetition,
+                        requests=args.latency_requests,
+                        direct_mode=True,
+                    )
+                    scale_raw, scale_rep, bucket_rows = run_scalability_repetition(
+                        sock_path="",
+                        tool=safe_tool,
+                        system_label=system.label,
+                        repetition=repetition,
+                        agent_counts=agent_counts,
+                        concurrency_levels=concurrency_levels,
+                        warmup_s=args.warmup_seconds,
+                        measure_s=args.measure_seconds,
+                        direct_mode=True,
+                    )
+                    latency_raw_rows.extend(lat_raw)
+                    latency_rep_rows.extend(lat_rep)
+                    scalability_raw_rows.extend(scale_raw)
+                    scalability_rep_rows.extend(scale_rep)
+                    throughput_bucket_rows.extend(bucket_rows)
+                    continue
                 with managed_mcpd(system, timeout_s=args.timeout_s) as sock_path:
                     tools = enrich_hash_from_mcpd(load_manifest_tools(), sock_path, args.timeout_s)
                     selected = preflight_tools(
@@ -1276,6 +1375,9 @@ def main() -> int:
                     throughput_bucket_rows.extend(bucket_rows)
 
     for system in active_systems:
+        if system.mode == "direct":
+            # E6 raw baseline doesn't participate in attack / budget / daemon-failure phases.
+            continue
         with managed_tool_services(
             sandboxed=system.sandboxed_tools,
             sandbox_fsize_bytes=args.sandbox_fsize_bytes,
@@ -1321,6 +1423,8 @@ def main() -> int:
 
     if args.boundary_repeats > 0:
         for system in active_systems:
+            if system.mode == "direct":
+                continue
             with managed_tool_services(
                 sandboxed=system.sandboxed_tools,
                 sandbox_fsize_bytes=args.sandbox_fsize_bytes,
