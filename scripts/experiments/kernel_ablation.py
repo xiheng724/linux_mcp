@@ -545,6 +545,33 @@ def render_report(summary: Dict[str, Any]) -> str:
         "construction (`kernel_mcp_reply_tool_decision`, 5 × `nla_put_*` +",
         "`genlmsg_reply`) — this is the dominant non-decomposable cost.",
         "",
+        "### Secondary finding: O(n) purge scan in approval-ticket issuance",
+        "",
+        "The `approval_ticket_body` delta reported above is **not** the pure",
+        "intrinsic cost of the consume + issue logic. Tracing",
+        "`kernel_mcp_issue_approval_ticket` in `kernel-mcp/src/kernel_mcp_main.c`",
+        "reveals that every ticket issuance calls",
+        "`kernel_mcp_purge_expired_tickets_locked()`, which iterates the",
+        "full 256-bucket approval hashtable and checks `expires_jiffies`",
+        "on every live entry. The default approval TTL is 300 seconds, so",
+        "over a ~1-minute E1 run nothing in the table ever expires — the",
+        "scan cost therefore grows linearly with the total number of",
+        "tickets issued by the benchmark.",
+        "",
+        "The runner caps ticket_trigger samples at `--ticket-requests` (default",
+        "100, vs 10,000 for benign modes) specifically to keep this O(n)",
+        "amplification small relative to the intrinsic issue+consume cost.",
+        "Even at this reduced sample count, some linear-growth contamination",
+        "remains; the figure should therefore be read as an **upper bound**",
+        "on the approval-ticket body cost under steady-state mcpd operation,",
+        "where tickets are decided and consumed quickly rather than",
+        "accumulating. A kernel-side optimization — moving the expiry scan",
+        "to the existing periodic `kernel_mcp_ticket_cleanup_timer` instead",
+        "of running it inline on every issuance — would eliminate the O(n)",
+        "component entirely. We flag this as a secondary microbench finding,",
+        "not a performance-characteristic claim about the kernel arbitration",
+        "fast path.",
+        "",
     ]
     return "\n".join(lines)
 
@@ -799,12 +826,29 @@ def run_ablation(
             pool=pool,
         )
 
-    # ticket_trigger modes run fewer samples per rep to keep the approval
-    # hashtable from growing unboundedly (TTL=300s, every request issues a
-    # fresh ticket). 1000 * 10 reps = 10k tickets across the run, well
-    # under the 256-bucket table's linear-chain degradation point.
+    # ticket_trigger modes run far fewer samples per rep than benign modes.
+    #
+    # Every ticket_trigger_full request makes the kernel issue a fresh
+    # approval ticket via kernel_mcp_issue_approval_ticket, which in turn
+    # calls kernel_mcp_purge_expired_tickets_locked() that scans all
+    # 256 buckets of the approval hashtable. TTL is 300s, so nothing
+    # expires during a ~minute-scale E1 run and the scan cost grows
+    # linearly in total live-ticket count. At 10,000 tickets the scan
+    # alone reached ~28 μs per issuance in the first full-scale run,
+    # which masks the intrinsic issue + consume logic cost.
+    #
+    # Default --ticket-requests=100 keeps the mean live-ticket count
+    # during the ticket_trigger sweep under ~500, which brings the
+    # purge_scan component down to a few-hundred-ns floor — still
+    # asymptotically O(n) but swamped by the actual issue/consume work
+    # we want to measure.
+    #
+    # Passing --ticket-requests=0 falls back to the old behavior of
+    # scaling linearly with --requests (requests // 10).
     def samples_for(mode: AblationMode, rep_samples: int) -> int:
         if mode.scenario == SCENARIO_TICKET_TRIGGER:
+            if args.ticket_requests > 0:
+                return args.ticket_requests
             return min(rep_samples, max(1, rep_samples // 10))
         return rep_samples
 
@@ -1035,9 +1079,21 @@ def main() -> int:
     parser.add_argument("--output-dir", default="experiment-results/kernel-ablation")
     parser.add_argument("--reps", type=int, default=10)
     parser.add_argument("--requests", type=int, default=10000,
-                        help="requests per (mode, rep) for benign scenarios; "
-                             "ticket_trigger modes are capped at requests/10 "
-                             "to limit approval-table growth.")
+                        help="requests per (mode, rep) for benign scenarios. "
+                             "Overridden for ticket_trigger by --ticket-requests.")
+    parser.add_argument("--ticket-requests", type=int, default=100,
+                        help="requests per (mode, rep) for ticket_trigger "
+                             "scenarios. Kept intentionally small (default 100, "
+                             "vs 10000 for benign) because every ticket_trigger_full "
+                             "request fires kernel_mcp_issue_approval_ticket, which "
+                             "calls an O(n) purge_expired_tickets scan over every "
+                             "live entry in the 256-bucket approval hashtable. "
+                             "TTL is 300s and nothing expires during a single E1 "
+                             "run, so the scan cost grows linearly in total "
+                             "live-ticket count. 100 keeps the steady-state "
+                             "number representative of the intrinsic issue+consume "
+                             "cost rather than the accumulated purge_scan cost. "
+                             "Set to 0 to fall back to the old requests//10 heuristic.")
     parser.add_argument("--warmup-requests", type=int, default=1000)
     parser.add_argument("--noop-requests", type=int, default=2000)
     parser.add_argument("--bootstrap-iters", type=int, default=1000)
@@ -1067,6 +1123,7 @@ def main() -> int:
     if args.smoke:
         args.reps = max(min(args.reps, 2), 2)
         args.requests = min(args.requests, 500)
+        args.ticket_requests = min(args.ticket_requests, 50)
         args.warmup_requests = min(args.warmup_requests, 100)
         args.noop_requests = min(args.noop_requests, 200)
         args.bootstrap_iters = min(args.bootstrap_iters, 200)
