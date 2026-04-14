@@ -85,6 +85,38 @@ def rpc_call(sock_path: str, req: Dict[str, Any], timeout_s: float) -> Dict[str,
     return obj
 
 
+class PersistentMcpdConn:
+    """Long-lived mcpd RPC connection for sustained-load workers.
+
+    The mcpd server multiplexes requests over a single connection
+    (see mcpd/server.py:_handle_connection which loops on recv_frame),
+    so reusing one socket avoids the SOMAXCONN bottleneck that bites
+    fresh-connect-per-request load patterns at concurrency >= 200.
+    """
+
+    def __init__(self, sock_path: str, timeout_s: float) -> None:
+        self._sock_path = sock_path
+        self._timeout_s = timeout_s
+        self._conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self._conn.settimeout(timeout_s)
+        self._conn.connect(sock_path)
+
+    def call(self, req: Dict[str, Any]) -> Dict[str, Any]:
+        payload = json.dumps(req, ensure_ascii=True).encode("utf-8")
+        send_frame(self._conn, payload)
+        raw = recv_frame(self._conn)
+        obj = json.loads(raw.decode("utf-8"))
+        if not isinstance(obj, dict):
+            raise RuntimeError("response is not JSON object")
+        return obj
+
+    def close(self) -> None:
+        try:
+            self._conn.close()
+        except Exception:
+            pass
+
+
 def load_manifest_tools(manifest_glob: str = "tool-app/manifests/*.json") -> List[ToolCase]:
     out: List[ToolCase] = []
     for path in sorted(glob.glob(manifest_glob)):
@@ -448,22 +480,59 @@ def run_sustained_load(
     warmup_s: float,
     payload_bytes: int,
     request_fn: Any,
+    make_worker_state: Any = None,
+    close_worker_state: Any = None,
     reservoir_cap: int = 5000,
     rng_seed: int = 0,
 ) -> SustainedResult:
     """Drive wall-clock-bounded load.
 
-    request_fn(worker_id, req_index) must return (status_ok: bool, latency_ms: float).
-    It is responsible for opening its own session if required — this helper only
-    schedules and collects samples so it can be reused across mcpd / direct paths
-    (and by the --dry-run synthetic stub in overload_eval.py).
+    Protocol:
+
+    - `make_worker_state(worker_id) -> state` is called once per worker before
+      the measurement window opens. It can (for example) open a persistent UDS
+      connection, open a session, or return None if no state is needed.
+    - `request_fn(state, req_index) -> (status_ok: bool, latency_ms: float)` is
+      called repeatedly in the hot loop. The same `state` is passed every call,
+      enabling connection pooling per worker. `req_index = -1` is the warmup
+      tick (latency is not recorded).
+    - `close_worker_state(state)` is called once per worker after the loop
+      exits (best-effort; exceptions are swallowed).
+
+    Only samples where `status_ok is True` are entered into the latency
+    reservoir — errors are counted in the `errors` counter but do NOT pollute
+    the latency distribution. This is critical: under connection saturation,
+    errors return in tens of microseconds and would otherwise push p50/p95
+    toward that floor and mask the real tail.
+
+    Back-compat shim: if `request_fn` accepts only `(worker_id, req_index)`
+    (the legacy overload_eval.py dry-run stub), the helper detects it via
+    signature inspection and wraps it automatically.
     """
     if concurrency <= 0:
         raise ValueError("concurrency must be positive")
+
+    # Legacy signature detection: _synthetic_request_fn in the dry-run path
+    # returns a closure with (worker_id, req_index). We wrap it so it fits
+    # the (state, req_index) protocol used below.
+    import inspect
+    try:
+        sig_params = list(inspect.signature(request_fn).parameters.values())
+        legacy = len(sig_params) >= 2 and sig_params[0].name in ("worker_id", "wid")
+    except (TypeError, ValueError):
+        legacy = False
+    if legacy:
+        _legacy_fn = request_fn
+        def request_fn(state, req_index):  # type: ignore[no-redef]
+            worker_id = state if isinstance(state, int) else 0
+            return _legacy_fn(worker_id, req_index)
+        if make_worker_state is None:
+            def make_worker_state(wid):  # type: ignore[no-redef]
+                return wid
+
     reservoir: List[float] = []
     reservoir_seen = 0
     reservoir_lock = __import__("threading").Lock()
-    rnd = random.Random(rng_seed)
 
     per_second_bucket_count = max(int(math.ceil(duration_s)), 1)
     per_second: List[int] = [0] * per_second_bucket_count
@@ -477,42 +546,61 @@ def run_sustained_load(
     def _worker(worker_id: int) -> None:
         nonlocal errors_total, requests_total, reservoir_seen
         local_rnd = random.Random(rng_seed + worker_id + 1)
-        barrier.wait()
-        measure_start = start_ref + warmup_s
-        measure_end = measure_start + duration_s
-        # Spin until measurement window opens.
-        while time.perf_counter() < measure_start:
+        state = None
+        if make_worker_state is not None:
             try:
-                request_fn(worker_id, -1)
+                state = make_worker_state(worker_id)
             except Exception:
-                pass
-        req_index = 0
-        while True:
-            now = time.perf_counter()
-            if now >= measure_end:
-                break
-            try:
-                status_ok, latency_ms = request_fn(worker_id, req_index)
-            except Exception:
-                status_ok = False
-                latency_ms = (time.perf_counter() - now) * 1000.0
-            bucket_idx = int(now - measure_start)
-            with errors_lock:
-                requests_total += 1
-                if not status_ok:
-                    errors_total += 1
-                if 0 <= bucket_idx < per_second_bucket_count:
-                    per_second[bucket_idx] += 1
-            with reservoir_lock:
-                reservoir_seen += 1
-                if len(reservoir) < reservoir_cap:
-                    reservoir.append(latency_ms)
-                else:
-                    # Reservoir sampling (Algorithm R).
-                    j = local_rnd.randint(0, reservoir_seen - 1)
-                    if j < reservoir_cap:
-                        reservoir[j] = latency_ms
-            req_index += 1
+                state = None
+        try:
+            barrier.wait()
+            measure_start = start_ref + warmup_s
+            measure_end = measure_start + duration_s
+            # Spin until measurement window opens. Warmup ticks use req_index=-1
+            # and their latency is never recorded.
+            while time.perf_counter() < measure_start:
+                try:
+                    request_fn(state, -1)
+                except Exception:
+                    pass
+            req_index = 0
+            while True:
+                now = time.perf_counter()
+                if now >= measure_end:
+                    break
+                try:
+                    status_ok, latency_ms = request_fn(state, req_index)
+                except Exception:
+                    status_ok = False
+                    latency_ms = (time.perf_counter() - now) * 1000.0
+                bucket_idx = int(now - measure_start)
+                with errors_lock:
+                    requests_total += 1
+                    if not status_ok:
+                        errors_total += 1
+                    elif 0 <= bucket_idx < per_second_bucket_count:
+                        # Count only successful requests in the per-second
+                        # throughput so rps reflects real work, not error churn.
+                        per_second[bucket_idx] += 1
+                # Only record latency for successful requests. Error latencies
+                # from connection refusals / timeouts would otherwise compress
+                # the reservoir toward the fail-fast floor and mask the tail.
+                if status_ok:
+                    with reservoir_lock:
+                        reservoir_seen += 1
+                        if len(reservoir) < reservoir_cap:
+                            reservoir.append(latency_ms)
+                        else:
+                            j = local_rnd.randint(0, reservoir_seen - 1)
+                            if j < reservoir_cap:
+                                reservoir[j] = latency_ms
+                req_index += 1
+        finally:
+            if close_worker_state is not None and state is not None:
+                try:
+                    close_worker_state(state)
+                except Exception:
+                    pass
 
     threads = [
         __import__("threading").Thread(target=_worker, args=(wid,), daemon=True)

@@ -415,6 +415,36 @@ def run_toctou_phase(
 # Phase 2: Cross-uid session hijack.
 # --------------------------------------------------------------------------- #
 
+PEER_CRED_SYSFS = "/sys/module/kernel_mcp/parameters/require_peer_cred"
+
+
+def _set_peer_cred_mode(value: int) -> None:
+    """Toggle the E4 peer-cred enforcement knob via sysfs.
+
+    Silently no-ops if the knob file does not exist (e.g. running against an
+    older kernel module build without the E4 follow-up patch, or on macOS
+    during smoke tests). Raises RuntimeError only if the write itself fails
+    — e.g. missing root privileges on the real VM run.
+    """
+    path = Path(PEER_CRED_SYSFS)
+    if not path.exists():
+        print(
+            f"[attack-extended] warning: {PEER_CRED_SYSFS} not present — "
+            f"kernel module may be built without the E4 peer-cred knob. "
+            f"Proceeding without toggle.",
+            file=sys.stderr,
+        )
+        return
+    try:
+        path.write_text("1" if value else "0")
+    except PermissionError as exc:
+        raise RuntimeError(
+            f"cannot write {PEER_CRED_SYSFS}: {exc}. "
+            f"--crossuid-both-modes requires root (the runner must be "
+            f"invoked under sudo or the sysfs file must be chmodded)."
+        ) from exc
+
+
 def run_crossuid_phase(
     *,
     client: Any,
@@ -423,6 +453,7 @@ def run_crossuid_phase(
     rng: random.Random,
     writer: csv.DictWriter,
     dry_run: bool,
+    dry_run_peer_cred_on: bool = False,
 ) -> Dict[str, Any]:
     """Attempt to hijack a session bound to a different uid.
 
@@ -505,11 +536,17 @@ def run_crossuid_phase(
             kernel_errno = -1
         dt = (time.perf_counter() - t0) * 1000.0
 
-        # In dry-run, synthesise the expected kernel behaviour: blind and
-        # guessed are binding_mismatch → DENY; leaked is allow (missing
-        # peer-cred guard — that is the whole point of the experiment).
+        # In dry-run, synthesise expected kernel behaviour. Without the E4
+        # patch (or when require_peer_cred=0) blind/guessed are
+        # binding_mismatch → DENY and leaked passes through — that is the
+        # original experiment's finding. With the patch enabled
+        # (dry_run_peer_cred_on=True) every attempt is additionally gated on
+        # real uid, so even the leaked sub-case is blocked with
+        # reason=peer_cred_mismatch.
         if dry_run:
-            if sub_case == "leaked":
+            if dry_run_peer_cred_on:
+                dec_name, reason = "DENY", "peer_cred_mismatch"
+            elif sub_case == "leaked":
                 dec_name, reason = "ALLOW", "allow"
             else:
                 dec_name, reason = "DENY", "binding_mismatch"
@@ -1024,6 +1061,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         help="shrink all phases for a ~30 s dry-run")
     parser.add_argument("--toctou-iterations", type=int, default=0)
     parser.add_argument("--crossuid-attempts", type=int, default=0)
+    parser.add_argument("--crossuid-both-modes", action="store_true",
+                        help="run cross-uid phase twice: once with "
+                             "require_peer_cred=0 (without the E4 patch) and "
+                             "once with require_peer_cred=1 (with the patch), "
+                             "for an A/B comparison. Requires sudo to toggle "
+                             "/sys/module/kernel_mcp/parameters/require_peer_cred.")
     parser.add_argument("--duration-s", type=float, default=0.0)
     parser.add_argument("--rate-limit-per-s", type=int, default=500)
     parser.add_argument("--fuzz-tool-id", type=int, default=4242)
@@ -1087,29 +1130,61 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               f"breaches={toctou_summary['breach_count']}")
 
     # Phase 2 — cross-uid hijack.
+    #
+    # When --crossuid-both-modes is set, run twice: once with
+    # require_peer_cred=0 (the "without patch" baseline — same behaviour as
+    # the initial E4 run) and once with require_peer_cred=1 (the "with patch"
+    # comparison). Otherwise fall back to single-mode behaviour controlled
+    # by whatever value is already set on the module.
+    crossuid_all_modes: Dict[str, Dict[str, Any]] = {}
     if "crossuid" in phases:
-        print(f"[attack-extended][crossuid] attempts={crossuid_attempts}")
-        t0 = time.monotonic()
-        crossuid_path = run_dir / "crossuid_result.csv"
-        with crossuid_path.open("w", encoding="utf-8", newline="") as fp:
-            writer = csv.DictWriter(
-                fp,
-                fieldnames=[
-                    "attempt", "attacker_uid", "sub_case", "decision",
-                    "reason", "kernel_errno", "latency_ms", "outcome",
-                ],
-            )
-            writer.writeheader()
-            crossuid_summary = run_crossuid_phase(
-                client=client,
-                attempts=crossuid_attempts,
-                tool_id=args.fuzz_tool_id + 1,
-                rng=rng,
-                writer=writer,
-                dry_run=args.dry_run,
-            )
-        print(f"[attack-extended][crossuid] done in {time.monotonic() - t0:.1f}s; "
-              f"blocked={crossuid_summary['blocked']}/{crossuid_summary['attempts']}")
+        if args.crossuid_both_modes:
+            mode_plan = [("without_patch", 0), ("with_patch", 1)]
+        else:
+            mode_plan = [("single", None)]
+        for mode_label, peer_cred_value in mode_plan:
+            if peer_cred_value is not None and not args.dry_run:
+                _set_peer_cred_mode(peer_cred_value)
+            print(f"[attack-extended][crossuid:{mode_label}] attempts={crossuid_attempts}")
+            t0 = time.monotonic()
+            if len(mode_plan) > 1:
+                crossuid_path = run_dir / f"crossuid_result_{mode_label}.csv"
+            else:
+                crossuid_path = run_dir / "crossuid_result.csv"
+            with crossuid_path.open("w", encoding="utf-8", newline="") as fp:
+                writer = csv.DictWriter(
+                    fp,
+                    fieldnames=[
+                        "attempt", "attacker_uid", "sub_case", "decision",
+                        "reason", "kernel_errno", "latency_ms", "outcome",
+                    ],
+                )
+                writer.writeheader()
+                # The dry-run synthetic branch is keyed on peer-cred mode so
+                # that the "with_patch" run shows leaked→DENY on macOS too.
+                phase_dry = args.dry_run
+                mode_summary = run_crossuid_phase(
+                    client=client,
+                    attempts=crossuid_attempts,
+                    tool_id=args.fuzz_tool_id + 1,
+                    rng=rng,
+                    writer=writer,
+                    dry_run=phase_dry,
+                    dry_run_peer_cred_on=(peer_cred_value == 1),
+                )
+            mode_summary["mode"] = mode_label
+            mode_summary["require_peer_cred"] = peer_cred_value
+            crossuid_all_modes[mode_label] = mode_summary
+            print(f"[attack-extended][crossuid:{mode_label}] done in "
+                  f"{time.monotonic() - t0:.1f}s; "
+                  f"blocked={mode_summary['blocked']}/{mode_summary['attempts']}")
+        # Backwards-compatible `crossuid` summary: if only one mode ran, use
+        # it directly; otherwise expose the with_patch result as the headline
+        # and stash both under crossuid_modes.
+        if len(mode_plan) == 1:
+            crossuid_summary = crossuid_all_modes["single"]
+        else:
+            crossuid_summary = crossuid_all_modes.get("with_patch") or crossuid_all_modes.get("without_patch")
 
     # Phase 3 — dumb fuzzer.
     if "fuzz" in phases:
@@ -1156,6 +1231,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         },
         "toctou": toctou_summary,
         "crossuid": crossuid_summary,
+        "crossuid_modes": crossuid_all_modes if crossuid_all_modes else None,
         "fuzz": (
             {
                 "total_sent": fuzz_stats.total_sent,

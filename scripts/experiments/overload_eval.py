@@ -55,16 +55,17 @@ DEFAULT_PAYLOAD_BYTES = 1024
 # ---------------------------------------------------------------------------
 
 
-def _synthetic_request_fn(system: str, concurrency: int, seed: int) -> Callable[[int, int], Tuple[bool, float]]:
-    """Return a request_fn for run_sustained_load that emits synthetic latencies.
+def _synthetic_make_state(worker_id: int) -> int:
+    return worker_id
 
-    The mean grows sublinearly with concurrency so the piecewise-linear knee
-    detector has something to latch onto. Kernel is given a slightly later
-    inflection point so the smoke output resembles the shape of the claim.
+
+def _synthetic_request_fn(system: str, concurrency: int, seed: int) -> Callable[[Any, int], Tuple[bool, float]]:
+    """Return a (state, req_index) request_fn that emits synthetic latencies.
+
+    Shape is picked so the smoke output resembles the claim: kernel gets a
+    slightly later inflection point. `state` is just the worker_id.
     """
     rnd = random.Random(seed)
-    # Per-system noise floor and knee concurrency — picked so the curves look
-    # distinguishable on a 5-point sweep.
     knee_c = {"userspace": 150.0, "seccomp": 120.0, "kernel": 260.0, "direct": 180.0}.get(system, 160.0)
     base_ms = {"userspace": 2.0, "seccomp": 3.0, "kernel": 2.5, "direct": 1.5}.get(system, 2.0)
     slope_pre = 0.01
@@ -75,12 +76,10 @@ def _synthetic_request_fn(system: str, concurrency: int, seed: int) -> Callable[
         mean = base_ms + slope_pre * knee_c + slope_post * (concurrency - knee_c)
     std = 0.3 * mean
 
-    def _fn(worker_id: int, req_index: int) -> Tuple[bool, float]:
+    def _fn(state: Any, req_index: int) -> Tuple[bool, float]:
         if req_index < 0:
-            # warmup tick — return cheap latency, don't cost too much
             return True, max(0.0, rnd.gauss(base_ms, 0.1))
         latency = max(0.05, rnd.gauss(mean, std))
-        # Inject rare errors so error_rate is not identically zero.
         ok = rnd.random() > 0.002
         return ok, latency
 
@@ -88,46 +87,109 @@ def _synthetic_request_fn(system: str, concurrency: int, seed: int) -> Callable[
 
 
 # ---------------------------------------------------------------------------
-# Real request generator (only used when --dry-run is NOT passed; guarded so
-# the runner still imports cleanly on macOS where security_eval's runtime
-# dependencies are not expected to be exercised).
+# Real request path.
+#
+# Worker state is a persistent (PersistentMcpdConn, session_id, target_tool)
+# triple. One UDS connection per worker is reused across every request in the
+# measurement window, so we never touch the kernel accept queue during the
+# hot loop. This fixes the prior SOMAXCONN saturation at concurrency >= 200
+# that showed up as ~99% error_rate and p99 in the microsecond range in the
+# first overload run.
+#
+# Errors are NOT recorded as latency samples (handled by run_sustained_load).
 # ---------------------------------------------------------------------------
 
 
-def _real_request_fn(system: str, sock_path: str, concurrency: int, seed: int) -> Callable[[int, int], Tuple[bool, float]]:
-    # Imported lazily so --dry-run on macOS does not require the security_eval
-    # runtime path (which may touch Linux-only helpers).
+@dataclass
+class _WorkerState:
+    conn: Any          # PersistentMcpdConn
+    session_id: str
+    target: Any        # ToolCase
+    worker_id: int
+
+
+def _prepare_system_context(system: str, sock_path: str) -> Dict[str, Any]:
+    """Run preflight once per system. Returns {target, sock_path}.
+
+    Sessions are opened per-worker rather than shared so that each persistent
+    UDS connection maps to exactly one session on the mcpd side (mcpd binds
+    sessions to SO_PEERCRED + connection identity).
+    """
     from benchmark_suite import (  # noqa: F401  — keep lazy
-        call_tool_direct,
         enrich_hash_from_mcpd,
         load_manifest_tools,
         preflight_tools,
     )
-    from security_eval import (  # noqa: F401
-        build_exec_req,
-        invoke_mcpd,
-        open_session_details,
-    )
 
     tools = enrich_hash_from_mcpd(load_manifest_tools(), sock_path, 10.0)
-    selected = preflight_tools(tools, mcpd_sock=sock_path, timeout_s=10.0, include_write=True, max_tools=20)
+    # Try read-only first so the sandboxed seccomp variant (which restricts
+    # tool writes) still finds a usable tool; fall back to include_write
+    # if no read-only tool passes preflight.
+    selected = preflight_tools(
+        tools, mcpd_sock=sock_path, timeout_s=10.0, include_write=False, max_tools=20
+    )
     if not selected:
-        raise RuntimeError(f"no tools passed preflight for overload run on {system}")
-    target = selected[0]
-    session = open_session_details(sock_path, 10.0, f"overload-{system}")
-    session_id = str(session["session_id"])
-
-    def _fn(worker_id: int, req_index: int) -> Tuple[bool, float]:
-        req = build_exec_req(
-            req_id=3000000 + worker_id * 10000 + max(req_index, 0),
-            session_id=session_id,
-            tool=target,
-            tool_hash=target.manifest_hash,
+        selected = preflight_tools(
+            tools, mcpd_sock=sock_path, timeout_s=10.0, include_write=True, max_tools=20
         )
-        resp, latency_ms = invoke_mcpd(sock_path=sock_path, timeout_s=20.0, req=req)
-        return resp.get("status") == "ok", latency_ms
+    if not selected:
+        raise RuntimeError(
+            f"no tools passed preflight for overload run on {system} "
+            f"(sock={sock_path}). Check scripts/run_tool_services.sh and "
+            f"endpoints under /tmp/linux-mcp-apps/."
+        )
+    return {"target": selected[0], "sock_path": sock_path}
 
-    return _fn
+
+def _real_request_fn(ctx: Dict[str, Any]) -> Tuple[Callable[[int], _WorkerState], Callable[[_WorkerState, int], Tuple[bool, float]], Callable[[_WorkerState], None]]:
+    """Build (make_state, request_fn, close_state) for the live-mcpd path."""
+    from benchmark_suite import PersistentMcpdConn  # noqa: F401 — keep lazy
+    from security_eval import build_exec_req  # noqa: F401
+
+    target = ctx["target"]
+    sock_path = ctx["sock_path"]
+
+    def make_state(worker_id: int) -> _WorkerState:
+        conn = PersistentMcpdConn(sock_path, timeout_s=20.0)
+        # Open a session on this persistent connection so the peer-cred binding
+        # (uid/pid) is tied to a stable socket identity.
+        open_req = {
+            "sys": "open_session",
+            "client_name": f"overload-w{worker_id}",
+            "ttl_ms": 10 * 60 * 1000,
+        }
+        resp = conn.call(open_req)
+        if resp.get("status") != "ok":
+            conn.close()
+            raise RuntimeError(
+                f"open_session failed on worker {worker_id}: {resp.get('error')}"
+            )
+        session_id = str(resp.get("session_id", ""))
+        if not session_id:
+            conn.close()
+            raise RuntimeError(f"open_session returned no session_id: {resp}")
+        return _WorkerState(conn=conn, session_id=session_id, target=target, worker_id=worker_id)
+
+    def request_fn(state: _WorkerState, req_index: int) -> Tuple[bool, float]:
+        req = build_exec_req(
+            req_id=3_000_000 + state.worker_id * 100_000 + max(req_index, 0),
+            session_id=state.session_id,
+            tool=state.target,
+            tool_hash=state.target.manifest_hash,
+        )
+        t0 = time.perf_counter()
+        try:
+            resp = state.conn.call(req)
+        except Exception:
+            return False, (time.perf_counter() - t0) * 1000.0
+        latency_ms = (time.perf_counter() - t0) * 1000.0
+        ok = resp.get("status") == "ok"
+        return ok, latency_ms
+
+    def close_state(state: _WorkerState) -> None:
+        state.conn.close()
+
+    return make_state, request_fn, close_state
 
 
 # ---------------------------------------------------------------------------
@@ -397,28 +459,109 @@ def main() -> int:
     per_second_rows: List[Dict[str, Any]] = []
     cell_records: List[Dict[str, Any]] = []
 
-    # Real-path state: one live mcpd per system. In dry-run we skip entirely.
-    live_ctx: Dict[str, Any] = {}
+    # Real-path state: one live mcpd per system + preflight context cached
+    # for the whole rep sweep. In dry-run we skip entirely.
+    live_ctx: Dict[str, Dict[str, Any]] = {}
+    tool_services_started = False
+    skipped_systems: List[Tuple[str, str]] = []
     try:
         if not args.dry_run:
-            from security_eval import launch_mcpd_variant, stop_process, wait_mcpd_ready
+            from security_eval import (  # noqa: F401
+                launch_mcpd_variant,
+                stop_process,
+                wait_mcpd_ready,
+            )
+
+            system_env = {
+                "userspace": {},
+                "seccomp": {"MCPD_STRICT_CHECKS": "1", "MCPD_AUDIT_LOGGING": "1"},
+                "kernel": {},
+                "direct": {},
+            }
+            system_mode = {
+                "userspace": "userspace_semantic_plane",
+                "seccomp": "userspace_semantic_plane",
+                "kernel": "normal",
+                "direct": "direct",
+            }
+
+            # Start tool services once for the whole run. If any requested
+            # system is "seccomp", launch the sandboxed variant so preflight
+            # for every other userspace-plane system still works against the
+            # same endpoints. This mirrors managed_tool_services() in
+            # linux_mcp_eval.py.
+            needs_sandbox = "seccomp" in systems
+            stop_cmd = ["bash", "scripts/stop_tool_services.sh"]
+            start_cmd = ["bash", "scripts/run_tool_services.sh"]
+            if needs_sandbox:
+                start_cmd.extend(["--sandbox", "simple"])
+            subprocess.run(stop_cmd, cwd=str(ROOT_DIR), check=False)
+            subprocess.run(start_cmd, cwd=str(ROOT_DIR), check=True)
+            tool_services_started = True
 
             for system in systems:
+                if system == "direct":
+                    skipped_systems.append((system, "direct mode not supported in overload_eval"))
+                    continue
                 sock_path = f"/tmp/mcpd-overload-{system}.sock"
-                mode = {"userspace": "userspace_semantic_plane", "seccomp": "userspace_semantic_plane", "kernel": "normal"}.get(system, "userspace_semantic_plane")
-                proc = launch_mcpd_variant(mode=mode, sock_path=sock_path)
-                wait_mcpd_ready(sock_path, 10.0)
-                live_ctx[system] = (proc, sock_path)
+                overrides = system_env.get(system, {})
+                prev_env = {k: os.environ.get(k) for k in overrides}
+                for k, v in overrides.items():
+                    os.environ[k] = v
+                proc = None
+                try:
+                    proc = launch_mcpd_variant(
+                        mode=system_mode.get(system, "userspace_semantic_plane"),
+                        sock_path=sock_path,
+                    )
+                    wait_mcpd_ready(sock_path, 10.0)
+                    preflight = _prepare_system_context(system, sock_path)
+                    make_state, req_fn_real, close_state = _real_request_fn(preflight)
+                    live_ctx[system] = {
+                        "proc": proc,
+                        "sock_path": sock_path,
+                        "preflight": preflight,
+                        "make_state": make_state,
+                        "req_fn": req_fn_real,
+                        "close_state": close_state,
+                    }
+                except Exception as exc:
+                    if proc is not None:
+                        try:
+                            stop_process(proc, sock_path)
+                        except Exception:
+                            pass
+                    print(f"[overload] skipping {system}: {exc}", flush=True)
+                    skipped_systems.append((system, str(exc)))
+                finally:
+                    for k, old in prev_env.items():
+                        if old is None:
+                            os.environ.pop(k, None)
+                        else:
+                            os.environ[k] = old
+
+            if not live_ctx:
+                raise RuntimeError(
+                    f"no usable system variants after preflight — nothing to run. "
+                    f"skipped: {skipped_systems}"
+                )
 
         for idx, (system, concurrency, rep) in enumerate(cells):
             cell_id = f"{system}-c{concurrency}-rep{rep}"
+            if not args.dry_run and system not in live_ctx:
+                print(f"[overload] skip cell {cell_id} (system {system} not ready)", flush=True)
+                continue
             print(f"[overload] cell {idx + 1}/{len(cells)}: {cell_id}", flush=True)
             seed = args.random_seed + idx
             if args.dry_run:
                 req_fn = _synthetic_request_fn(system, concurrency, seed)
+                make_state = None
+                close_state = None
             else:
-                proc, sock_path = live_ctx[system]
-                req_fn = _real_request_fn(system, sock_path, concurrency, seed)
+                entry = live_ctx[system]
+                req_fn = entry["req_fn"]
+                make_state = entry["make_state"]
+                close_state = entry["close_state"]
             result = run_sustained_load(
                 system=system,
                 concurrency=concurrency,
@@ -426,6 +569,8 @@ def main() -> int:
                 warmup_s=warmup,
                 payload_bytes=args.payload_bytes,
                 request_fn=req_fn,
+                make_worker_state=make_state,
+                close_worker_state=close_state,
                 rng_seed=seed,
             )
             latencies_sorted = sorted(result.latency_samples_ms)
@@ -474,11 +619,26 @@ def main() -> int:
         if not args.dry_run and live_ctx:
             from security_eval import stop_process
 
-            for system, (proc, sock_path) in live_ctx.items():
+            for system, entry in live_ctx.items():
                 try:
-                    stop_process(proc, sock_path)
+                    stop_process(entry["proc"], entry["sock_path"])
                 except Exception:
                     pass
+        if tool_services_started:
+            try:
+                subprocess.run(
+                    ["bash", "scripts/stop_tool_services.sh"],
+                    cwd=str(ROOT_DIR),
+                    check=False,
+                )
+            except Exception:
+                pass
+        if skipped_systems:
+            print(
+                "[overload] skipped systems: "
+                + ", ".join(f"{s}({r[:60]})" for s, r in skipped_systems),
+                flush=True,
+            )
 
     # Fit p99 knee per system, pooling reps at each concurrency level.
     knee_by_system: Dict[str, float] = {}
