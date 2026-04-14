@@ -186,6 +186,46 @@ METHODOLOGY_NOTE_DELTAS: Tuple[Tuple[str, str, str, str], ...] = (
     ),
 )
 
+# One phase per delta we want to measure.
+# Each phase runs its two modes in lock-step via measure_paired_real.
+# Flagged as "kind" so the summary layer knows which table to put the
+# resulting delta in.
+PAIRED_PHASES: Tuple[Tuple[str, str, str, str, str, str], ...] = (
+    # (phase_label, mode_a_name, mode_b_name, kind, scenario_hint, note_template)
+    (
+        "registry+agent_lookup",
+        "full",
+        "skip_lookups",
+        "meaningful",
+        SCENARIO_BENIGN_LARGE,
+        "two mutex pairs + xa_load(N=%(n_tools)s) + agent hashtable walk(M=%(n_agents)s)",
+    ),
+    (
+        "approval_ticket_body",
+        "ticket_trigger_full",
+        "ticket_trigger_skip",
+        "meaningful",
+        SCENARIO_TICKET_TRIGGER,
+        "kernel_mcp_consume_approval_ticket + kernel_mcp_issue_approval_ticket (approval_lock + hashtable insert)",
+    ),
+    (
+        "hash_guard_body",
+        "full",
+        "skip_hash",
+        "methodology_note",
+        SCENARIO_BENIGN_LARGE,
+        "hash_mismatch guard body is dead under valid hash (delta = noise floor)",
+    ),
+    (
+        "binding_guard_body",
+        "full",
+        "skip_binding",
+        "methodology_note",
+        SCENARIO_BENIGN_LARGE,
+        "binding_mismatch guard body is dead under valid binding (delta = noise floor)",
+    ),
+)
+
 
 def percentile(values: Sequence[float], p: float) -> float:
     if not values:
@@ -255,6 +295,59 @@ def paired_bootstrap_delta_ci(
         round(percentile(deltas, 0.025), 6),
         round(percentile(deltas, 0.975), 6),
     )
+
+
+def paired_delta_stats(
+    delta_samples: Sequence[float], *, iters: int = 1000, seed: int = 0xCAFE
+) -> Dict[str, float]:
+    """Compute paired-delta statistics from a pre-aligned delta vector.
+
+    Returns:
+      mean, median, std, ci_lo, ci_hi (bootstrap 95% on mean),
+      t_paired, p_paired (paired t-test against H0: mean=0).
+    """
+    n = len(delta_samples)
+    if n < 2:
+        return {
+            "mean_ms": 0.0,
+            "median_ms": 0.0,
+            "std_ms": 0.0,
+            "ci_lo": 0.0,
+            "ci_hi": 0.0,
+            "t_paired": 0.0,
+            "p_paired": 1.0,
+            "n": n,
+        }
+    mean_d = statistics.fmean(delta_samples)
+    median_d = percentile(sorted(delta_samples), 0.5)
+    std_d = statistics.stdev(delta_samples)
+    # Bootstrap CI on the mean by resampling the delta vector directly.
+    rng = random.Random(seed)
+    boots: List[float] = []
+    for _ in range(iters):
+        sample = [delta_samples[rng.randrange(n)] for _ in range(n)]
+        boots.append(statistics.fmean(sample))
+    boots.sort()
+    ci_lo = percentile(boots, 0.025)
+    ci_hi = percentile(boots, 0.975)
+    # Paired t-test against mean=0 (normal approximation for large n).
+    se = std_d / math.sqrt(n)
+    if se == 0.0:
+        t = 0.0
+        p = 1.0
+    else:
+        t = mean_d / se
+        p = 2.0 * (1.0 - _std_normal_cdf(abs(t)))
+    return {
+        "mean_ms": round(mean_d, 6),
+        "median_ms": round(median_d, 6),
+        "std_ms": round(std_d, 6),
+        "ci_lo": round(ci_lo, 6),
+        "ci_hi": round(ci_hi, 6),
+        "t_paired": round(t, 4),
+        "p_paired": round(max(min(p, 1.0), 0.0), 6),
+        "n": n,
+    }
 
 
 def welch_t(a: Sequence[float], b: Sequence[float]) -> Tuple[float, float]:
@@ -394,10 +487,11 @@ def render_report(summary: Dict[str, Any]) -> str:
         "## Setup",
         "",
         f"- reps: {meta['reps']}",
-        f"- requests per (mode, rep) — benign: {meta['requests_per_cell']}",
-        f"- requests per (mode, rep) — ticket_trigger: {meta['requests_per_cell'] // 10}",
+        f"- pairs per phase (benign): {meta['requests_per_cell']}",
+        f"- pairs per phase (ticket_trigger): {meta.get('ticket_requests', meta['requests_per_cell'] // 10)}",
         f"- benign registry scale: {meta['n_tools_registered']} tools, {meta['n_agents_registered']} agents",
-        f"- order randomization: per-rep shuffle of mode list",
+        "- measurement method: **paired**, request-level alternation inside each phase",
+        "- order randomization: per-rep shuffle of phase list",
         f"- dry-run: {meta['dry_run']}",
         "",
         "## Environment",
@@ -453,27 +547,37 @@ def render_report(summary: Dict[str, Any]) -> str:
         "",
         "## Per-stage body cost (paired ablation)",
         "",
-        "These are the **meaningful** deltas — pairs of modes where the",
-        "bypass flag actually changes the kernel execution path under its",
-        "workload. Both the mean-based and p50-based delta are shown because",
-        "p50 is robust to hypervisor preemption outliers in individual",
-        "100k-sample cells.",
+        "Each row below was produced by a **paired measurement**: within a",
+        "single benchmark phase, the baseline mode and the bypass mode were",
+        "alternated request-by-request inside a tight loop, so the two",
+        "samples in each pair are collected ~μs apart and share the same",
+        "scheduler state, cache residency, and jiffies tick. The delta",
+        "column is the mean of `baseline[i] - bypass[i]` across all pairs,",
+        "not the difference of two independent means — which is why the",
+        "bootstrap CIs are much tighter than a naive sequential ablation",
+        "would produce. Hypervisor-level rep drift (the source of the ~200",
+        "ns run-to-run shift we observed in earlier runs) cancels out",
+        "inside the paired difference.",
         "",
-        "| stage | baseline | bypass | Δ_avg (μs) | Δ_p50 (μs) | bootstrap 95% CI (μs) | note |",
-        "|---|---|---|---:|---:|---|---|",
+        "| stage | baseline | bypass | n_pairs | Δ_avg (μs) | Δ_p50 (μs) | bootstrap 95% CI (μs) | t_paired | p_paired | note |",
+        "|---|---|---|---:|---:|---:|---|---:|---:|---|",
     ]
     for row in summary["meaningful_stage_deltas"]:
         lines.append(
-            "| {stage} | {baseline_mode} | {bypass_mode} | "
+            "| {stage} | {baseline_mode} | {bypass_mode} | {n_pairs} | "
             "{d_avg_us:+.3f} | {d_p50_us:+.3f} | "
-            "[{ci_lo_us:+.3f}, {ci_hi_us:+.3f}] | {note} |".format(
+            "[{ci_lo_us:+.3f}, {ci_hi_us:+.3f}] | "
+            "{t:+.2f} | {p:.3g} | {note} |".format(
                 stage=row["stage"],
                 baseline_mode=row["baseline_mode"],
                 bypass_mode=row["bypass_mode"],
+                n_pairs=row["n_pairs"],
                 d_avg_us=row["delta_avg_ms"] * 1000.0,
                 d_p50_us=row["delta_p50_ms"] * 1000.0,
                 ci_lo_us=row["delta_ci_lo"] * 1000.0,
                 ci_hi_us=row["delta_ci_hi"] * 1000.0,
+                t=row["t_paired"],
+                p=row["p_paired"],
                 note=row["note"],
             )
         )
@@ -488,39 +592,46 @@ def render_report(summary: Dict[str, Any]) -> str:
         "`kernel_mcp_cmd_tool_request` are short-circuited by the workload state",
         "before the experiment flag is consulted; full and skip_{hash,binding}",
         "therefore execute identical kernel code paths, and any measured delta",
-        "between them is noise on the same code, not a stage cost. We keep them",
-        "in the output so that the path-identity caveat is visible in the raw",
-        "data instead of requiring a source-level trace to rediscover.",
+        "between them is noise on the same code, not a stage cost. Under",
+        "paired measurement this noise should cancel to within a few tens of",
+        "nanoseconds, so the rows below are a consistency check on the paired",
+        "method itself — if any of them reports a large non-zero delta,",
+        "something in the measurement is broken.",
         "",
-        "| stage | baseline | bypass | Δ_avg (μs) | Δ_p50 (μs) | bootstrap 95% CI (μs) | note |",
-        "|---|---|---|---:|---:|---|---|",
+        "| stage | baseline | bypass | n_pairs | Δ_avg (μs) | Δ_p50 (μs) | bootstrap 95% CI (μs) | t_paired | p_paired | note |",
+        "|---|---|---|---:|---:|---:|---|---:|---:|---|",
     ]
     for row in summary["methodology_note_deltas"]:
         lines.append(
-            "| {stage} | {baseline_mode} | {bypass_mode} | "
+            "| {stage} | {baseline_mode} | {bypass_mode} | {n_pairs} | "
             "{d_avg_us:+.3f} | {d_p50_us:+.3f} | "
-            "[{ci_lo_us:+.3f}, {ci_hi_us:+.3f}] | {note} |".format(
+            "[{ci_lo_us:+.3f}, {ci_hi_us:+.3f}] | "
+            "{t:+.2f} | {p:.3g} | {note} |".format(
                 stage=row["stage"],
                 baseline_mode=row["baseline_mode"],
                 bypass_mode=row["bypass_mode"],
+                n_pairs=row["n_pairs"],
                 d_avg_us=row["delta_avg_ms"] * 1000.0,
                 d_p50_us=row["delta_p50_ms"] * 1000.0,
                 ci_lo_us=row["delta_ci_lo"] * 1000.0,
                 ci_hi_us=row["delta_ci_hi"] * 1000.0,
+                t=row["t_paired"],
+                p=row["p_paired"],
                 note=row["note"],
             )
         )
 
     lines += [
         "",
-        "## Pairwise Welch t-tests (BH-corrected across all deltas)",
+        "## Paired t-tests (BH-corrected across all four phases)",
         "",
-        "| stage | baseline | bypass | t | p_raw | p_bh |",
-        "|---|---|---|---:|---:|---:|",
+        "| stage | baseline | bypass | n_pairs | t | p_raw | p_bh |",
+        "|---|---|---|---:|---:|---:|---:|",
     ]
     for row in summary["pairwise_tests"]:
         lines.append(
-            "| {stage} | {baseline} | {bypass} | {t:.4f} | {p_raw:.6f} | {p_bh:.6f} |".format(**row)
+            "| {stage} | {baseline} | {bypass} | {n_pairs} | "
+            "{t:+.4f} | {p_raw:.6f} | {p_bh:.6f} |".format(**row)
         )
 
     lines += [
@@ -687,6 +798,178 @@ def measure_mode_dry(
     return [max(center + rng.gauss(0.0, 0.0004), 0.0005) for _ in range(requests)]
 
 
+def measure_paired_real(
+    client: Any,
+    *,
+    mode_a: AblationMode,
+    mode_b: AblationMode,
+    pair_requests: int,
+    req_start: int,
+    seed: int,
+    pool: Dict[str, Any],
+) -> Tuple[List[float], List[float]]:
+    """Interleave tool_request calls between two modes to cancel VM jitter.
+
+    The classic trap in microbenching two kernel paths on a shared VM is
+    that rep-level timing drift (hypervisor scheduler window, NMI ticks,
+    vCPU migration) moves both modes' means around by more than the
+    signal you're trying to measure. We dodge it here by alternating
+    request-by-request: mode A sample i and mode B sample i are
+    measured ~μs apart, so they share the same scheduler state, same
+    cache residency, same jiffies tick.
+
+    Paired bootstrap / t-tests on (a[i], b[i]) then recover a much
+    tighter CI than mean(a) - mean(b) would.
+
+    Returns two lists of equal length `pair_requests`, one per mode,
+    aligned by index so `a[i]` and `b[i]` are a matched pair.
+    """
+    a_samples: List[float] = []
+    b_samples: List[float] = []
+    a_samples_append = a_samples.append  # bind locally for tight loop
+    b_samples_append = b_samples.append
+
+    a_ok = set(mode_a.ok_decisions)
+    b_ok = set(mode_b.ok_decisions)
+    a_flags = mode_a.experiment_flags
+    b_flags = mode_b.experiment_flags
+    a_scenario = mode_a.scenario
+    b_scenario = mode_b.scenario
+
+    if a_scenario != b_scenario:
+        raise RuntimeError(
+            f"measure_paired_real: modes {mode_a.name} and {mode_b.name} "
+            f"target different scenarios ({a_scenario} vs {b_scenario}); "
+            f"paired measurement is only meaningful within a single scenario"
+        )
+
+    if a_scenario == SCENARIO_TICKET_TRIGGER:
+        agents = [pool["ticket_agent"]]
+        tools = [pool["ticket_tool"]]
+    else:
+        agents = pool["benign_agents"]
+        tools = pool["benign_tools"]
+    n_agents = len(agents)
+    n_tools = len(tools)
+    if n_agents == 0 or n_tools == 0:
+        raise RuntimeError(
+            f"measure_paired_real: empty pool for scenario={a_scenario}"
+        )
+
+    rnd = random.Random(seed)
+    tr = client.tool_request
+    perf = time.perf_counter
+
+    # Randomize the A-first vs B-first ordering per pair so any
+    # within-pair ordering bias (e.g. cache warm-up on the first call)
+    # is split symmetrically across both modes.
+    order_bits = [rnd.random() < 0.5 for _ in range(pair_requests)]
+
+    for i in range(pair_requests):
+        # Share agent/tool choice between the paired samples so the only
+        # thing that differs between A and B is the experiment_flags value.
+        if n_agents > 1:
+            agent = agents[rnd.randrange(n_agents)]
+        else:
+            agent = agents[0]
+        if n_tools > 1:
+            tool = tools[rnd.randrange(n_tools)]
+        else:
+            tool = tools[0]
+
+        req_id_a = req_start + 2 * i
+        req_id_b = req_start + 2 * i + 1
+        a_first = order_bits[i]
+
+        if a_first:
+            t0 = perf()
+            dec_a = tr(
+                req_id=req_id_a, agent_id=agent.agent_id,
+                binding_hash=agent.binding_hash, binding_epoch=agent.binding_epoch,
+                tool_id=tool.tool_id, tool_hash=tool.tool_hash,
+                experiment_flags=a_flags,
+            )
+            t1 = perf()
+            dec_b = tr(
+                req_id=req_id_b, agent_id=agent.agent_id,
+                binding_hash=agent.binding_hash, binding_epoch=agent.binding_epoch,
+                tool_id=tool.tool_id, tool_hash=tool.tool_hash,
+                experiment_flags=b_flags,
+            )
+            t2 = perf()
+            a_ms = (t1 - t0) * 1000.0
+            b_ms = (t2 - t1) * 1000.0
+        else:
+            t0 = perf()
+            dec_b = tr(
+                req_id=req_id_b, agent_id=agent.agent_id,
+                binding_hash=agent.binding_hash, binding_epoch=agent.binding_epoch,
+                tool_id=tool.tool_id, tool_hash=tool.tool_hash,
+                experiment_flags=b_flags,
+            )
+            t1 = perf()
+            dec_a = tr(
+                req_id=req_id_a, agent_id=agent.agent_id,
+                binding_hash=agent.binding_hash, binding_epoch=agent.binding_epoch,
+                tool_id=tool.tool_id, tool_hash=tool.tool_hash,
+                experiment_flags=a_flags,
+            )
+            t2 = perf()
+            b_ms = (t1 - t0) * 1000.0
+            a_ms = (t2 - t1) * 1000.0
+
+        if dec_a.decision not in a_ok:
+            raise RuntimeError(
+                f"measure_paired_real mode_a={mode_a.name} unexpected decision "
+                f"{dec_a.decision} (reason={dec_a.reason}); "
+                f"expected one of {sorted(a_ok)}"
+            )
+        if dec_b.decision not in b_ok:
+            raise RuntimeError(
+                f"measure_paired_real mode_b={mode_b.name} unexpected decision "
+                f"{dec_b.decision} (reason={dec_b.reason}); "
+                f"expected one of {sorted(b_ok)}"
+            )
+        a_samples_append(a_ms)
+        b_samples_append(b_ms)
+
+    return a_samples, b_samples
+
+
+def measure_paired_dry(
+    *,
+    mode_a_name: str,
+    mode_b_name: str,
+    pair_requests: int,
+    seed: int,
+) -> Tuple[List[float], List[float]]:
+    """Synthetic paired-sample generator for macOS dry-runs.
+
+    Shares a per-pair jitter component between the two modes so the
+    paired delta distribution is tighter than (mean_a - mean_b), which
+    is exactly the property a real paired measurement should have.
+    """
+    rng = random.Random(seed)
+    centers = {
+        "full": 0.008,
+        "skip_lookups": 0.0076,
+        "ticket_trigger_full": 0.0095,
+        "ticket_trigger_skip": 0.008,
+        "skip_hash": 0.008,
+        "skip_binding": 0.008,
+    }
+    c_a = centers.get(mode_a_name, 0.008)
+    c_b = centers.get(mode_b_name, 0.008)
+    a_samples: List[float] = []
+    b_samples: List[float] = []
+    for _ in range(pair_requests):
+        # Shared per-pair jitter (big), private per-call jitter (small).
+        shared = rng.gauss(0.0, 0.0004)
+        a_samples.append(max(c_a + shared + rng.gauss(0.0, 0.00005), 0.0005))
+        b_samples.append(max(c_b + shared + rng.gauss(0.0, 0.00005), 0.0005))
+    return a_samples, b_samples
+
+
 def setup_scenarios(
     client: Any,
     *,
@@ -826,64 +1109,94 @@ def run_ablation(
             pool=pool,
         )
 
-    # ticket_trigger modes run far fewer samples per rep than benign modes.
+    # Paired measurement strategy.
     #
+    # Each phase in PAIRED_PHASES runs a tight alternating loop over
+    # two modes (one request of mode A, one of mode B, repeated) inside
+    # measure_paired_real. Both samples in a pair share the same ~μs
+    # window of VM state (scheduler, cache residency, jiffies tick),
+    # so their difference a[i]-b[i] is a much tighter estimator of the
+    # stage body cost than mean(A) - mean(B) would be under rep-level
+    # hypervisor drift.
+    #
+    # ticket_trigger phases still run far fewer pairs than benign phases.
     # Every ticket_trigger_full request makes the kernel issue a fresh
     # approval ticket via kernel_mcp_issue_approval_ticket, which in turn
     # calls kernel_mcp_purge_expired_tickets_locked() that scans all
-    # 256 buckets of the approval hashtable. TTL is 300s, so nothing
-    # expires during a ~minute-scale E1 run and the scan cost grows
-    # linearly in total live-ticket count. At 10,000 tickets the scan
-    # alone reached ~28 μs per issuance in the first full-scale run,
-    # which masks the intrinsic issue + consume logic cost.
-    #
-    # Default --ticket-requests=100 keeps the mean live-ticket count
-    # during the ticket_trigger sweep under ~500, which brings the
-    # purge_scan component down to a few-hundred-ns floor — still
-    # asymptotically O(n) but swamped by the actual issue/consume work
-    # we want to measure.
-    #
-    # Passing --ticket-requests=0 falls back to the old behavior of
-    # scaling linearly with --requests (requests // 10).
-    def samples_for(mode: AblationMode, rep_samples: int) -> int:
-        if mode.scenario == SCENARIO_TICKET_TRIGGER:
+    # 256 buckets of the approval hashtable. TTL is 300s and nothing
+    # expires during a ~minute-scale E1 run, so the scan cost grows
+    # linearly in total live-ticket count. Default --ticket-requests=100
+    # caps each ticket phase at 100 pairs/rep and bounds the purge-scan
+    # contamination.
+    def pair_count_for(scenario: str) -> int:
+        if scenario == SCENARIO_TICKET_TRIGGER:
             if args.ticket_requests > 0:
                 return args.ticket_requests
-            return min(rep_samples, max(1, rep_samples // 10))
-        return rep_samples
+            return max(1, args.requests // 10)
+        return args.requests
+
+    # Paired samples per phase. Each value is a list of (a_ms, b_ms)
+    # tuples aligned by index so `paired_phase_samples[phase][i]` is
+    # one matched measurement pair for the phase's two modes.
+    paired_phase_samples: Dict[str, List[Tuple[float, float]]] = {
+        label: [] for (label, _, _, _, _, _) in PAIRED_PHASES
+    }
 
     try:
-        mode_names = [m.name for m in MODES]
+        phase_labels = [p[0] for p in PAIRED_PHASES]
         for rep in range(args.reps):
-            order = list(mode_names)
+            order = list(phase_labels)
             rng.shuffle(order)
-            for mode_name in order:
-                mode = next(m for m in MODES if m.name == mode_name)
-                n_samples = samples_for(mode, args.requests)
-                rep_seed = args.seed + rep * 997 + (hash(mode_name) & 0xFFFF)
+            for label in order:
+                phase = next(p for p in PAIRED_PHASES if p[0] == label)
+                _, mode_a_name, mode_b_name, _kind, _scn, _note = phase
+                mode_a = next(m for m in MODES if m.name == mode_a_name)
+                mode_b = next(m for m in MODES if m.name == mode_b_name)
+                pair_n = pair_count_for(mode_a.scenario)
+                rep_seed = args.seed + rep * 997 + (hash(label) & 0xFFFF)
                 if args.dry_run:
-                    samples = measure_mode_dry(
-                        mode_name=mode_name,
-                        requests=n_samples,
+                    a_samples, b_samples = measure_paired_dry(
+                        mode_a_name=mode_a_name,
+                        mode_b_name=mode_b_name,
+                        pair_requests=pair_n,
                         seed=rep_seed,
                     )
                 else:
-                    samples = measure_mode_real(
+                    a_samples, b_samples = measure_paired_real(
                         client,
-                        mode=mode,
-                        requests=n_samples,
-                        req_start=1_000_000 + rep * 100_000 + len(per_mode[mode_name]),
+                        mode_a=mode_a,
+                        mode_b=mode_b,
+                        pair_requests=pair_n,
+                        req_start=1_000_000
+                        + rep * 100_000
+                        + len(paired_phase_samples[label]) * 2,
                         seed=rep_seed,
                         pool=pool,
                     )
-                per_mode[mode_name].extend(samples)
-                rep_summary = summarize(f"{mode_name}_rep{rep}", samples)
-                rep_summary["rep"] = rep
-                rep_summary["mode"] = mode_name
-                per_rep_rows.append(rep_summary)
+                for a_ms, b_ms in zip(a_samples, b_samples):
+                    paired_phase_samples[label].append((a_ms, b_ms))
+                    per_mode[mode_a_name].append(a_ms)
+                    per_mode[mode_b_name].append(b_ms)
+                delta_vec = [x - y for x, y in zip(a_samples, b_samples)]
+                rep_mean_delta = (
+                    statistics.fmean(delta_vec) if delta_vec else 0.0
+                )
+                rep_sum_a = summarize(f"{mode_a_name}_rep{rep}", a_samples)
+                rep_sum_a["rep"] = rep
+                rep_sum_a["mode"] = mode_a_name
+                rep_sum_a["phase"] = label
+                per_rep_rows.append(rep_sum_a)
+                rep_sum_b = summarize(f"{mode_b_name}_rep{rep}", b_samples)
+                rep_sum_b["rep"] = rep
+                rep_sum_b["mode"] = mode_b_name
+                rep_sum_b["phase"] = label
+                per_rep_rows.append(rep_sum_b)
                 print(
-                    f"[kernel-ablation] rep={rep} mode={mode_name} n={len(samples)} "
-                    f"avg_ms={rep_summary['avg_ms']:.6f} p99_ms={rep_summary['p99_ms']:.6f}"
+                    f"[kernel-ablation] rep={rep} phase={label} "
+                    f"pairs={len(a_samples)} "
+                    f"a_p50={rep_sum_a['p50_ms']:.6f} "
+                    f"b_p50={rep_sum_b['p50_ms']:.6f} "
+                    f"delta_mean={rep_mean_delta*1000.0:+.3f}us"
                 )
 
         # Noise floor
@@ -903,78 +1216,82 @@ def run_ablation(
     mode_summaries = [summarize(m.name, per_mode[m.name]) for m in MODES]
     noop_summary = summarize("noop", noop_samples)
 
-    # Meaningful stage deltas: pairs where bypassing one flag actually
-    # changes the kernel execution path under its workload. These are the
-    # numbers that go into the paper.
-    def _one_delta(label: str, baseline_name: str, bypass_name: str, note_template: str) -> Dict[str, Any]:
-        a = per_mode[baseline_name]
-        b = per_mode[bypass_name]
-        if not a or not b:
+    # Paired stage deltas: computed directly from the (a,b) pair vectors
+    # collected by measure_paired_real. This is the key change vs the
+    # previous run_ablation — we no longer compute `mean(A) - mean(B)`
+    # across independent, rep-level-drift-contaminated runs. We compute
+    # `mean(a[i] - b[i])` across index-aligned samples that were
+    # collected μs apart inside the same rep.
+    def _paired_delta(label: str, mode_a_name: str, mode_b_name: str, note_template: str) -> Dict[str, Any]:
+        pairs = paired_phase_samples.get(label, [])
+        a_col = [p[0] for p in pairs]
+        b_col = [p[1] for p in pairs]
+        delta_vec = [a - b for a, b in pairs]
+        note = note_template % {"n_tools": args.n_tools, "n_agents": args.n_agents}
+        if not delta_vec:
             return {
                 "stage": label,
-                "baseline_mode": baseline_name,
-                "bypass_mode": bypass_name,
+                "baseline_mode": mode_a_name,
+                "bypass_mode": mode_b_name,
+                "n_pairs": 0,
                 "baseline_avg_ms": 0.0,
                 "baseline_p50_ms": 0.0,
                 "bypass_avg_ms": 0.0,
                 "bypass_p50_ms": 0.0,
                 "delta_avg_ms": 0.0,
                 "delta_p50_ms": 0.0,
-                "delta_bootstrap_mean_ms": 0.0,
+                "delta_std_ms": 0.0,
                 "delta_ci_lo": 0.0,
                 "delta_ci_hi": 0.0,
-                "note": note_template % {"n_tools": args.n_tools, "n_agents": args.n_agents},
+                "t_paired": 0.0,
+                "p_paired": 1.0,
+                "note": note,
             }
-        baseline_avg = statistics.fmean(a)
-        bypass_avg = statistics.fmean(b)
-        baseline_p50 = percentile(sorted(a), 0.5)
-        bypass_p50 = percentile(sorted(b), 0.5)
-        delta_mean, ci_lo, ci_hi = paired_bootstrap_delta_ci(
-            a, b, iters=args.bootstrap_iters, seed=args.seed
+        stats = paired_delta_stats(
+            delta_vec, iters=args.bootstrap_iters, seed=args.seed
         )
         return {
             "stage": label,
-            "baseline_mode": baseline_name,
-            "bypass_mode": bypass_name,
-            "baseline_avg_ms": round(baseline_avg, 6),
-            "baseline_p50_ms": round(baseline_p50, 6),
-            "bypass_avg_ms": round(bypass_avg, 6),
-            "bypass_p50_ms": round(bypass_p50, 6),
-            "delta_avg_ms": round(baseline_avg - bypass_avg, 6),
-            "delta_p50_ms": round(baseline_p50 - bypass_p50, 6),
-            "delta_bootstrap_mean_ms": delta_mean,
-            "delta_ci_lo": ci_lo,
-            "delta_ci_hi": ci_hi,
-            "note": note_template % {"n_tools": args.n_tools, "n_agents": args.n_agents},
+            "baseline_mode": mode_a_name,
+            "bypass_mode": mode_b_name,
+            "n_pairs": len(delta_vec),
+            "baseline_avg_ms": round(statistics.fmean(a_col), 6),
+            "baseline_p50_ms": round(percentile(sorted(a_col), 0.5), 6),
+            "bypass_avg_ms": round(statistics.fmean(b_col), 6),
+            "bypass_p50_ms": round(percentile(sorted(b_col), 0.5), 6),
+            "delta_avg_ms": stats["mean_ms"],
+            "delta_p50_ms": stats["median_ms"],
+            "delta_std_ms": stats["std_ms"],
+            "delta_ci_lo": stats["ci_lo"],
+            "delta_ci_hi": stats["ci_hi"],
+            "t_paired": stats["t_paired"],
+            "p_paired": stats["p_paired"],
+            "note": note,
         }
 
-    meaningful_stage_deltas: List[Dict[str, Any]] = [
-        _one_delta(label, baseline, bypass, note)
-        for (label, baseline, bypass, note) in MEANINGFUL_STAGE_DELTAS
-    ]
-    methodology_note_deltas: List[Dict[str, Any]] = [
-        _one_delta(label, baseline, bypass, note)
-        for (label, baseline, bypass, note) in METHODOLOGY_NOTE_DELTAS
-    ]
+    meaningful_stage_deltas: List[Dict[str, Any]] = []
+    methodology_note_deltas: List[Dict[str, Any]] = []
+    for (label, mode_a_name, mode_b_name, kind, _scn, note) in PAIRED_PHASES:
+        row = _paired_delta(label, mode_a_name, mode_b_name, note)
+        if kind == "meaningful":
+            meaningful_stage_deltas.append(row)
+        else:
+            methodology_note_deltas.append(row)
 
-    # Pairwise Welch tests across every meaningful pair, BH-corrected.
+    # BH correction across every paired t-test in the run.
     pairwise_rows: List[Dict[str, Any]] = []
     pvals_raw: List[float] = []
-    for label, baseline, bypass, _note in MEANINGFUL_STAGE_DELTAS + METHODOLOGY_NOTE_DELTAS:
-        a = per_mode[baseline]
-        b = per_mode[bypass]
-        if not a or not b:
-            pairwise_rows.append(
-                {"stage": label, "baseline": baseline, "bypass": bypass,
-                 "t": 0.0, "p_raw": 1.0}
-            )
-            pvals_raw.append(1.0)
-            continue
-        t, p = welch_t(a, b)
-        pvals_raw.append(p)
+    for row in meaningful_stage_deltas + methodology_note_deltas:
+        pvals_raw.append(row["p_paired"])
         pairwise_rows.append(
-            {"stage": label, "baseline": baseline, "bypass": bypass,
-             "t": t, "p_raw": p}
+            {
+                "stage": row["stage"],
+                "baseline": row["baseline_mode"],
+                "bypass": row["bypass_mode"],
+                "t": row["t_paired"],
+                "p_raw": row["p_paired"],
+                "n_pairs": row["n_pairs"],
+            }
         )
     adj = benjamini_hochberg(pvals_raw)
     for row, p_bh in zip(pairwise_rows, adj):
@@ -984,16 +1301,19 @@ def run_ablation(
         "meta": {
             "reps": args.reps,
             "requests_per_cell": args.requests,
+            "ticket_requests": args.ticket_requests,
             "warmup_requests": args.warmup_requests,
             "n_tools_registered": args.n_tools,
             "n_agents_registered": args.n_agents,
+            "measurement_method": "paired",
             "dry_run": args.dry_run,
             "seed": args.seed,
             "bootstrap_iters": args.bootstrap_iters,
             "noop_requests": args.noop_requests,
             "scenario_notes": {
                 "benign_large": f"{args.n_tools} tools + {args.n_agents} agents; uniformly random (tool, agent) per request",
-                "ticket_trigger": f"1 high-risk tool (risk_flags=FILESYSTEM_DELETE); ticket path exercised; request count capped at requests/10 per rep to limit approval-table growth",
+                "ticket_trigger": f"1 high-risk tool (risk_flags=FILESYSTEM_DELETE); ticket path exercised; pair count capped at --ticket-requests (default 100) to limit approval-table growth",
+                "measurement": "paired request-level alternation: for each delta phase, modes A and B are interleaved request-by-request in a tight loop so the two samples in each pair share the same scheduler state and cache residency; deltas are computed from paired samples directly, not from mean(A) - mean(B)",
             },
         },
         "modes": [
@@ -1021,15 +1341,16 @@ def run_ablation(
     write_csv(
         run_dir / "kernel_ablation_per_rep.csv",
         per_rep_rows,
-        ["rep", "mode", "samples", "avg_ms", "std_ms", "ci95_ms", "p50_ms", "p95_ms", "p99_ms", "min_ms", "max_ms"],
+        ["rep", "phase", "mode", "samples", "avg_ms", "std_ms", "ci95_ms", "p50_ms", "p95_ms", "p99_ms", "min_ms", "max_ms"],
     )
-    # Meaningful stage deltas (paper-quality numbers).
+    # Stage-delta CSV schema: reflects the new paired measurement.
     delta_columns = [
-        "stage", "baseline_mode", "bypass_mode",
+        "stage", "baseline_mode", "bypass_mode", "n_pairs",
         "baseline_avg_ms", "baseline_p50_ms",
         "bypass_avg_ms", "bypass_p50_ms",
-        "delta_avg_ms", "delta_p50_ms",
-        "delta_bootstrap_mean_ms", "delta_ci_lo", "delta_ci_hi",
+        "delta_avg_ms", "delta_p50_ms", "delta_std_ms",
+        "delta_ci_lo", "delta_ci_hi",
+        "t_paired", "p_paired",
         "note",
     ]
     write_csv(
@@ -1045,7 +1366,7 @@ def run_ablation(
     write_csv(
         run_dir / "kernel_ablation_pairwise_tests.csv",
         pairwise_rows,
-        ["stage", "baseline", "bypass", "t", "p_raw", "p_bh"],
+        ["stage", "baseline", "bypass", "n_pairs", "t", "p_raw", "p_bh"],
     )
     write_csv(
         run_dir / "kernel_ablation_noop.csv",
@@ -1053,6 +1374,7 @@ def run_ablation(
         ["mode", "samples", "avg_ms", "std_ms", "ci95_ms", "p50_ms", "p95_ms", "p99_ms", "min_ms", "max_ms"],
     )
 
+    # Per-mode sample rows (pooled across all phases that used that mode).
     sample_rows: List[Dict[str, Any]] = []
     for m in MODES:
         for idx, val in enumerate(per_mode[m.name], start=1):
@@ -1061,6 +1383,33 @@ def run_ablation(
         run_dir / "kernel_ablation_samples.csv",
         sample_rows,
         ["mode", "sample_index", "rtt_ms"],
+    )
+
+    # Paired sample rows (one row per measurement pair, carrying both modes'
+    # latencies alongside the derived delta). Down-stream analysis should
+    # prefer this file over kernel_ablation_samples.csv when computing
+    # stage cost: each row is a μs-aligned pair that cancels VM drift.
+    paired_rows: List[Dict[str, Any]] = []
+    for phase_label, pairs in paired_phase_samples.items():
+        phase_meta = next(p for p in PAIRED_PHASES if p[0] == phase_label)
+        _, a_name, b_name, _kind, _scn, _note = phase_meta
+        for idx, (a_ms, b_ms) in enumerate(pairs, start=1):
+            paired_rows.append(
+                {
+                    "phase": phase_label,
+                    "pair_index": idx,
+                    "baseline_mode": a_name,
+                    "bypass_mode": b_name,
+                    "baseline_ms": round(a_ms, 6),
+                    "bypass_ms": round(b_ms, 6),
+                    "delta_ms": round(a_ms - b_ms, 6),
+                }
+            )
+    write_csv(
+        run_dir / "kernel_ablation_paired_samples.csv",
+        paired_rows,
+        ["phase", "pair_index", "baseline_mode", "bypass_mode",
+         "baseline_ms", "bypass_ms", "delta_ms"],
     )
 
     (run_dir / "kernel_ablation_summary.json").write_text(
