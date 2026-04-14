@@ -1,0 +1,10 @@
+metric,system,payload,n,mean_avg_ms,mean_avg_ci_lo,mean_avg_ci_hi,mean_p99_ms,mean_p99_ci_lo,mean_p99_ci_hi
+latency,kernel,large,5,6.908,6.8628,6.9624,8.6518,8.5452,8.7456
+latency,kernel,medium,5,0.828,0.8244,0.8316,1.0296,0.9918,1.0662
+latency,kernel,small,5,0.7868,0.784,0.7896,1.0736,1.0482,1.1022
+latency,seccomp,large,5,9.3302,9.1076,9.7448,12.0726,10.9152,14.126
+latency,seccomp,medium,5,0.8392,0.836,0.843605,1.032,0.9894,1.07226
+latency,seccomp,small,5,0.7778,0.772,0.7846,1.0094,0.9568,1.0576
+latency,userspace,large,5,7.2256,7.0112,7.5498,9.8074,8.6864,11.9036
+latency,userspace,medium,5,0.8006,0.7972,0.8034,1.0152,0.9758,1.0394
+latency,userspace,small,5,0.7638,0.7544,0.7732,1.1444,1.025,1.3064
