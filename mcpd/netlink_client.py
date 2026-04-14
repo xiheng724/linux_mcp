@@ -372,8 +372,22 @@ class KernelMcpNetlinkClient:
         tool_id: int,
         tool_hash: str,
         ticket_id: int = 0,
-        experiment_flags: int = 0,
+        experiment_flags: "int | None" = None,
     ) -> ToolDecision:
+        """Send a TOOL_REQUEST.
+
+        `experiment_flags` semantics:
+          - `None` (default): do NOT attach the EXPERIMENT_FLAGS nlattr at all.
+            Production mcpd should use this — no extra bytes on the wire and no
+            extra kernel-side parse step per request.
+          - `int` (including 0): attach the nlattr with the given value. The
+            kernel_ablation runner MUST pass this form — even for the `full`
+            mode it should pass `experiment_flags=0` — so that the netlink
+            transport path is symmetric across modes. If the "full" case
+            omitted the attribute while skip modes attached it, the kernel
+            side would spend an extra ~300 ns parsing one more nlattr on
+            skip modes, contaminating the per-stage deltas.
+        """
         attrs = [
             (ATTR["AGENT_ID"], agent_id.encode("utf-8") + b"\x00"),
             (ATTR["TOOL_ID"], struct.pack("=I", tool_id)),
@@ -387,7 +401,7 @@ class KernelMcpNetlinkClient:
             attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
         if ticket_id > 0:
             attrs.append((ATTR["TICKET_ID"], struct.pack("=Q", ticket_id)))
-        if experiment_flags > 0:
+        if experiment_flags is not None:
             attrs.append((ATTR["EXPERIMENT_FLAGS"], struct.pack("=I", experiment_flags)))
 
         genl_cmd, resp_attrs = self._request(
