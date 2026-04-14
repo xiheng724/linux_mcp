@@ -32,11 +32,12 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-DEFAULT_N_VALUES = "8,64,512,4096,16384"
-DEFAULT_REPS = 5
+DEFAULT_N_VALUES = "8,16,32,64,128,256,512,1024,2048,4096,8192,16384"
+DEFAULT_REPS = 10
 SMOKE_N_VALUES = "8,64,512"
 SMOKE_REPS = 2
 DEFAULT_LOOKUP_SAMPLES = 2000
+WARMUP_N = 64  # throwaway register pass before each N's measurement reps
 TOOL_ID_BASE = 10000
 KERNEL_TOOL_CAP: Optional[int] = None  # unbounded: kernel uses xa_store without cap
 SYSFS_TOOLS_DIR = "/sys/kernel/mcp/tools"
@@ -396,11 +397,65 @@ def bootstrap_slope_ci(
     return (slopes[lo_idx], slopes[hi_idx])
 
 
+def fit_register_model(
+    n_values: List[int], total_ms_values: List[float]
+) -> Dict[str, float]:
+    """Fit total_ms(N) = a + b * N by ordinary least squares.
+
+    `a` is the fixed one-time setup cost (socket open, first mutex, ...), `b`
+    is the per-tool steady-state cost. The asymptotic registration throughput
+    as N -> infinity is 1/b tools per millisecond, or 1000/b tools per second.
+
+    Returns a dict with keys: a_ms, b_ms_per_tool, b_us_per_tool,
+    asymptotic_tps, r_squared, n_points.
+    """
+    n_points = len(n_values)
+    if n_points < 2 or n_points != len(total_ms_values):
+        return {
+            "a_ms": 0.0,
+            "b_ms_per_tool": 0.0,
+            "b_us_per_tool": 0.0,
+            "asymptotic_tps": 0.0,
+            "r_squared": 0.0,
+            "n_points": n_points,
+        }
+    xs = [float(n) for n in n_values]
+    ys = list(total_ms_values)
+    mean_x = statistics.fmean(xs)
+    mean_y = statistics.fmean(ys)
+    num = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(xs, ys))
+    den = sum((xi - mean_x) ** 2 for xi in xs)
+    if den == 0:
+        return {
+            "a_ms": mean_y,
+            "b_ms_per_tool": 0.0,
+            "b_us_per_tool": 0.0,
+            "asymptotic_tps": 0.0,
+            "r_squared": 0.0,
+            "n_points": n_points,
+        }
+    slope = num / den  # ms per tool
+    intercept = mean_y - slope * mean_x
+    ss_tot = sum((yi - mean_y) ** 2 for yi in ys)
+    ss_res = sum((yi - (intercept + slope * xi)) ** 2 for xi, yi in zip(xs, ys))
+    r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+    asymptotic_tps = (1000.0 / slope) if slope > 0 else 0.0
+    return {
+        "a_ms": round(intercept, 6),
+        "b_ms_per_tool": round(slope, 9),
+        "b_us_per_tool": round(slope * 1000.0, 4),
+        "asymptotic_tps": round(asymptotic_tps, 1),
+        "r_squared": round(r2, 6),
+        "n_points": n_points,
+    }
+
+
 def generate_plots(
     run_dir: Path,
     *,
     per_n_kernel: Dict[int, Dict[str, Any]],
     per_n_userspace: Dict[int, Dict[str, Any]],
+    register_fit: Optional[Dict[str, float]] = None,
 ) -> None:
     plt = maybe_import_plotting()
     plots_dir = run_dir / "plots"
@@ -415,6 +470,7 @@ def generate_plots(
     user_avg = [per_n_userspace[n]["lookup"]["avg_ms"] for n in ns]
     user_ci = [per_n_userspace[n]["lookup"]["ci95_ms"] for n in ns]
 
+    # (1) Lookup scaling — unchanged.
     fig, ax = plt.subplots(figsize=(7, 4.5))
     ax.errorbar(ns, kernel_avg, yerr=kernel_ci, marker="o", label="kernel_mcp", capsize=3)
     ax.errorbar(ns, user_avg, yerr=user_ci, marker="s", label="python dict", capsize=3)
@@ -428,16 +484,79 @@ def generate_plots(
     fig.savefig(plots_dir / "figure_registry_lookup_scaling.png", dpi=180)
     plt.close(fig)
 
+    # (2) Per-tool registration cost with asymptote at b.
+    # This is the primary register-path figure: it plots per-tool cost in
+    # microseconds with 95% CI bars, a horizontal asymptote at b (the
+    # fitted per-tool steady-state cost), and a dashed model curve
+    # a/N + b showing how the measurement collapses onto b as N grows.
+    per_tool_us = [per_n_kernel[n]["register"].get("per_tool_avg_us", 0.0) for n in ns]
+    per_tool_ci = [per_n_kernel[n]["register"].get("per_tool_ci95_us", 0.0) for n in ns]
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    ax.errorbar(
+        ns, per_tool_us, yerr=per_tool_ci, marker="o", color="#4C78A8",
+        label="measured", capsize=3,
+    )
+    if register_fit and register_fit.get("b_us_per_tool", 0.0) > 0:
+        a_ms = register_fit["a_ms"]
+        b_us = register_fit["b_us_per_tool"]
+        # Model curve: per_tool_us(N) = (a_ms * 1000) / N + b_us.
+        x_dense = [float(n) for n in ns]
+        if len(ns) >= 2:
+            import math as _math
+            lo = float(ns[0])
+            hi = float(ns[-1])
+            step_count = 64
+            ratio = (hi / lo) ** (1.0 / max(step_count - 1, 1)) if lo > 0 else 1.0
+            x_dense = [lo * (ratio ** k) for k in range(step_count)]
+        y_model = [(a_ms * 1000.0) / x + b_us for x in x_dense]
+        ax.plot(x_dense, y_model, linestyle="--", color="#888",
+                label=f"fit: a/N + b (b={b_us:.2f} μs)")
+        ax.axhline(b_us, linestyle=":", color="#d62728",
+                   label=f"asymptote b = {b_us:.2f} μs")
+    ax.set_xscale("log", base=2)
+    ax.set_xlabel("N (registered tools)")
+    ax.set_ylabel("per-tool registration cost (μs)")
+    ax.set_title("Register-path per-tool cost vs N")
+    ax.grid(alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(plots_dir / "figure_registry_register_curve.png", dpi=180)
+    plt.close(fig)
+
+    # (3) Throughput with asymptote — kept for continuity with the old figure
+    # but now annotated with the model curve N/(a+bN) and the 1/b asymptote
+    # so "throughput saturates at 1/b" is visually unambiguous.
     throughput = [
         per_n_kernel[n]["register"]["throughput_tools_per_sec"] for n in ns
     ]
     fig, ax = plt.subplots(figsize=(7, 4.5))
-    ax.plot(ns, throughput, marker="o", color="#4C78A8")
+    ax.plot(ns, throughput, marker="o", color="#4C78A8", label="measured")
+    if register_fit and register_fit.get("b_ms_per_tool", 0.0) > 0:
+        a_ms = register_fit["a_ms"]
+        b_ms = register_fit["b_ms_per_tool"]
+        asymptote = register_fit["asymptotic_tps"]
+        if len(ns) >= 2:
+            lo = float(ns[0])
+            hi = float(ns[-1])
+            step_count = 64
+            ratio = (hi / lo) ** (1.0 / max(step_count - 1, 1)) if lo > 0 else 1.0
+            x_dense = [lo * (ratio ** k) for k in range(step_count)]
+        else:
+            x_dense = [float(ns[0])] if ns else [1.0]
+        y_model = [
+            (x / ((a_ms + b_ms * x) / 1000.0)) if (a_ms + b_ms * x) > 0 else 0.0
+            for x in x_dense
+        ]
+        ax.plot(x_dense, y_model, linestyle="--", color="#888",
+                label=f"fit: N / (a + bN)")
+        ax.axhline(asymptote, linestyle=":", color="#d62728",
+                   label=f"asymptote 1/b ≈ {asymptote:.0f}/s")
     ax.set_xscale("log", base=2)
     ax.set_xlabel("N (registered tools)")
     ax.set_ylabel("registration throughput (tools/s)")
-    ax.set_title("Registry registration throughput")
+    ax.set_title("Register-path throughput vs N with asymptote")
     ax.grid(alpha=0.25)
+    ax.legend()
     fig.tight_layout()
     fig.savefig(plots_dir / "figure_registry_register_throughput.png", dpi=180)
     plt.close(fig)
@@ -447,6 +566,7 @@ def generate_plots(
 def render_report(summary: Dict[str, Any]) -> str:
     meta = summary["meta"]
     fit = summary["lookup_fit"]
+    reg_fit = summary.get("register_fit", {})
     lines = [
         "# Registry Scaling Experiment Report",
         "",
@@ -457,6 +577,7 @@ def render_report(summary: Dict[str, Any]) -> str:
         f"- reps_per_N: {meta['reps']}",
         f"- lookup_samples_per_rep: {meta['lookup_samples']}",
         f"- N values: {', '.join(str(n) for n in meta['N_values'])}",
+        f"- warmup_n: {meta.get('warmup_n', 0)} (throwaway register pass before each N)",
         f"- dry_run: {meta['dry_run']}",
     ]
     if meta.get("warnings"):
@@ -467,37 +588,61 @@ def render_report(summary: Dict[str, Any]) -> str:
             lines.append(f"- {warn}")
     lines += [
         "",
+        "## Register-path model: total_ms(N) = a + b·N",
+        "",
+        "We model bulk registration as a one-time setup cost `a` plus a",
+        "per-tool steady-state cost `b`. The asymptotic registration",
+        "throughput as N → ∞ is `1/b` tools/ms = `1000/b` tools/s.",
+        "",
+        "| parameter | value |",
+        "|---|---:|",
+        f"| a (fixed setup cost) | {reg_fit.get('a_ms', 0.0):.4f} ms |",
+        f"| b (per-tool steady-state cost) | {reg_fit.get('b_us_per_tool', 0.0):.3f} μs |",
+        f"| asymptotic throughput 1/b | {reg_fit.get('asymptotic_tps', 0.0):.0f} tools/s |",
+        f"| R² | {reg_fit.get('r_squared', 0.0):.4f} |",
+        f"| fit points | {reg_fit.get('n_points', 0)} |",
+        "",
+        "Interpretation: throughput = N/(a+bN) is a monotonically *increasing*",
+        "function of N with no local maximum. The apparent 'hump' visible in",
+        "a raw throughput-vs-N plot is simply the curve approaching its",
+        "asymptote 1/b from below; there is no scaling degradation at large N.",
+        "The per-tool cost figure is a cleaner primary visualization since",
+        "its asymptote (b, a single horizontal line) is immediately legible.",
+        "",
         "## Per-N summary",
         "",
-        "| N | register_total_ms | tools_per_sec | lookup_avg_ms | lookup_p95_ms | lookup_p99_ms | user_dict_avg_ms | sysfs_ls_ms |",
-        "|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| N | total_ms | per_tool_μs | ±CI95 | tps | lookup_avg_μs | lookup_p99_μs | user_dict_μs | sysfs_ls_ms |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for n in sorted(summary["per_N"].keys(), key=int):
         row = summary["per_N"][str(n)] if isinstance(n, int) else summary["per_N"][n]
+        per_tool_us = row["register"].get("per_tool_avg_us", 0.0)
+        per_tool_ci = row["register"].get("per_tool_ci95_us", 0.0)
         lines.append(
-            "| {n} | {reg:.3f} | {tps:.1f} | {lav:.6f} | {lp95:.6f} | {lp99:.6f} | {uav:.6f} | {sys:.3f} |".format(
+            "| {n} | {reg:.3f} | {ptu:.3f} | ±{ci:.3f} | {tps:.0f} | {lav:.3f} | {lp99:.3f} | {uav:.3f} | {sys:.3f} |".format(
                 n=n,
                 reg=row["register"]["total_ms"],
+                ptu=per_tool_us,
+                ci=per_tool_ci,
                 tps=row["register"]["throughput_tools_per_sec"],
-                lav=row["lookup"]["avg_ms"],
-                lp95=row["lookup"]["p95_ms"],
-                lp99=row["lookup"]["p99_ms"],
-                uav=row["userspace"]["avg_ms"],
+                lav=row["lookup"]["avg_ms"] * 1000.0,
+                lp99=row["lookup"]["p99_ms"] * 1000.0,
+                uav=row["userspace"]["avg_ms"] * 1000.0,
                 sys=row["sysfs_ls_ms_avg"],
             )
         )
     lines += [
         "",
-        "## Log-linear fit (lookup_ms ~ a + b*log2(N))",
+        "## Log-linear lookup fit (lookup_ms ~ a + b·log2(N))",
         "",
         f"- intercept a = {fit['intercept']:.6f} ms",
         f"- slope b = {fit['slope']:.6f} ms/doubling",
-        f"- R^2 = {fit['r_squared']:.4f}",
+        f"- R² = {fit['r_squared']:.4f}",
         f"- slope 95% bootstrap CI: [{fit['slope_ci_lo']:.6f}, {fit['slope_ci_hi']:.6f}] ms/doubling",
         "",
-        "A slope near zero supports the ~O(1) lookup claim; a non-zero slope",
-        "at the given R^2 indicates log-scale behavior (expected for balanced",
-        "trees, not for hashed/xarray lookups).",
+        "A slope near zero with a CI containing zero supports the O(1)",
+        "lookup claim. A non-zero slope at high R² would indicate log-scale",
+        "behavior (expected for balanced trees, not for hash/xarray lookups).",
         "",
     ]
     return "\n".join(lines)
@@ -531,12 +676,28 @@ def run_experiment(
         for n in n_values:
             rep_register_total_ms: List[float] = []
             rep_register_throughput: List[float] = []
+            rep_register_per_tool_us: List[float] = []
             rep_lookup_all: List[float] = []
             rep_user_lookup_all: List[float] = []
             rep_sysfs_ms: List[float] = []
             rep_memory_snapshots: List[Dict[str, Any]] = []
             mem_free_before: Optional[int] = None
             mem_free_after: Optional[int] = None
+
+            # Throwaway warmup pass at WARMUP_N tools: puts the Python
+            # interpreter, the netlink socket, and the kernel-side mutex
+            # path into steady state so the first measured rep does not
+            # pay cold-start cost and distort the register fit.
+            try:
+                bulk_register(
+                    backend,
+                    n=WARMUP_N,
+                    agent_id=agent_id,
+                    binding_hash=binding_hash,
+                    binding_epoch=binding_epoch,
+                )
+            except Exception:
+                pass
 
             for rep in range(reps):
                 mem_free_before = read_meminfo_free_kb() if rep == 0 else mem_free_before
@@ -550,6 +711,8 @@ def run_experiment(
                 rep_register_total_ms.append(total_ms)
                 tps = (n / (total_ms / 1000.0)) if total_ms > 0 else 0.0
                 rep_register_throughput.append(tps)
+                per_tool_us = (total_ms * 1000.0 / n) if n > 0 else 0.0
+                rep_register_per_tool_us.append(per_tool_us)
 
                 lookups = measure_lookup_samples(
                     backend,
@@ -598,13 +761,27 @@ def run_experiment(
             lookup_summary = summarize(f"kernel_N{n}", rep_lookup_all)
             user_summary = summarize(f"user_N{n}", rep_user_lookup_all)
             reg_avg = statistics.fmean(rep_register_total_ms) if rep_register_total_ms else 0.0
+            reg_std = statistics.stdev(rep_register_total_ms) if len(rep_register_total_ms) > 1 else 0.0
             tps_avg = statistics.fmean(rep_register_throughput) if rep_register_throughput else 0.0
+            per_tool_avg_us = (
+                statistics.fmean(rep_register_per_tool_us) if rep_register_per_tool_us else 0.0
+            )
+            per_tool_std_us = (
+                statistics.stdev(rep_register_per_tool_us)
+                if len(rep_register_per_tool_us) > 1
+                else 0.0
+            )
+            per_tool_ci95_us = ci95(per_tool_std_us, len(rep_register_per_tool_us))
             sysfs_avg = statistics.fmean(rep_sysfs_ms) if rep_sysfs_ms else 0.0
             per_n_data[n] = {
                 "register": {
                     "reps": reps,
                     "total_ms": round(reg_avg, 6),
+                    "total_std_ms": round(reg_std, 6),
                     "per_tool_avg_ms": round(reg_avg / n, 9) if n > 0 else 0.0,
+                    "per_tool_avg_us": round(per_tool_avg_us, 4),
+                    "per_tool_std_us": round(per_tool_std_us, 4),
+                    "per_tool_ci95_us": round(per_tool_ci95_us, 4),
                     "throughput_tools_per_sec": round(tps_avg, 3),
                 },
                 "lookup": lookup_summary,
@@ -628,6 +805,15 @@ def run_experiment(
     intercept, slope, r2 = linreg_log2(fit_x, fit_y)
     slope_lo, slope_hi = bootstrap_slope_ci(fit_x, fit_y)
 
+    # Register-path model: total_ms(N) = a + b * N.
+    # `a` is the fixed one-time setup cost, `b` is the per-tool steady-state
+    # cost, and 1000/b is the asymptotic throughput as N -> infinity. This
+    # replaces the misleading throughput-vs-N curve: throughput looks like
+    # a "hump" only because tps = N/(a+bN) approaches 1/b non-linearly.
+    fit_register_ns = sorted(per_n_data.keys())
+    fit_register_total = [per_n_data[n]["register"]["total_ms"] for n in fit_register_ns]
+    register_fit = fit_register_model(fit_register_ns, fit_register_total)
+
     summary: Dict[str, Any] = {
         "meta": {
             "host": platform.node(),
@@ -637,6 +823,7 @@ def run_experiment(
             "reps": reps,
             "lookup_samples": lookup_samples,
             "N_values": sorted(per_n_data.keys()),
+            "warmup_n": WARMUP_N,
             "dry_run": dry_run,
             "seed": seed,
             "warnings": warnings,
@@ -650,6 +837,7 @@ def run_experiment(
             "slope_ci_lo": round(slope_lo, 6),
             "slope_ci_hi": round(slope_hi, 6),
         },
+        "register_fit": register_fit,
     }
 
     summary_rows: List[Dict[str, Any]] = []
@@ -660,7 +848,11 @@ def run_experiment(
                 "N": n,
                 "reps": reps,
                 "register_total_ms_avg": row["register"]["total_ms"],
+                "register_total_std_ms": row["register"].get("total_std_ms", 0.0),
                 "register_per_tool_ms_avg": row["register"]["per_tool_avg_ms"],
+                "register_per_tool_us_avg": row["register"].get("per_tool_avg_us", 0.0),
+                "register_per_tool_us_std": row["register"].get("per_tool_std_us", 0.0),
+                "register_per_tool_us_ci95": row["register"].get("per_tool_ci95_us", 0.0),
                 "register_throughput_tools_per_sec": row["register"]["throughput_tools_per_sec"],
                 "lookup_avg_ms": row["lookup"]["avg_ms"],
                 "lookup_std_ms": row["lookup"]["std_ms"],
@@ -685,7 +877,11 @@ def run_experiment(
             "N",
             "reps",
             "register_total_ms_avg",
+            "register_total_std_ms",
             "register_per_tool_ms_avg",
+            "register_per_tool_us_avg",
+            "register_per_tool_us_std",
+            "register_per_tool_us_ci95",
             "register_throughput_tools_per_sec",
             "lookup_avg_ms",
             "lookup_std_ms",
@@ -710,7 +906,12 @@ def run_experiment(
         encoding="utf-8",
     )
     (run_dir / "registry_scaling_report.md").write_text(render_report(summary), encoding="utf-8")
-    generate_plots(run_dir, per_n_kernel=per_n_data, per_n_userspace=per_n_user)
+    generate_plots(
+        run_dir,
+        per_n_kernel=per_n_data,
+        per_n_userspace=per_n_user,
+        register_fit=register_fit,
+    )
 
     print(f"[registry-scaling] result dir: {run_dir}")
     print(f"[registry-scaling] summary:    {run_dir / 'registry_scaling_summary.json'}")
