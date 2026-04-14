@@ -1,6 +1,6 @@
 # Statistical Rehash Report (E5)
 
-Source snapshot: `/Users/lixiheng/Code/linux_mcp/experiment-results/linux-mcp-paper-final-n5/run-20260405-173020`
+Source snapshot: `/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-paper-final-n5/run-20260405-173020`
 
 This report post-processes existing `linux_mcp_eval.py` snapshots
 without re-running any workload. It closes three gaps in the original
@@ -18,10 +18,10 @@ overhead claims.
 
 | metric | value (ms) |
 |---|---:|
-| avg  | 0.003150 |
-| p50  | 0.003083 |
-| p95  | 0.003292 |
-| p99  | 0.004542 |
+| avg  | 0.003187 |
+| p50  | 0.003125 |
+| p95  | 0.003375 |
+| p99  | 0.004333 |
 
 Any μs-level claim from the ablation or microbench suites should
 be read as `floor + Δ`. The floor captures everything that

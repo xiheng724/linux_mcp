@@ -1,0 +1,673 @@
+{
+  "meta": {
+    "run_ts": "run-20260414-071246",
+    "dry_run": false,
+    "smoke": false,
+    "systems": [
+      "userspace",
+      "seccomp",
+      "kernel"
+    ],
+    "concurrency_levels": [
+      50,
+      100,
+      200,
+      400,
+      800
+    ],
+    "reps": 3,
+    "duration_s": 180.0,
+    "warmup_s": 30.0,
+    "payload_bytes": 1024,
+    "random_seed": 20260414
+  },
+  "knees": {
+    "seccomp": 100.0,
+    "userspace": 100.0,
+    "kernel": 100.0
+  },
+  "summary": [
+    {
+      "cell_id": "seccomp-c50-rep1",
+      "system": "seccomp",
+      "concurrency": 50,
+      "rep": 1,
+      "rps": 4.011,
+      "p50_ms": 4675.8099,
+      "p95_ms": 19111.9238,
+      "p99_ms": 19871.8697,
+      "error_rate": 0.501385,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c400-rep1",
+      "system": "seccomp",
+      "concurrency": 400,
+      "rep": 1,
+      "rps": 1453.739,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c100-rep1",
+      "system": "userspace",
+      "concurrency": 100,
+      "rep": 1,
+      "rps": 1696.456,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c800-rep1",
+      "system": "kernel",
+      "concurrency": 800,
+      "rep": 1,
+      "rps": 326099.15,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c400-rep1",
+      "system": "userspace",
+      "concurrency": 400,
+      "rep": 1,
+      "rps": 333768.5,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c800-rep1",
+      "system": "userspace",
+      "concurrency": 800,
+      "rep": 1,
+      "rps": 1061527.639,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c200-rep1",
+      "system": "kernel",
+      "concurrency": 200,
+      "rep": 1,
+      "rps": 2060.333,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c50-rep1",
+      "system": "userspace",
+      "concurrency": 50,
+      "rep": 1,
+      "rps": 2018.056,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c800-rep1",
+      "system": "seccomp",
+      "concurrency": 800,
+      "rep": 1,
+      "rps": 1773.894,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c50-rep1",
+      "system": "kernel",
+      "concurrency": 50,
+      "rep": 1,
+      "rps": 2202.072,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c200-rep1",
+      "system": "seccomp",
+      "concurrency": 200,
+      "rep": 1,
+      "rps": 1776.261,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c200-rep1",
+      "system": "userspace",
+      "concurrency": 200,
+      "rep": 1,
+      "rps": 2146.478,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c100-rep1",
+      "system": "seccomp",
+      "concurrency": 100,
+      "rep": 1,
+      "rps": 2094.989,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c100-rep1",
+      "system": "kernel",
+      "concurrency": 100,
+      "rep": 1,
+      "rps": 2137.189,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c400-rep1",
+      "system": "kernel",
+      "concurrency": 400,
+      "rep": 1,
+      "rps": 1892.728,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c200-rep2",
+      "system": "kernel",
+      "concurrency": 200,
+      "rep": 2,
+      "rps": 1817.506,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c400-rep2",
+      "system": "seccomp",
+      "concurrency": 400,
+      "rep": 2,
+      "rps": 1979.211,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c50-rep2",
+      "system": "seccomp",
+      "concurrency": 50,
+      "rep": 2,
+      "rps": 2027.672,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c400-rep2",
+      "system": "userspace",
+      "concurrency": 400,
+      "rep": 2,
+      "rps": 2020.961,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c800-rep2",
+      "system": "kernel",
+      "concurrency": 800,
+      "rep": 2,
+      "rps": 289042.211,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c50-rep2",
+      "system": "kernel",
+      "concurrency": 50,
+      "rep": 2,
+      "rps": 1767.083,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c50-rep2",
+      "system": "userspace",
+      "concurrency": 50,
+      "rep": 2,
+      "rps": 2317.578,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c800-rep2",
+      "system": "userspace",
+      "concurrency": 800,
+      "rep": 2,
+      "rps": 377604.239,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c100-rep2",
+      "system": "userspace",
+      "concurrency": 100,
+      "rep": 2,
+      "rps": 1755.85,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c200-rep2",
+      "system": "userspace",
+      "concurrency": 200,
+      "rep": 2,
+      "rps": 1744.422,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c800-rep2",
+      "system": "seccomp",
+      "concurrency": 800,
+      "rep": 2,
+      "rps": 375295.667,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c100-rep2",
+      "system": "kernel",
+      "concurrency": 100,
+      "rep": 2,
+      "rps": 2131.661,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c400-rep2",
+      "system": "kernel",
+      "concurrency": 400,
+      "rep": 2,
+      "rps": 1863.289,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c100-rep2",
+      "system": "seccomp",
+      "concurrency": 100,
+      "rep": 2,
+      "rps": 2210.233,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c200-rep2",
+      "system": "seccomp",
+      "concurrency": 200,
+      "rep": 2,
+      "rps": 2034.206,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c200-rep3",
+      "system": "kernel",
+      "concurrency": 200,
+      "rep": 3,
+      "rps": 2041.261,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c400-rep3",
+      "system": "kernel",
+      "concurrency": 400,
+      "rep": 3,
+      "rps": 1824.467,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c100-rep3",
+      "system": "kernel",
+      "concurrency": 100,
+      "rep": 3,
+      "rps": 1825.089,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c400-rep3",
+      "system": "userspace",
+      "concurrency": 400,
+      "rep": 3,
+      "rps": 1988.567,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c100-rep3",
+      "system": "seccomp",
+      "concurrency": 100,
+      "rep": 3,
+      "rps": 2188.517,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c50-rep3",
+      "system": "seccomp",
+      "concurrency": 50,
+      "rep": 3,
+      "rps": 2194.217,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c800-rep3",
+      "system": "seccomp",
+      "concurrency": 800,
+      "rep": 3,
+      "rps": 369244.878,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c50-rep3",
+      "system": "userspace",
+      "concurrency": 50,
+      "rep": 3,
+      "rps": 2296.206,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c50-rep3",
+      "system": "kernel",
+      "concurrency": 50,
+      "rep": 3,
+      "rps": 2182.344,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c400-rep3",
+      "system": "seccomp",
+      "concurrency": 400,
+      "rep": 3,
+      "rps": 1944.272,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c200-rep3",
+      "system": "userspace",
+      "concurrency": 200,
+      "rep": 3,
+      "rps": 2127.372,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c800-rep3",
+      "system": "userspace",
+      "concurrency": 800,
+      "rep": 3,
+      "rps": 402701.344,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "userspace-c100-rep3",
+      "system": "userspace",
+      "concurrency": 100,
+      "rep": 3,
+      "rps": 1716.844,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "seccomp-c200-rep3",
+      "system": "seccomp",
+      "concurrency": 200,
+      "rep": 3,
+      "rps": 2095.45,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    },
+    {
+      "cell_id": "kernel-c800-rep3",
+      "system": "kernel",
+      "concurrency": 800,
+      "rep": 3,
+      "rps": 372870.133,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "error_rate": 1.0,
+      "knee_c": 100.0
+    }
+  ],
+  "stats_p99_bootstrap": [
+    {
+      "system": "seccomp",
+      "concurrency": 50,
+      "p99_ms": 19871.8697,
+      "p99_ci_lo": 9425.062,
+      "p99_ci_hi": 19898.5121,
+      "n_samples": 360
+    }
+  ],
+  "pairwise_median_test": [
+    {
+      "concurrency": 50,
+      "system_a": "kernel",
+      "system_b": "seccomp",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 50,
+      "system_a": "kernel",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 50,
+      "system_a": "seccomp",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 100,
+      "system_a": "kernel",
+      "system_b": "seccomp",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 100,
+      "system_a": "kernel",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 100,
+      "system_a": "seccomp",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 200,
+      "system_a": "kernel",
+      "system_b": "seccomp",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 200,
+      "system_a": "kernel",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 200,
+      "system_a": "seccomp",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 400,
+      "system_a": "kernel",
+      "system_b": "seccomp",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 400,
+      "system_a": "kernel",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 400,
+      "system_a": "seccomp",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 800,
+      "system_a": "kernel",
+      "system_b": "seccomp",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 800,
+      "system_a": "kernel",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    },
+    {
+      "concurrency": 800,
+      "system_a": "seccomp",
+      "system_b": "userspace",
+      "median_test_p": 1.0
+    }
+  ]
+}
