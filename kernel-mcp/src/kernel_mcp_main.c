@@ -1,3 +1,4 @@
+#include <linux/cred.h>
 #include <linux/hashtable.h>
 #include <linux/init.h>
 #include <linux/jiffies.h>
@@ -6,11 +7,15 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/netlink.h>
+#include <linux/sock_diag.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/timer.h>
+#include <linux/uidgid.h>
+#include <linux/user_namespace.h>
 #include <linux/xarray.h>
 #include <net/genetlink.h>
+#include <net/sock.h>
 
 #include <linux/kernel_mcp_schema.h>
 
@@ -125,6 +130,28 @@ static struct timer_list kernel_mcp_ticket_cleanup_timer;
 static unsigned long long kernel_mcp_agent_max_calls;
 module_param_named(agent_max_calls, kernel_mcp_agent_max_calls, ullong, 0644);
 MODULE_PARM_DESC(agent_max_calls, "maximum allowed calls per agent before denial; 0 disables the budget");
+
+/*
+ * E4 follow-up: peer-credential enforcement on TOOL_REQUEST.
+ *
+ * Before this knob existed, kernel_mcp_cmd_tool_request identified the caller
+ * purely via the AGENT_ID string carried in the netlink message, which meant
+ * the only cross-uid defence was the secrecy of a userspace-computed
+ * `binding_hash` cookie handed out by mcpd. The E4 `crossuid` experiment
+ * demonstrated that once that cookie leaks, any local process can impersonate
+ * any registered agent.
+ *
+ * When `require_peer_cred` is nonzero, the kernel additionally compares the
+ * real uid of the netlink sender against the `agent->uid` recorded at
+ * AGENT_REGISTER time and denies any mismatch with reason="peer_cred_mismatch".
+ * The knob defaults to 0 so existing snapshots (`without patch`) remain
+ * reproducible; flip it via `/sys/module/kernel_mcp/parameters/require_peer_cred`
+ * to run the `with patch` comparison.
+ */
+static bool kernel_mcp_require_peer_cred;
+module_param_named(require_peer_cred, kernel_mcp_require_peer_cred, bool, 0644);
+MODULE_PARM_DESC(require_peer_cred,
+		 "when true, TOOL_REQUEST must come from the same real uid that registered the agent");
 
 static struct kobject *kernel_mcp_sysfs_root;
 static struct kobject *kernel_mcp_sysfs_tools;
@@ -904,8 +931,10 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	u32 key;
 	bool hash_mismatch = false;
 
-	(void)skb;
+	/* skb is used below for peer-cred enforcement via NETLINK_CB(skb).sk */
 	if (!info)
+		return -EINVAL;
+	if (!skb)
 		return -EINVAL;
 	if (!info->attrs[KERNEL_MCP_ATTR_AGENT_ID] ||
 	    !info->attrs[KERNEL_MCP_ATTR_TOOL_ID] ||
@@ -956,6 +985,27 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 		mutex_unlock(&kernel_mcp_agents_lock);
 		return kernel_mcp_reply_tool_decision(info, agent_id, tool_id, req_id,
 						      decision, reason, ticket_id);
+	}
+
+	/*
+	 * Optional peer-cred enforcement (E4 follow-up). When enabled, the
+	 * real uid of the netlink sender must equal the uid recorded at
+	 * AGENT_REGISTER time. Skipped when the agent has no recorded uid
+	 * (legacy registration) so we do not break existing callers who
+	 * never supplied a uid. Bypassable by SKIP_BINDING for microbench
+	 * continuity with the other experiment knobs.
+	 */
+	if (kernel_mcp_require_peer_cred && agent->uid_set &&
+	    !(experiment_flags & KERNEL_MCP_EXPERIMENT_SKIP_BINDING)) {
+		struct sock *sender_sk = NETLINK_CB(skb).sk;
+		kuid_t sender_kuid = sender_sk ? sock_i_uid(sender_sk) : GLOBAL_ROOT_UID;
+		uid_t sender_uid = from_kuid(&init_user_ns, sender_kuid);
+
+		if (sender_uid != agent->uid) {
+			decision = KERNEL_MCP_DECISION_DENY;
+			reason = "peer_cred_mismatch";
+			goto out_accounting;
+		}
 	}
 
 	if (hash_mismatch &&
