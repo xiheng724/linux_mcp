@@ -89,6 +89,16 @@ require_root() {
 build_and_load_kernel() {
   require_root
   log "phase 0: building + reloading kernel_mcp (picks up new flags + peer-cred knob)"
+
+  # Purge stale /tmp state from previous runs under different uids. On
+  # Debian/Ubuntu kernels with fs.protected_regular=2 (default), bash cannot
+  # open an existing /tmp file owned by a different user for write, even as
+  # root — sweep them out before any downstream script tries to redirect.
+  rm -f /tmp/linux-mcp-app-*.log /tmp/linux-mcp-app-*.pid 2>/dev/null || true
+  rm -f /tmp/mcpd-*.log /tmp/mcpd-overload-*.sock 2>/dev/null || true
+  rm -f /tmp/mcpd-userspace-eval.sock /tmp/mcpd-seccomp-eval.sock \
+        /tmp/mcpd-kernel-eval.sock /tmp/mcpd-direct-eval.sock 2>/dev/null || true
+
   bash scripts/build_kernel.sh     >> "$RUN_LOG" 2>&1
   bash scripts/unload_module.sh    >> "$RUN_LOG" 2>&1 || true
   bash scripts/load_module.sh      >> "$RUN_LOG" 2>&1

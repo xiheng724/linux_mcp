@@ -81,6 +81,13 @@ PY
   fi
 
   rm -f "$endpoint"
+  # Delete any stale logfile left over from a previous run before redirecting
+  # into it. On Debian/Ubuntu kernels with fs.protected_regular=2 (default),
+  # bash's `>"$logfile"` fails with EACCES when the sticky /tmp directory
+  # already holds a regular file owned by a different user — even for root.
+  # Unlinking first and letting the shell recreate the file under the current
+  # uid side-steps the protection entirely.
+  rm -f "$logfile"
   if [[ -n "$SANDBOX_MODE" ]]; then
     nohup env \
       LINUX_MCP_SIMPLE_SANDBOX="$SANDBOX_MODE" \
