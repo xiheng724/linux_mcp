@@ -1,0 +1,276 @@
+{
+  "meta": {
+    "reps": 10,
+    "requests_per_cell": 10000,
+    "ticket_requests": 100,
+    "warmup_requests": 1000,
+    "n_tools_registered": 1024,
+    "n_agents_registered": 64,
+    "measurement_method": "paired",
+    "dry_run": false,
+    "seed": 11259375,
+    "bootstrap_iters": 1000,
+    "noop_requests": 2000,
+    "scenario_notes": {
+      "benign_large": "1024 tools + 64 agents; uniformly random (tool, agent) per request",
+      "ticket_trigger": "1 high-risk tool (risk_flags=FILESYSTEM_DELETE); ticket path exercised; pair count capped at --ticket-requests (default 100) to limit approval-table growth",
+      "measurement": "paired request-level alternation: for each delta phase, modes A and B are interleaved request-by-request in a tight loop so the two samples in each pair share the same scheduler state and cache residency; deltas are computed from paired samples directly, not from mean(A) - mean(B)"
+    }
+  },
+  "modes": [
+    {
+      "name": "full",
+      "experiment_flags": 0,
+      "scenario": "benign_large_registry",
+      "ok_decisions": [
+        "ALLOW"
+      ],
+      "description": "Full arbitration path at realistic registry scale (N tools, M agents)"
+    },
+    {
+      "name": "skip_lookups",
+      "experiment_flags": 1,
+      "scenario": "benign_large_registry",
+      "ok_decisions": [
+        "ALLOW"
+      ],
+      "description": "Early return before any tool/agent lookup (bypasses 2 mutex pairs + xa_load + hashtable walk)"
+    },
+    {
+      "name": "ticket_trigger_full",
+      "experiment_flags": 0,
+      "scenario": "ticket_trigger",
+      "ok_decisions": [
+        "DEFER"
+      ],
+      "description": "High-risk tool, request without ticket -> runs kernel_mcp_consume_approval_ticket + issue_approval_ticket"
+    },
+    {
+      "name": "ticket_trigger_skip",
+      "experiment_flags": 8,
+      "scenario": "ticket_trigger",
+      "ok_decisions": [
+        "ALLOW"
+      ],
+      "description": "Same workload as ticket_trigger_full but SKIP_TICKET bypasses the approval branch"
+    },
+    {
+      "name": "skip_hash",
+      "experiment_flags": 2,
+      "scenario": "benign_large_registry",
+      "ok_decisions": [
+        "ALLOW"
+      ],
+      "description": "Methodology note: guard body is dead under valid hash, reported to document the path-identity caveat"
+    },
+    {
+      "name": "skip_binding",
+      "experiment_flags": 4,
+      "scenario": "benign_large_registry",
+      "ok_decisions": [
+        "ALLOW"
+      ],
+      "description": "Methodology note: guard body is dead under valid binding, reported to document the path-identity caveat"
+    }
+  ],
+  "mode_summaries": [
+    {
+      "mode": "full",
+      "samples": 300000,
+      "avg_ms": 0.007969,
+      "std_ms": 0.032444,
+      "ci95_ms": 0.000116,
+      "p50_ms": 0.007459,
+      "p95_ms": 0.008958,
+      "p99_ms": 0.01575,
+      "min_ms": 0.006958,
+      "max_ms": 17.476166
+    },
+    {
+      "mode": "skip_lookups",
+      "samples": 100000,
+      "avg_ms": 0.007874,
+      "std_ms": 0.002807,
+      "ci95_ms": 1.7e-05,
+      "p50_ms": 0.0075,
+      "p95_ms": 0.008709,
+      "p99_ms": 0.015625,
+      "min_ms": 0.006958,
+      "max_ms": 0.291667
+    },
+    {
+      "mode": "ticket_trigger_full",
+      "samples": 1000,
+      "avg_ms": 0.010073,
+      "std_ms": 0.00375,
+      "ci95_ms": 0.000232,
+      "p50_ms": 0.009083,
+      "p95_ms": 0.016173,
+      "p99_ms": 0.02722,
+      "min_ms": 0.008,
+      "max_ms": 0.052542
+    },
+    {
+      "mode": "ticket_trigger_skip",
+      "samples": 1000,
+      "avg_ms": 0.008061,
+      "std_ms": 0.003208,
+      "ci95_ms": 0.000199,
+      "p50_ms": 0.007459,
+      "p95_ms": 0.010088,
+      "p99_ms": 0.019584,
+      "min_ms": 0.007125,
+      "max_ms": 0.068542
+    },
+    {
+      "mode": "skip_hash",
+      "samples": 100000,
+      "avg_ms": 0.007948,
+      "std_ms": 0.024959,
+      "ci95_ms": 0.000155,
+      "p50_ms": 0.007458,
+      "p95_ms": 0.009,
+      "p99_ms": 0.015667,
+      "min_ms": 0.006917,
+      "max_ms": 7.790042
+    },
+    {
+      "mode": "skip_binding",
+      "samples": 100000,
+      "avg_ms": 0.007818,
+      "std_ms": 0.002833,
+      "ci95_ms": 1.8e-05,
+      "p50_ms": 0.007417,
+      "p95_ms": 0.008958,
+      "p99_ms": 0.014625,
+      "min_ms": 0.007,
+      "max_ms": 0.367834
+    }
+  ],
+  "meaningful_stage_deltas": [
+    {
+      "stage": "registry+agent_lookup",
+      "baseline_mode": "full",
+      "bypass_mode": "skip_lookups",
+      "n_pairs": 100000,
+      "baseline_avg_ms": 0.007983,
+      "baseline_p50_ms": 0.007542,
+      "bypass_avg_ms": 0.007874,
+      "bypass_p50_ms": 0.0075,
+      "delta_avg_ms": 0.000109,
+      "delta_p50_ms": 4.2e-05,
+      "delta_std_ms": 0.00342,
+      "delta_ci_lo": 8.7e-05,
+      "delta_ci_hi": 0.000131,
+      "t_paired": 10.0801,
+      "p_paired": 0.0,
+      "note": "two mutex pairs + xa_load(N=1024) + agent hashtable walk(M=64)"
+    },
+    {
+      "stage": "approval_ticket_body",
+      "baseline_mode": "ticket_trigger_full",
+      "bypass_mode": "ticket_trigger_skip",
+      "n_pairs": 1000,
+      "baseline_avg_ms": 0.010073,
+      "baseline_p50_ms": 0.009083,
+      "bypass_avg_ms": 0.008061,
+      "bypass_p50_ms": 0.007459,
+      "delta_avg_ms": 0.002012,
+      "delta_p50_ms": 0.001542,
+      "delta_std_ms": 0.003979,
+      "delta_ci_lo": 0.00176,
+      "delta_ci_hi": 0.002257,
+      "t_paired": 15.9894,
+      "p_paired": 0.0,
+      "note": "kernel_mcp_consume_approval_ticket + kernel_mcp_issue_approval_ticket (approval_lock + hashtable insert)"
+    }
+  ],
+  "methodology_note_deltas": [
+    {
+      "stage": "hash_guard_body",
+      "baseline_mode": "full",
+      "bypass_mode": "skip_hash",
+      "n_pairs": 100000,
+      "baseline_avg_ms": 0.008111,
+      "baseline_p50_ms": 0.007458,
+      "bypass_avg_ms": 0.007948,
+      "bypass_p50_ms": 0.007458,
+      "delta_avg_ms": 0.000163,
+      "delta_p50_ms": 0.0,
+      "delta_std_ms": 0.058733,
+      "delta_ci_lo": -0.000153,
+      "delta_ci_hi": 0.000541,
+      "t_paired": 0.8774,
+      "p_paired": 0.380294,
+      "note": "hash_mismatch guard body is dead under valid hash (delta = noise floor)"
+    },
+    {
+      "stage": "binding_guard_body",
+      "baseline_mode": "full",
+      "bypass_mode": "skip_binding",
+      "n_pairs": 100000,
+      "baseline_avg_ms": 0.007812,
+      "baseline_p50_ms": 0.007417,
+      "bypass_avg_ms": 0.007818,
+      "bypass_p50_ms": 0.007417,
+      "delta_avg_ms": -7e-06,
+      "delta_p50_ms": 0.0,
+      "delta_std_ms": 0.003146,
+      "delta_ci_lo": -2.7e-05,
+      "delta_ci_hi": 1.3e-05,
+      "t_paired": -0.6537,
+      "p_paired": 0.513304,
+      "note": "binding_mismatch guard body is dead under valid binding (delta = noise floor)"
+    }
+  ],
+  "pairwise_tests": [
+    {
+      "stage": "registry+agent_lookup",
+      "baseline": "full",
+      "bypass": "skip_lookups",
+      "t": 10.0801,
+      "p_raw": 0.0,
+      "n_pairs": 100000,
+      "p_bh": 0.0
+    },
+    {
+      "stage": "approval_ticket_body",
+      "baseline": "ticket_trigger_full",
+      "bypass": "ticket_trigger_skip",
+      "t": 15.9894,
+      "p_raw": 0.0,
+      "n_pairs": 1000,
+      "p_bh": 0.0
+    },
+    {
+      "stage": "hash_guard_body",
+      "baseline": "full",
+      "bypass": "skip_hash",
+      "t": 0.8774,
+      "p_raw": 0.380294,
+      "n_pairs": 100000,
+      "p_bh": 0.507059
+    },
+    {
+      "stage": "binding_guard_body",
+      "baseline": "full",
+      "bypass": "skip_binding",
+      "t": -0.6537,
+      "p_raw": 0.513304,
+      "n_pairs": 100000,
+      "p_bh": 0.513304
+    }
+  ],
+  "noop": {
+    "mode": "noop",
+    "samples": 2000,
+    "avg_ms": 0.00333,
+    "std_ms": 0.001516,
+    "ci95_ms": 6.6e-05,
+    "p50_ms": 0.003125,
+    "p95_ms": 0.003669,
+    "p99_ms": 0.004793,
+    "min_ms": 0.003,
+    "max_ms": 0.033791
+  }
+}

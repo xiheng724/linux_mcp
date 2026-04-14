@@ -14,19 +14,10 @@ Where an ablation run is supplied via `--ablation-run`, the measured
 KERNEL_MCP_CMD_NOOP RTT is used as a noise floor anchor for μs-level
 overhead claims.
 
-## Noise floor (measured)
+## Noise floor
 
-| metric | value (ms) |
-|---|---:|
-| avg  | 0.003187 |
-| p50  | 0.003125 |
-| p95  | 0.003375 |
-| p99  | 0.004333 |
-
-Any μs-level claim from the ablation or microbench suites should
-be read as `floor + Δ`. The floor captures everything that
-Generic Netlink + the minimum `KMCP_CMD_NOOP` handler contribute
-before any registry, hash, binding, or ticket work is done.
+No ablation run supplied (pass `--ablation-run <kernel-ablation run dir>`
+to anchor μs-level claims against the measured NOOP RTT).
 
 ## Latency pairwise tests (Welch t, BH-corrected, Cliff's delta)
 

@@ -1,23 +1,12 @@
 {
   "meta": {
     "source": "/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-paper-final-n5/run-20260405-173020",
-    "ablation_run": "experiment-results/kernel-ablation/run-20260414-070048",
-    "generated_at": "2026-04-14T10:22:05Z"
+    "ablation_run": "experiment-results/kernel-ablation/run-run-20260414-133832",
+    "generated_at": "2026-04-14T13:41:37Z"
   },
   "latency_pairwise_count": 9,
   "scalability_pairwise_count": 60,
   "latency_cells": 9,
   "scalability_cells": 60,
-  "noise_floor": {
-    "mode": "noop",
-    "samples": 2000,
-    "avg_ms": 0.003187,
-    "std_ms": 0.000392,
-    "ci95_ms": 1.7e-05,
-    "p50_ms": 0.003125,
-    "p95_ms": 0.003375,
-    "p99_ms": 0.004333,
-    "min_ms": 0.002958,
-    "max_ms": 0.011667
-  }
+  "noise_floor": null
 }

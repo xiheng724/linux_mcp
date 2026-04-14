@@ -11,6 +11,12 @@ individual suites remain the authoritative source for raw data.
 | | | toctou breach_rate=0.000% | crossuid passed=0/500 | fuzz oops=0 sent=880640 | |
 | attack-extended | run-20260413T170724Z | [attack_extended_report.md](/home/lxh/Code/linux-mcp/experiment-results/attack-extended/run-20260413T170724Z/attack_extended_report.md) | [attack_extended_summary.json](/home/lxh/Code/linux-mcp/experiment-results/attack-extended/run-20260413T170724Z/attack_extended_summary.json) |
 | | | toctou breach_rate=0.000% | crossuid passed=174/500 | fuzz oops=0 sent=876768 | |
+| kernel-ablation | run-20260414-133832 | [kernel_ablation_report.md](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-133832/kernel_ablation_report.md) | [kernel_ablation_summary.json](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-133832/kernel_ablation_summary.json) |
+| | | full avg=0.007969 ms, skip_lookups avg=0.007874 ms, noop floor=0.003330 ms | |
+| kernel-ablation | run-20260414-132347 | [kernel_ablation_report.md](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-132347/kernel_ablation_report.md) | [kernel_ablation_summary.json](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-132347/kernel_ablation_summary.json) |
+| | | full avg=0.008189 ms, skip_lookups avg=0.008003 ms, noop floor=0.003343 ms | |
+| kernel-ablation | run-20260414-131531 | [kernel_ablation_report.md](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-131531/kernel_ablation_report.md) | [kernel_ablation_summary.json](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-131531/kernel_ablation_summary.json) |
+| | | full avg=0.008377 ms, skip_lookups avg=0.007746 ms, noop floor=0.003144 ms | |
 | kernel-ablation | run-20260414-123630 | [kernel_ablation_report.md](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-123630/kernel_ablation_report.md) | [kernel_ablation_summary.json](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-123630/kernel_ablation_summary.json) |
 | | | full avg=0.007548 ms, skip_lookups avg=0.007522 ms, noop floor=0.003192 ms | |
 | kernel-ablation | run-20260414-123506 |  |  |

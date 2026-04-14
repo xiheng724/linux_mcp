@@ -1,0 +1,3 @@
+stage,baseline_mode,bypass_mode,n_pairs,baseline_avg_ms,baseline_p50_ms,bypass_avg_ms,bypass_p50_ms,delta_avg_ms,delta_p50_ms,delta_std_ms,delta_ci_lo,delta_ci_hi,t_paired,p_paired,note
+hash_guard_body,full,skip_hash,100000,0.008111,0.007458,0.007948,0.007458,0.000163,0.0,0.058733,-0.000153,0.000541,0.8774,0.380294,hash_mismatch guard body is dead under valid hash (delta = noise floor)
+binding_guard_body,full,skip_binding,100000,0.007812,0.007417,0.007818,0.007417,-7e-06,0.0,0.003146,-2.7e-05,1.3e-05,-0.6537,0.513304,binding_mismatch guard body is dead under valid binding (delta = noise floor)

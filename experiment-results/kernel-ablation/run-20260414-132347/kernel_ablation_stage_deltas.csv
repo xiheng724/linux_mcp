@@ -1,0 +1,3 @@
+stage,baseline_mode,bypass_mode,baseline_avg_ms,baseline_p50_ms,bypass_avg_ms,bypass_p50_ms,delta_avg_ms,delta_p50_ms,delta_bootstrap_mean_ms,delta_ci_lo,delta_ci_hi,note
+registry+agent_lookup,full,skip_lookups,0.008189,0.007792,0.008003,0.0075,0.000186,0.000292,0.000186,9.7e-05,0.000265,two mutex pairs + xa_load(N=1024) + agent hashtable walk(M=64)
+approval_ticket_body,ticket_trigger_full,ticket_trigger_skip,0.01378,0.009791,0.00989,0.007583,0.00389,0.002208,0.003817,0.000758,0.009325,kernel_mcp_consume_approval_ticket + kernel_mcp_issue_approval_ticket (approval_lock + hashtable insert)
