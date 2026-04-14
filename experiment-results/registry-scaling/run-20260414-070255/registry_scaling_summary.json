@@ -1,0 +1,245 @@
+{
+  "meta": {
+    "host": "lixiheng-server",
+    "platform": "Linux-6.8.0-107-generic-aarch64-with-glibc2.39",
+    "kernel_release": "6.8.0-107-generic",
+    "python": "3.12.3",
+    "reps": 5,
+    "lookup_samples": 2000,
+    "N_values": [
+      8,
+      64,
+      512,
+      4096,
+      16384
+    ],
+    "dry_run": false,
+    "seed": 20260414,
+    "warnings": [],
+    "timestamp_utc": "2026-04-14T07:02:57Z"
+  },
+  "per_N": {
+    "8": {
+      "register": {
+        "reps": 5,
+        "total_ms": 0.064508,
+        "per_tool_avg_ms": 0.008063525,
+        "throughput_tools_per_sec": 125827.422
+      },
+      "lookup": {
+        "label": "kernel_N8",
+        "samples": 10000,
+        "avg_ms": 0.007362,
+        "std_ms": 0.001765,
+        "ci95_ms": 3.5e-05,
+        "p50_ms": 0.007041,
+        "p95_ms": 0.009416,
+        "p99_ms": 0.012834,
+        "min_ms": 0.006666,
+        "max_ms": 0.069833
+      },
+      "userspace": {
+        "label": "user_N8",
+        "samples": 10000,
+        "avg_ms": 6.4e-05,
+        "std_ms": 0.000165,
+        "ci95_ms": 3e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 8.4e-05,
+        "min_ms": 0.0,
+        "max_ms": 0.009459
+      },
+      "sysfs_ls_ms_avg": 0.644883,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 409024
+      },
+      "meminfo_free_kb_before": 417068,
+      "meminfo_free_kb_after": 409024,
+      "meminfo_free_delta_kb": 8044
+    },
+    "64": {
+      "register": {
+        "reps": 5,
+        "total_ms": 0.439192,
+        "per_tool_avg_ms": 0.006862372,
+        "throughput_tools_per_sec": 147470.534
+      },
+      "lookup": {
+        "label": "kernel_N64",
+        "samples": 10000,
+        "avg_ms": 0.0074,
+        "std_ms": 0.001879,
+        "ci95_ms": 3.7e-05,
+        "p50_ms": 0.007084,
+        "p95_ms": 0.008583,
+        "p99_ms": 0.012417,
+        "min_ms": 0.00675,
+        "max_ms": 0.132583
+      },
+      "userspace": {
+        "label": "user_N64",
+        "samples": 10000,
+        "avg_ms": 6.2e-05,
+        "std_ms": 0.000104,
+        "ci95_ms": 2e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 0.000125,
+        "min_ms": 0.0,
+        "max_ms": 0.005041
+      },
+      "sysfs_ls_ms_avg": 0.515166,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 405244
+      },
+      "meminfo_free_kb_before": 409024,
+      "meminfo_free_kb_after": 405244,
+      "meminfo_free_delta_kb": 3780
+    },
+    "512": {
+      "register": {
+        "reps": 5,
+        "total_ms": 2.903849,
+        "per_tool_avg_ms": 0.005671581,
+        "throughput_tools_per_sec": 176922.327
+      },
+      "lookup": {
+        "label": "kernel_N512",
+        "samples": 10000,
+        "avg_ms": 0.00714,
+        "std_ms": 0.002044,
+        "ci95_ms": 4e-05,
+        "p50_ms": 0.006958,
+        "p95_ms": 0.007458,
+        "p99_ms": 0.01,
+        "min_ms": 0.006708,
+        "max_ms": 0.119167
+      },
+      "userspace": {
+        "label": "user_N512",
+        "samples": 10000,
+        "avg_ms": 5.6e-05,
+        "std_ms": 7.1e-05,
+        "ci95_ms": 1e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 8.4e-05,
+        "min_ms": 0.0,
+        "max_ms": 0.004708
+      },
+      "sysfs_ls_ms_avg": 0.647742,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 408148
+      },
+      "meminfo_free_kb_before": 405244,
+      "meminfo_free_kb_after": 407392,
+      "meminfo_free_delta_kb": -2148
+    },
+    "4096": {
+      "register": {
+        "reps": 5,
+        "total_ms": 24.887205,
+        "per_tool_avg_ms": 0.006075978,
+        "throughput_tools_per_sec": 165419.144
+      },
+      "lookup": {
+        "label": "kernel_N4096",
+        "samples": 10000,
+        "avg_ms": 0.007393,
+        "std_ms": 0.002033,
+        "ci95_ms": 4e-05,
+        "p50_ms": 0.007166,
+        "p95_ms": 0.008209,
+        "p99_ms": 0.012167,
+        "min_ms": 0.006708,
+        "max_ms": 0.1335
+      },
+      "userspace": {
+        "label": "user_N4096",
+        "samples": 10000,
+        "avg_ms": 6.9e-05,
+        "std_ms": 8.2e-05,
+        "ci95_ms": 2e-06,
+        "p50_ms": 8.3e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 0.000125,
+        "min_ms": 0.0,
+        "max_ms": 0.006167
+      },
+      "sysfs_ls_ms_avg": 3.410724,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 396692
+      },
+      "meminfo_free_kb_before": 407392,
+      "meminfo_free_kb_after": 396692,
+      "meminfo_free_delta_kb": 10700
+    },
+    "16384": {
+      "register": {
+        "reps": 5,
+        "total_ms": 104.567969,
+        "per_tool_avg_ms": 0.006382322,
+        "throughput_tools_per_sec": 161384.566
+      },
+      "lookup": {
+        "label": "kernel_N16384",
+        "samples": 10000,
+        "avg_ms": 0.008072,
+        "std_ms": 0.005193,
+        "ci95_ms": 0.000102,
+        "p50_ms": 0.007458,
+        "p95_ms": 0.011,
+        "p99_ms": 0.015667,
+        "min_ms": 0.006833,
+        "max_ms": 0.380667
+      },
+      "userspace": {
+        "label": "user_N16384",
+        "samples": 10000,
+        "avg_ms": 0.00012,
+        "std_ms": 9.7e-05,
+        "ci95_ms": 2e-06,
+        "p50_ms": 8.4e-05,
+        "p95_ms": 0.00025,
+        "p99_ms": 0.000375,
+        "min_ms": 4.1e-05,
+        "max_ms": 0.006459
+      },
+      "sysfs_ls_ms_avg": 13.24494,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 364528
+      },
+      "meminfo_free_kb_before": 396692,
+      "meminfo_free_kb_after": 364528,
+      "meminfo_free_delta_kb": 32164
+    }
+  },
+  "lookup_fit": {
+    "intercept": 0.007067,
+    "slope": 4.6e-05,
+    "r_squared": 0.340623,
+    "slope_ci_lo": -4.3e-05,
+    "slope_ci_hi": 0.000194
+  }
+}

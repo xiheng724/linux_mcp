@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "source": "/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-paper-final-n5/run-20260405-173020",
+    "ablation_run": "experiment-results/kernel-ablation/run-run-20260414-133832",
+    "generated_at": "2026-04-14T13:41:37Z"
+  },
+  "latency_pairwise_count": 9,
+  "scalability_pairwise_count": 60,
+  "latency_cells": 9,
+  "scalability_cells": 60,
+  "noise_floor": null
+}

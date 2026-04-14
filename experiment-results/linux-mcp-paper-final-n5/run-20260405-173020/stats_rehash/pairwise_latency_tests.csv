@@ -1,0 +1,10 @@
+metric,payload,system_a,system_b,n_a,n_b,mean_a,mean_b,t,df,p_raw,p_bh,cliffs_delta
+latency_avg_ms,large,kernel,seccomp,5,5,6.908,9.3302,-11.793525,4.168,0.0,0.0,1.0
+latency_avg_ms,large,kernel,userspace,5,5,6.908,7.2256,-1.990913,4.282,0.04649,0.04649,0.92
+latency_avg_ms,large,seccomp,userspace,5,5,9.3302,7.2256,8.198638,7.515,0.0,0.0,-1.0
+latency_avg_ms,medium,kernel,seccomp,5,5,0.828,0.8392,-3.57043,7.942,0.000356,0.000535,1.0
+latency_avg_ms,medium,kernel,userspace,5,5,0.828,0.8006,9.965284,7.72,0.0,0.0,-1.0
+latency_avg_ms,medium,seccomp,userspace,5,5,0.8392,0.8006,13.318265,7.451,0.0,0.0,-1.0
+latency_avg_ms,small,kernel,seccomp,5,5,0.7868,0.7778,2.3024,5.534,0.021313,0.027402,-0.76
+latency_avg_ms,small,kernel,userspace,5,5,0.7868,0.7638,4.017199,4.667,5.9e-05,0.000106,-1.0
+latency_avg_ms,small,seccomp,userspace,5,5,0.7778,0.7638,2.135477,6.862,0.032722,0.036812,-0.64

@@ -1,0 +1,610 @@
+{
+  "meta": {
+    "host": "lixiheng-server",
+    "platform": "Linux-6.8.0-107-generic-aarch64-with-glibc2.39",
+    "kernel_release": "6.8.0-107-generic",
+    "python": "3.12.3",
+    "reps": 5,
+    "lookup_samples": 2000,
+    "N_values": [
+      8,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096,
+      8192,
+      16384
+    ],
+    "warmup_n": 64,
+    "dry_run": false,
+    "seed": 20260414,
+    "warnings": [],
+    "timestamp_utc": "2026-04-14T12:00:18Z"
+  },
+  "per_N": {
+    "8": {
+      "register": {
+        "reps": 5,
+        "total_ms": 0.054658,
+        "total_std_ms": 0.011567,
+        "per_tool_avg_ms": 0.006832274,
+        "per_tool_avg_us": 6.8323,
+        "per_tool_std_us": 1.4459,
+        "per_tool_ci95_us": 1.2674,
+        "throughput_tools_per_sec": 150877.371
+      },
+      "lookup": {
+        "label": "kernel_N8",
+        "samples": 10000,
+        "avg_ms": 0.007101,
+        "std_ms": 0.001252,
+        "ci95_ms": 2.5e-05,
+        "p50_ms": 0.006833,
+        "p95_ms": 0.008294,
+        "p99_ms": 0.011625,
+        "min_ms": 0.006583,
+        "max_ms": 0.037916
+      },
+      "userspace": {
+        "label": "user_N8",
+        "samples": 10000,
+        "avg_ms": 6e-05,
+        "std_ms": 6.3e-05,
+        "ci95_ms": 1e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 0.000125,
+        "min_ms": 0.0,
+        "max_ms": 0.001875
+      },
+      "sysfs_ls_ms_avg": 0.590358,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3223900
+      },
+      "meminfo_free_kb_before": 3232972,
+      "meminfo_free_kb_after": 3215836,
+      "meminfo_free_delta_kb": 17136
+    },
+    "16": {
+      "register": {
+        "reps": 5,
+        "total_ms": 0.090866,
+        "total_std_ms": 0.003387,
+        "per_tool_avg_ms": 0.005679138,
+        "per_tool_avg_us": 5.6791,
+        "per_tool_std_us": 0.2117,
+        "per_tool_ci95_us": 0.1856,
+        "throughput_tools_per_sec": 176276.86
+      },
+      "lookup": {
+        "label": "kernel_N16",
+        "samples": 10000,
+        "avg_ms": 0.007086,
+        "std_ms": 0.001284,
+        "ci95_ms": 2.5e-05,
+        "p50_ms": 0.006833,
+        "p95_ms": 0.00875,
+        "p99_ms": 0.011792,
+        "min_ms": 0.006583,
+        "max_ms": 0.043291
+      },
+      "userspace": {
+        "label": "user_N16",
+        "samples": 10000,
+        "avg_ms": 5.8e-05,
+        "std_ms": 6.3e-05,
+        "ci95_ms": 1e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 8.4e-05,
+        "min_ms": 0.0,
+        "max_ms": 0.002375
+      },
+      "sysfs_ls_ms_avg": 0.43965,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3215588
+      },
+      "meminfo_free_kb_before": 3215836,
+      "meminfo_free_kb_after": 3215588,
+      "meminfo_free_delta_kb": 248
+    },
+    "32": {
+      "register": {
+        "reps": 5,
+        "total_ms": 0.1819,
+        "total_std_ms": 0.013058,
+        "per_tool_avg_ms": 0.005684375,
+        "per_tool_avg_us": 5.6844,
+        "per_tool_std_us": 0.4081,
+        "per_tool_ci95_us": 0.3577,
+        "throughput_tools_per_sec": 176608.552
+      },
+      "lookup": {
+        "label": "kernel_N32",
+        "samples": 10000,
+        "avg_ms": 0.007219,
+        "std_ms": 0.002821,
+        "ci95_ms": 5.5e-05,
+        "p50_ms": 0.006875,
+        "p95_ms": 0.00825,
+        "p99_ms": 0.011375,
+        "min_ms": 0.006583,
+        "max_ms": 0.141875
+      },
+      "userspace": {
+        "label": "user_N32",
+        "samples": 10000,
+        "avg_ms": 5.8e-05,
+        "std_ms": 5.8e-05,
+        "ci95_ms": 1e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 8.4e-05,
+        "min_ms": 0.0,
+        "max_ms": 0.001875
+      },
+      "sysfs_ls_ms_avg": 0.602892,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3211808
+      },
+      "meminfo_free_kb_before": 3215588,
+      "meminfo_free_kb_after": 3211808,
+      "meminfo_free_delta_kb": 3780
+    },
+    "64": {
+      "register": {
+        "reps": 5,
+        "total_ms": 0.38355,
+        "total_std_ms": 0.021638,
+        "per_tool_avg_ms": 0.005992972,
+        "per_tool_avg_us": 5.993,
+        "per_tool_std_us": 0.3381,
+        "per_tool_ci95_us": 0.2964,
+        "throughput_tools_per_sec": 167293.356
+      },
+      "lookup": {
+        "label": "kernel_N64",
+        "samples": 10000,
+        "avg_ms": 0.007179,
+        "std_ms": 0.001671,
+        "ci95_ms": 3.3e-05,
+        "p50_ms": 0.006917,
+        "p95_ms": 0.008041,
+        "p99_ms": 0.011959,
+        "min_ms": 0.006541,
+        "max_ms": 0.065834
+      },
+      "userspace": {
+        "label": "user_N64",
+        "samples": 10000,
+        "avg_ms": 6e-05,
+        "std_ms": 8.2e-05,
+        "ci95_ms": 2e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 0.000125,
+        "min_ms": 0.0,
+        "max_ms": 0.002333
+      },
+      "sysfs_ls_ms_avg": 0.555109,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3208028
+      },
+      "meminfo_free_kb_before": 3211808,
+      "meminfo_free_kb_after": 3206516,
+      "meminfo_free_delta_kb": 5292
+    },
+    "128": {
+      "register": {
+        "reps": 5,
+        "total_ms": 0.786633,
+        "total_std_ms": 0.107229,
+        "per_tool_avg_ms": 0.006145572,
+        "per_tool_avg_us": 6.1456,
+        "per_tool_std_us": 0.8377,
+        "per_tool_ci95_us": 0.7343,
+        "throughput_tools_per_sec": 165025.832
+      },
+      "lookup": {
+        "label": "kernel_N128",
+        "samples": 10000,
+        "avg_ms": 0.007067,
+        "std_ms": 0.001491,
+        "ci95_ms": 2.9e-05,
+        "p50_ms": 0.006875,
+        "p95_ms": 0.007667,
+        "p99_ms": 0.010418,
+        "min_ms": 0.006625,
+        "max_ms": 0.051542
+      },
+      "userspace": {
+        "label": "user_N128",
+        "samples": 10000,
+        "avg_ms": 7e-05,
+        "std_ms": 0.000444,
+        "ci95_ms": 9e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 0.000125,
+        "min_ms": 0.0,
+        "max_ms": 0.032833
+      },
+      "sysfs_ls_ms_avg": 0.530525,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3202484
+      },
+      "meminfo_free_kb_before": 3206516,
+      "meminfo_free_kb_after": 3200720,
+      "meminfo_free_delta_kb": 5796
+    },
+    "256": {
+      "register": {
+        "reps": 5,
+        "total_ms": 1.436275,
+        "total_std_ms": 0.053573,
+        "per_tool_avg_ms": 0.005610448,
+        "per_tool_avg_us": 5.6104,
+        "per_tool_std_us": 0.2093,
+        "per_tool_ci95_us": 0.1834,
+        "throughput_tools_per_sec": 178434.325
+      },
+      "lookup": {
+        "label": "kernel_N256",
+        "samples": 10000,
+        "avg_ms": 0.007048,
+        "std_ms": 0.001752,
+        "ci95_ms": 3.4e-05,
+        "p50_ms": 0.006875,
+        "p95_ms": 0.007458,
+        "p99_ms": 0.009958,
+        "min_ms": 0.006584,
+        "max_ms": 0.088166
+      },
+      "userspace": {
+        "label": "user_N256",
+        "samples": 10000,
+        "avg_ms": 5.7e-05,
+        "std_ms": 6.9e-05,
+        "ci95_ms": 1e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 8.4e-05,
+        "min_ms": 0.0,
+        "max_ms": 0.005125
+      },
+      "sysfs_ls_ms_avg": 0.502483,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3205508
+      },
+      "meminfo_free_kb_before": 3200720,
+      "meminfo_free_kb_after": 3203744,
+      "meminfo_free_delta_kb": -3024
+    },
+    "512": {
+      "register": {
+        "reps": 5,
+        "total_ms": 3.02815,
+        "total_std_ms": 0.293882,
+        "per_tool_avg_ms": 0.005914355,
+        "per_tool_avg_us": 5.9144,
+        "per_tool_std_us": 0.574,
+        "per_tool_ci95_us": 0.5031,
+        "throughput_tools_per_sec": 170248.255
+      },
+      "lookup": {
+        "label": "kernel_N512",
+        "samples": 10000,
+        "avg_ms": 0.007547,
+        "std_ms": 0.004666,
+        "ci95_ms": 9.1e-05,
+        "p50_ms": 0.007,
+        "p95_ms": 0.009416,
+        "p99_ms": 0.015375,
+        "min_ms": 0.006666,
+        "max_ms": 0.191917
+      },
+      "userspace": {
+        "label": "user_N512",
+        "samples": 10000,
+        "avg_ms": 5.5e-05,
+        "std_ms": 2e-05,
+        "ci95_ms": 0.0,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 8.4e-05,
+        "min_ms": 4.1e-05,
+        "max_ms": 0.000209
+      },
+      "sysfs_ls_ms_avg": 0.791367,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3199964
+      },
+      "meminfo_free_kb_before": 3203744,
+      "meminfo_free_kb_after": 3199208,
+      "meminfo_free_delta_kb": 4536
+    },
+    "1024": {
+      "register": {
+        "reps": 5,
+        "total_ms": 5.688325,
+        "total_std_ms": 0.124867,
+        "per_tool_avg_ms": 0.005555005,
+        "per_tool_avg_us": 5.555,
+        "per_tool_std_us": 0.1219,
+        "per_tool_ci95_us": 0.1069,
+        "throughput_tools_per_sec": 180087.175
+      },
+      "lookup": {
+        "label": "kernel_N1024",
+        "samples": 10000,
+        "avg_ms": 0.007475,
+        "std_ms": 0.005561,
+        "ci95_ms": 0.000109,
+        "p50_ms": 0.007042,
+        "p95_ms": 0.008458,
+        "p99_ms": 0.013166,
+        "min_ms": 0.006625,
+        "max_ms": 0.369
+      },
+      "userspace": {
+        "label": "user_N1024",
+        "samples": 10000,
+        "avg_ms": 6.4e-05,
+        "std_ms": 5.4e-05,
+        "ci95_ms": 1e-06,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 0.000125,
+        "min_ms": 4.1e-05,
+        "max_ms": 0.004917
+      },
+      "sysfs_ls_ms_avg": 1.011217,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3194672
+      },
+      "meminfo_free_kb_before": 3199208,
+      "meminfo_free_kb_after": 3193916,
+      "meminfo_free_delta_kb": 5292
+    },
+    "2048": {
+      "register": {
+        "reps": 5,
+        "total_ms": 11.7126,
+        "total_std_ms": 0.301276,
+        "per_tool_avg_ms": 0.005719043,
+        "per_tool_avg_us": 5.719,
+        "per_tool_std_us": 0.1471,
+        "per_tool_ci95_us": 0.1289,
+        "throughput_tools_per_sec": 174946.533
+      },
+      "lookup": {
+        "label": "kernel_N2048",
+        "samples": 10000,
+        "avg_ms": 0.007464,
+        "std_ms": 0.005807,
+        "ci95_ms": 0.000114,
+        "p50_ms": 0.007,
+        "p95_ms": 0.009084,
+        "p99_ms": 0.015542,
+        "min_ms": 0.006625,
+        "max_ms": 0.398167
+      },
+      "userspace": {
+        "label": "user_N2048",
+        "samples": 10000,
+        "avg_ms": 6.2e-05,
+        "std_ms": 2.2e-05,
+        "ci95_ms": 0.0,
+        "p50_ms": 4.2e-05,
+        "p95_ms": 8.4e-05,
+        "p99_ms": 8.4e-05,
+        "min_ms": 0.0,
+        "max_ms": 0.00025
+      },
+      "sysfs_ls_ms_avg": 1.144009,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3189128
+      },
+      "meminfo_free_kb_before": 3193916,
+      "meminfo_free_kb_after": 3188876,
+      "meminfo_free_delta_kb": 5040
+    },
+    "4096": {
+      "register": {
+        "reps": 5,
+        "total_ms": 26.225192,
+        "total_std_ms": 3.773883,
+        "per_tool_avg_ms": 0.006402635,
+        "per_tool_avg_us": 6.4026,
+        "per_tool_std_us": 0.9214,
+        "per_tool_ci95_us": 0.8076,
+        "throughput_tools_per_sec": 158651.461
+      },
+      "lookup": {
+        "label": "kernel_N4096",
+        "samples": 10000,
+        "avg_ms": 0.007979,
+        "std_ms": 0.002389,
+        "ci95_ms": 4.7e-05,
+        "p50_ms": 0.007334,
+        "p95_ms": 0.01275,
+        "p99_ms": 0.018291,
+        "min_ms": 0.006792,
+        "max_ms": 0.046292
+      },
+      "userspace": {
+        "label": "user_N4096",
+        "samples": 10000,
+        "avg_ms": 7.5e-05,
+        "std_ms": 0.000124,
+        "ci95_ms": 2e-06,
+        "p50_ms": 8.3e-05,
+        "p95_ms": 0.000125,
+        "p99_ms": 0.000166,
+        "min_ms": 0.0,
+        "max_ms": 0.010667
+      },
+      "sysfs_ls_ms_avg": 2.827791,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3158924
+      },
+      "meminfo_free_kb_before": 3188372,
+      "meminfo_free_kb_after": 3158924,
+      "meminfo_free_delta_kb": 29448
+    },
+    "8192": {
+      "register": {
+        "reps": 5,
+        "total_ms": 47.807192,
+        "total_std_ms": 2.812902,
+        "per_tool_avg_ms": 0.005835839,
+        "per_tool_avg_us": 5.8358,
+        "per_tool_std_us": 0.3434,
+        "per_tool_ci95_us": 0.301,
+        "throughput_tools_per_sec": 171815.865
+      },
+      "lookup": {
+        "label": "kernel_N8192",
+        "samples": 10000,
+        "avg_ms": 0.007304,
+        "std_ms": 0.001208,
+        "ci95_ms": 2.4e-05,
+        "p50_ms": 0.007042,
+        "p95_ms": 0.007958,
+        "p99_ms": 0.013711,
+        "min_ms": 0.006709,
+        "max_ms": 0.035625
+      },
+      "userspace": {
+        "label": "user_N8192",
+        "samples": 10000,
+        "avg_ms": 7.3e-05,
+        "std_ms": 2.7e-05,
+        "ci95_ms": 1e-06,
+        "p50_ms": 8.3e-05,
+        "p95_ms": 0.000125,
+        "p99_ms": 0.000125,
+        "min_ms": 4.1e-05,
+        "max_ms": 0.000375
+      },
+      "sysfs_ls_ms_avg": 3.40795,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3160584
+      },
+      "meminfo_free_kb_before": 3158924,
+      "meminfo_free_kb_after": 3160584,
+      "meminfo_free_delta_kb": -1660
+    },
+    "16384": {
+      "register": {
+        "reps": 5,
+        "total_ms": 98.901175,
+        "total_std_ms": 5.460749,
+        "per_tool_avg_ms": 0.006036449,
+        "per_tool_avg_us": 6.0364,
+        "per_tool_std_us": 0.3333,
+        "per_tool_ci95_us": 0.2921,
+        "throughput_tools_per_sec": 166056.06
+      },
+      "lookup": {
+        "label": "kernel_N16384",
+        "samples": 10000,
+        "avg_ms": 0.007766,
+        "std_ms": 0.003929,
+        "ci95_ms": 7.7e-05,
+        "p50_ms": 0.007375,
+        "p95_ms": 0.008834,
+        "p99_ms": 0.018297,
+        "min_ms": 0.006667,
+        "max_ms": 0.307
+      },
+      "userspace": {
+        "label": "user_N16384",
+        "samples": 10000,
+        "avg_ms": 0.000115,
+        "std_ms": 0.000101,
+        "ci95_ms": 2e-06,
+        "p50_ms": 8.3e-05,
+        "p95_ms": 0.000292,
+        "p99_ms": 0.000417,
+        "min_ms": 4.1e-05,
+        "max_ms": 0.005708
+      },
+      "sysfs_ls_ms_avg": 7.767142,
+      "module_snapshot_last": {
+        "module_coresize": "36864",
+        "module_initsize": "0",
+        "module_refcnt": "0",
+        "module_taint": "OE",
+        "meminfo_free_kb": 3142808
+      },
+      "meminfo_free_kb_before": 3160716,
+      "meminfo_free_kb_after": 3142808,
+      "meminfo_free_delta_kb": 17908
+    }
+  },
+  "lookup_fit": {
+    "intercept": 0.006826,
+    "slope": 6.2e-05,
+    "r_squared": 0.557448,
+    "slope_ci_lo": 3e-05,
+    "slope_ci_hi": 9.8e-05
+  },
+  "register_fit": {
+    "a_ms": -0.068232,
+    "b_ms_per_tool": 0.00601695,
+    "b_us_per_tool": 6.017,
+    "asymptotic_tps": 166197.1,
+    "r_squared": 0.99945,
+    "n_points": 12
+  }
+}

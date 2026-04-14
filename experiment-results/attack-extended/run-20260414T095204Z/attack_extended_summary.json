@@ -1,0 +1,172 @@
+{
+  "crossuid": {
+    "attempts": 500,
+    "blind_pass": 0,
+    "blocked": 500,
+    "blocked_rate": 1.0,
+    "blocked_rate_ci95": [
+      0.9926493899480924,
+      1.0
+    ],
+    "finding": "missing peer-cred enforcement \u2192 follow-up patch recommended: kernel_mcp_cmd_tool_request does not compare NETLINK_CB(skb) credentials against registered agent->uid",
+    "guessed_pass": 0,
+    "leaked_pass": 0,
+    "mode": "with_patch",
+    "passed": 0,
+    "require_peer_cred": 1
+  },
+  "crossuid_modes": {
+    "with_patch": {
+      "attempts": 500,
+      "blind_pass": 0,
+      "blocked": 500,
+      "blocked_rate": 1.0,
+      "blocked_rate_ci95": [
+        0.9926493899480924,
+        1.0
+      ],
+      "finding": "missing peer-cred enforcement \u2192 follow-up patch recommended: kernel_mcp_cmd_tool_request does not compare NETLINK_CB(skb) credentials against registered agent->uid",
+      "guessed_pass": 0,
+      "leaked_pass": 0,
+      "mode": "with_patch",
+      "passed": 0,
+      "require_peer_cred": 1
+    },
+    "without_patch": {
+      "attempts": 500,
+      "blind_pass": 0,
+      "blocked": 326,
+      "blocked_rate": 0.652,
+      "blocked_rate_ci95": [
+        0.608444442634021,
+        0.6937459099958798
+      ],
+      "finding": "missing peer-cred enforcement \u2192 follow-up patch recommended: kernel_mcp_cmd_tool_request does not compare NETLINK_CB(skb) credentials against registered agent->uid",
+      "guessed_pass": 0,
+      "leaked_pass": 174,
+      "mode": "without_patch",
+      "passed": 174,
+      "require_peer_cred": 0
+    }
+  },
+  "fuzz": {
+    "dmesg_findings": {
+      "bug": 0,
+      "gpf": 0,
+      "kmemleak": 0,
+      "oops": 0,
+      "warn": 0
+    },
+    "errno_hist": {
+      "-34": 176429,
+      "-22": 176664,
+      "-14": 176123,
+      "-2": 175531,
+      "-1": 175893
+    },
+    "mutation_hist": {
+      "bit_flip": 192581,
+      "none": 109846,
+      "oversize_len": 193514,
+      "truncate": 191699,
+      "type_sub": 193000
+    },
+    "per_cmd_errno": {
+      "AGENT_REGISTER": {
+        "-34": 21818,
+        "-22": 22217,
+        "-14": 21778,
+        "-2": 21987,
+        "-1": 22168
+      },
+      "APPROVAL_DECIDE": {
+        "-34": 22044,
+        "-22": 22226,
+        "-14": 22020,
+        "-2": 22131,
+        "-1": 22161
+      },
+      "LIST_TOOLS": {
+        "-34": 22017,
+        "-22": 22112,
+        "-14": 22061,
+        "-2": 21947,
+        "-1": 21645
+      },
+      "NOOP": {
+        "-34": 22019,
+        "-22": 22120,
+        "-14": 22229,
+        "-2": 21776,
+        "-1": 22067
+      },
+      "RESET_TOOLS": {
+        "-34": 21917,
+        "-22": 22063,
+        "-14": 22122,
+        "-2": 21885,
+        "-1": 21859
+      },
+      "TOOL_COMPLETE": {
+        "-34": 22222,
+        "-22": 22055,
+        "-14": 21772,
+        "-2": 21723,
+        "-1": 21837
+      },
+      "TOOL_REGISTER": {
+        "-34": 22374,
+        "-22": 21769,
+        "-14": 22140,
+        "-2": 21802,
+        "-1": 21931
+      },
+      "TOOL_REQUEST": {
+        "-34": 22018,
+        "-22": 22102,
+        "-14": 22001,
+        "-2": 22280,
+        "-1": 22225
+      }
+    },
+    "socket_errors": 0,
+    "total_sent": 880640
+  },
+  "meta": {
+    "crossuid_attempts": 500,
+    "dry_run": false,
+    "fuzz_duration_s": 1800.0,
+    "phases": [
+      "crossuid",
+      "fuzz",
+      "toctou"
+    ],
+    "platform": "Linux-6.8.0-107-generic-aarch64-with-glibc2.39",
+    "python": "3.12.3",
+    "run_ts": "run-20260414T095204Z",
+    "seed": 20260414,
+    "smoke": false,
+    "toctou_iterations": 10000
+  },
+  "peer_cred_finding": "kernel_mcp_cmd_tool_request has no NETLINK_CB / current_uid check \u2014 cross-uid hijack is gated only by the secrecy of binding_hash",
+  "toctou": {
+    "blocked_rate_ci95": [
+      0.9996311800853821,
+      1.0
+    ],
+    "breach_count": 0,
+    "breach_rate": 0.0,
+    "breach_rate_ci95": [
+      0.0,
+      0.00036881991461784613
+    ],
+    "defer_count": 15,
+    "deny_binding_mismatch": 0,
+    "deny_hash_mismatch": 9985,
+    "iterations": 10000,
+    "reason_histogram": {
+      "approval_ticket_unknown": 15,
+      "hash_mismatch": 9985
+    }
+  }
+}

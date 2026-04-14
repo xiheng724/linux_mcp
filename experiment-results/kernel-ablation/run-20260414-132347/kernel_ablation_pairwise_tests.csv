@@ -1,0 +1,5 @@
+stage,baseline,bypass,t,p_raw,p_bh
+registry+agent_lookup,full,skip_lookups,4.179879,2.9e-05,0.000116
+approval_ticket_body,ticket_trigger_full,ticket_trigger_skip,1.530537,0.125884,0.125884
+hash_guard_body,full,skip_hash,-2.211411,0.027007,0.036009
+binding_guard_body,full,skip_binding,-2.219369,0.026462,0.036009
