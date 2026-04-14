@@ -904,7 +904,7 @@ def render_fuzz_plot(stats: FuzzStats, out_path: Path) -> Optional[Path]:
     ax.legend(loc="upper right", fontsize=7)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=150)
+    fig.savefig(out_path)
     plt.close(fig)
     return out_path
 
@@ -1211,7 +1211,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             getattr(fuzz_stats, "dmesg_delta", ""), encoding="utf-8"
         )
         write_fuzz_report(run_dir, fuzz_stats)
-        render_fuzz_plot(fuzz_stats, plots_dir / "figure_fuzz_errno_distribution.png")
+        render_fuzz_plot(fuzz_stats, plots_dir / "figure_fuzz_errno_distribution.pdf")
         print(f"[attack-extended][fuzz] done in {time.monotonic() - t0:.1f}s; "
               f"sent={fuzz_stats.total_sent}")
 

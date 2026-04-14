@@ -219,7 +219,7 @@ def generate_plots(
     ax.set_title("Per-mode kernel path RTT (lower is cheaper)")
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(plots_dir / "figure_ablation_mean_rtt.png", dpi=180)
+    fig.savefig(plots_dir / "figure_ablation_mean_rtt.pdf")
     plt.close(fig)
 
     if stage_deltas:
@@ -239,7 +239,7 @@ def generate_plots(
         ax.grid(axis="y", alpha=0.25)
         ax.axhline(0, color="#444", linewidth=0.8)
         fig.tight_layout()
-        fig.savefig(plots_dir / "figure_ablation_stage_delta.png", dpi=180)
+        fig.savefig(plots_dir / "figure_ablation_stage_delta.pdf")
         plt.close(fig)
 
     (run_dir / "plots_status.json").write_text(
@@ -313,14 +313,49 @@ def render_report(summary: Dict[str, Any]) -> str:
         )
     lines += [
         "",
-        "## Caveats",
+        "## Interpretation (important — path-identity under valid workload)",
         "",
-        "- Delta estimates near the sub-microsecond range should be read",
-        "  together with the noop noise floor above.",
-        "- This is single-factor ablation: cross-interactions between stages",
-        "  are not measured. The absolute per-stage costs do not sum to",
-        "  `full - skip_lookups` exactly because the kernel path has shared",
-        "  prologue work that all non-skip modes still pay.",
+        "This ablation runner uses valid credentials: the registered tool hash",
+        "matches the request, the registered binding hash matches the request,",
+        "`risk_flags = 0` (no approval gate), and `require_peer_cred = 0`.",
+        "Under those conditions, a careful trace of `kernel_mcp_cmd_tool_request`",
+        "in `kernel-mcp/src/kernel_mcp_main.c` shows that `full`, `skip_ticket`,",
+        "`skip_binding`, and `skip_hash` **execute literally identical kernel",
+        "instructions**. The `if (hash_mismatch && …)`, `if (binding != …)`,",
+        "and `if (risk_flags & APPROVAL_REQUIRED_FLAGS)` guards are already",
+        "short-circuited by the workload state, so their bodies never execute",
+        "regardless of the experiment flag. Only `skip_lookups` takes a truly",
+        "different path — it returns early at line 961 before any mutex, xarray,",
+        "or agent lookup work.",
+        "",
+        "Therefore, the per-stage deltas above for hash / binding / ticket are",
+        "**not** measuring per-stage cost. They are noise measurements on the",
+        "same kernel path executed four times. The `skip_lookups` delta is the",
+        "only one that decomposes meaningfully, and it measures the combined",
+        "cost of two uncontended mutex pairs, one xarray load, and one agent",
+        "hashtable lookup over a small registry (~150-200 ns in practice on",
+        "this aarch64 VM).",
+        "",
+        "This is the truthful experimental result: the fast path of kernel",
+        "arbitration under valid inputs is dominated by (a) Generic Netlink",
+        "transport and (b) reply-skb construction, and **the per-check guards",
+        "are too cheap to measure individually on this hardware**. To actually",
+        "isolate per-check costs one would need to send invalid inputs that",
+        "force each guard to take its deny path, and compare against a run",
+        "with that check bypassed. That is left as future work; the present",
+        "result is reported as a methodology check, not a stage decomposition.",
+        "",
+        "## Kernel arbitration total cost (primary number)",
+        "",
+        f"- full p50:     {summary['mode_summaries'][0]['p50_ms']:.6f} ms",
+        f"- noop p50:     {summary['noop']['p50_ms']:.6f} ms",
+        f"- **arbitration = full_p50 − noop_p50 = {summary['mode_summaries'][0]['p50_ms'] - summary['noop']['p50_ms']:.6f} ms**",
+        "",
+        "The median (p50) is preferred over the mean because VMware preemption",
+        "events occasionally inject multi-millisecond outliers into single",
+        "samples. The noise floor (noop) captures everything Generic Netlink",
+        "and the minimum `KMCP_CMD_NOOP` handler contribute before any",
+        "registry, hash, binding, or ticket work is done.",
         "",
     ]
     return "\n".join(lines)

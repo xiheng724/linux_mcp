@@ -112,7 +112,7 @@ def generate_plots(run_dir: Path, *, bare_samples: List[float], full_samples: Li
     ax.set_ylabel("RTT (ms)")
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(plots_dir / "figure_netlink_rtt_boxplot.png", dpi=180)
+    fig.savefig(plots_dir / "figure_netlink_rtt_boxplot.pdf")
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(7, 4.5))
@@ -123,7 +123,7 @@ def generate_plots(run_dir: Path, *, bare_samples: List[float], full_samples: Li
     ax.legend()
     ax.grid(alpha=0.25)
     fig.tight_layout()
-    fig.savefig(plots_dir / "figure_netlink_rtt_ordered.png", dpi=180)
+    fig.savefig(plots_dir / "figure_netlink_rtt_ordered.pdf")
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(7, 4.5))
@@ -132,7 +132,7 @@ def generate_plots(run_dir: Path, *, bare_samples: List[float], full_samples: Li
     ax.set_ylabel("Count")
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(plots_dir / "figure_lookup_overhead_hist.png", dpi=180)
+    fig.savefig(plots_dir / "figure_lookup_overhead_hist.pdf")
     plt.close(fig)
     write_plot_status(run_dir, enabled=True)
 

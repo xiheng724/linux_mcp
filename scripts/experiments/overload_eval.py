@@ -751,16 +751,16 @@ def main() -> int:
     }
     (run_dir / "overload_summary.json").write_text(json.dumps(summary_obj, ensure_ascii=True, indent=2), encoding="utf-8")
 
-    _plot_p99_vs_concurrency(summary_rows, run_dir / "plots" / "figure_overload_p99_vs_concurrency.png")
-    _plot_throughput_timeseries(per_second_rows, run_dir / "plots" / "figure_overload_throughput_timeseries.png")
-    _plot_latency_cdf(sample_rows, run_dir / "plots" / "figure_overload_latency_cdf.png")
+    _plot_p99_vs_concurrency(summary_rows, run_dir / "plots" / "figure_overload_p99_vs_concurrency.pdf")
+    _plot_throughput_timeseries(per_second_rows, run_dir / "plots" / "figure_overload_throughput_timeseries.pdf")
+    _plot_latency_cdf(sample_rows, run_dir / "plots" / "figure_overload_latency_cdf.pdf")
 
-    # Always materialize the PNG paths so smoke validation can assert their presence
+    # Always materialize the PDF paths so smoke validation can assert their presence
     # even when matplotlib is unavailable (we emit empty placeholder files in that case).
     for plot_name in (
-        "figure_overload_p99_vs_concurrency.png",
-        "figure_overload_throughput_timeseries.png",
-        "figure_overload_latency_cdf.png",
+        "figure_overload_p99_vs_concurrency.pdf",
+        "figure_overload_throughput_timeseries.pdf",
+        "figure_overload_latency_cdf.pdf",
     ):
         plot_path = run_dir / "plots" / plot_name
         if not plot_path.exists():

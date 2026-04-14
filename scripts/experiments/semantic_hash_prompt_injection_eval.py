@@ -126,7 +126,7 @@ def generate_plots(run_dir: Path, *, planning_rows: Sequence[Dict[str, Any]], ke
     ax.tick_params(axis="x", rotation=18)
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(plots_dir / "figure_planning_latency_by_case.png", dpi=180)
+    fig.savefig(plots_dir / "figure_planning_latency_by_case.pdf")
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(8, 4.8))
@@ -136,7 +136,7 @@ def generate_plots(run_dir: Path, *, planning_rows: Sequence[Dict[str, Any]], ke
     ax.tick_params(axis="x", rotation=18)
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(plots_dir / "figure_kernel_block_rate_by_case.png", dpi=180)
+    fig.savefig(plots_dir / "figure_kernel_block_rate_by_case.pdf")
     plt.close(fig)
     write_plot_status(run_dir, enabled=True)
 

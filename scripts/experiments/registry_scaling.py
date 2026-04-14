@@ -481,7 +481,7 @@ def generate_plots(
     ax.grid(alpha=0.25)
     ax.legend()
     fig.tight_layout()
-    fig.savefig(plots_dir / "figure_registry_lookup_scaling.png", dpi=180)
+    fig.savefig(plots_dir / "figure_registry_lookup_scaling.pdf")
     plt.close(fig)
 
     # (2) Per-tool registration cost with asymptote at b.
@@ -520,7 +520,7 @@ def generate_plots(
     ax.grid(alpha=0.25)
     ax.legend()
     fig.tight_layout()
-    fig.savefig(plots_dir / "figure_registry_register_curve.png", dpi=180)
+    fig.savefig(plots_dir / "figure_registry_register_curve.pdf")
     plt.close(fig)
 
     # (3) Throughput with asymptote — kept for continuity with the old figure
@@ -558,7 +558,7 @@ def generate_plots(
     ax.grid(alpha=0.25)
     ax.legend()
     fig.tight_layout()
-    fig.savefig(plots_dir / "figure_registry_register_throughput.png", dpi=180)
+    fig.savefig(plots_dir / "figure_registry_register_throughput.pdf")
     plt.close(fig)
     write_plot_status(run_dir, enabled=True)
 
