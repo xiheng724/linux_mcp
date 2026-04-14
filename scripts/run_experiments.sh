@@ -68,8 +68,46 @@ else
   PYTHON_BIN="python3"
 fi
 
+# When invoked via sudo we prefer to run the experiments themselves as the
+# original (unprivileged) user, so that every file written into
+# experiment-results/ is owned by that user and future `git pull`, plot
+# retrofits, IDE edits, etc. do not trip over root-owned stale files. sudo
+# is still required at the driver level for kernel module load and for the
+# E4 require_peer_cred sysfs writes — but the Python runners themselves do
+# not need root for E1/E2/E3/E5/render_index.
+#
+# Strategy:
+#   - If $EUID == 0 AND $SUDO_USER is set, we drop privileges for runner
+#     invocations via `sudo -u $SUDO_USER -E -- …`.
+#   - If $EUID == 0 AND $SUDO_USER is unset (running as real root without
+#     sudo), we stay root.
+#   - If $EUID != 0 we just run commands directly (no wrapper needed).
+#
+# E4 remains root because attack_extended.py needs to write
+# /sys/module/kernel_mcp/parameters/require_peer_cred for the crossuid A/B
+# A/B toggle.
+DROP_USER=""
+if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+  DROP_USER="$SUDO_USER"
+fi
+
+run_as_user() {
+  # Run "$@" as the unprivileged user if we have one, otherwise directly.
+  if [[ -n "$DROP_USER" ]]; then
+    sudo -u "$DROP_USER" -E -- "$@"
+  else
+    "$@"
+  fi
+}
+
 RUN_LOG="$ROOT_DIR/experiment-results/run_experiments_$(date -u +%Y%m%dT%H%M%SZ).log"
 mkdir -p "$ROOT_DIR/experiment-results"
+if [[ -n "$DROP_USER" ]]; then
+  # Make sure the unprivileged user owns the results tree and the log file
+  # we are about to create. Best-effort — if experiment-results/ was
+  # previously polluted by a direct-root run, this retroactively cleans it.
+  chown -R "$DROP_USER:$DROP_USER" "$ROOT_DIR/experiment-results" 2>/dev/null || true
+fi
 echo "[driver] logging to $RUN_LOG"
 
 log() {
@@ -129,7 +167,7 @@ run_e1() {
   else
     args+=(--reps 10 --requests 10000)
   fi
-  "$PYTHON_BIN" scripts/experiments/kernel_ablation.py "${args[@]}" 2>&1 | tee -a "$RUN_LOG"
+  run_as_user "$PYTHON_BIN" scripts/experiments/kernel_ablation.py "${args[@]}" 2>&1 | tee -a "$RUN_LOG"
   E1_RUN_DIR="$(ls -td experiment-results/kernel-ablation/run-* | head -1)"
   log "phase E1 done → $E1_RUN_DIR"
 }
@@ -142,7 +180,7 @@ run_e2() {
   else
     args+=(--reps 5)
   fi
-  "$PYTHON_BIN" scripts/experiments/registry_scaling.py "${args[@]}" 2>&1 | tee -a "$RUN_LOG"
+  run_as_user "$PYTHON_BIN" scripts/experiments/registry_scaling.py "${args[@]}" 2>&1 | tee -a "$RUN_LOG"
   E2_RUN_DIR="$(ls -td experiment-results/registry-scaling/run-* | head -1)"
   log "phase E2 done → $E2_RUN_DIR"
 }
@@ -162,7 +200,7 @@ run_e3() {
     # 180s × 5 concurrency levels × 3 reps × 3 systems ≈ 2.5h wall clock.
     args+=(--duration-s 180 --reps 3 --warmup-s 30)
   fi
-  "$PYTHON_BIN" scripts/experiments/overload_eval.py "${args[@]}" 2>&1 | tee -a "$RUN_LOG"
+  run_as_user "$PYTHON_BIN" scripts/experiments/overload_eval.py "${args[@]}" 2>&1 | tee -a "$RUN_LOG"
   E3_RUN_DIR="$(ls -td experiment-results/overload/run-* 2>/dev/null | head -1 || true)"
   if [[ -z "$E3_RUN_DIR" ]]; then
     # User may have invoked with --output-dir; fall back to the flat dir.
@@ -181,6 +219,11 @@ run_e4() {
     # Default toctou=10k, crossuid=500 per mode, fuzz=1800s.
     :
   fi
+  # E4 must stay root because attack_extended.py toggles
+  # /sys/module/kernel_mcp/parameters/require_peer_cred between the two
+  # crossuid-mode arms. The resulting run-<ts>/ directory is then chowned
+  # back to the invoking user below so the user can post-process / diff /
+  # plot / `git status` the new artifacts without EPERM.
   "$PYTHON_BIN" scripts/experiments/attack_extended.py "${args[@]}" 2>&1 | tee -a "$RUN_LOG"
   # Leave the knob in its restored default (=0) so the next unrelated run
   # does not inherit a surprising policy.
@@ -188,6 +231,11 @@ run_e4() {
     echo 0 > /sys/module/kernel_mcp/parameters/require_peer_cred
   fi
   E4_RUN_DIR="$(ls -td experiment-results/attack-extended/run-* | head -1)"
+  # Drop ownership of the freshly-created attack-extended run dir so the
+  # user can touch it without sudo afterwards.
+  if [[ -n "$DROP_USER" && -d "$E4_RUN_DIR" ]]; then
+    chown -R "$DROP_USER:$DROP_USER" "$E4_RUN_DIR" 2>/dev/null || true
+  fi
   log "phase E4 done → $E4_RUN_DIR"
 }
 
@@ -208,7 +256,7 @@ run_e5() {
   else
     log "E5 running without ablation anchor (no kernel-ablation run found)"
   fi
-  "$PYTHON_BIN" scripts/experiments/stats_rehash.py "$n5_dir" \
+  run_as_user "$PYTHON_BIN" scripts/experiments/stats_rehash.py "$n5_dir" \
     "${ablation_arg[@]}" \
     --output-dir "$n5_dir/stats_rehash" \
     2>&1 | tee -a "$RUN_LOG"
@@ -217,7 +265,7 @@ run_e5() {
 
 render_index() {
   log "rendering experiment-results/INDEX.md"
-  "$PYTHON_BIN" scripts/experiments/render_experiment_index.py \
+  run_as_user "$PYTHON_BIN" scripts/experiments/render_experiment_index.py \
     --output experiment-results/INDEX.md 2>&1 | tee -a "$RUN_LOG"
 }
 
