@@ -1,0 +1,11 @@
+metric,value
+iterations,10000
+breach_count,0
+breach_rate,0.000000
+breach_ci95_lo,0.000000
+breach_ci95_hi,0.000369
+blocked_ci95_lo,0.999631
+blocked_ci95_hi,1.000000
+deny_hash_mismatch,9984
+deny_binding_mismatch,0
+defer_count,16
