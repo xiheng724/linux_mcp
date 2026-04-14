@@ -11,6 +11,9 @@ individual suites remain the authoritative source for raw data.
 | | | toctou breach_rate=0.000% | crossuid passed=0/500 | fuzz oops=0 sent=880640 | |
 | attack-extended | run-20260413T170724Z | [attack_extended_report.md](/home/lxh/Code/linux-mcp/experiment-results/attack-extended/run-20260413T170724Z/attack_extended_report.md) | [attack_extended_summary.json](/home/lxh/Code/linux-mcp/experiment-results/attack-extended/run-20260413T170724Z/attack_extended_summary.json) |
 | | | toctou breach_rate=0.000% | crossuid passed=174/500 | fuzz oops=0 sent=876768 | |
+| kernel-ablation | run-20260414-123630 | [kernel_ablation_report.md](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-123630/kernel_ablation_report.md) | [kernel_ablation_summary.json](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-123630/kernel_ablation_summary.json) |
+| | | full avg=0.007548 ms, skip_lookups avg=0.007522 ms, noop floor=0.003192 ms | |
+| kernel-ablation | run-20260414-123506 |  |  |
 | kernel-ablation | run-20260414-115825 | [kernel_ablation_report.md](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-115825/kernel_ablation_report.md) | [kernel_ablation_summary.json](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-115825/kernel_ablation_summary.json) |
 | | | full avg=0.008143 ms, skip_lookups avg=0.008218 ms, noop floor=0.003243 ms | |
 | kernel-ablation | run-20260414-070048 | [kernel_ablation_report.md](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-070048/kernel_ablation_report.md) | [kernel_ablation_summary.json](/home/lxh/Code/linux-mcp/experiment-results/kernel-ablation/run-20260414-070048/kernel_ablation_summary.json) |
@@ -21,6 +24,8 @@ individual suites remain the authoritative source for raw data.
 | linux-mcp-paper-final-n5 | run-20260405-173020 | [linux_mcp_report.md](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/linux_mcp_report.md) | [linux_mcp_summary.json](/home/lxh/Code/linux-mcp/experiment-results/linux-mcp-paper-final-n5/run-20260405-173020/linux_mcp_summary.json) |
 | netlink-microbench-e | run-20260406-111914 | [netlink_microbench_report.md](/home/lxh/Code/linux-mcp/experiment-results/netlink-microbench-e/run-20260406-111914/netlink_microbench_report.md) | [netlink_microbench_summary.json](/home/lxh/Code/linux-mcp/experiment-results/netlink-microbench-e/run-20260406-111914/netlink_microbench_summary.json) |
 | overload | run-20260414-070257 |  |  |
+| registry-scaling | run-20260414-123832 | [registry_scaling_report.md](/home/lxh/Code/linux-mcp/experiment-results/registry-scaling/run-20260414-123832/registry_scaling_report.md) | [registry_scaling_summary.json](/home/lxh/Code/linux-mcp/experiment-results/registry-scaling/run-20260414-123832/registry_scaling_summary.json) |
+| | | (extract failed: 0) | |
 | registry-scaling | run-20260414-120016 | [registry_scaling_report.md](/home/lxh/Code/linux-mcp/experiment-results/registry-scaling/run-20260414-120016/registry_scaling_report.md) | [registry_scaling_summary.json](/home/lxh/Code/linux-mcp/experiment-results/registry-scaling/run-20260414-120016/registry_scaling_summary.json) |
 | | | (extract failed: 0) | |
 | registry-scaling | run-20260414-070255 | [registry_scaling_report.md](/home/lxh/Code/linux-mcp/experiment-results/registry-scaling/run-20260414-070255/registry_scaling_report.md) | [registry_scaling_summary.json](/home/lxh/Code/linux-mcp/experiment-results/registry-scaling/run-20260414-070255/registry_scaling_summary.json) |

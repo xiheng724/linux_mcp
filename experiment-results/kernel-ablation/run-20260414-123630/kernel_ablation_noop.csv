@@ -1,0 +1,2 @@
+mode,samples,avg_ms,std_ms,ci95_ms,p50_ms,p95_ms,p99_ms,min_ms,max_ms
+noop,2000,0.003192,0.000465,2e-05,0.003125,0.003375,0.004334,0.003,0.01425

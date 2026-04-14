@@ -1,0 +1,5 @@
+mode,t,p_raw,p_bh
+skip_ticket,-16.146521,0.0,0.0
+skip_binding,-7.046947,0.0,0.0
+skip_hash,-3.872483,0.000108,0.000144
+skip_lookups,2.775903,0.005505,0.005505
