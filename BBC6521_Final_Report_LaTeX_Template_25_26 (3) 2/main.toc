@@ -32,29 +32,34 @@
 \contentsline {subsection}{\numberline {3.12}Limitations and Identified Optimisation Opportunities}{25}{subsection.3.12}%
 \contentsline {section}{\textit {Chapter 4: Results and Discussion}}{26}{subsection.3.12}%
 \contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{26}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{28}{subsection.4.2}%
-\contentsline {subsection}{\numberline {4.3}Security Evaluation}{28}{subsection.4.3}%
-\contentsline {subsection}{\numberline {4.4}Daemon Failure and Recovery}{31}{subsection.4.4}%
-\contentsline {subsection}{\numberline {4.5}Discussion}{32}{subsection.4.5}%
-\contentsline {subsection}{\numberline {4.6}Threats to Validity}{34}{subsection.4.6}%
-\contentsline {section}{\textit {Chapter 5: Conclusion and Further Work}}{35}{section*.11}%
-\contentsline {subsection}{\numberline {5.1}Conclusion}{35}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Reflection}{36}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Further Work}{36}{subsection.5.3}%
-\contentsline {section}{\textit {References}}{38}{subsection.5.3}%
-\contentsline {section}{\textit {Acknowledgment}}{42}{section*.12}%
-\contentsline {section}{\textit {Appendices}}{43}{section*.13}%
-\contentsline {subsection}{Disclaimer}{43}{section*.14}%
-\contentsline {subsection}{Acknowledgement of using Generative AI}{44}{section*.15}%
-\contentsline {subsection}{Project specification}{45}{section*.16}%
-\contentsline {subsection}{Early-term progress report}{52}{section*.17}%
-\contentsline {subsection}{Mid-term progress report}{59}{section*.18}%
-\contentsline {subsection}{Supervision log}{66}{section*.19}%
-\contentsline {subsection}{Additional Appendices}{69}{section*.20}%
-\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{69}{section*.21}%
-\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{69}{paragraph*.22}%
-\contentsline {paragraph}{Complete Netlink attribute encoding.}{69}{paragraph*.23}%
-\contentsline {paragraph}{Semantic hash computation.}{70}{paragraph*.24}%
-\contentsline {paragraph}{Complete manifest field specification.}{71}{paragraph*.25}%
-\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{72}{section*.26}%
-\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{73}{section*.27}%
+\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{32}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Registry Scaling}{33}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Security Evaluation}{35}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Extended Threat Model}{37}{subsection.4.5}%
+\contentsline {paragraph}{TOCTOU on the approval window.}{37}{paragraph*.11}%
+\contentsline {paragraph}{Cross-UID session hijack.}{37}{paragraph*.12}%
+\contentsline {paragraph}{Generic Netlink dumb fuzzer.}{38}{paragraph*.13}%
+\contentsline {subsection}{\numberline {4.6}Daemon Failure and Recovery}{38}{subsection.4.6}%
+\contentsline {subsection}{\numberline {4.7}Discussion}{39}{subsection.4.7}%
+\contentsline {subsection}{\numberline {4.8}Threats to Validity}{40}{subsection.4.8}%
+\contentsline {section}{\textit {Chapter 5: Conclusion and Further Work}}{41}{section*.14}%
+\contentsline {subsection}{\numberline {5.1}Conclusion}{41}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Reflection}{42}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Further Work}{42}{subsection.5.3}%
+\contentsline {section}{\textit {References}}{44}{subsection.5.3}%
+\contentsline {section}{\textit {Acknowledgment}}{48}{section*.15}%
+\contentsline {section}{\textit {Appendices}}{49}{section*.16}%
+\contentsline {subsection}{Disclaimer}{49}{section*.17}%
+\contentsline {subsection}{Acknowledgement of using Generative AI}{50}{section*.18}%
+\contentsline {subsection}{Project specification}{51}{section*.19}%
+\contentsline {subsection}{Early-term progress report}{58}{section*.20}%
+\contentsline {subsection}{Mid-term progress report}{65}{section*.21}%
+\contentsline {subsection}{Supervision log}{72}{section*.22}%
+\contentsline {subsection}{Additional Appendices}{75}{section*.23}%
+\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{75}{section*.24}%
+\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{75}{paragraph*.25}%
+\contentsline {paragraph}{Complete Netlink attribute encoding.}{75}{paragraph*.26}%
+\contentsline {paragraph}{Semantic hash computation.}{76}{paragraph*.27}%
+\contentsline {paragraph}{Complete manifest field specification.}{77}{paragraph*.28}%
+\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{78}{section*.29}%
+\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{79}{section*.30}%

@@ -34,10 +34,10 @@ Gateway logic bugs therefore no longer threaten the critical state transitions; 
 
 This position is deliberately narrower than either extreme in prior work.
 AIOS-style proposals offer strong guarantees by replacing OS infrastructure, at the cost of deployability on existing systems.
-User-space frameworks preserve deployment flexibility but inherit the structural weaknesses identified in Chapter~2.
+User-space frameworks preserve deployment flexibility but inherit the structural weaknesses identified in \hyperref[chap:background]{Chapter~2}.
 \texttt{linux-mcp} instead moves only those invariants that require protection \emph{from the gateway itself} into the kernel, leaving semantic parsing, tool execution, and everything else in user space.
 Nor does it replace existing Linux security mechanisms such as seccomp or LSM; it complements them at a layer those mechanisms cannot reach.
-The central hypothesis is that this targeted placement improves binding safety and failure resilience at acceptable performance cost; Chapter~4 tests this claim empirically.
+The central hypothesis is that this targeted placement improves binding safety and failure resilience at acceptable performance cost; \hyperref[chap:evaluation]{Chapter~4} tests this claim empirically.
 
 \paragraph{Comparison with user-space systems.}
 To contextualise the design, we compare \texttt{linux-mcp} with two representative user-space tool-invocation frameworks: OpenClaw~\cite{openclaw2026}, which uses a monolithic user-space gateway, and Hermes Agent~\cite{nousresearch2026hermesagent}, which runs the entire control and execution pipeline inside a single Python process.
