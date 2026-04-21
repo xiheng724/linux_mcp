@@ -38,7 +38,23 @@
 #define KERNEL_MCP_ATTR_POLICY_ID 27
 #define KERNEL_MCP_ATTR_AGENT_BINDING 28
 #define KERNEL_MCP_ATTR_AGENT_EPOCH 29
-#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_AGENT_EPOCH
+#define KERNEL_MCP_ATTR_PAYLOAD_HASH 30
+#define KERNEL_MCP_ATTR_RESPONSE_HASH 31
+#define KERNEL_MCP_ATTR_ERR_HEAD 32
+#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_ERR_HEAD
+
+/* Data-plane call-summary sysfs record layout.
+ * Exposed as a fixed-size binary blob at /sys/kernel/mcp/agents/<id>/call_log.
+ * Userspace decoders depend on these sizes; treat as append-only ABI.
+ */
+#define KERNEL_MCP_CALL_LOG_SIZE 32
+#define KERNEL_MCP_CALL_HASH_PREFIX 8
+#define KERNEL_MCP_CALL_ERR_HEAD_MAX 48
+
+#define KERNEL_MCP_CALL_STATUS_OK 0U
+#define KERNEL_MCP_CALL_STATUS_ERR 1U
+#define KERNEL_MCP_CALL_STATUS_DENY 2U
+#define KERNEL_MCP_CALL_STATUS_DEFER 3U
 
 /* Static tool risk flags, set from manifest risk_tags by user-space. */
 #define KERNEL_MCP_RISK_FILESYSTEM_WRITE (1U << 0)

@@ -2,12 +2,15 @@
 #include <linux/init.h>
 #include <linux/jiffies.h>
 #include <linux/jhash.h>
+#include <linux/ktime.h>
 #include <linux/kobject.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/netlink.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
+#include <linux/string.h>
+#include <linux/sysfs.h>
 #include <linux/timer.h>
 #include <linux/xarray.h>
 #include <net/genetlink.h>
@@ -63,6 +66,22 @@ struct kernel_mcp_tool_snapshot {
 	u32 risk_flags;
 };
 
+/* Per-call audit record. Layout is ABI — userspace decoders rely on these sizes.
+ * Kept intentionally fixed-length and binary so we never parse JSON in the kernel.
+ */
+struct kernel_mcp_call_record {
+	u64 seq;
+	u64 timestamp_ns;
+	u64 req_id;
+	u32 tool_id;
+	u32 status;   /* KERNEL_MCP_CALL_STATUS_* */
+	u32 exec_ms;
+	u32 reserved;
+	u8 payload_hash[KERNEL_MCP_CALL_HASH_PREFIX];
+	u8 response_hash[KERNEL_MCP_CALL_HASH_PREFIX];
+	u8 err_head[KERNEL_MCP_CALL_ERR_HEAD_MAX];
+};
+
 struct kernel_mcp_agent {
 	char id[KERNEL_MCP_AGENT_ID_MAX];
 	u32 pid;
@@ -79,6 +98,14 @@ struct kernel_mcp_agent {
 	u32 last_exec_ms;
 	u32 last_status;
 	char last_reason[KERNEL_MCP_REASON_MAX];
+	/* Fixed-size circular log of recent call summaries. Survives mcpd crash;
+	 * populated from cmd_tool_complete (ALLOW path) and from cmd_tool_request
+	 * (DENY/DEFER paths). Head always points at the next write slot.
+	 */
+	u64 call_log_seq;
+	u32 call_log_head;
+	u32 call_log_count;
+	struct kernel_mcp_call_record call_log[KERNEL_MCP_CALL_LOG_SIZE];
 	struct hlist_node hnode;
 	struct kobject *kobj;
 };
@@ -93,6 +120,8 @@ struct kernel_mcp_agent_snapshot {
 	u64 completed_err_count;
 	u32 last_exec_ms;
 	u32 last_status;
+	u32 call_log_head;
+	u32 call_log_count;
 	char last_reason[KERNEL_MCP_REASON_MAX];
 };
 
@@ -167,11 +196,59 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_MAX + 1] = {
 	},
 	[KERNEL_MCP_ATTR_AGENT_BINDING] = { .type = NLA_U64 },
 	[KERNEL_MCP_ATTR_AGENT_EPOCH] = { .type = NLA_U64 },
+	[KERNEL_MCP_ATTR_PAYLOAD_HASH] = {
+		.type = NLA_BINARY,
+		.len = KERNEL_MCP_CALL_HASH_PREFIX,
+	},
+	[KERNEL_MCP_ATTR_RESPONSE_HASH] = {
+		.type = NLA_BINARY,
+		.len = KERNEL_MCP_CALL_HASH_PREFIX,
+	},
+	[KERNEL_MCP_ATTR_ERR_HEAD] = {
+		.type = NLA_BINARY,
+		.len = KERNEL_MCP_CALL_ERR_HEAD_MAX,
+	},
 };
 
 static u32 kernel_mcp_agent_hash_key(const char *agent_id)
 {
 	return jhash(agent_id, strlen(agent_id), 0);
+}
+
+/* Append a fixed-size record to the agent's circular call_log. Caller must hold
+ * kernel_mcp_agents_lock. `payload_hash`, `response_hash`, `err_head` may be
+ * NULL (fields are zeroed). `err_head_len` is clamped to the record field size.
+ */
+static void kernel_mcp_agent_call_log_append(struct kernel_mcp_agent *agent,
+					     u64 req_id, u32 tool_id, u32 status,
+					     u32 exec_ms,
+					     const u8 *payload_hash,
+					     const u8 *response_hash,
+					     const u8 *err_head, size_t err_head_len)
+{
+	struct kernel_mcp_call_record *rec;
+	size_t copy_len;
+
+	rec = &agent->call_log[agent->call_log_head];
+	memset(rec, 0, sizeof(*rec));
+	rec->seq = ++agent->call_log_seq;
+	rec->timestamp_ns = ktime_get_real_ns();
+	rec->req_id = req_id;
+	rec->tool_id = tool_id;
+	rec->status = status;
+	rec->exec_ms = exec_ms;
+	if (payload_hash)
+		memcpy(rec->payload_hash, payload_hash, KERNEL_MCP_CALL_HASH_PREFIX);
+	if (response_hash)
+		memcpy(rec->response_hash, response_hash, KERNEL_MCP_CALL_HASH_PREFIX);
+	if (err_head && err_head_len) {
+		copy_len = min_t(size_t, err_head_len, KERNEL_MCP_CALL_ERR_HEAD_MAX);
+		memcpy(rec->err_head, err_head, copy_len);
+	}
+
+	agent->call_log_head = (agent->call_log_head + 1) % KERNEL_MCP_CALL_LOG_SIZE;
+	if (agent->call_log_count < KERNEL_MCP_CALL_LOG_SIZE)
+		agent->call_log_count++;
 }
 
 static struct kernel_mcp_agent *
@@ -239,8 +316,52 @@ kernel_mcp_lookup_agent_snapshot(struct kobject *kobj,
 	out->completed_err_count = agent->completed_err_count;
 	out->last_exec_ms = agent->last_exec_ms;
 	out->last_status = agent->last_status;
+	out->call_log_head = agent->call_log_head;
+	out->call_log_count = agent->call_log_count;
 	strscpy(out->last_reason, agent->last_reason, sizeof(out->last_reason));
 	mutex_unlock(&kernel_mcp_agents_lock);
+	return 0;
+}
+
+/* Copy the call log into `out` in logical order (oldest first) and return the
+ * number of valid records. `out` must have at least KERNEL_MCP_CALL_LOG_SIZE
+ * entries. Unused tail slots are zeroed.
+ */
+static int
+kernel_mcp_copy_agent_call_log(struct kobject *kobj,
+			       struct kernel_mcp_call_record *out,
+			       u32 *out_count)
+{
+	const char *agent_id;
+	struct kernel_mcp_agent *agent;
+	u32 key;
+	u32 count;
+	u32 head;
+	u32 start;
+	u32 i;
+
+	agent_id = kobject_name(kobj);
+	key = kernel_mcp_agent_hash_key(agent_id);
+
+	mutex_lock(&kernel_mcp_agents_lock);
+	agent = kernel_mcp_find_agent_locked(agent_id, key);
+	if (!agent) {
+		mutex_unlock(&kernel_mcp_agents_lock);
+		return -ENOENT;
+	}
+	count = agent->call_log_count;
+	head = agent->call_log_head;
+	/* When not yet wrapped, slot 0 is the oldest. After wrap, head is the
+	 * next write slot and therefore also the oldest surviving record.
+	 */
+	start = (count < KERNEL_MCP_CALL_LOG_SIZE) ? 0 : head;
+	memset(out, 0,
+	       sizeof(struct kernel_mcp_call_record) * KERNEL_MCP_CALL_LOG_SIZE);
+	for (i = 0; i < count; i++)
+		out[i] = agent->call_log[(start + i) % KERNEL_MCP_CALL_LOG_SIZE];
+	mutex_unlock(&kernel_mcp_agents_lock);
+
+	*out_count = count;
 	return 0;
 }
 
@@ -355,6 +476,50 @@ KERNEL_MCP_DEFINE_AGENT_SHOW_U64(completed_ok, completed_ok_count)
 KERNEL_MCP_DEFINE_AGENT_SHOW_U64(completed_err, completed_err_count)
 KERNEL_MCP_DEFINE_AGENT_SHOW_U32(last_exec_ms, last_exec_ms)
 KERNEL_MCP_DEFINE_AGENT_SHOW_U32(last_status, last_status)
+KERNEL_MCP_DEFINE_AGENT_SHOW_U32(call_log_head, call_log_head)
+KERNEL_MCP_DEFINE_AGENT_SHOW_U32(call_log_count, call_log_count)
+
+static ssize_t kernel_mcp_agent_call_log_read(struct file *filp,
+					      struct kobject *kobj,
+					      struct bin_attribute *attr,
+					      char *buf, loff_t pos, size_t size)
+{
+	struct kernel_mcp_call_record *snapshot;
+	const size_t full_bytes =
+		sizeof(struct kernel_mcp_call_record) * KERNEL_MCP_CALL_LOG_SIZE;
+	u32 valid_records = 0;
+	size_t valid_bytes;
+	ssize_t copied;
+	int ret;
+
+	(void)filp;
+	(void)attr;
+
+	if (pos < 0)
+		return -EINVAL;
+	if ((size_t)pos >= full_bytes)
+		return 0;
+
+	snapshot = kzalloc(full_bytes, GFP_KERNEL);
+	if (!snapshot)
+		return -ENOMEM;
+
+	ret = kernel_mcp_copy_agent_call_log(kobj, snapshot, &valid_records);
+	if (ret) {
+		kfree(snapshot);
+		return ret;
+	}
+
+	valid_bytes = (size_t)valid_records * sizeof(struct kernel_mcp_call_record);
+	if ((size_t)pos >= valid_bytes) {
+		kfree(snapshot);
+		return 0;
+	}
+	copied = min_t(size_t, size, valid_bytes - (size_t)pos);
+	memcpy(buf, ((char *)snapshot) + pos, copied);
+	kfree(snapshot);
+	return copied;
+}
 static struct kobj_attribute kernel_mcp_name_attr =
 	__ATTR(name, 0444, kernel_mcp_tool_name_show, NULL);
 static struct kobj_attribute kernel_mcp_hash_attr =
@@ -396,6 +561,19 @@ static struct kobj_attribute kernel_mcp_agent_last_exec_ms_attr =
 	__ATTR(last_exec_ms, 0444, kernel_mcp_agent_last_exec_ms_show, NULL);
 static struct kobj_attribute kernel_mcp_agent_last_status_attr =
 	__ATTR(last_status, 0444, kernel_mcp_agent_last_status_show, NULL);
+static struct kobj_attribute kernel_mcp_agent_call_log_head_attr =
+	__ATTR(call_log_head, 0444, kernel_mcp_agent_call_log_head_show, NULL);
+static struct kobj_attribute kernel_mcp_agent_call_log_count_attr =
+	__ATTR(call_log_count, 0444, kernel_mcp_agent_call_log_count_show, NULL);
+
+static struct bin_attribute kernel_mcp_agent_call_log_bin_attr = {
+	.attr = {
+		.name = "call_log",
+		.mode = 0444,
+	},
+	.size = sizeof(struct kernel_mcp_call_record) * KERNEL_MCP_CALL_LOG_SIZE,
+	.read = kernel_mcp_agent_call_log_read,
+};
 
 static struct attribute *kernel_mcp_agent_attrs[] = {
 	&kernel_mcp_agent_allow_attr.attr,
@@ -408,6 +586,8 @@ static struct attribute *kernel_mcp_agent_attrs[] = {
 	&kernel_mcp_agent_completed_err_attr.attr,
 	&kernel_mcp_agent_last_exec_ms_attr.attr,
 	&kernel_mcp_agent_last_status_attr.attr,
+	&kernel_mcp_agent_call_log_head_attr.attr,
+	&kernel_mcp_agent_call_log_count_attr.attr,
 	NULL,
 };
 
@@ -523,6 +703,7 @@ static void kernel_mcp_agent_sysfs_remove(struct kernel_mcp_agent *agent)
 {
 	if (!agent->kobj)
 		return;
+	sysfs_remove_bin_file(agent->kobj, &kernel_mcp_agent_call_log_bin_attr);
 	sysfs_remove_group(agent->kobj, &kernel_mcp_agent_attr_group);
 	kobject_put(agent->kobj);
 	agent->kobj = NULL;
@@ -541,6 +722,15 @@ static int kernel_mcp_agent_sysfs_create(struct kernel_mcp_agent *agent)
 
 	ret = sysfs_create_group(agent->kobj, &kernel_mcp_agent_attr_group);
 	if (ret) {
+		kobject_put(agent->kobj);
+		agent->kobj = NULL;
+		return ret;
+	}
+
+	ret = sysfs_create_bin_file(agent->kobj,
+				    &kernel_mcp_agent_call_log_bin_attr);
+	if (ret) {
+		sysfs_remove_group(agent->kobj, &kernel_mcp_agent_attr_group);
 		kobject_put(agent->kobj);
 		agent->kobj = NULL;
 		return ret;
@@ -889,6 +1079,8 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	const char *requested_tool_hash = NULL;
 	const char *reason = "allow";
 	const char *ticket_reason = "approval_missing";
+	const u8 *payload_hash = NULL;
+	size_t payload_hash_len = 0;
 	u32 tool_id;
 	u64 req_id;
 	u64 ticket_id = 0;
@@ -920,6 +1112,11 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 		binding_hash = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_BINDING]);
 	if (info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH])
 		binding_epoch = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH]);
+	if (info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH]) {
+		payload_hash_len = nla_len(info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH]);
+		if (payload_hash_len >= KERNEL_MCP_CALL_HASH_PREFIX)
+			payload_hash = nla_data(info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH]);
+	}
 
 	mutex_lock(&kernel_mcp_tools_lock);
 	tool = xa_load(&kernel_mcp_tools, tool_id);
@@ -987,13 +1184,28 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	reason = "allow";
 
 out_accounting:
-	if (decision == KERNEL_MCP_DECISION_ALLOW)
+	if (decision == KERNEL_MCP_DECISION_ALLOW) {
 		agent->allow_count++;
-	else if (decision == KERNEL_MCP_DECISION_DENY)
+	} else if (decision == KERNEL_MCP_DECISION_DENY) {
 		agent->deny_count++;
-	else
+	} else {
 		agent->defer_count++;
+	}
 	strscpy(agent->last_reason, reason, sizeof(agent->last_reason));
+
+	/* For DENY/DEFER the tool never ran; record an audit entry here so
+	 * rejections remain visible after mcpd dies. ALLOW gets its entry on
+	 * tool_complete, which carries the real exec_ms and response summary.
+	 */
+	if (decision != KERNEL_MCP_DECISION_ALLOW) {
+		u32 rec_status = (decision == KERNEL_MCP_DECISION_DENY)
+					 ? KERNEL_MCP_CALL_STATUS_DENY
+					 : KERNEL_MCP_CALL_STATUS_DEFER;
+		kernel_mcp_agent_call_log_append(
+			agent, req_id, tool_id, rec_status, 0, payload_hash,
+			NULL, (const u8 *)reason,
+			reason ? strnlen(reason, KERNEL_MCP_CALL_ERR_HEAD_MAX) : 0);
+	}
 	mutex_unlock(&kernel_mcp_agents_lock);
 
 	return kernel_mcp_reply_tool_decision(info, agent_id, tool_id, req_id,
@@ -1004,6 +1216,10 @@ static int kernel_mcp_cmd_tool_complete(struct sk_buff *skb, struct genl_info *i
 {
 	struct kernel_mcp_agent *agent;
 	const char *agent_id;
+	const u8 *payload_hash = NULL;
+	const u8 *response_hash = NULL;
+	const u8 *err_head = NULL;
+	size_t err_head_len = 0;
 	u32 tool_id;
 	u64 req_id;
 	u32 status;
@@ -1025,9 +1241,17 @@ static int kernel_mcp_cmd_tool_complete(struct sk_buff *skb, struct genl_info *i
 	tool_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_ID]);
 	status = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_STATUS]);
 	exec_ms = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_EXEC_MS]);
+	if (info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH] &&
+	    nla_len(info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH]) >= KERNEL_MCP_CALL_HASH_PREFIX)
+		payload_hash = nla_data(info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH]);
+	if (info->attrs[KERNEL_MCP_ATTR_RESPONSE_HASH] &&
+	    nla_len(info->attrs[KERNEL_MCP_ATTR_RESPONSE_HASH]) >= KERNEL_MCP_CALL_HASH_PREFIX)
+		response_hash = nla_data(info->attrs[KERNEL_MCP_ATTR_RESPONSE_HASH]);
+	if (info->attrs[KERNEL_MCP_ATTR_ERR_HEAD]) {
+		err_head_len = nla_len(info->attrs[KERNEL_MCP_ATTR_ERR_HEAD]);
+		err_head = nla_data(info->attrs[KERNEL_MCP_ATTR_ERR_HEAD]);
+	}
 
-	(void)req_id;
-	(void)tool_id;
 	key = kernel_mcp_agent_hash_key(agent_id);
 	mutex_lock(&kernel_mcp_agents_lock);
 	agent = kernel_mcp_find_agent_locked(agent_id, key);
@@ -1042,6 +1266,13 @@ static int kernel_mcp_cmd_tool_complete(struct sk_buff *skb, struct genl_info *i
 		agent->completed_err_count++;
 	agent->last_exec_ms = exec_ms;
 	agent->last_status = status;
+
+	kernel_mcp_agent_call_log_append(
+		agent, req_id, tool_id,
+		status == KERNEL_MCP_COMPLETE_STATUS_OK
+			? KERNEL_MCP_CALL_STATUS_OK
+			: KERNEL_MCP_CALL_STATUS_ERR,
+		exec_ms, payload_hash, response_hash, err_head, err_head_len);
 	mutex_unlock(&kernel_mcp_agents_lock);
 	return 0;
 }

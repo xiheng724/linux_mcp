@@ -210,6 +210,7 @@ def _kernel_arbitrate(
     tool_id: int,
     tool_hash: str,
     ticket_id: int = 0,
+    payload_hash: bytes = b"",
 ) -> Tuple[str, str, int]:
     client = _get_kernel_client()
     try:
@@ -221,6 +222,7 @@ def _kernel_arbitrate(
             tool_id=tool_id,
             tool_hash=tool_hash,
             ticket_id=ticket_id,
+            payload_hash=payload_hash,
         )
     except RuntimeError as exc:
         if "Invalid argument" in str(exc):
@@ -250,6 +252,9 @@ def _kernel_report_complete(
     req_id: int,
     status_code: int,
     exec_ms: int,
+    payload_hash: bytes = b"",
+    response_hash: bytes = b"",
+    err_head: bytes = b"",
 ) -> None:
     client = _get_kernel_client()
     client.tool_complete(
@@ -258,7 +263,23 @@ def _kernel_report_complete(
         tool_id=tool_id,
         status_code=status_code,
         exec_ms=exec_ms,
+        payload_hash=payload_hash,
+        response_hash=response_hash,
+        err_head=err_head,
     )
+
+
+def _canonical_payload_bytes(payload: Any) -> bytes:
+    """Serialize payload the same way manifest hashing does so the audit
+    prefix is stable across mcpd restarts and matches any offline replay."""
+    try:
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    except (TypeError, ValueError):
+        return repr(payload).encode("utf-8", errors="replace")
+
+
+def _summary_hash_prefix(blob: bytes) -> bytes:
+    return hashlib.sha256(blob).digest()[:8] if blob else b""
 
 
 def _call_uds_tool(tool: ToolManifest, req_id: int, agent_id: str, payload: Any) -> Dict[str, Any]:
@@ -388,6 +409,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
 
     payload = req.get("payload", {})
     validate_payload(tool.input_schema, payload)
+    payload_hash = _summary_hash_prefix(_canonical_payload_bytes(payload))
 
     tool_hash = _resolve_tool_hash(req, tool)
     _ensure_agent_registered(agent_id, binding)
@@ -400,6 +422,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         tool_id=tool_id,
         tool_hash=tool_hash,
         ticket_id=approval_ticket_id,
+        payload_hash=payload_hash,
     )
     if decision == "DENY":
         return {
@@ -439,6 +462,8 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
 
     exec_start = time.perf_counter()
     status_code = 1
+    response_hash = b""
+    err_head = b""
     try:
         tool_resp = _call_tool_service(tool, req_id=req_id, agent_id=agent_id, payload=payload)
         status = tool_resp.get("status")
@@ -453,6 +478,9 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             tool_t_ms = int((time.perf_counter() - exec_start) * 1000)
         if status == "ok":
             status_code = 0
+            response_hash = _summary_hash_prefix(_canonical_payload_bytes(result))
+        else:
+            err_head = err.encode("utf-8", errors="replace")[:48]
         return {
             "req_id": req_id,
             "status": status,
@@ -464,6 +492,9 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "reason": reason,
             "ticket_id": ticket_id,
         }
+    except Exception as exc:  # noqa: BLE001
+        err_head = str(exc).encode("utf-8", errors="replace")[:48]
+        raise
     finally:
         exec_ms = int((time.perf_counter() - exec_start) * 1000)
         try:
@@ -473,6 +504,9 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
                 req_id=req_id,
                 status_code=status_code,
                 exec_ms=exec_ms,
+                payload_hash=payload_hash,
+                response_hash=response_hash,
+                err_head=err_head,
             )
         except Exception as exc:  # noqa: BLE001
             LOGGER.error(

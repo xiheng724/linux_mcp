@@ -372,6 +372,7 @@ class KernelMcpNetlinkClient:
         tool_id: int,
         tool_hash: str,
         ticket_id: int = 0,
+        payload_hash: bytes = b"",
     ) -> ToolDecision:
         attrs = [
             (ATTR["AGENT_ID"], agent_id.encode("utf-8") + b"\x00"),
@@ -386,6 +387,8 @@ class KernelMcpNetlinkClient:
             attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
         if ticket_id > 0:
             attrs.append((ATTR["TICKET_ID"], struct.pack("=Q", ticket_id)))
+        if payload_hash:
+            attrs.append((ATTR["PAYLOAD_HASH"], payload_hash[:8]))
 
         genl_cmd, resp_attrs = self._request(
             msg_type=self._family_id,
@@ -445,6 +448,9 @@ class KernelMcpNetlinkClient:
         tool_id: int,
         status_code: int,
         exec_ms: int,
+        payload_hash: bytes = b"",
+        response_hash: bytes = b"",
+        err_head: bytes = b"",
     ) -> None:
         attrs = [
             (ATTR["REQ_ID"], struct.pack("=Q", req_id)),
@@ -453,6 +459,12 @@ class KernelMcpNetlinkClient:
             (ATTR["STATUS"], struct.pack("=I", status_code)),
             (ATTR["EXEC_MS"], struct.pack("=I", exec_ms)),
         ]
+        if payload_hash:
+            attrs.append((ATTR["PAYLOAD_HASH"], payload_hash[:8]))
+        if response_hash:
+            attrs.append((ATTR["RESPONSE_HASH"], response_hash[:8]))
+        if err_head:
+            attrs.append((ATTR["ERR_HEAD"], err_head[:48]))
         self._request(
             msg_type=self._family_id,
             cmd=CMD["TOOL_COMPLETE"],

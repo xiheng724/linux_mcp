@@ -41,4 +41,19 @@ ATTR: Final[dict[str, int]] = {
     "POLICY_ID": 27,
     "AGENT_BINDING": 28,
     "AGENT_EPOCH": 29,
+    "PAYLOAD_HASH": 30,
+    "RESPONSE_HASH": 31,
+    "ERR_HEAD": 32,
 }
+
+# Data-plane call-summary sysfs record layout.
+# Mirrors KERNEL_MCP_CALL_* constants in the kernel header; kept here so the
+# userspace decoder (scripts/mcpctl_dump_calls.py) does not duplicate numbers.
+CALL_LOG_SIZE: Final[int] = 32
+CALL_HASH_PREFIX: Final[int] = 8
+CALL_ERR_HEAD_MAX: Final[int] = 48
+
+CALL_STATUS_OK: Final[int] = 0
+CALL_STATUS_ERR: Final[int] = 1
+CALL_STATUS_DENY: Final[int] = 2
+CALL_STATUS_DEFER: Final[int] = 3
