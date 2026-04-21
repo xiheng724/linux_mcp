@@ -31,11 +31,14 @@ from client.kernel_mcp.schema import (
     CALL_STATUS_DENY,
     CALL_STATUS_ERR,
     CALL_STATUS_OK,
+    TOOL_STATUS_LABELS,
 )
 
 # struct kernel_mcp_call_record layout (little-endian on all supported arches).
 # u64 seq; u64 timestamp_ns; u64 req_id; u32 tool_id; u32 status; u32 exec_ms;
-# u32 reserved; u8 payload_hash[8]; u8 response_hash[8]; u8 err_head[48];
+# u32 tool_status_code; u8 payload_hash[8]; u8 response_hash[8]; u8 err_head[48];
+# Note: the last u32 was named "reserved" before the tool_status_code rename.
+# Binary layout is identical; older decoders read it as 0 (= UNSPECIFIED).
 RECORD_FMT = f"<QQQIIII{CALL_HASH_PREFIX}s{CALL_HASH_PREFIX}s{CALL_ERR_HEAD_MAX}s"
 RECORD_SIZE = struct.calcsize(RECORD_FMT)
 
@@ -53,12 +56,13 @@ def _format_err_head(raw: bytes) -> str:
 
 
 def _format_record(rec: tuple) -> str:
-    seq, ts_ns, req_id, tool_id, status, exec_ms, _reserved, ph, rh, err = rec
+    seq, ts_ns, req_id, tool_id, status, exec_ms, tsc, ph, rh, err = rec
     status_label = _STATUS_LABELS.get(status, f"?{status}")
+    tsc_label = TOOL_STATUS_LABELS.get(tsc, f"?{tsc}")
     ts_ms = ts_ns // 1_000_000
     return (
         f"seq={seq:>5} ts_ms={ts_ms:<16} req={req_id:<20} tool={tool_id:<5} "
-        f"status={status_label:<5} exec_ms={exec_ms:<6} "
+        f"status={status_label:<5} tsc={tsc_label:<13} exec_ms={exec_ms:<6} "
         f"payload={ph.hex()} response={rh.hex()} err=\"{_format_err_head(err)}\""
     )
 

@@ -1,0 +1,55 @@
+# Default config for the repo demo stack.
+#
+# run_tool_services.sh and run_mcpd.sh auto-select this file when
+# LINUX_MCP_CONFIG is unset. Operators should copy it to
+# /etc/linux-mcp/mcpd.toml (or point $LINUX_MCP_CONFIG at it) for
+# non-demo deployments.
+
+[transports.uds_rpc]
+# Path-UDS prefix used by the bundled demo manifests. Adjust when
+# relocating sockets (e.g. /run/linux-mcp/ on multi-user hosts).
+allow_prefixes = ["/tmp/linux-mcp-apps/"]
+
+[transports.uds_abstract]
+# Enables the abstract-namespace demo (tool-app/manifests/16_abstract_demo_app.json).
+# Set to "" to disable abstract UDS entirely.
+#
+# SECURITY: abstract sockets have no filesystem ACL, so the name
+# pattern is NOT a trust boundary. A disallowed-uid process that binds
+# a name matching the pattern would otherwise impersonate the backend.
+# mcpd therefore enforces [security].allowed_backend_uids on every
+# probe and exec dial (see below). Leave this pattern empty for
+# production unless operators have explicitly scoped the uid list.
+allow_name_pattern = "^linux-mcp/[a-z0-9_.-]+$"
+
+[security]
+# Binary-hash TOFU behaviour: mcpd always refuses tool:exec when the
+# live probe cannot confirm the backend's current identity this round.
+# A cached digest alone is never used to pass the kernel TOFU check —
+# that would let a transient probe outage silently reuse a stale hash
+# across a backend swap.
+#
+# Binary-hash TOFU guarantees for interpreter-hosted backends
+# (Python, Ruby, Node, shell, ...):
+#   /proc/<pid>/exe points at the interpreter, not the application
+#   code. mcpd detects interpreter-backed processes and composites
+#   /proc/<pid>/exe with the manifest-declared script digest
+#   (sha256 of the demo_entrypoint .py file at manifest load time).
+#   Swapping the .py file on disk invalidates the kernel's TOFU pin
+#   on the next backend restart, but does NOT invalidate the currently
+#   running Python process — interpreters load the script once at
+#   startup and don't re-read it. Treat the guarantee as "next
+#   restart will catch the swap", not "live swap detection".
+# Native backends (/proc/<pid>/exe is the actual ELF) get the stronger
+# guarantee of full exe-identity change detection.
+
+# UIDs allowed to serve as tool backends. Enforced via SO_PEERCRED on
+# both the probe dial and the exec dial to prevent a process owned by
+# a different local user from impersonating a tool — the primary
+# mitigation against abstract-UDS name hijacking. If this key is
+# absent, mcpd defaults to a list containing only its own effective
+# uid, which is what the demo stack wants (run_tool_services.sh and
+# run_mcpd.sh execute as the same user). Heterogeneous deployments
+# (e.g. backends under a dedicated service account) must list every
+# backend uid here explicitly.
+# allowed_backend_uids = [1000]

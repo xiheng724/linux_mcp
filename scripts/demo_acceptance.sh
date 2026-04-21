@@ -29,6 +29,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
+echo "[demo] step 0: build native demo binaries"
+run_as_user make -C "$ROOT_DIR" native-demos
+
 echo "[demo] step 1: build kernel module"
 ${SUDO} bash scripts/build_kernel.sh
 
@@ -65,6 +68,27 @@ ${SUDO} ls -l /sys/kernel/mcp/agents/a1/
 ${SUDO} cat /sys/kernel/mcp/agents/a1/completed_ok
 ${SUDO} cat /sys/kernel/mcp/agents/a1/last_exec_ms
 ${SUDO} cat /sys/kernel/mcp/agents/a1/last_status
+
+echo "[demo] step 10b: probe unit tests (cache fallback, identity race, uid allowlist)"
+run_as_user python3 scripts/test_probe_unit.py
+
+echo "[demo] step 10c: binary-replacement attack regression (distinct PID)"
+run_as_user bash scripts/smoke_binary_replacement.sh
+
+echo "[demo] step 10d: binary-replacement attack regression (same PID via execve)"
+run_as_user bash scripts/smoke_same_pid_replacement.sh
+
+echo "[demo] step 10e: python script-swap regression (interpreter-hosted backends)"
+run_as_user bash scripts/smoke_python_script_swap.sh
+
+echo "[demo] step 10f: probe failure refuses cached digest after cache warmup"
+run_as_user bash scripts/smoke_probe_failure_after_cache.sh
+
+echo "[demo] step 10g: dynamic manifest re-registration races"
+run_as_user bash scripts/acceptance_dynamic_reregister.sh
+
+echo "[demo] step 10h: call_log survives mcpd crash"
+bash scripts/acceptance_call_log_after_crash.sh
 
 echo "[demo] step 11: stop mcpd"
 run_as_user bash scripts/stop_mcpd.sh

@@ -56,20 +56,40 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _bind_socket(transport: str, endpoint: str) -> socket.socket:
+    """Create and bind an AF_UNIX socket according to the manifest's transport.
+
+    uds_rpc binds to a filesystem path (we mkdir the parent and clear any
+    stale socket file first). uds_abstract binds to the Linux abstract
+    namespace by prefixing NUL; no filesystem artefact to clean.
+    """
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    if transport == "uds_abstract":
+        sock.bind(b"\x00" + endpoint.encode("utf-8"))
+        return sock
+    if transport == "uds_rpc":
+        endpoint_path = Path(endpoint)
+        endpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        if endpoint_path.exists():
+            endpoint_path.unlink()
+        sock.bind(str(endpoint_path))
+        return sock
+    sock.close()
+    raise ValueError(f"unsupported transport for demo_rpc: {transport!r}")
+
+
 def serve(
     manifest_path: str,
     operations: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]],
 ) -> int:
     raw = load_manifest(manifest_path)
     endpoint = raw.get("endpoint", "")
+    transport = raw.get("transport", "uds_rpc")
     app_id = raw.get("app_id", "unknown")
     if not isinstance(endpoint, str) or not endpoint:
         raise ValueError(f"{manifest_path}: endpoint must be non-empty string")
-
-    endpoint_path = Path(endpoint)
-    endpoint_path.parent.mkdir(parents=True, exist_ok=True)
-    if endpoint_path.exists():
-        endpoint_path.unlink()
+    if not isinstance(transport, str) or not transport:
+        raise ValueError(f"{manifest_path}: transport must be non-empty string")
 
     stop_event = threading.Event()
 
@@ -129,12 +149,12 @@ def serve(
 
     server: socket.socket | None = None
     try:
-        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        server.bind(str(endpoint_path))
+        server = _bind_socket(transport, endpoint)
         server.listen(128)
         server.settimeout(0.5)
         print(
-            f"[demo_app] serving app_id={app_id} endpoint={endpoint} operations={sorted(operations.keys())}",
+            f"[demo_app] serving app_id={app_id} transport={transport} "
+            f"endpoint={endpoint} operations={sorted(operations.keys())}",
             flush=True,
         )
         while not stop_event.is_set():
@@ -155,7 +175,10 @@ def serve(
                 server.close()
             except Exception:  # noqa: BLE001
                 pass
-        if endpoint_path.exists():
-            endpoint_path.unlink()
+        # Only path-based endpoints leave filesystem artefacts.
+        if transport == "uds_rpc":
+            p = Path(endpoint)
+            if p.exists():
+                p.unlink()
         signal.signal(signal.SIGINT, prev_int)
         signal.signal(signal.SIGTERM, prev_term)

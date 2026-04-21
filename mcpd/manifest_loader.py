@@ -7,7 +7,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 try:
     from schema_utils import ensure_int, ensure_non_empty_str
@@ -50,6 +50,14 @@ SEMANTIC_HASH_FIELDS = (
     "examples",
     "path_semantics",
     "approval_policy",
+    # `operation` is the RPC method actually invoked on the backend.
+    # Changing it silently retargets the tool to different code paths
+    # with potentially different side effects, so it IS part of
+    # semantic identity — moving it out of binding_fingerprint keeps
+    # planners, approvals, and kernel hash checks honest when a
+    # manifest edit repoints the RPC. (transport/endpoint remain
+    # binding-only because they only move where the backend lives.)
+    "operation",
 )
 
 
@@ -70,7 +78,32 @@ class ToolManifest:
     endpoint: str
     operation: str
     timeout_ms: int
+    # Semantic identity, exposed to llm-app as the canonical tool hash.
+    # Intentionally excludes transport/endpoint so an operator can move
+    # a backend between hosts without the tool looking like a different
+    # tool to planners or to the kernel's exported identity. `operation`
+    # IS part of semantic identity — see SEMANTIC_HASH_FIELDS.
     manifest_hash: str
+    # Runtime routing fingerprint. Separate from manifest_hash because
+    # binding changes must force a kernel-side unregister+register to
+    # clear the TOFU binary_hash slot, but they must NOT make the tool
+    # look semantically different to consumers. See server._load_runtime_registry
+    # for how the two fingerprints drive distinct reconciliation paths.
+    binding_fingerprint: str
+    # SHA-256 of the demo entry script on disk, computed at manifest
+    # load time. Empty when demo_entrypoint is missing, not a Python
+    # file, or unreadable. Used by the probe to build a composite
+    # binary_hash for interpreter-hosted backends so swapping the
+    # script file invalidates the kernel's TOFU pin on next restart —
+    # without this, hashing /proc/<pid>/exe alone pins only the
+    # interpreter (python3) and misses application-code swaps.
+    script_digest: str
+    # Absolute on-disk path of the demo entry script. Empty when not
+    # applicable. Held alongside `script_digest` so the probe can
+    # re-hash the script at probe time without reloading manifests;
+    # otherwise a script swap between mcpd startups would stay
+    # trusted until the daemon is bounced.
+    script_path: str
 
 
 @dataclass(frozen=True)
@@ -115,6 +148,35 @@ def _ensure_rel_tool_path(name: str, value: Any, path: Path) -> str:
     return text
 
 
+def _compute_script_digest(demo_entrypoint: str | None, manifest_path: Path) -> Tuple[str, str]:
+    """Return (sha256_hex, resolved_path) for the on-disk script file
+    referenced by `demo_entrypoint`. Digest is "" if the entry doesn't
+    look like a Python script or cannot be read; path is the absolute
+    resolved path when `demo_entrypoint` is a .py file (kept even if
+    the current read fails, so probe-time refresh can still find it).
+
+    Called once per manifest at load time so the probe can present a
+    composite hash (interpreter+script) when the backend is
+    interpreter-hosted. The resolved path is returned so the probe
+    can re-hash the script at call time without reloading manifests."""
+    if not demo_entrypoint or not isinstance(demo_entrypoint, str):
+        return "", ""
+    if not demo_entrypoint.endswith(".py"):
+        # Native binaries don't need this: /proc/<pid>/exe already
+        # identifies the running code.
+        return "", ""
+    repo_root = manifest_path.resolve().parent.parent.parent
+    script_path = (repo_root / demo_entrypoint).resolve()
+    try:
+        h = hashlib.sha256()
+        with open(script_path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest(), str(script_path)
+    except OSError:
+        return "", str(script_path)
+
+
 def _load_tool(
     raw: Dict[str, Any],
     *,
@@ -122,6 +184,8 @@ def _load_tool(
     app_name: str,
     transport: str,
     endpoint: str,
+    script_digest: str,
+    script_path: str,
     path: Path,
 ) -> ToolManifest:
     required = (
@@ -202,7 +266,23 @@ def _load_tool(
         "examples": examples,
         "path_semantics": normalized_path_semantics,
         "approval_policy": normalized_approval_policy,
+        "operation": operation,
     }
+
+    # Runtime binding fingerprint. These fields describe *where* the
+    # backend lives, not *what* it does. Transport/endpoint changes mean
+    # we may now be talking to a different process at a different
+    # address and must drop the kernel's TOFU binary_hash pin. The
+    # invoked RPC method (`operation`) is NOT here — it belongs to
+    # semantic identity above, so that a retarget from note_list to
+    # workspace_overview changes the exported tool hash and cannot be
+    # slipped in behind a hash-stable rebind.
+    binding_fingerprint = hashlib.sha256(
+        _canonical_json_bytes({
+            "transport": transport,
+            "endpoint": endpoint,
+        })
+    ).hexdigest()
 
     return ToolManifest(
         tool_id=tool_id,
@@ -221,6 +301,9 @@ def _load_tool(
         operation=operation,
         timeout_ms=timeout_ms,
         manifest_hash=_semantic_hash(semantic_raw, path),
+        binding_fingerprint=binding_fingerprint,
+        script_digest=script_digest,
+        script_path=script_path,
     )
 
 
@@ -248,6 +331,15 @@ def load_app_manifest(path: Path) -> AppManifest:
     if demo_entrypoint not in ("", None):
         _ensure_rel_tool_path("demo_entrypoint", demo_entrypoint, path)
 
+    # Pre-compute once per app manifest: all tools in the same manifest
+    # share the same demo_entrypoint and therefore the same script
+    # digest. Done here (not inside _load_tool) to avoid re-hashing the
+    # script file per tool in apps with many tools.
+    script_digest, script_path = _compute_script_digest(
+        demo_entrypoint if isinstance(demo_entrypoint, str) else "",
+        path,
+    )
+
     tools_raw = raw["tools"]
     if not isinstance(tools_raw, list) or not tools_raw:
         raise ValueError(f"{path}: tools must be non-empty list")
@@ -264,6 +356,8 @@ def load_app_manifest(path: Path) -> AppManifest:
             app_name=app_name,
             transport=transport,
             endpoint=endpoint,
+            script_digest=script_digest,
+            script_path=script_path,
             path=path,
         )
         if tool.tool_id in seen_ids:

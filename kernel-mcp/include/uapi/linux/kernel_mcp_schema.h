@@ -44,7 +44,8 @@
 #define KERNEL_MCP_ATTR_ERR_HEAD 32
 #define KERNEL_MCP_ATTR_BINARY_HASH 33
 #define KERNEL_MCP_ATTR_CATALOG_EPOCH 34
-#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_CATALOG_EPOCH
+#define KERNEL_MCP_ATTR_TOOL_STATUS_CODE 35
+#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_TOOL_STATUS_CODE
 
 /* Data-plane call-summary sysfs record layout.
  * Exposed as a fixed-size binary blob at /sys/kernel/mcp/agents/<id>/call_log.
@@ -58,6 +59,19 @@
 #define KERNEL_MCP_CALL_STATUS_ERR 1U
 #define KERNEL_MCP_CALL_STATUS_DENY 2U
 #define KERNEL_MCP_CALL_STATUS_DEFER 3U
+
+/* Fine-grained tool outcome classification carried in call_record's
+ * tool_status_code slot (repurposed from the old `reserved` u32 — the
+ * binary layout is unchanged, so old decoders keep working and simply
+ * read these codes as zero / UNSPECIFIED). Append-only.
+ */
+#define KERNEL_MCP_TSC_UNSPECIFIED 0U
+#define KERNEL_MCP_TSC_OK 1U
+#define KERNEL_MCP_TSC_TOOL_ERROR 2U    /* tool service returned status=error */
+#define KERNEL_MCP_TSC_FORWARD_FAIL 3U  /* mcpd could not reach the tool endpoint */
+#define KERNEL_MCP_TSC_PROBE_FAILED 4U  /* live binary_hash probe could not confirm backend */
+#define KERNEL_MCP_TSC_KERNEL_DENY 5U
+#define KERNEL_MCP_TSC_KERNEL_DEFER 6U
 
 /* Static tool risk flags, set from manifest risk_tags by user-space. */
 #define KERNEL_MCP_RISK_FILESYSTEM_WRITE (1U << 0)

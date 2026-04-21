@@ -1,0 +1,36 @@
+{
+  "app_id": "abstract_demo_app",
+  "app_name": "Abstract UDS Demo",
+  "transport": "uds_abstract",
+  "endpoint": "linux-mcp/abstract_demo_app",
+  "demo_entrypoint": "tool-app/demo_apps/abstract_echo_app.py",
+  "tools": [
+    {
+      "tool_id": 45,
+      "name": "abstract_echo_ping",
+      "risk_tags": [],
+      "operation": "abstract_echo",
+      "timeout_ms": 5000,
+      "description": "Ping the abstract-UDS demo backend. Returns the supplied note along with a flag proving the call traversed the uds_abstract transport path.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {}
+        },
+        {
+          "payload": {
+            "note": "hello via abstract namespace"
+          }
+        }
+      ]
+    }
+  ]
+}

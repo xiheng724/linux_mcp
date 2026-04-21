@@ -135,20 +135,27 @@ def _dial_uds_abstract(endpoint: str, timeout_s: float) -> socket.socket:
 
 
 # ---------------------------------------------------------------------------
-# vsock_rpc — reserved name for VM/container attestor use cases. Not wired
-# up this round; validator refuses so manifests cannot silently reach an
-# unimplemented dialer.
+# vsock_rpc — intentionally NOT implemented.
+#
+# The name is kept in the registry so a manifest specifying this transport
+# gets a clear error at load time instead of a late AttributeError. Actually
+# wiring vsock requires a peer-attestation story (host/guest CID allow-list,
+# image digest check, etc.) that we have not designed yet. Treat this as a
+# future item tracked in the project README, not "soon".
 # ---------------------------------------------------------------------------
 def _validate_vsock_rpc(endpoint: str, cfg: TransportConfig) -> None:
     (endpoint, cfg)
     raise TransportError(
-        "vsock_rpc is reserved but not implemented; follow-up work required"
+        "vsock_rpc is not implemented in this build — see README for status "
+        "(future item, pending peer-attestation design)"
     )
 
 
 def _dial_vsock_rpc(endpoint: str, timeout_s: float) -> socket.socket:
     (endpoint, timeout_s)
-    raise NotImplementedError("vsock_rpc dialer not implemented")
+    raise NotImplementedError(
+        "vsock_rpc dialer not implemented — future work"
+    )
 
 
 register_transport("uds_rpc", _validate_uds_rpc, _dial_uds_rpc)

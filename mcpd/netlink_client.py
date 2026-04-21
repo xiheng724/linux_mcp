@@ -475,6 +475,7 @@ class KernelMcpNetlinkClient:
         payload_hash: bytes = b"",
         response_hash: bytes = b"",
         err_head: bytes = b"",
+        tool_status_code: int = 0,
     ) -> None:
         attrs = [
             (ATTR["REQ_ID"], struct.pack("=Q", req_id)),
@@ -489,6 +490,8 @@ class KernelMcpNetlinkClient:
             attrs.append((ATTR["RESPONSE_HASH"], response_hash[:8]))
         if err_head:
             attrs.append((ATTR["ERR_HEAD"], err_head[:48]))
+        if tool_status_code:
+            attrs.append((ATTR["TOOL_STATUS_CODE"], struct.pack("=I", tool_status_code)))
         self._request(
             msg_type=self._family_id,
             cmd=CMD["TOOL_COMPLETE"],

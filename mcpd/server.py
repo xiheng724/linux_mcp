@@ -14,9 +14,10 @@ import struct
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, NamedTuple, Tuple
 
 try:
+    from config import SecurityConfig, load_security_config
     from manifest_loader import DEFAULT_MANIFEST_DIR, AppManifest, ToolManifest, load_all_manifests
     from netlink_client import KernelMcpNetlinkClient
     from public_catalog import list_apps_public, list_tools_public
@@ -37,6 +38,7 @@ try:
         validate_pending_approval_req,
     )
 except ModuleNotFoundError:  # pragma: no cover - package import fallback
+    from .config import SecurityConfig, load_security_config
     from .manifest_loader import DEFAULT_MANIFEST_DIR, AppManifest, ToolManifest, load_all_manifests
     from .netlink_client import KernelMcpNetlinkClient
     from .public_catalog import list_apps_public, list_tools_public
@@ -80,14 +82,98 @@ _kernel_client: KernelMcpNetlinkClient | None = None
 _manifest_reload_lock = threading.Lock()
 _manifest_signature = ""
 
-# Backend binary hash cache: tool_id -> (observed_pid, sha256_hex).
-# Populated lazily on first tool:exec per tool. Re-hashed when the backend
-# pid changes (service restart), which is exactly the case where TOFU in the
-# kernel should either accept the first value or reject a subsequent one.
-_backend_hash_cache: Dict[int, Tuple[int, str]] = {}
+# Backend binary hash cache.
+# Key:  tool_id
+# Value: (pid, exe_identity, sha256_hex)
+#
+# Linux execve(2) keeps the PID, so keying the cache by PID alone would
+# let a backend self-reexec (systemd ExecReload, supervisord hot-reload,
+# or an attacker-triggered execve) silently reuse the old hash. We bind
+# cache validity to an `exe_identity` tuple drawn from /proc/<pid>/exe
+# instead — readlink target plus stat's (dev, inode, size, mtime_ns).
+# Any of those changing forces a re-hash.
+_backend_hash_cache: Dict[int, Tuple[int, Tuple, str]] = {}
 _backend_hash_lock = threading.Lock()
 
+
+def _exe_identity(pid: int) -> Tuple | None:
+    """Cheap fingerprint of the executable behind /proc/<pid>/exe.
+
+    Caveats:
+      - readlink catches execve to a different path.
+      - st_dev + st_ino catch replacement via unlink+create (`cp`).
+      - st_size + st_mtime_ns catch in-place rewrites (`open(O_TRUNC)`).
+
+    Returns None when /proc is not readable — callers must treat that as
+    "identity unknown" and recompute the digest rather than trust a cache.
+    """
+    try:
+        exe_path = f"/proc/{pid}/exe"
+        target = os.readlink(exe_path)
+        st = os.stat(exe_path)
+    except OSError:
+        return None
+    return (target, st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns)
+
+
+def _is_interpreter_exe(exe_target: str) -> bool:
+    """Heuristic: does /proc/<pid>/exe point at a language runtime rather
+    than an application-specific binary? Used to decide whether hashing
+    /proc/<pid>/exe alone fingerprints the loaded code or only the
+    runtime (see the composite-hash logic below)."""
+    base = os.path.basename(exe_target)
+    # Strip minor-version suffixes like "python3.11" so python/python3/python3.11 all match.
+    for name in _INTERPRETER_BASENAMES:
+        if base.startswith(name):
+            return True
+    return False
+
+
+def _composite_interpreter_hash(exe_digest: str, script_digest: str) -> str:
+    """Combine the interpreter's /proc/<pid>/exe digest with the
+    manifest-declared script digest into a single 64-hex string that
+    moves when EITHER changes. Kernel only has one TOFU slot, so we
+    present one value; operators see a stronger guarantee than "only
+    the interpreter is pinned"."""
+    return hashlib.sha256(
+        (exe_digest + ":" + script_digest).encode("ascii")
+    ).hexdigest()
+
+
+def _fresh_script_digest(script_path: str) -> str:
+    """Re-hash the on-disk entry script at probe time.
+
+    The manifest's cached `script_digest` is only recomputed when the
+    manifest JSON changes. For interpreter-hosted backends that means a
+    script swap between mcpd startups would be trusted until the
+    daemon is bounced — the attack the adversarial review flagged.
+    Reading the file here at every probe means the composite hash
+    tracks the script bytes actually on disk right now; if the kernel
+    TOFU pin no longer matches, the next arbitration returns DENY
+    binary_mismatch without needing a reload.
+    """
+    if not script_path:
+        return ""
+    try:
+        h = hashlib.sha256()
+        with open(script_path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return ""
+
+# Loaded on demand so tests and importing tools don't hit the filesystem.
+_security_config: SecurityConfig | None = None
+
 CATALOG_EPOCH_SYSFS = Path("/sys/kernel/mcp/tool_catalog_epoch")
+
+
+def _get_security_config() -> SecurityConfig:
+    global _security_config
+    if _security_config is None:
+        _security_config = load_security_config()
+    return _security_config
 
 
 def _get_kernel_client() -> KernelMcpNetlinkClient:
@@ -111,12 +197,44 @@ def _read_catalog_epoch() -> int:
 
 
 def _register_tool_with_kernel(tool: ToolManifest) -> None:
+    """Register (or re-register) a tool in the kernel, pinning binary_hash
+    as early as backend ready allows.
+
+    Probes the backend with SO_PEERCRED + /proc/<pid>/exe so the kernel's
+    TOFU slot is filled before first tool:exec, closing the window where
+    an attacker could replace the backend binary between mcpd startup and
+    the first call. If the probe returns empty we still register so the
+    control plane remains intact, but we do not pin a new kernel hash
+    until a later live probe succeeds.
+    """
     client = _get_kernel_client()
+    pr = _probe_backend_binary_hash(tool)
+    # Pin a hash only when the probe is live AND returned a non-empty
+    # digest. A cached fallback (live=False) must not be re-pinned — that
+    # would re-confirm a stale digest against a backend we couldn't
+    # actually observe this round.
+    if pr.live and pr.digest:
+        LOGGER.info(
+            "register tool=%d name=%s risk=0x%x binary_hash=%s",
+            tool.tool_id, tool.name, tool.risk_flags, pr.digest[:16] + "...",
+        )
+    else:
+        LOGGER.warning(
+            "register tool=%d name=%s probe live=%s digest_empty=%s "
+            "transport=%s endpoint=%s (will retry at exec)",
+            tool.tool_id, tool.name, pr.live, not pr.digest,
+            tool.transport, tool.endpoint,
+        )
+    # Only forward a non-empty hash when the probe was live. Forwarding
+    # the cached fallback here would quietly refresh the kernel's view
+    # of "known good" without any confirmation this round.
+    outbound_hash = pr.digest if pr.live else ""
     client.register_tool(
         tool_id=tool.tool_id,
         name=tool.name,
         risk_flags=tool.risk_flags,
         tool_hash=tool.manifest_hash,
+        binary_hash=outbound_hash,
     )
 
 
@@ -136,11 +254,31 @@ def _compute_manifest_signature() -> str:
 def _load_runtime_registry(*, force_reset: bool = False) -> str:
     """Reconcile local manifest state with the kernel tool registry.
 
-    Does an incremental diff rather than wholesale reset_tools: only the
-    tools that are new, removed, or whose manifest_hash changed will trigger
-    kernel mutations. Each mutation bumps the kernel's catalog_epoch, which
-    invalidates sessions opened before the mutation and forces them to
-    rebind (see catalog_stale_rebind_required).
+    Two fingerprints drive the diff, tracked separately on purpose:
+
+      - manifest_hash  : semantic identity (name, description, schema,
+                         risk_tags, ...). Changing it means the tool looks
+                         like a different tool to llm-app. Semantic-only
+                         changes trigger a plain register_tool() — the
+                         kernel refreshes name/hash/risk_flags and bumps
+                         catalog_epoch. The TOFU binary_hash slot is
+                         intentionally preserved; same backend runs it.
+      - binding_fingerprint : runtime routing (transport, endpoint,
+                         operation). Changing this means the tool may now
+                         be served by a *different process with a different
+                         binary*. The old TOFU binary_hash pin would make
+                         every subsequent call DENY as binary_mismatch, so
+                         we must unregister_tool() first to clear the slot,
+                         then register_tool() so the next probe can learn
+                         the new backend's hash cleanly. Each mutation also
+                         advances catalog_epoch, which is what forces any
+                         pre-change session to hit catalog_stale_rebind_required
+                         instead of silently routing to the new endpoint.
+
+    Both fingerprints are compared explicitly; we do NOT fold binding into
+    manifest_hash because that would make a host-move look like a tool
+    identity change to external consumers, which is the opposite of what
+    the semantic-hash design guarantees.
 
     force_reset=True keeps the old startup behavior — useful once after
     kernel module reload when the module's tool registry is known to be
@@ -163,16 +301,27 @@ def _load_runtime_registry(*, force_reset: bool = False) -> str:
     else:
         with _registry_lock:
             previous_tool_ids = set(_tool_registry.keys())
-            previous_hashes = {
+            previous_manifest_hashes = {
                 tid: t.manifest_hash for tid, t in _tool_registry.items()
+            }
+            previous_binding_fingerprints = {
+                tid: t.binding_fingerprint for tid, t in _tool_registry.items()
             }
         new_tool_ids = set(tool_registry.keys())
 
         removed = previous_tool_ids - new_tool_ids
         added = new_tool_ids - previous_tool_ids
-        changed = {
-            tid for tid in (previous_tool_ids & new_tool_ids)
-            if previous_hashes.get(tid) != tool_registry[tid].manifest_hash
+
+        intersect = previous_tool_ids & new_tool_ids
+        semantic_changed = {
+            tid for tid in intersect
+            if previous_manifest_hashes.get(tid)
+            != tool_registry[tid].manifest_hash
+        }
+        binding_changed = {
+            tid for tid in intersect
+            if previous_binding_fingerprints.get(tid)
+            != tool_registry[tid].binding_fingerprint
         }
 
         for tool_id in removed:
@@ -182,13 +331,41 @@ def _load_runtime_registry(*, force_reset: bool = False) -> str:
                 LOGGER.warning("kernel unregister failed tool=%d err=%s",
                                tool_id, exc)
             _backend_hash_cache.pop(tool_id, None)
-        for tool_id in added | changed:
+
+        # Binding changes must clear the kernel TOFU slot before re-registering;
+        # if we only call register_tool(), kernel_mcp_register_tool preserves
+        # the old binary_hash and every subsequent tool:exec will DENY as
+        # binary_mismatch after a genuine backend move. Also drop mcpd's
+        # per-tool hash cache so the next probe starts clean.
+        for tool_id in binding_changed:
+            try:
+                client.unregister_tool(tool_id)
+            except RuntimeError as exc:
+                LOGGER.warning(
+                    "kernel unregister during binding-change failed tool=%d err=%s",
+                    tool_id, exc,
+                )
+            _backend_hash_cache.pop(tool_id, None)
+            LOGGER.warning(
+                "tool=%d runtime binding changed (transport/endpoint/operation); "
+                "cleared kernel TOFU slot and local hash cache before re-register",
+                tool_id,
+            )
+
+        # A binding_changed tool also needs to be re-registered. A
+        # semantic_changed tool whose binding is unchanged only needs the
+        # in-place register (kernel updates metadata and bumps epoch, TOFU
+        # slot intentionally preserved).
+        to_register = added | binding_changed | semantic_changed
+        for tool_id in to_register:
             _register_tool_with_kernel(tool_registry[tool_id])
 
-        if removed or added or changed:
+        if removed or added or semantic_changed or binding_changed:
             LOGGER.info(
-                "reconciled kernel catalog added=%d removed=%d changed=%d",
-                len(added), len(removed), len(changed),
+                "reconciled kernel catalog added=%d removed=%d "
+                "semantic_changed=%d binding_changed=%d",
+                len(added), len(removed),
+                len(semantic_changed), len(binding_changed),
             )
 
     with _registry_lock:
@@ -325,6 +502,18 @@ def _kernel_arbitrate(
     )
 
 
+# Fine-grained outcome codes persisted to call_record.tool_status_code.
+# Mirror of KERNEL_MCP_TSC_* in kernel_mcp_schema.h; keep in sync or
+# `make schema-verify` will catch drift.
+TSC_UNSPECIFIED = 0
+TSC_OK = 1
+TSC_TOOL_ERROR = 2
+TSC_FORWARD_FAIL = 3
+TSC_PROBE_FAILED = 4
+TSC_KERNEL_DENY = 5
+TSC_KERNEL_DEFER = 6
+
+
 def _kernel_report_complete(
     agent_id: str,
     tool_id: int,
@@ -334,6 +523,7 @@ def _kernel_report_complete(
     payload_hash: bytes = b"",
     response_hash: bytes = b"",
     err_head: bytes = b"",
+    tool_status_code: int = TSC_UNSPECIFIED,
 ) -> None:
     client = _get_kernel_client()
     client.tool_complete(
@@ -345,6 +535,7 @@ def _kernel_report_complete(
         payload_hash=payload_hash,
         response_hash=response_hash,
         err_head=err_head,
+        tool_status_code=tool_status_code,
     )
 
 
@@ -363,67 +554,309 @@ def _summary_hash_prefix(blob: bytes) -> bytes:
 
 _SO_PEERCRED_STRUCT = struct.Struct("iii")  # pid, uid, gid
 
+# Basenames of executables we treat as interpreters rather than
+# application binaries. When /proc/<pid>/exe points at one of these,
+# hashing /proc/<pid>/exe alone would pin the *runtime* rather than
+# the loaded application code, which is the bug the adversarial
+# review flagged. We composite with the manifest-declared script
+# digest instead. Matched by prefix so "python3.11" and "python3" are
+# both caught.
+_INTERPRETER_BASENAMES = ("python", "ruby", "node", "bash", "sh")
 
-def _probe_backend_binary_hash(tool: ToolManifest) -> str:
-    """Return the SHA-256 hex digest of the backend process behind tool.endpoint.
 
-    Uses SO_PEERCRED on a short-lived AF_UNIX connect to identify the backend
-    pid, then reads /proc/<pid>/exe as a magic symlink to hash the actual
-    running binary. Cached per tool until the backend pid changes.
+class ProbeResult:
+    """Outcome of `_probe_backend_binary_hash`.
 
-    Returns "" on any I/O failure — the kernel then either keeps an existing
-    TOFU lock (without comparing) or starts with no lock until a future
-    request succeeds. We do not want probe flakes to DENY real traffic.
+    `live` is the critical bit: True means this invocation actually
+    confirmed the currently-serving binary's identity (either by
+    hashing /proc/<pid>/exe fresh, or by validating that the cached
+    digest's exe_identity still matches what /proc reports right now).
+    False means we could not confirm and are falling back to the last
+    known-good digest — the exec path must refuse to forward in that
+    case because the backend may have been swapped during the blind
+    window.
+
+    When `hold=True` was passed to the probe and the result is live,
+    `conn` is the open socket to the verified backend. Callers MUST
+    close it (either by sending the real RPC through it or explicitly
+    calling .close()); the exec path reuses this connection to prove
+    the payload went to the same process we just probed, closing the
+    TOCTOU window that a second dial would open.
+    """
+    __slots__ = ("digest", "live", "conn", "pid", "identity")
+
+    def __init__(
+        self,
+        *,
+        digest: str,
+        live: bool,
+        conn: socket.socket | None = None,
+        pid: int = 0,
+        identity: Tuple | None = None,
+    ) -> None:
+        self.digest = digest
+        self.live = live
+        self.conn = conn
+        self.pid = pid
+        self.identity = identity
+
+
+def _check_peer_uid(peer_uid: int, tool_id: int, context: str) -> bool:
+    """True iff SO_PEERCRED peer uid is in allowed_backend_uids.
+
+    Applied to both the probe dial and the tool:exec dial so an
+    attacker who races to bind the same abstract/path UDS under a
+    different uid cannot impersonate a tool backend. For the default
+    config (only mcpd's own euid is trusted) this closes the
+    cross-user impersonation window the adversarial review flagged
+    for abstract sockets; it also hardens the path-UDS case where
+    /tmp/linux-mcp-apps/ is on a world-writable tmpfs.
+    """
+    sec = _get_security_config()
+    allowed = sec.allowed_backend_uids or ()
+    if peer_uid in allowed:
+        return True
+    LOGGER.warning(
+        "peer uid check failed context=%s tool=%d peer_uid=%d allowed=%s",
+        context, tool_id, peer_uid, sorted(allowed),
+    )
+    return False
+
+
+def _read_peercred(conn: socket.socket) -> Tuple[int, int] | None:
+    """Return (pid, uid) from SO_PEERCRED on an AF_UNIX connection, or
+    None if the option cannot be read."""
+    try:
+        raw = conn.getsockopt(
+            socket.SOL_SOCKET,
+            socket.SO_PEERCRED,
+            _SO_PEERCRED_STRUCT.size,
+        )
+        pid, uid, _gid = _SO_PEERCRED_STRUCT.unpack(raw)
+        return (pid, uid)
+    except (OSError, struct.error):
+        return None
+
+
+def _probe_backend_binary_hash(
+    tool: ToolManifest, *, hold: bool = False
+) -> ProbeResult:
+    """Probe the backend behind `tool.endpoint` and return its binary hash
+    plus a `live` bit indicating whether this call actually confirmed
+    the currently-serving binary.
+
+    When `hold=True`, a successful live probe returns a ProbeResult
+    whose `.conn` is the still-open verified socket. The caller owns
+    this socket and MUST close it (e.g. by handing it to
+    `_call_tool_service`, which will consume it). Reusing the probed
+    connection is the point: it eliminates the TOCTOU window between
+    "probe saw process A" and "exec dial got process B that grabbed
+    the same UDS name after A exited", which otherwise lets a
+    same-uid substitute receive the payload that the kernel approved
+    for A.
+
+    On `hold=False`, the connection is always closed before return —
+    used by the registration path that only wants to learn a hash.
+
+    Contract for callers:
+      - live=True, digest=<sha256>: current binary identity confirmed;
+        safe to forward a tool:exec. With hold=True the caller must
+        close result.conn.
+      - live=True, digest="": confirmed, but hashing is not possible on
+        this transport (non-AF_UNIX) — treated like "no new pin".
+      - live=False, digest=<cached>: live probe failed; the exec path
+        must refuse because the backend could have swapped during the
+        blind window. conn is always None here even with hold=True.
+      - live=False, digest="": no cached fallback available either.
+
+    For interpreter-backed backends (python, ruby, node, ...), we
+    substitute `composite_hash(interpreter_digest, script_digest)` for
+    the raw /proc/<pid>/exe hash, so a swap of the application script
+    on disk will invalidate the kernel's TOFU pin on the next restart.
+    Without the script_digest (non-.py entry or missing file) we fall
+    back to interpreter-only hashing and log a warning that TOFU is
+    degraded for that tool.
     """
     with _backend_hash_lock:
         cached = _backend_hash_cache.get(tool.tool_id)
+    fallback_digest = cached[2] if cached else ""
+
+    # Helper to consistently return a failure while ensuring the
+    # held socket is closed (callers must not have to worry about it).
+    def _fail(conn: socket.socket | None) -> ProbeResult:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+        return ProbeResult(digest=fallback_digest, live=False)
 
     try:
         probe = transport_dial(tool.transport, tool.endpoint, 2.0)
     except (OSError, socket.timeout, TransportError, NotImplementedError) as exc:
-        LOGGER.warning("backend probe dial failed tool=%d transport=%s endpoint=%s err=%s",
-                       tool.tool_id, tool.transport, tool.endpoint, exc)
-        return cached[1] if cached else ""
-    with probe:
-        # SO_PEERCRED is AF_UNIX-specific. For any non-AF_UNIX transport the
-        # probe silently returns cached/empty — the kernel keeps whatever
-        # binary_hash it had and operators get a log line rather than a
-        # spurious DENY. vsock attestation is future work.
-        if probe.family != socket.AF_UNIX:
-            return cached[1] if cached else ""
-        try:
-            cred_raw = probe.getsockopt(
-                socket.SOL_SOCKET,
-                socket.SO_PEERCRED,
-                _SO_PEERCRED_STRUCT.size,
+        LOGGER.warning(
+            "backend probe dial failed tool=%d transport=%s endpoint=%s err=%s",
+            tool.tool_id, tool.transport, tool.endpoint, exc,
+        )
+        return _fail(None)
+
+    if probe.family != socket.AF_UNIX:
+        # SO_PEERCRED is AF_UNIX-only. vsock attestation is future
+        # work; for now there's no way to confirm identity so we can't
+        # claim live.
+        return _fail(probe)
+
+    peer = _read_peercred(probe)
+    if peer is None:
+        LOGGER.warning(
+            "backend SO_PEERCRED failed tool=%d endpoint=%s",
+            tool.tool_id, tool.endpoint,
+        )
+        return _fail(probe)
+    backend_pid, backend_uid = peer
+    if not _check_peer_uid(backend_uid, tool.tool_id, context="probe"):
+        return _fail(probe)
+
+    # Fast path: cache hit whose pinned identity still matches what
+    # /proc reports *now*. This is the bulk of hot-path calls.
+    current_identity = _exe_identity(backend_pid)
+    if (
+        cached is not None
+        and cached[0] == backend_pid
+        and current_identity is not None
+        and cached[1] == current_identity
+    ):
+        if not hold:
+            probe.close()
+        return ProbeResult(
+            digest=cached[2], live=True,
+            conn=probe if hold else None,
+            pid=backend_pid, identity=current_identity,
+        )
+    if (
+        cached is not None
+        and cached[0] == backend_pid
+        and current_identity is not None
+        and cached[1] != current_identity
+    ):
+        LOGGER.warning(
+            "exe identity drift tool=%d pid=%d "
+            "(execve or in-place binary replacement); re-hashing",
+            tool.tool_id, backend_pid,
+        )
+
+    # Re-hash with race detection. Identity captured BEFORE the read is
+    # the key we cache under (so the cached digest really is the hash
+    # of the bytes identified by that tuple). If the post-read identity
+    # disagrees, the backend execved or had its file replaced during
+    # the read — retry once, otherwise give up and don't cache.
+    for attempt in range(2):
+        id_before = _exe_identity(backend_pid)
+        if id_before is None:
+            LOGGER.warning(
+                "backend exe identity unreadable tool=%d pid=%d",
+                tool.tool_id, backend_pid,
             )
-            backend_pid, _uid, _gid = _SO_PEERCRED_STRUCT.unpack(cred_raw)
-        except (OSError, socket.timeout, struct.error) as exc:
-            LOGGER.warning("backend probe failed tool=%d endpoint=%s err=%s",
-                           tool.tool_id, tool.endpoint, exc)
-            return cached[1] if cached else ""
+            return _fail(probe)
+        try:
+            hasher = hashlib.sha256()
+            with open(f"/proc/{backend_pid}/exe", "rb") as fh:
+                for chunk in iter(lambda: fh.read(65536), b""):
+                    hasher.update(chunk)
+            exe_digest = hasher.hexdigest()
+        except OSError as exc:
+            LOGGER.warning(
+                "backend exe read failed tool=%d pid=%d err=%s",
+                tool.tool_id, backend_pid, exc,
+            )
+            return _fail(probe)
+        id_after = _exe_identity(backend_pid)
+        if id_after is None:
+            return _fail(probe)
+        if id_before != id_after:
+            LOGGER.warning(
+                "exe identity raced during hash tool=%d pid=%d attempt=%d; retrying",
+                tool.tool_id, backend_pid, attempt,
+            )
+            continue
 
-    if cached and cached[0] == backend_pid:
-        return cached[1]
+        # Interpreter-aware composite hash. When the backend is hosted
+        # by an interpreter, hashing /proc/<pid>/exe alone pins the
+        # interpreter, NOT the application code. We combine with a
+        # live-read digest of the entry script so a change to the
+        # script on disk invalidates the kernel TOFU pin immediately —
+        # the manifest-cached digest is only refreshed when the
+        # manifest JSON itself changes, so relying on it would leave a
+        # swapped .py trusted until mcpd bounces.
+        exe_target = id_before[0]
+        if _is_interpreter_exe(exe_target):
+            live_script_digest = _fresh_script_digest(tool.script_path)
+            if not live_script_digest:
+                # Fall back to whatever we captured at manifest load so
+                # a transient read failure doesn't nuke an otherwise
+                # valid pin; the next successful read will DENY via
+                # binary_mismatch if the script actually changed.
+                live_script_digest = tool.script_digest
+                if live_script_digest:
+                    LOGGER.warning(
+                        "tool=%d name=%s script re-read failed "
+                        "(path=%s); using manifest-cached digest",
+                        tool.tool_id, tool.name, tool.script_path,
+                    )
+            if live_script_digest:
+                digest = _composite_interpreter_hash(exe_digest, live_script_digest)
+            else:
+                LOGGER.warning(
+                    "tool=%d name=%s backend is interpreter-hosted (exe=%s) but "
+                    "no script_digest available — binary_hash pins interpreter "
+                    "only; application code is NOT TOFU-protected",
+                    tool.tool_id, tool.name, exe_target,
+                )
+                digest = exe_digest
+        else:
+            digest = exe_digest
 
-    exe_path = f"/proc/{backend_pid}/exe"
-    try:
-        hasher = hashlib.sha256()
-        with open(exe_path, "rb") as fh:
-            for chunk in iter(lambda: fh.read(65536), b""):
-                hasher.update(chunk)
-        digest = hasher.hexdigest()
-    except OSError as exc:
-        LOGGER.warning("backend exe read failed tool=%d pid=%d err=%s",
-                       tool.tool_id, backend_pid, exc)
-        return cached[1] if cached else ""
+        with _backend_hash_lock:
+            _backend_hash_cache[tool.tool_id] = (backend_pid, id_before, digest)
+        if not hold:
+            probe.close()
+        return ProbeResult(
+            digest=digest, live=True,
+            conn=probe if hold else None,
+            pid=backend_pid, identity=id_before,
+        )
 
-    with _backend_hash_lock:
-        _backend_hash_cache[tool.tool_id] = (backend_pid, digest)
-    return digest
+    LOGGER.warning(
+        "unable to capture stable binary_hash tool=%d pid=%d; not caching",
+        tool.tool_id, backend_pid,
+    )
+    return _fail(probe)
 
 
-def _call_tool_service(tool: ToolManifest, req_id: int, agent_id: str, payload: Any) -> Dict[str, Any]:
+def _call_tool_service(
+    tool: ToolManifest,
+    req_id: int,
+    agent_id: str,
+    payload: Any,
+    *,
+    conn: socket.socket | None = None,
+    probed_pid: int = 0,
+    probed_identity: Tuple | None = None,
+) -> Dict[str, Any]:
+    """Send a tool:exec RPC and return the backend's response.
+
+    If `conn` is provided it is the already-verified socket the probe
+    used to compute the binary_hash. We reuse it for the real RPC so
+    the kernel's approval and the actual payload destination are
+    provably the same process — no TOCTOU between probe dial and exec
+    dial. The caller passes `probed_pid` / `probed_identity` only for
+    sanity checks in that path.
+
+    When `conn` is None we fall back to a fresh dial (used by the
+    synchronous test smoke and the legacy registration-sync path);
+    that dial does its own peer UID check but cannot prove process
+    identity continuity with an earlier probe.
+    """
     req = {
         "req_id": req_id,
         "agent_id": agent_id,
@@ -433,16 +866,74 @@ def _call_tool_service(tool: ToolManifest, req_id: int, agent_id: str, payload: 
     }
     encoded = json.dumps(req, ensure_ascii=True).encode("utf-8")
     timeout_s = max(tool.timeout_ms / 1000.0, 1.0)
-    try:
-        conn = transport_dial(tool.transport, tool.endpoint, timeout_s)
-    except (FileNotFoundError, ConnectionRefusedError, TimeoutError, OSError) as exc:
-        raise ValueError(f"tool service offline: {tool.endpoint}") from exc
-    except TransportError as exc:
-        raise ValueError(f"tool transport error: {exc}") from exc
-    except NotImplementedError as exc:
-        raise ValueError(f"tool transport not implemented: {exc}") from exc
+
+    if conn is None:
+        try:
+            conn = transport_dial(tool.transport, tool.endpoint, timeout_s)
+        except (FileNotFoundError, ConnectionRefusedError, TimeoutError, OSError) as exc:
+            raise ValueError(f"tool service offline: {tool.endpoint}") from exc
+        except TransportError as exc:
+            raise ValueError(f"tool transport error: {exc}") from exc
+        except NotImplementedError as exc:
+            raise ValueError(f"tool transport not implemented: {exc}") from exc
+        reused = False
+    else:
+        reused = True
     try:
         with conn:
+            conn.settimeout(timeout_s)
+            if not reused and conn.family == socket.AF_UNIX:
+                # Fresh dial: cannot prove continuity with any prior
+                # probe. Fall back to the peer UID allowlist; the exec
+                # path would have DENY'd upstream if the live probe
+                # failed, so reaching here means we at least saw an OK
+                # probe this round.
+                peer = _read_peercred(conn)
+                if peer is None:
+                    raise ValueError(
+                        f"tool service peer identity unreadable: {tool.endpoint}"
+                    )
+                _peer_pid, peer_uid = peer
+                if not _check_peer_uid(peer_uid, tool.tool_id, context="exec"):
+                    raise ValueError(
+                        f"tool service peer uid={peer_uid} not in "
+                        f"allowed_backend_uids (tool={tool.tool_id})"
+                    )
+            elif reused and conn.family == socket.AF_UNIX:
+                # Reused probe socket: pid/identity were already
+                # verified by the probe. Re-check both peer credentials
+                # AND /proc/<pid>/exe identity before sending the
+                # payload. execve() preserves PID and keeps already-
+                # accepted connections open unless the backend marks
+                # them CLOEXEC, so a same-PID check alone lets a
+                # backend accept the probe, re-exec into different
+                # code, and still receive the approved payload on the
+                # already-held socket. Comparing the pre-exec identity
+                # tuple against the one /proc reports now closes that
+                # window.
+                peer = _read_peercred(conn)
+                if peer is None:
+                    raise ValueError(
+                        f"tool service peer identity unreadable on reused probe socket: {tool.endpoint}"
+                    )
+                now_pid, _now_uid = peer
+                if probed_pid and now_pid and now_pid != probed_pid:
+                    raise ValueError(
+                        f"probed pid={probed_pid} but exec socket reports "
+                        f"pid={now_pid} (tool={tool.tool_id}) — backend swapped"
+                    )
+                if probed_identity is not None:
+                    now_identity = _exe_identity(now_pid or probed_pid)
+                    if now_identity is None:
+                        raise ValueError(
+                            f"exe identity unreadable on reused probe socket: {tool.endpoint}"
+                        )
+                    if now_identity != probed_identity:
+                        raise ValueError(
+                            f"probe/exec identity drift on reused socket "
+                            f"(tool={tool.tool_id} pid={now_pid}) — backend re-execed "
+                            f"after probe approval"
+                        )
             send_frame(conn, encoded, max_msg_size=MAX_MSG_SIZE)
             raw = recv_frame(conn, max_msg_size=MAX_MSG_SIZE)
     except (FileNotFoundError, ConnectionRefusedError, TimeoutError, OSError) as exc:
@@ -475,16 +966,6 @@ def _list_tools_public(app_id: str = "") -> List[Dict[str, Any]]:
         else:
             tools = _tool_registry.values()
     return list_tools_public(list(tools))
-
-
-def _build_error(req_id: int, err: str, t_ms: int) -> Dict[str, Any]:
-    return {
-        "req_id": req_id,
-        "status": "error",
-        "result": {},
-        "error": err,
-        "t_ms": t_ms,
-    }
 
 
 def _approval_decide(
@@ -551,8 +1032,51 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
     payload = req.get("payload", {})
     validate_payload(tool.input_schema, payload)
     payload_hash = _summary_hash_prefix(_canonical_payload_bytes(payload))
-    backend_binary_hash = _probe_backend_binary_hash(tool)
+    # hold=True: keep the probe's verified socket open so we can send the
+    # actual payload on the same connection after kernel arbitration.
+    # That closes the TOCTOU window between probe and exec dial.
+    probe_result = _probe_backend_binary_hash(tool, hold=True)
+    backend_binary_hash = probe_result.digest
 
+    # Refuse any request whose live backend identity we could not confirm
+    # this round. Serving the cached digest on a failed live probe would
+    # let a swapped backend pass the kernel TOFU check.
+    if not probe_result.live:
+        LOGGER.warning(
+            "refusing tool=%d name=%s: live probe failed "
+            "(cached_digest_present=%s)",
+            tool_id, tool.name, bool(backend_binary_hash),
+        )
+        # Record the denial in the kernel's per-agent call_log so it
+        # survives an mcpd crash and shows up in sysfs. Register the
+        # agent first so tool_complete has an agent to look up.
+        try:
+            _ensure_agent_registered(agent_id, binding)
+            _kernel_report_complete(
+                agent_id=agent_id,
+                tool_id=tool_id,
+                req_id=req_id,
+                status_code=1,
+                exec_ms=0,
+                payload_hash=payload_hash,
+                err_head=b"probe_failed",
+                tool_status_code=TSC_PROBE_FAILED,
+            )
+        except Exception as audit_exc:  # noqa: BLE001
+            LOGGER.error(
+                "failed to record probe_failed audit req_id=%d agent=%s tool=%d err=%s",
+                req_id, agent_id, tool_id, audit_exc,
+            )
+        return {
+            "req_id": req_id,
+            "status": "error",
+            "result": {},
+            "error": "binary_hash probe failed",
+            "t_ms": 0,
+            "decision": "DENY",
+            "reason": "probe_failed",
+            "ticket_id": 0,
+        }
     tool_hash = _resolve_tool_hash(req, tool)
     _ensure_agent_registered(agent_id, binding)
     approval_ticket_id = ensure_int("approval_ticket_id", req.get("approval_ticket_id", 0))
@@ -569,6 +1093,12 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         catalog_epoch=binding.catalog_epoch,
     )
     if decision == "DENY":
+        # Kernel rejected: close the probed socket, do NOT forward.
+        if probe_result.conn is not None:
+            try:
+                probe_result.conn.close()
+            except Exception:  # noqa: BLE001
+                pass
         return {
             "req_id": req_id,
             "status": "error",
@@ -580,6 +1110,13 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "ticket_id": ticket_id,
         }
     if decision == "DEFER":
+        # Deferred awaiting approval: close probe socket, the retry
+        # after approval opens a fresh probe.
+        if probe_result.conn is not None:
+            try:
+                probe_result.conn.close()
+            except Exception:  # noqa: BLE001
+                pass
         if ticket_id > 0:
             remember_pending_approval(
                 ticket_id=ticket_id,
@@ -608,8 +1145,29 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
     status_code = 1
     response_hash = b""
     err_head = b""
+    tool_status_code = TSC_UNSPECIFIED
     try:
-        tool_resp = _call_tool_service(tool, req_id=req_id, agent_id=agent_id, payload=payload)
+        try:
+            # Reuse the probed socket for the real RPC. The kernel just
+            # approved based on the identity we saw at probe time; by
+            # sending the payload down the same socket we guarantee the
+            # approval and the payload land in the same process.
+            tool_resp = _call_tool_service(
+                tool,
+                req_id=req_id,
+                agent_id=agent_id,
+                payload=payload,
+                conn=probe_result.conn,
+                probed_pid=probe_result.pid,
+                probed_identity=probe_result.identity,
+            )
+        except ValueError as exc:
+            # _call_tool_service wraps connect refused / timeout / transport
+            # errors into ValueError, so this branch is mcpd forwarding
+            # failures (as opposed to the tool returning status=error).
+            tool_status_code = TSC_FORWARD_FAIL
+            err_head = str(exc).encode("utf-8", errors="replace")[:48]
+            raise
         status = tool_resp.get("status")
         result = tool_resp.get("result", {})
         err = tool_resp.get("error", "")
@@ -622,8 +1180,10 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             tool_t_ms = int((time.perf_counter() - exec_start) * 1000)
         if status == "ok":
             status_code = 0
+            tool_status_code = TSC_OK
             response_hash = _summary_hash_prefix(_canonical_payload_bytes(result))
         else:
+            tool_status_code = TSC_TOOL_ERROR
             err_head = err.encode("utf-8", errors="replace")[:48]
         return {
             "req_id": req_id,
@@ -637,7 +1197,10 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             "ticket_id": ticket_id,
         }
     except Exception as exc:  # noqa: BLE001
-        err_head = str(exc).encode("utf-8", errors="replace")[:48]
+        if not err_head:
+            err_head = str(exc).encode("utf-8", errors="replace")[:48]
+        if tool_status_code == TSC_UNSPECIFIED:
+            tool_status_code = TSC_FORWARD_FAIL
         raise
     finally:
         exec_ms = int((time.perf_counter() - exec_start) * 1000)
@@ -651,6 +1214,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
                 payload_hash=payload_hash,
                 response_hash=response_hash,
                 err_head=err_head,
+                tool_status_code=tool_status_code,
             )
         except Exception as exc:  # noqa: BLE001
             LOGGER.error(
@@ -878,7 +1442,13 @@ def _handle_connection(conn: socket.socket) -> None:
                 if req_kind.startswith("sys:"):
                     resp = {"status": "error", "error": str(exc)}
                 else:
-                    resp = _build_error(req_id=req_id, err=str(exc), t_ms=t_ms)
+                    resp = {
+                        "req_id": req_id,
+                        "status": "error",
+                        "result": {},
+                        "error": str(exc),
+                        "t_ms": t_ms,
+                    }
                 try:
                     send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
                 except Exception:  # noqa: BLE001

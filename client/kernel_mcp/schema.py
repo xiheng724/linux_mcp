@@ -47,6 +47,7 @@ ATTR: Final[dict[str, int]] = {
     "ERR_HEAD": 32,
     "BINARY_HASH": 33,
     "CATALOG_EPOCH": 34,
+    "TOOL_STATUS_CODE": 35,
 }
 
 # Data-plane call-summary sysfs record layout.
@@ -60,3 +61,24 @@ CALL_STATUS_OK: Final[int] = 0
 CALL_STATUS_ERR: Final[int] = 1
 CALL_STATUS_DENY: Final[int] = 2
 CALL_STATUS_DEFER: Final[int] = 3
+
+# Fine-grained outcome classification. Mirrors KERNEL_MCP_TSC_* in
+# kernel_mcp_schema.h; stored in call_record.tool_status_code (the old
+# `reserved` slot — same width, so the binary layout is unchanged).
+TOOL_STATUS_UNSPECIFIED: Final[int] = 0
+TOOL_STATUS_OK: Final[int] = 1
+TOOL_STATUS_TOOL_ERROR: Final[int] = 2
+TOOL_STATUS_FORWARD_FAIL: Final[int] = 3
+TOOL_STATUS_PROBE_FAILED: Final[int] = 4
+TOOL_STATUS_KERNEL_DENY: Final[int] = 5
+TOOL_STATUS_KERNEL_DEFER: Final[int] = 6
+
+TOOL_STATUS_LABELS: Final[dict[int, str]] = {
+    TOOL_STATUS_UNSPECIFIED: "UNSPECIFIED",
+    TOOL_STATUS_OK: "OK",
+    TOOL_STATUS_TOOL_ERROR: "TOOL_ERROR",
+    TOOL_STATUS_FORWARD_FAIL: "FORWARD_FAIL",
+    TOOL_STATUS_PROBE_FAILED: "PROBE_FAILED",
+    TOOL_STATUS_KERNEL_DENY: "KERNEL_DENY",
+    TOOL_STATUS_KERNEL_DEFER: "KERNEL_DEFER",
+}

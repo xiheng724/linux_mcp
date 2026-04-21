@@ -1,0 +1,36 @@
+{
+  "app_id": "native_echo_app",
+  "app_name": "Native Echo (binary-hash test)",
+  "transport": "uds_rpc",
+  "endpoint": "/tmp/linux-mcp-apps/native_echo.sock",
+  "demo_entrypoint": "tool-app/demo_apps/native_echo/bin/native_echo",
+  "tools": [
+    {
+      "tool_id": 44,
+      "name": "native_echo_ping",
+      "risk_tags": [],
+      "operation": "echo",
+      "timeout_ms": 5000,
+      "description": "Minimal native UDS backend used by the binary-hash replacement test. Echoes a static acknowledgement; the payload is ignored.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {}
+        },
+        {
+          "payload": {
+            "note": "hello from the replacement-attack smoke test"
+          }
+        }
+      ]
+    }
+  ]
+}

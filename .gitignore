@@ -18,6 +18,9 @@ __pycache__/
 client/bin/*
 !client/bin/.gitkeep
 
+# Native demo binaries (built by `make native-demos`)
+tool-app/demo_apps/native_echo/bin/
+
 # Kernel module build outputs
 kernel-mcp/*.o
 kernel-mcp/*.ko

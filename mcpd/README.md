@@ -15,8 +15,8 @@
 
 - 加载 `tool-app/manifests/*.json`
 - 校验 manifest 格式
-- 计算语义 hash
-- 把 manifest tool 注册进内核
+- 计算完整 64 字符十六进制 SHA-256 语义 hash
+- 将 manifest tool 增量同步到内核，并在删除或语义变化时做 `unregister/re-register`
 - 维护 app/tool runtime registry
 - 提供 `/tmp/mcpd.sock` 上的 framed JSON RPC
 - 处理 `list_apps` / `list_tools`
@@ -24,11 +24,12 @@
 - 处理 `open_session`
 - 处理 `tool:exec`
 - 将 session 绑定到 peer identity
-- 为每个 session 派生 `binding_hash / binding_epoch`
+- 为每个 session 派生 `binding_hash / binding_epoch / catalog_epoch`
 - 为首次出现的服务端 `agent_id` 做带 binding 元数据的 netlink agent register
+- 对后端服务做可执行文件探测并附带 `binary_hash`
 - 通过内核做仲裁
-- 调用 tool app 的 UDS endpoint
-- 向内核回报 `tool_complete`
+- 按 transport policy 调用 tool app endpoint
+- 向内核回报 `tool_complete`，附带 payload/response 摘要和错误头
 
 ## 运行模型
 
@@ -40,16 +41,18 @@ llm-app -> mcpd -> kernel netlink
 更具体地说：
 
 1. 启动时加载所有 manifest
-2. 将每个 tool 注册到内核
+2. 将每个 tool 与内核 registry 做增量对账
 3. 对外暴露 app/tool catalog
 4. 通过 UDS peer credentials 识别本地客户端
-5. 为客户端签发短期 session 和服务端生成的 `agent_id`
-6. 从 session 派生 `binding_hash / binding_epoch`
-7. 接收带 `session_id` 的 `tool:exec`
-8. 校验 session、请求和 payload
-9. 调用内核 `tool_request`
-10. 若 `ALLOW`，再调用对应 app 的 `operation`
-11. 执行后调用内核 `tool_complete`
+5. 在 `open_session` 时读取当前内核 `catalog_epoch`
+6. 为客户端签发短期 session 和服务端生成的 `agent_id`
+7. 从 session 派生 `binding_hash / binding_epoch / catalog_epoch`
+8. 接收带 `session_id` 的 `tool:exec`
+9. 校验 session、请求和 payload
+10. 计算 payload 摘要并探测 backend `binary_hash`
+11. 调用内核 `tool_request`
+12. 若 `ALLOW`，再调用对应 app 的 `operation`
+13. 执行后调用内核 `tool_complete`
 
 ## public RPC
 
@@ -126,6 +129,18 @@ netlink client 在 [netlink_client.py](/home/lxh/Code/linux-mcp/mcpd/netlink_cli
 
 - `binding_hash`
 - `binding_epoch`
+- `catalog_epoch`
+
+另外，`tool_request` 还会附带：
+
+- `payload_hash`
+- `binary_hash`
+
+`tool_complete` 会附带：
+
+- `payload_hash`
+- `response_hash`
+- `err_head`
 
 当前 `mcpd` 对 `DEFER` 的处理方式是：
 
@@ -138,6 +153,7 @@ netlink client 在 [netlink_client.py](/home/lxh/Code/linux-mcp/mcpd/netlink_cli
 当前仓库约定里，rate limiting 和重试策略应由 `mcpd` 在用户空间完成，不在内核协议或 agent 内核状态里维护 token bucket。
 
 另外，`mcpd` 运行期间会在处理 `list_apps`、`list_tools` 和 `tool:exec` 前检查 manifest 目录是否变化；如果 `tool-app/manifests/*.json` 有新增、删除或修改，它会自动刷新内存 registry 并重新把当前 manifest tools 同步到内核 registry，无需手动重启 `mcpd`。
+如果某个 session 在旧 catalog epoch 上执行新注册工具，内核会返回 `catalog_stale_rebind_required`；`llm-app` 当前实现会重新 `open_session` 后自动重试一次。
 
 ## 与 manifest 的关系
 
@@ -161,8 +177,10 @@ manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_
   - `examples`
   - `path_semantics`（可选）
   - `approval_policy`（可选）
-- 仅支持 `transport = "uds_rpc"`
-- endpoint 必须位于 `/tmp/linux-mcp-apps/`
+- `uds_rpc` 是默认 transport；`uds_abstract` 由 `mcpd` 原生支持，并通过仓库自带的 [config/mcpd.demo.toml](../config/mcpd.demo.toml) 启用 allow_name_pattern，默认 demo 已覆盖两条路径
+- `vsock_rpc` 只保留了 transport 名字——dialer 未实现，validator 会直接拒绝；peer attestation 设计仍是 future item
+- path-based `uds_rpc` endpoint 必须匹配配置里的 allow prefixes，默认前缀是 `/tmp/linux-mcp-apps/`
+- `uds_abstract` endpoint 需要匹配配置里的 `allow_name_pattern`
 - `tool_id` 必须全局唯一
 
 语义 hash 当前只由这些字段决定：
@@ -178,9 +196,11 @@ manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_
 - `path_semantics`
 - `approval_policy`
 
+也就是说，`transport` / `endpoint` / `operation` 不属于语义 hash 的一部分；它们影响运行时绑定，但不会改变对 `llm-app` 暴露的工具语义身份。
+
 ## 与 tool app 的关系
 
-当前只支持 `uds_rpc` transport。
+`mcpd` 默认同时覆盖 `uds_rpc` 与 `uds_abstract`（后者由 [config/mcpd.demo.toml](../config/mcpd.demo.toml) 放行），`vsock_rpc` 作为名字保留但不实现。
 
 `mcpd` 发给 app 的请求结构：
 
@@ -249,9 +269,33 @@ cat /tmp/mcpd-$(id -u).log
 python3 llm-app/rpc.py
 ```
 
+如果只想绕过 planner 做一次直接执行自检，可运行：
+
+```bash
+python3 scripts/mcpctl_exec_smoke.py
+```
+
+如果想在 `mcpd` 崩溃后查看内核保留的最近调用摘要，可运行：
+
+```bash
+sudo python3 scripts/mcpctl_dump_calls.py <agent_id>
+```
+
+输出包含粗粒度 `status` (`OK` / `ERR` / `DENY` / `DEFER`) 以及细粒度
+`tsc` 字段（`OK` / `TOOL_ERROR` / `FORWARD_FAIL` / `PROBE_FAILED` /
+`KERNEL_DENY` / `KERNEL_DEFER` / `UNSPECIFIED`），足以区分"内核拒绝 / 工
+具返回 error / mcpd 转发失败"三类不同的失败路径。
+
+仓库里自带一条 acceptance 脚本把"发起调用 → kill -9 mcpd → 从 sysfs
+读回记录"全流程钉住，直接运行即可：
+
+```bash
+bash scripts/acceptance_call_log_after_crash.sh
+```
+
 ## 当前限制
 
-- 仅支持 `uds_rpc`
+- `vsock_rpc` 只是保留 transport 名字，未实现 dialer；等待 peer attestation 设计后再决定是否启用
 - catalog 只保留语义字段给 `llm-app`
 - payload schema 校验是轻量级的，不是完整 JSON Schema 引擎
 - 大输出仍走 framed JSON，没有单独数据面

@@ -86,9 +86,9 @@ struct kernel_mcp_call_record {
 	u64 timestamp_ns;
 	u64 req_id;
 	u32 tool_id;
-	u32 status;   /* KERNEL_MCP_CALL_STATUS_* */
+	u32 status;             /* KERNEL_MCP_CALL_STATUS_* */
 	u32 exec_ms;
-	u32 reserved;
+	u32 tool_status_code;   /* KERNEL_MCP_TSC_* (was `reserved`; same width) */
 	u8 payload_hash[KERNEL_MCP_CALL_HASH_PREFIX];
 	u8 response_hash[KERNEL_MCP_CALL_HASH_PREFIX];
 	u8 err_head[KERNEL_MCP_CALL_ERR_HEAD_MAX];
@@ -237,6 +237,7 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_MAX + 1] = {
 		.len = KERNEL_MCP_TOOL_HASH_MAX - 1,
 	},
 	[KERNEL_MCP_ATTR_CATALOG_EPOCH] = { .type = NLA_U64 },
+	[KERNEL_MCP_ATTR_TOOL_STATUS_CODE] = { .type = NLA_U32 },
 };
 
 static u32 kernel_mcp_agent_hash_key(const char *agent_id)
@@ -250,7 +251,7 @@ static u32 kernel_mcp_agent_hash_key(const char *agent_id)
  */
 static void kernel_mcp_agent_call_log_append(struct kernel_mcp_agent *agent,
 					     u64 req_id, u32 tool_id, u32 status,
-					     u32 exec_ms,
+					     u32 exec_ms, u32 tool_status_code,
 					     const u8 *payload_hash,
 					     const u8 *response_hash,
 					     const u8 *err_head, size_t err_head_len)
@@ -266,6 +267,7 @@ static void kernel_mcp_agent_call_log_append(struct kernel_mcp_agent *agent,
 	rec->tool_id = tool_id;
 	rec->status = status;
 	rec->exec_ms = exec_ms;
+	rec->tool_status_code = tool_status_code;
 	if (payload_hash)
 		memcpy(rec->payload_hash, payload_hash, KERNEL_MCP_CALL_HASH_PREFIX);
 	if (response_hash)
@@ -1391,8 +1393,12 @@ out_accounting:
 		u32 rec_status = (decision == KERNEL_MCP_DECISION_DENY)
 					 ? KERNEL_MCP_CALL_STATUS_DENY
 					 : KERNEL_MCP_CALL_STATUS_DEFER;
+		u32 rec_tsc = (decision == KERNEL_MCP_DECISION_DENY)
+				       ? KERNEL_MCP_TSC_KERNEL_DENY
+				       : KERNEL_MCP_TSC_KERNEL_DEFER;
 		kernel_mcp_agent_call_log_append(
-			agent, req_id, tool_id, rec_status, 0, payload_hash,
+			agent, req_id, tool_id, rec_status, 0, rec_tsc,
+			payload_hash,
 			NULL, (const u8 *)reason,
 			reason ? strnlen(reason, KERNEL_MCP_CALL_ERR_HEAD_MAX) : 0);
 	}
@@ -1414,6 +1420,7 @@ static int kernel_mcp_cmd_tool_complete(struct sk_buff *skb, struct genl_info *i
 	u64 req_id;
 	u32 status;
 	u32 exec_ms;
+	u32 tool_status_code = KERNEL_MCP_TSC_UNSPECIFIED;
 	u32 key;
 
 	(void)skb;
@@ -1431,6 +1438,9 @@ static int kernel_mcp_cmd_tool_complete(struct sk_buff *skb, struct genl_info *i
 	tool_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_ID]);
 	status = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_STATUS]);
 	exec_ms = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_EXEC_MS]);
+	if (info->attrs[KERNEL_MCP_ATTR_TOOL_STATUS_CODE])
+		tool_status_code = nla_get_u32(
+			info->attrs[KERNEL_MCP_ATTR_TOOL_STATUS_CODE]);
 	if (info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH] &&
 	    nla_len(info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH]) >= KERNEL_MCP_CALL_HASH_PREFIX)
 		payload_hash = nla_data(info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH]);
@@ -1457,12 +1467,23 @@ static int kernel_mcp_cmd_tool_complete(struct sk_buff *skb, struct genl_info *i
 	agent->last_exec_ms = exec_ms;
 	agent->last_status = status;
 
+	/* If mcpd did not annotate tool_status_code, infer a reasonable
+	 * default from the coarse status so older decoders still see
+	 * something meaningful instead of always UNSPECIFIED.
+	 */
+	if (tool_status_code == KERNEL_MCP_TSC_UNSPECIFIED) {
+		tool_status_code = (status == KERNEL_MCP_COMPLETE_STATUS_OK)
+					   ? KERNEL_MCP_TSC_OK
+					   : KERNEL_MCP_TSC_TOOL_ERROR;
+	}
+
 	kernel_mcp_agent_call_log_append(
 		agent, req_id, tool_id,
 		status == KERNEL_MCP_COMPLETE_STATUS_OK
 			? KERNEL_MCP_CALL_STATUS_OK
 			: KERNEL_MCP_CALL_STATUS_ERR,
-		exec_ms, payload_hash, response_hash, err_head, err_head_len);
+		exec_ms, tool_status_code,
+		payload_hash, response_hash, err_head, err_head_len);
 	mutex_unlock(&kernel_mcp_agents_lock);
 	return 0;
 }

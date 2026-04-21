@@ -343,10 +343,14 @@ manifest 同时承载两类信息：
 - `llm-app` 只使用语义信息
 - `mcpd` 同时使用语义信息和运行时绑定信息
 
+语义 hash 只覆盖语义字段本身，不覆盖 `transport` / `endpoint` / `operation` 这类运行时绑定信息。
+
 ## 当前约束
 
-- 只支持 `transport = "uds_rpc"`
-- endpoint 必须位于 `/tmp/linux-mcp-apps/`
+- `uds_rpc` 仍是主力 transport，仓库默认 demo 同时提供一个 `uds_abstract` backend（[manifests/16_abstract_demo_app.json](manifests/16_abstract_demo_app.json)）
+- `vsock_rpc` 名字保留但 dialer 未实现，validator 直接拒绝——后续随 peer attestation 设计一并评估
+- path-based `uds_rpc` endpoint 默认需要位于 `/tmp/linux-mcp-apps/`，或匹配 operator 配置的 allow prefixes
+- `uds_abstract` endpoint 需要匹配 operator 配置的 `allow_name_pattern`（默认由 [config/mcpd.demo.toml](../config/mcpd.demo.toml) 放行）
 - `tool_id` 需要在所有 manifest 中全局唯一
 
 ## demo RPC 协议
@@ -398,7 +402,8 @@ bash scripts/run_tool_services.sh
 
 - 遍历 `tool-app/manifests/*.json`
 - 读取每个 manifest 的 `demo_entrypoint`
-- 后台启动对应服务
+- 自动构建仓库自带的 native demo 二进制（如果缺失）
+- 对 `uds_rpc` 和 `uds_abstract` manifest 启动对应服务
 - 等待 endpoint socket ready
 
 停止：
@@ -410,6 +415,7 @@ bash scripts/stop_tool_services.sh
 ## 当前边界与限制
 
 - 这些 app 仍然是 demo services，但比之前更接近独立 app 语义
-- 目前所有 app 都走同一种 transport：`uds_rpc`
+- 仓库当前提供的 demo manifests 都走 `uds_rpc`；非 `uds_rpc` transport 需要额外配置与自定义启动方式
 - 返回结果仍然是 JSON object
-- manifest 变更会影响 `mcpd` registry 和内核里的 `tool_hash`
+- 语义字段变更会影响 `mcpd` registry 和内核里的 `tool_hash`
+- 运行时绑定字段变更会影响 `mcpd` 的路由与内核 catalog epoch，但不会改变语义 hash

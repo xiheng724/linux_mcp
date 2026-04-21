@@ -10,6 +10,13 @@ else
   PYTHON_BIN="python3"
 fi
 
+# Default to the repo demo config when the operator has not pointed
+# LINUX_MCP_CONFIG elsewhere. Must match what run_tool_services.sh does
+# so both halves of the stack agree on transport allow-lists.
+if [[ -z "${LINUX_MCP_CONFIG:-}" ]] && [[ -f "$ROOT_DIR/config/mcpd.demo.toml" ]]; then
+  export LINUX_MCP_CONFIG="$ROOT_DIR/config/mcpd.demo.toml"
+fi
+
 SOCK_PATH="/tmp/mcpd.sock"
 RUNTIME_UID="$(id -u)"
 PID_PATH="/tmp/mcpd-${RUNTIME_UID}.pid"

@@ -31,7 +31,11 @@ The repository is not a phase-based sketch. It is a runnable end-to-end system w
 - Kernel-visible control-plane state without moving tool execution into the kernel
 - Manifest-driven catalog export through `list_apps` and `list_tools`
 - Session binding against real UDS peer credentials
+- Incremental catalog reconciliation with kernel-enforced `catalog_epoch` and `llm-app` auto-rebind on stale sessions
+- TOFU-locked backend `binary_hash` so manifest-stable tools cannot silently swap executables at runtime. For native backends the kernel pin is the full SHA-256 of `/proc/<pid>/exe`; for interpreter-hosted backends (Python, Ruby, ...) the pin is `sha256(interpreter_digest ":" script_digest)` so swapping the script on disk invalidates the pin on the next restart. Application code cannot be verified live because interpreters only read the script at startup.
 - Approval-gated mediation for risky tools
+- Per-agent kernel `call_log` with payload/response summary hashes for post-crash audit
+- Operator-configurable transport policy in `mcpd` (`uds_rpc` + `uds_abstract`; `vsock_rpc` is a reserved name that is intentionally not implemented)
 - A paper-ready `linux_mcp` snapshot with controlled-noise latency, throughput, attack, and daemon-failure results
 - Sysfs-backed observability for debugging and post-crash inspection
 
@@ -48,6 +52,8 @@ In this repository, `seccomp` means a hardened userspace baseline (`userspace + 
 - Userspace execution with kernel-backed arbitration
 - Manifest-driven app and tool discovery
 - Session binding between a client process and mediated tool requests
+- Dynamic tool catalog updates without restarting the whole stack
+- Post-crash inspection of recent mediated calls through kernel-held summaries
 - Approval-gated execution for risky tools
 - Sysfs visibility for post-mortem inspection and debugging
 
@@ -155,13 +161,13 @@ linux-mcp/
 ### `kernel-mcp`
 
 The kernel module is the control-plane enforcement point, not the execution engine.
-It provides the `KERNEL_MCP` Generic Netlink family, tool/agent state, approval tickets, binding checks, and sysfs exposure under `/sys/kernel/mcp/...`.
-The demo policy is intentionally simple: deny unknown agents and hash mismatches, defer risky tools, allow the rest.
+It provides the `KERNEL_MCP` Generic Netlink family, tool/agent state, approval tickets, catalog epoch tracking, backend identity checks, per-agent call summaries, and sysfs exposure under `/sys/kernel/mcp/...`.
+The demo policy is intentionally simple: deny unknown agents, stale bindings, hash mismatches, and backend binary mismatches; defer risky tools; allow the rest.
 
 ### `mcpd`
 
 `mcpd` is the only component that understands both tool semantics and runtime endpoints.
-It loads manifests, computes hashes, registers tools in the kernel, exposes `/tmp/mcpd.sock`, binds sessions to UDS peers, validates payloads, forwards tool RPCs, and reports completion back to the kernel.
+It loads manifests, computes full SHA-256 semantic hashes, incrementally reconciles the kernel tool registry, exposes `/tmp/mcpd.sock`, binds sessions to UDS peers plus catalog epoch, validates payloads, forwards tool RPCs across the configured transport policy, and reports completion summaries back to the kernel.
 
 ### `tool-app`
 
@@ -177,9 +183,10 @@ The manifest layer is the semantic source of truth for the system.
 
 ### Current constraints
 
-- only `transport = "uds_rpc"` is supported
-- endpoints must live under `/tmp/linux-mcp-apps/`
-- manifest semantics are hashed into exported tool identity
+- manifest semantics are hashed into exported tool identity with full 64-hex SHA-256
+- `uds_rpc` remains the primary transport; `uds_abstract` is wired into the default demo path via [tool-app/manifests/16_abstract_demo_app.json](tool-app/manifests/16_abstract_demo_app.json) and [config/mcpd.demo.toml](config/mcpd.demo.toml)
+- `vsock_rpc` is **not implemented** — the transport validator refuses it on purpose; peer-attestation design is a future item
+- path-based `uds_rpc` endpoints must match the configured allow prefixes; the built-in default is `/tmp/linux-mcp-apps/`
 
 ## Getting Started
 
@@ -209,6 +216,8 @@ export DEEPSEEK_API_KEY="your_key"
 python3 llm-app/cli.py --once "show system info"
 ```
 
+`run_tool_services.sh` will auto-build the bundled native demo binaries on first use if they are missing.
+
 ### Shutdown
 
 ```bash
@@ -233,6 +242,9 @@ python llm-app/gui_app.py
 ls /sys/kernel/mcp/tools
 cat /sys/kernel/mcp/tools/2/name
 cat /sys/kernel/mcp/tools/2/hash
+cat /sys/kernel/mcp/tools/2/binary_hash
+cat /sys/kernel/mcp/tools/2/registered_at_epoch
+cat /sys/kernel/mcp/tool_catalog_epoch
 
 ls /sys/kernel/mcp/agents
 cat /sys/kernel/mcp/agents/a1/allow
@@ -240,6 +252,8 @@ cat /sys/kernel/mcp/agents/a1/defer
 cat /sys/kernel/mcp/agents/a1/completed_ok
 cat /sys/kernel/mcp/agents/a1/last_reason
 cat /sys/kernel/mcp/agents/a1/last_exec_ms
+cat /sys/kernel/mcp/agents/a1/opened_at_epoch
+sudo python3 scripts/mcpctl_dump_calls.py a1
 ```
 
 ### Userspace logs
@@ -348,7 +362,8 @@ Purpose: reproduce the supplementary microbenchmark separating bare Generic Netl
 
 - tool planning and payload construction depend on DeepSeek; there is no offline planner
 - kernel policy is a demo policy, not a general authorization framework
-- only `uds_rpc` transport is supported
+- retained experiment snapshots were captured before `uds_abstract` entered the default demo flow; new runs exercise both `uds_rpc` and `uds_abstract`
+- `vsock_rpc` is a reserved transport name only — the dialer is deliberately not implemented and there is no peer-attestation story yet
 - the data plane still uses framed JSON RPC
 - session state is userspace-owned and does not survive daemon restart the way approval state can
 
