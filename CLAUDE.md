@@ -94,5 +94,5 @@ Experiment scripts (`run_linux_mcp_evaluation.sh`, `run_repeated_linux_mcp.sh`, 
 - Do not add JSON parsing or tool execution inside the kernel module — the split is intentional.
 - Manifests are authoritative; do not hardcode tool identity or endpoints in `mcpd` or `llm-app`.
 - Session state is userspace-owned and does not survive `mcpd` restart; approval state in the kernel does.
-- Only `uds_rpc` transport is supported; endpoints must live under `/tmp/linux-mcp-apps/`.
+- Transport policy is operator-configurable via [mcpd/transport.py](mcpd/transport.py) and [mcpd/config.py](mcpd/config.py) (`$LINUX_MCP_CONFIG` or `/etc/linux-mcp/mcpd.toml`). The **defaults** are `transport = "uds_rpc"` with endpoints under `/tmp/linux-mcp-apps/`; `uds_abstract` is also available but disabled until `allow_name_pattern` is configured. `vsock_rpc` is a reserved name without a dialer yet.
 - The planner has no offline fallback — features that require planning will fail without `DEEPSEEK_API_KEY`.

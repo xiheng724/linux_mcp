@@ -12,9 +12,30 @@ from typing import Any, Dict, List
 try:
     from schema_utils import ensure_int, ensure_non_empty_str
     from risk import normalize_risk_tags, risk_flags_from_tags
+    from transport import TransportError, validate_endpoint
+    from config import load_transport_config
 except ModuleNotFoundError:  # pragma: no cover - package import fallback
     from .schema_utils import ensure_int, ensure_non_empty_str
     from .risk import normalize_risk_tags, risk_flags_from_tags
+    from .transport import TransportError, validate_endpoint
+    from .config import load_transport_config
+
+# Cached transport policy. Loaded on first manifest parse so tests can set
+# $LINUX_MCP_CONFIG before importing. Accessible via reload_transport_config()
+# if an operator needs a hot reload (not wired to a signal yet).
+_transport_cfg = None
+
+
+def reload_transport_config() -> None:
+    global _transport_cfg
+    _transport_cfg = load_transport_config()
+
+
+def _get_transport_cfg():
+    global _transport_cfg
+    if _transport_cfg is None:
+        _transport_cfg = load_transport_config()
+    return _transport_cfg
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST_DIR = ROOT_DIR / "tool-app" / "manifests"
@@ -218,10 +239,10 @@ def load_app_manifest(path: Path) -> AppManifest:
     transport = ensure_non_empty_str("transport", raw["transport"])
     endpoint = ensure_non_empty_str("endpoint", raw["endpoint"])
 
-    if transport != "uds_rpc":
-        raise ValueError(f"{path}: unsupported transport {transport!r}")
-    if not endpoint.startswith("/tmp/linux-mcp-apps/"):
-        raise ValueError(f"{path}: endpoint must start with /tmp/linux-mcp-apps/")
+    try:
+        validate_endpoint(transport, endpoint, _get_transport_cfg())
+    except TransportError as exc:
+        raise ValueError(f"{path}: {exc}") from exc
 
     demo_entrypoint = raw.get("demo_entrypoint")
     if demo_entrypoint not in ("", None):

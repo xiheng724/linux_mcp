@@ -22,6 +22,7 @@ try:
     from public_catalog import list_apps_public, list_tools_public
     from rpc_framing import recv_frame, send_frame
     from schema_utils import ensure_int, ensure_non_empty_str, validate_payload
+    from transport import TransportError, dial as transport_dial
     from session_store import (
         AgentBinding,
         PeerIdentity,
@@ -41,6 +42,7 @@ except ModuleNotFoundError:  # pragma: no cover - package import fallback
     from .public_catalog import list_apps_public, list_tools_public
     from .rpc_framing import recv_frame, send_frame
     from .schema_utils import ensure_int, ensure_non_empty_str, validate_payload
+    from .transport import TransportError, dial as transport_dial
     from .session_store import (
         AgentBinding,
         PeerIdentity,
@@ -377,19 +379,29 @@ def _probe_backend_binary_hash(tool: ToolManifest) -> str:
         cached = _backend_hash_cache.get(tool.tool_id)
 
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
-            probe.settimeout(2.0)
-            probe.connect(tool.endpoint)
+        probe = transport_dial(tool.transport, tool.endpoint, 2.0)
+    except (OSError, socket.timeout, TransportError, NotImplementedError) as exc:
+        LOGGER.warning("backend probe dial failed tool=%d transport=%s endpoint=%s err=%s",
+                       tool.tool_id, tool.transport, tool.endpoint, exc)
+        return cached[1] if cached else ""
+    with probe:
+        # SO_PEERCRED is AF_UNIX-specific. For any non-AF_UNIX transport the
+        # probe silently returns cached/empty — the kernel keeps whatever
+        # binary_hash it had and operators get a log line rather than a
+        # spurious DENY. vsock attestation is future work.
+        if probe.family != socket.AF_UNIX:
+            return cached[1] if cached else ""
+        try:
             cred_raw = probe.getsockopt(
                 socket.SOL_SOCKET,
                 socket.SO_PEERCRED,
                 _SO_PEERCRED_STRUCT.size,
             )
-        backend_pid, _uid, _gid = _SO_PEERCRED_STRUCT.unpack(cred_raw)
-    except (OSError, socket.timeout, struct.error) as exc:
-        LOGGER.warning("backend probe failed tool=%d endpoint=%s err=%s",
-                       tool.tool_id, tool.endpoint, exc)
-        return cached[1] if cached else ""
+            backend_pid, _uid, _gid = _SO_PEERCRED_STRUCT.unpack(cred_raw)
+        except (OSError, socket.timeout, struct.error) as exc:
+            LOGGER.warning("backend probe failed tool=%d endpoint=%s err=%s",
+                           tool.tool_id, tool.endpoint, exc)
+            return cached[1] if cached else ""
 
     if cached and cached[0] == backend_pid:
         return cached[1]
@@ -411,7 +423,7 @@ def _probe_backend_binary_hash(tool: ToolManifest) -> str:
     return digest
 
 
-def _call_uds_tool(tool: ToolManifest, req_id: int, agent_id: str, payload: Any) -> Dict[str, Any]:
+def _call_tool_service(tool: ToolManifest, req_id: int, agent_id: str, payload: Any) -> Dict[str, Any]:
     req = {
         "req_id": req_id,
         "agent_id": agent_id,
@@ -422,9 +434,15 @@ def _call_uds_tool(tool: ToolManifest, req_id: int, agent_id: str, payload: Any)
     encoded = json.dumps(req, ensure_ascii=True).encode("utf-8")
     timeout_s = max(tool.timeout_ms / 1000.0, 1.0)
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
-            conn.settimeout(timeout_s)
-            conn.connect(tool.endpoint)
+        conn = transport_dial(tool.transport, tool.endpoint, timeout_s)
+    except (FileNotFoundError, ConnectionRefusedError, TimeoutError, OSError) as exc:
+        raise ValueError(f"tool service offline: {tool.endpoint}") from exc
+    except TransportError as exc:
+        raise ValueError(f"tool transport error: {exc}") from exc
+    except NotImplementedError as exc:
+        raise ValueError(f"tool transport not implemented: {exc}") from exc
+    try:
+        with conn:
             send_frame(conn, encoded, max_msg_size=MAX_MSG_SIZE)
             raw = recv_frame(conn, max_msg_size=MAX_MSG_SIZE)
     except (FileNotFoundError, ConnectionRefusedError, TimeoutError, OSError) as exc:
@@ -440,12 +458,6 @@ def _call_uds_tool(tool: ToolManifest, req_id: int, agent_id: str, payload: Any)
     if status not in ("ok", "error"):
         raise ValueError(f"tool service returned invalid status ({tool.name})")
     return resp
-
-
-def _call_tool_service(tool: ToolManifest, req_id: int, agent_id: str, payload: Any) -> Dict[str, Any]:
-    if tool.transport != "uds_rpc":
-        raise ValueError(f"unsupported tool transport: {tool.transport}")
-    return _call_uds_tool(tool, req_id=req_id, agent_id=agent_id, payload=payload)
 
 
 def _list_apps_public() -> List[Dict[str, Any]]:
