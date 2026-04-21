@@ -41,7 +41,8 @@
 #define KERNEL_MCP_ATTR_PAYLOAD_HASH 30
 #define KERNEL_MCP_ATTR_RESPONSE_HASH 31
 #define KERNEL_MCP_ATTR_ERR_HEAD 32
-#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_ERR_HEAD
+#define KERNEL_MCP_ATTR_BINARY_HASH 33
+#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_BINARY_HASH
 
 /* Data-plane call-summary sysfs record layout.
  * Exposed as a fixed-size binary blob at /sys/kernel/mcp/agents/<id>/call_log.

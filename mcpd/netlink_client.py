@@ -315,6 +315,7 @@ class KernelMcpNetlinkClient:
         name: str,
         risk_flags: int,
         tool_hash: str = "",
+        binary_hash: str = "",
     ) -> None:
         if tool_id <= 0:
             raise ValueError("tool_id must be positive")
@@ -327,6 +328,8 @@ class KernelMcpNetlinkClient:
         ]
         if tool_hash:
             attrs.append((ATTR["TOOL_HASH"], tool_hash.encode("utf-8") + b"\x00"))
+        if binary_hash:
+            attrs.append((ATTR["BINARY_HASH"], binary_hash.encode("utf-8") + b"\x00"))
         self._request(
             msg_type=self._family_id,
             cmd=CMD["TOOL_REGISTER"],
@@ -358,6 +361,7 @@ class KernelMcpNetlinkClient:
                 "risk_flags": _attr_u32(attrs, ATTR["TOOL_RISK_FLAGS"]),
                 "status": _attr_u32(attrs, ATTR["STATUS"]) if ATTR["STATUS"] in attrs else 0,
                 "hash": _attr_string(attrs, ATTR["TOOL_HASH"]) if ATTR["TOOL_HASH"] in attrs else "",
+                "binary_hash": _attr_string(attrs, ATTR["BINARY_HASH"]) if ATTR["BINARY_HASH"] in attrs else "",
             }
             tools.append(tool)
         return tools
@@ -373,6 +377,7 @@ class KernelMcpNetlinkClient:
         tool_hash: str,
         ticket_id: int = 0,
         payload_hash: bytes = b"",
+        binary_hash: str = "",
     ) -> ToolDecision:
         attrs = [
             (ATTR["AGENT_ID"], agent_id.encode("utf-8") + b"\x00"),
@@ -389,6 +394,8 @@ class KernelMcpNetlinkClient:
             attrs.append((ATTR["TICKET_ID"], struct.pack("=Q", ticket_id)))
         if payload_hash:
             attrs.append((ATTR["PAYLOAD_HASH"], payload_hash[:8]))
+        if binary_hash:
+            attrs.append((ATTR["BINARY_HASH"], binary_hash.encode("utf-8") + b"\x00"))
 
         genl_cmd, resp_attrs = self._request(
             msg_type=self._family_id,

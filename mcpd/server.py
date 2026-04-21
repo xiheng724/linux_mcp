@@ -78,6 +78,13 @@ _kernel_client: KernelMcpNetlinkClient | None = None
 _manifest_reload_lock = threading.Lock()
 _manifest_signature = ""
 
+# Backend binary hash cache: tool_id -> (observed_pid, sha256_hex).
+# Populated lazily on first tool:exec per tool. Re-hashed when the backend
+# pid changes (service restart), which is exactly the case where TOFU in the
+# kernel should either accept the first value or reject a subsequent one.
+_backend_hash_cache: Dict[int, Tuple[int, str]] = {}
+_backend_hash_lock = threading.Lock()
+
 
 def _get_kernel_client() -> KernelMcpNetlinkClient:
     if _kernel_client is None:
@@ -211,6 +218,7 @@ def _kernel_arbitrate(
     tool_hash: str,
     ticket_id: int = 0,
     payload_hash: bytes = b"",
+    binary_hash: str = "",
 ) -> Tuple[str, str, int]:
     client = _get_kernel_client()
     try:
@@ -223,6 +231,7 @@ def _kernel_arbitrate(
             tool_hash=tool_hash,
             ticket_id=ticket_id,
             payload_hash=payload_hash,
+            binary_hash=binary_hash,
         )
     except RuntimeError as exc:
         if "Invalid argument" in str(exc):
@@ -280,6 +289,58 @@ def _canonical_payload_bytes(payload: Any) -> bytes:
 
 def _summary_hash_prefix(blob: bytes) -> bytes:
     return hashlib.sha256(blob).digest()[:8] if blob else b""
+
+
+_SO_PEERCRED_STRUCT = struct.Struct("iii")  # pid, uid, gid
+
+
+def _probe_backend_binary_hash(tool: ToolManifest) -> str:
+    """Return the SHA-256 hex digest of the backend process behind tool.endpoint.
+
+    Uses SO_PEERCRED on a short-lived AF_UNIX connect to identify the backend
+    pid, then reads /proc/<pid>/exe as a magic symlink to hash the actual
+    running binary. Cached per tool until the backend pid changes.
+
+    Returns "" on any I/O failure — the kernel then either keeps an existing
+    TOFU lock (without comparing) or starts with no lock until a future
+    request succeeds. We do not want probe flakes to DENY real traffic.
+    """
+    with _backend_hash_lock:
+        cached = _backend_hash_cache.get(tool.tool_id)
+
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+            probe.settimeout(2.0)
+            probe.connect(tool.endpoint)
+            cred_raw = probe.getsockopt(
+                socket.SOL_SOCKET,
+                socket.SO_PEERCRED,
+                _SO_PEERCRED_STRUCT.size,
+            )
+        backend_pid, _uid, _gid = _SO_PEERCRED_STRUCT.unpack(cred_raw)
+    except (OSError, socket.timeout, struct.error) as exc:
+        LOGGER.warning("backend probe failed tool=%d endpoint=%s err=%s",
+                       tool.tool_id, tool.endpoint, exc)
+        return cached[1] if cached else ""
+
+    if cached and cached[0] == backend_pid:
+        return cached[1]
+
+    exe_path = f"/proc/{backend_pid}/exe"
+    try:
+        hasher = hashlib.sha256()
+        with open(exe_path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
+                hasher.update(chunk)
+        digest = hasher.hexdigest()
+    except OSError as exc:
+        LOGGER.warning("backend exe read failed tool=%d pid=%d err=%s",
+                       tool.tool_id, backend_pid, exc)
+        return cached[1] if cached else ""
+
+    with _backend_hash_lock:
+        _backend_hash_cache[tool.tool_id] = (backend_pid, digest)
+    return digest
 
 
 def _call_uds_tool(tool: ToolManifest, req_id: int, agent_id: str, payload: Any) -> Dict[str, Any]:
@@ -410,6 +471,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
     payload = req.get("payload", {})
     validate_payload(tool.input_schema, payload)
     payload_hash = _summary_hash_prefix(_canonical_payload_bytes(payload))
+    backend_binary_hash = _probe_backend_binary_hash(tool)
 
     tool_hash = _resolve_tool_hash(req, tool)
     _ensure_agent_registered(agent_id, binding)
@@ -423,6 +485,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         tool_hash=tool_hash,
         ticket_id=approval_ticket_id,
         payload_hash=payload_hash,
+        binary_hash=backend_binary_hash,
     )
     if decision == "DENY":
         return {

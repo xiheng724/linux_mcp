@@ -56,6 +56,10 @@ struct kernel_mcp_tool {
 	u32 id;
 	char name[KERNEL_MCP_TOOL_NAME_MAX];
 	char hash[KERNEL_MCP_TOOL_HASH_MAX];
+	/* TOFU-locked SHA-256 hex of the backend executable; '' until first
+	 * TOOL_REQUEST carries a binary_hash, after which any mismatch denies.
+	 */
+	char binary_hash[KERNEL_MCP_TOOL_HASH_MAX];
 	u32 risk_flags;
 	struct kobject *kobj;
 };
@@ -63,6 +67,7 @@ struct kernel_mcp_tool {
 struct kernel_mcp_tool_snapshot {
 	char name[KERNEL_MCP_TOOL_NAME_MAX];
 	char hash[KERNEL_MCP_TOOL_HASH_MAX];
+	char binary_hash[KERNEL_MCP_TOOL_HASH_MAX];
 	u32 risk_flags;
 };
 
@@ -208,6 +213,10 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_MAX + 1] = {
 		.type = NLA_BINARY,
 		.len = KERNEL_MCP_CALL_ERR_HEAD_MAX,
 	},
+	[KERNEL_MCP_ATTR_BINARY_HASH] = {
+		.type = NLA_NUL_STRING,
+		.len = KERNEL_MCP_TOOL_HASH_MAX - 1,
+	},
 };
 
 static u32 kernel_mcp_agent_hash_key(const char *agent_id)
@@ -285,6 +294,7 @@ kernel_mcp_lookup_tool_snapshot(struct kobject *kobj,
 	}
 	strscpy(out->name, tool->name, sizeof(out->name));
 	strscpy(out->hash, tool->hash, sizeof(out->hash));
+	strscpy(out->binary_hash, tool->binary_hash, sizeof(out->binary_hash));
 	out->risk_flags = tool->risk_flags;
 	mutex_unlock(&kernel_mcp_tools_lock);
 	return 0;
@@ -441,6 +451,7 @@ static ssize_t kernel_mcp_agent_##_name##_show(struct kobject *kobj,            
 
 KERNEL_MCP_DEFINE_TOOL_SHOW_STR(name, name)
 KERNEL_MCP_DEFINE_TOOL_SHOW_STR(hash, hash)
+KERNEL_MCP_DEFINE_TOOL_SHOW_STR(binary_hash, binary_hash)
 KERNEL_MCP_DEFINE_TOOL_SHOW_U32(risk_flags, risk_flags, "0x%08x")
 
 static ssize_t kernel_mcp_tool_status_show(struct kobject *kobj,
@@ -524,6 +535,8 @@ static struct kobj_attribute kernel_mcp_name_attr =
 	__ATTR(name, 0444, kernel_mcp_tool_name_show, NULL);
 static struct kobj_attribute kernel_mcp_hash_attr =
 	__ATTR(hash, 0444, kernel_mcp_tool_hash_show, NULL);
+static struct kobj_attribute kernel_mcp_binary_hash_attr =
+	__ATTR(binary_hash, 0444, kernel_mcp_tool_binary_hash_show, NULL);
 static struct kobj_attribute kernel_mcp_risk_flags_attr =
 	__ATTR(risk_flags, 0444, kernel_mcp_tool_risk_flags_show, NULL);
 static struct kobj_attribute kernel_mcp_tool_status_attr =
@@ -532,6 +545,7 @@ static struct kobj_attribute kernel_mcp_tool_status_attr =
 static struct attribute *kernel_mcp_tool_attrs[] = {
 	&kernel_mcp_name_attr.attr,
 	&kernel_mcp_hash_attr.attr,
+	&kernel_mcp_binary_hash_attr.attr,
 	&kernel_mcp_risk_flags_attr.attr,
 	&kernel_mcp_tool_status_attr.attr,
 	NULL,
@@ -652,7 +666,8 @@ static void kernel_mcp_tools_destroy_all(void)
 }
 
 static int kernel_mcp_register_tool(u32 tool_id, const char *name,
-				    u32 risk_flags, const char *hash)
+				    u32 risk_flags, const char *hash,
+				    const char *binary_hash)
 {
 	struct kernel_mcp_tool *tool;
 	int ret;
@@ -663,6 +678,15 @@ static int kernel_mcp_register_tool(u32 tool_id, const char *name,
 		strscpy(tool->name, name, sizeof(tool->name));
 		if (hash)
 			strscpy(tool->hash, hash, sizeof(tool->hash));
+		/* binary_hash is TOFU: only accept a value if the slot is still
+		 * empty. Once pinned by a prior TOOL_REQUEST (or an earlier
+		 * register), do not silently overwrite it — mismatches must go
+		 * through the deny path on cmd_tool_request.
+		 */
+		if (binary_hash && binary_hash[0] != '\0' &&
+		    tool->binary_hash[0] == '\0')
+			strscpy(tool->binary_hash, binary_hash,
+				sizeof(tool->binary_hash));
 		tool->risk_flags = risk_flags;
 		mutex_unlock(&kernel_mcp_tools_lock);
 		return 0;
@@ -679,6 +703,9 @@ static int kernel_mcp_register_tool(u32 tool_id, const char *name,
 	strscpy(tool->name, name, sizeof(tool->name));
 	if (hash)
 		strscpy(tool->hash, hash, sizeof(tool->hash));
+	if (binary_hash && binary_hash[0] != '\0')
+		strscpy(tool->binary_hash, binary_hash,
+			sizeof(tool->binary_hash));
 
 	ret = xa_err(xa_store(&kernel_mcp_tools, tool_id, tool, GFP_KERNEL));
 	if (ret) {
@@ -1021,6 +1048,7 @@ static int kernel_mcp_cmd_tool_register(struct sk_buff *skb,
 	u32 risk_flags;
 	const char *tool_name;
 	const char *tool_hash = NULL;
+	const char *binary_hash = NULL;
 
 	(void)skb;
 	if (!info)
@@ -1035,8 +1063,11 @@ static int kernel_mcp_cmd_tool_register(struct sk_buff *skb,
 	risk_flags = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_RISK_FLAGS]);
 	if (info->attrs[KERNEL_MCP_ATTR_TOOL_HASH])
 		tool_hash = nla_data(info->attrs[KERNEL_MCP_ATTR_TOOL_HASH]);
+	if (info->attrs[KERNEL_MCP_ATTR_BINARY_HASH])
+		binary_hash = nla_data(info->attrs[KERNEL_MCP_ATTR_BINARY_HASH]);
 
-	return kernel_mcp_register_tool(tool_id, tool_name, risk_flags, tool_hash);
+	return kernel_mcp_register_tool(tool_id, tool_name, risk_flags,
+					tool_hash, binary_hash);
 }
 
 static int kernel_mcp_cmd_agent_register(struct sk_buff *skb,
@@ -1077,6 +1108,7 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	struct kernel_mcp_tool *tool;
 	const char *agent_id;
 	const char *requested_tool_hash = NULL;
+	const char *requested_binary_hash = NULL;
 	const char *reason = "allow";
 	const char *ticket_reason = "approval_missing";
 	const u8 *payload_hash = NULL;
@@ -1090,6 +1122,8 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	u32 risk_flags = 0;
 	u32 key;
 	bool hash_mismatch = false;
+	bool binary_mismatch = false;
+	bool binary_tofu_locked = false;
 
 	(void)skb;
 	if (!info)
@@ -1117,6 +1151,9 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 		if (payload_hash_len >= KERNEL_MCP_CALL_HASH_PREFIX)
 			payload_hash = nla_data(info->attrs[KERNEL_MCP_ATTR_PAYLOAD_HASH]);
 	}
+	if (info->attrs[KERNEL_MCP_ATTR_BINARY_HASH])
+		requested_binary_hash =
+			nla_data(info->attrs[KERNEL_MCP_ATTR_BINARY_HASH]);
 
 	mutex_lock(&kernel_mcp_tools_lock);
 	tool = xa_load(&kernel_mcp_tools, tool_id);
@@ -1128,7 +1165,26 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	if (requested_tool_hash && tool->hash[0] != '\0' &&
 	    strcmp(tool->hash, requested_tool_hash) != 0)
 		hash_mismatch = true;
+	/* Binary-hash TOFU: on first non-empty observation lock it in; on any
+	 * subsequent request, compare strictly. Missing binary_hash on the
+	 * request leaves an already-pinned value unchanged and does NOT deny —
+	 * we only enforce when mcpd actually asserts a hash.
+	 */
+	if (requested_binary_hash && requested_binary_hash[0] != '\0') {
+		if (tool->binary_hash[0] == '\0') {
+			strscpy(tool->binary_hash, requested_binary_hash,
+				sizeof(tool->binary_hash));
+			binary_tofu_locked = true;
+		} else if (strcmp(tool->binary_hash,
+				  requested_binary_hash) != 0) {
+			binary_mismatch = true;
+		}
+	}
 	mutex_unlock(&kernel_mcp_tools_lock);
+
+	if (binary_tofu_locked)
+		pr_info("kernel_mcp: TOFU-locked tool %u binary_hash\n",
+			tool_id);
 
 	mutex_lock(&kernel_mcp_agents_lock);
 	agent = kernel_mcp_find_agent_locked(agent_id, key);
@@ -1143,6 +1199,11 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	if (hash_mismatch) {
 		decision = KERNEL_MCP_DECISION_DENY;
 		reason = "hash_mismatch";
+		goto out_accounting;
+	}
+	if (binary_mismatch) {
+		decision = KERNEL_MCP_DECISION_DENY;
+		reason = "binary_mismatch";
 		goto out_accounting;
 	}
 	if (agent->binding_hash != binding_hash ||
@@ -1398,6 +1459,13 @@ static int kernel_mcp_cmd_list_tools_dump(struct sk_buff *skb,
 		if (tool->hash[0] != '\0') {
 			ret = nla_put_string(skb, KERNEL_MCP_ATTR_TOOL_HASH,
 					     tool->hash);
+			if (ret)
+				goto dump_nla_fail;
+		}
+		if (tool->binary_hash[0] != '\0') {
+			ret = nla_put_string(skb,
+					     KERNEL_MCP_ATTR_BINARY_HASH,
+					     tool->binary_hash);
 			if (ret)
 				goto dump_nla_fail;
 		}

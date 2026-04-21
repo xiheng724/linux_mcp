@@ -44,6 +44,7 @@ ATTR: Final[dict[str, int]] = {
     "PAYLOAD_HASH": 30,
     "RESPONSE_HASH": 31,
     "ERR_HEAD": 32,
+    "BINARY_HASH": 33,
 }
 
 # Data-plane call-summary sysfs record layout.
