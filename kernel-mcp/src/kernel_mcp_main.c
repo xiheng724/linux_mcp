@@ -1,3 +1,4 @@
+#include <linux/atomic.h>
 #include <linux/hashtable.h>
 #include <linux/init.h>
 #include <linux/jiffies.h>
@@ -61,6 +62,11 @@ struct kernel_mcp_tool {
 	 */
 	char binary_hash[KERNEL_MCP_TOOL_HASH_MAX];
 	u32 risk_flags;
+	/* Monotonic catalog epoch at which this tool was last (re)registered.
+	 * Agents opened at an earlier epoch are forced to rebind before they
+	 * can call this tool; see cmd_tool_request.
+	 */
+	u64 registered_at_epoch;
 	struct kobject *kobj;
 };
 
@@ -69,6 +75,7 @@ struct kernel_mcp_tool_snapshot {
 	char hash[KERNEL_MCP_TOOL_HASH_MAX];
 	char binary_hash[KERNEL_MCP_TOOL_HASH_MAX];
 	u32 risk_flags;
+	u64 registered_at_epoch;
 };
 
 /* Per-call audit record. Layout is ABI — userspace decoders rely on these sizes.
@@ -94,6 +101,10 @@ struct kernel_mcp_agent {
 	bool uid_set;
 	u64 binding_hash;
 	u64 binding_epoch;
+	/* Catalog epoch observed when this agent opened its session. Used to
+	 * force rebind when a tool was (re)registered after the session began.
+	 */
+	u64 opened_at_epoch;
 	/* Rate limiting is handled in mcpd user space, not in the kernel agent state. */
 	u64 allow_count;
 	u64 deny_count;
@@ -118,6 +129,7 @@ struct kernel_mcp_agent {
 struct kernel_mcp_agent_snapshot {
 	u64 binding_hash;
 	u64 binding_epoch;
+	u64 opened_at_epoch;
 	u64 allow_count;
 	u64 deny_count;
 	u64 defer_count;
@@ -149,6 +161,13 @@ struct kernel_mcp_approval_ticket {
 
 static DEFINE_XARRAY(kernel_mcp_tools);
 static DEFINE_MUTEX(kernel_mcp_tools_lock);
+
+/* Global monotonically-increasing catalog epoch. Every tool register or
+ * unregister atomically increments this counter; the resulting value is
+ * stored on the affected tool and compared against each agent's
+ * opened_at_epoch at TOOL_REQUEST time to force rebind on catalog drift.
+ */
+static atomic64_t kernel_mcp_tool_catalog_epoch = ATOMIC64_INIT(0);
 
 static DEFINE_HASHTABLE(kernel_mcp_agents, KERNEL_MCP_AGENT_HASH_BITS);
 static DEFINE_MUTEX(kernel_mcp_agents_lock);
@@ -217,6 +236,7 @@ static const struct nla_policy kernel_mcp_policy[KERNEL_MCP_ATTR_MAX + 1] = {
 		.type = NLA_NUL_STRING,
 		.len = KERNEL_MCP_TOOL_HASH_MAX - 1,
 	},
+	[KERNEL_MCP_ATTR_CATALOG_EPOCH] = { .type = NLA_U64 },
 };
 
 static u32 kernel_mcp_agent_hash_key(const char *agent_id)
@@ -296,6 +316,7 @@ kernel_mcp_lookup_tool_snapshot(struct kobject *kobj,
 	strscpy(out->hash, tool->hash, sizeof(out->hash));
 	strscpy(out->binary_hash, tool->binary_hash, sizeof(out->binary_hash));
 	out->risk_flags = tool->risk_flags;
+	out->registered_at_epoch = tool->registered_at_epoch;
 	mutex_unlock(&kernel_mcp_tools_lock);
 	return 0;
 }
@@ -326,6 +347,7 @@ kernel_mcp_lookup_agent_snapshot(struct kobject *kobj,
 	out->completed_err_count = agent->completed_err_count;
 	out->last_exec_ms = agent->last_exec_ms;
 	out->last_status = agent->last_status;
+	out->opened_at_epoch = agent->opened_at_epoch;
 	out->call_log_head = agent->call_log_head;
 	out->call_log_count = agent->call_log_count;
 	strscpy(out->last_reason, agent->last_reason, sizeof(out->last_reason));
@@ -454,6 +476,20 @@ KERNEL_MCP_DEFINE_TOOL_SHOW_STR(hash, hash)
 KERNEL_MCP_DEFINE_TOOL_SHOW_STR(binary_hash, binary_hash)
 KERNEL_MCP_DEFINE_TOOL_SHOW_U32(risk_flags, risk_flags, "0x%08x")
 
+static ssize_t kernel_mcp_tool_registered_at_epoch_show(struct kobject *kobj,
+							struct kobj_attribute *attr,
+							char *buf)
+{
+	struct kernel_mcp_tool_snapshot snapshot;
+	int ret;
+	(void)attr;
+	ret = kernel_mcp_lookup_tool_snapshot(kobj, &snapshot);
+	if (ret)
+		return ret;
+	return sysfs_emit(buf, "%llu\n",
+			  (unsigned long long)snapshot.registered_at_epoch);
+}
+
 static ssize_t kernel_mcp_tool_status_show(struct kobject *kobj,
 					   struct kobj_attribute *attr,
 					   char *buf)
@@ -489,6 +525,7 @@ KERNEL_MCP_DEFINE_AGENT_SHOW_U32(last_exec_ms, last_exec_ms)
 KERNEL_MCP_DEFINE_AGENT_SHOW_U32(last_status, last_status)
 KERNEL_MCP_DEFINE_AGENT_SHOW_U32(call_log_head, call_log_head)
 KERNEL_MCP_DEFINE_AGENT_SHOW_U32(call_log_count, call_log_count)
+KERNEL_MCP_DEFINE_AGENT_SHOW_U64(opened_at_epoch, opened_at_epoch)
 
 static ssize_t kernel_mcp_agent_call_log_read(struct file *filp,
 					      struct kobject *kobj,
@@ -541,6 +578,9 @@ static struct kobj_attribute kernel_mcp_risk_flags_attr =
 	__ATTR(risk_flags, 0444, kernel_mcp_tool_risk_flags_show, NULL);
 static struct kobj_attribute kernel_mcp_tool_status_attr =
 	__ATTR(status, 0444, kernel_mcp_tool_status_show, NULL);
+static struct kobj_attribute kernel_mcp_tool_registered_at_epoch_attr =
+	__ATTR(registered_at_epoch, 0444,
+	       kernel_mcp_tool_registered_at_epoch_show, NULL);
 
 static struct attribute *kernel_mcp_tool_attrs[] = {
 	&kernel_mcp_name_attr.attr,
@@ -548,6 +588,7 @@ static struct attribute *kernel_mcp_tool_attrs[] = {
 	&kernel_mcp_binary_hash_attr.attr,
 	&kernel_mcp_risk_flags_attr.attr,
 	&kernel_mcp_tool_status_attr.attr,
+	&kernel_mcp_tool_registered_at_epoch_attr.attr,
 	NULL,
 };
 
@@ -579,6 +620,9 @@ static struct kobj_attribute kernel_mcp_agent_call_log_head_attr =
 	__ATTR(call_log_head, 0444, kernel_mcp_agent_call_log_head_show, NULL);
 static struct kobj_attribute kernel_mcp_agent_call_log_count_attr =
 	__ATTR(call_log_count, 0444, kernel_mcp_agent_call_log_count_show, NULL);
+static struct kobj_attribute kernel_mcp_agent_opened_at_epoch_attr =
+	__ATTR(opened_at_epoch, 0444,
+	       kernel_mcp_agent_opened_at_epoch_show, NULL);
 
 static struct bin_attribute kernel_mcp_agent_call_log_bin_attr = {
 	.attr = {
@@ -602,6 +646,7 @@ static struct attribute *kernel_mcp_agent_attrs[] = {
 	&kernel_mcp_agent_last_status_attr.attr,
 	&kernel_mcp_agent_call_log_head_attr.attr,
 	&kernel_mcp_agent_call_log_count_attr.attr,
+	&kernel_mcp_agent_opened_at_epoch_attr.attr,
 	NULL,
 };
 
@@ -671,23 +716,40 @@ static int kernel_mcp_register_tool(u32 tool_id, const char *name,
 {
 	struct kernel_mcp_tool *tool;
 	int ret;
+	bool tool_changed = false;
 
 	mutex_lock(&kernel_mcp_tools_lock);
 	tool = xa_load(&kernel_mcp_tools, tool_id);
 	if (tool) {
-		strscpy(tool->name, name, sizeof(tool->name));
-		if (hash)
+		if (strcmp(tool->name, name) != 0) {
+			strscpy(tool->name, name, sizeof(tool->name));
+			tool_changed = true;
+		}
+		if (hash && strcmp(tool->hash, hash) != 0) {
 			strscpy(tool->hash, hash, sizeof(tool->hash));
+			tool_changed = true;
+		}
+		if (tool->risk_flags != risk_flags) {
+			tool->risk_flags = risk_flags;
+			tool_changed = true;
+		}
 		/* binary_hash is TOFU: only accept a value if the slot is still
 		 * empty. Once pinned by a prior TOOL_REQUEST (or an earlier
 		 * register), do not silently overwrite it — mismatches must go
 		 * through the deny path on cmd_tool_request.
+		 *
+		 * TOFU-setting the binary_hash is NOT a catalog mutation: it's
+		 * about the backend executable identity, not tool semantics.
+		 * Agents opened before a TOFU lock should not be forced to
+		 * rebind; only manifest-layer changes bump the catalog epoch.
 		 */
 		if (binary_hash && binary_hash[0] != '\0' &&
 		    tool->binary_hash[0] == '\0')
 			strscpy(tool->binary_hash, binary_hash,
 				sizeof(tool->binary_hash));
-		tool->risk_flags = risk_flags;
+		if (tool_changed)
+			tool->registered_at_epoch = atomic64_inc_return(
+				&kernel_mcp_tool_catalog_epoch);
 		mutex_unlock(&kernel_mcp_tools_lock);
 		return 0;
 	}
@@ -706,6 +768,8 @@ static int kernel_mcp_register_tool(u32 tool_id, const char *name,
 	if (binary_hash && binary_hash[0] != '\0')
 		strscpy(tool->binary_hash, binary_hash,
 			sizeof(tool->binary_hash));
+	tool->registered_at_epoch = atomic64_inc_return(
+		&kernel_mcp_tool_catalog_epoch);
 
 	ret = xa_err(xa_store(&kernel_mcp_tools, tool_id, tool, GFP_KERNEL));
 	if (ret) {
@@ -722,6 +786,27 @@ static int kernel_mcp_register_tool(u32 tool_id, const char *name,
 		return ret;
 	}
 
+	mutex_unlock(&kernel_mcp_tools_lock);
+	return 0;
+}
+
+static int kernel_mcp_unregister_tool(u32 tool_id)
+{
+	struct kernel_mcp_tool *tool;
+
+	mutex_lock(&kernel_mcp_tools_lock);
+	tool = xa_load(&kernel_mcp_tools, tool_id);
+	if (!tool) {
+		mutex_unlock(&kernel_mcp_tools_lock);
+		return -ENOENT;
+	}
+	xa_erase(&kernel_mcp_tools, tool_id);
+	/* Bump the catalog epoch so surviving agent sessions are forced to
+	 * rebind before they see a stale tool slot repopulated by a future
+	 * register of the same tool_id.
+	 */
+	atomic64_inc(&kernel_mcp_tool_catalog_epoch);
+	kernel_mcp_tool_free(tool);
 	mutex_unlock(&kernel_mcp_tools_lock);
 	return 0;
 }
@@ -789,7 +874,7 @@ static void kernel_mcp_agents_destroy_all(void)
 
 static int kernel_mcp_register_agent(const char *agent_id, u32 pid, bool uid_set,
 				     u32 uid, u64 binding_hash,
-				     u64 binding_epoch)
+				     u64 binding_epoch, u64 opened_at_epoch)
 {
 	struct kernel_mcp_agent *agent;
 	u32 key;
@@ -805,6 +890,12 @@ static int kernel_mcp_register_agent(const char *agent_id, u32 pid, bool uid_set
 			agent->uid = uid;
 		agent->binding_hash = binding_hash;
 		agent->binding_epoch = binding_epoch;
+		/* Re-registering the same agent id (rebind) refreshes the
+		 * catalog epoch snapshot; without this the agent would still
+		 * be stuck at the old epoch after a successful rebind.
+		 */
+		if (opened_at_epoch > 0)
+			agent->opened_at_epoch = opened_at_epoch;
 		mutex_unlock(&kernel_mcp_agents_lock);
 		return 0;
 	}
@@ -821,6 +912,7 @@ static int kernel_mcp_register_agent(const char *agent_id, u32 pid, bool uid_set
 	agent->uid_set = uid_set;
 	agent->binding_hash = binding_hash;
 	agent->binding_epoch = binding_epoch;
+	agent->opened_at_epoch = opened_at_epoch;
 	strscpy(agent->last_reason, "registered", sizeof(agent->last_reason));
 
 	ret = kernel_mcp_agent_sysfs_create(agent);
@@ -1041,6 +1133,21 @@ nla_fail:
 	return -EMSGSIZE;
 }
 
+static int kernel_mcp_cmd_tool_unregister(struct sk_buff *skb,
+					  struct genl_info *info)
+{
+	u32 tool_id;
+
+	(void)skb;
+	if (!info)
+		return -EINVAL;
+	if (!info->attrs[KERNEL_MCP_ATTR_TOOL_ID])
+		return -EINVAL;
+
+	tool_id = nla_get_u32(info->attrs[KERNEL_MCP_ATTR_TOOL_ID]);
+	return kernel_mcp_unregister_tool(tool_id);
+}
+
 static int kernel_mcp_cmd_tool_register(struct sk_buff *skb,
 					struct genl_info *info)
 {
@@ -1078,6 +1185,7 @@ static int kernel_mcp_cmd_agent_register(struct sk_buff *skb,
 	u32 uid = 0;
 	u64 binding_hash = 0;
 	u64 binding_epoch = 0;
+	u64 opened_at_epoch = 0;
 	bool uid_set = false;
 
 	(void)skb;
@@ -1097,9 +1205,12 @@ static int kernel_mcp_cmd_agent_register(struct sk_buff *skb,
 		binding_hash = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_BINDING]);
 	if (info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH])
 		binding_epoch = nla_get_u64(info->attrs[KERNEL_MCP_ATTR_AGENT_EPOCH]);
+	if (info->attrs[KERNEL_MCP_ATTR_CATALOG_EPOCH])
+		opened_at_epoch = nla_get_u64(
+			info->attrs[KERNEL_MCP_ATTR_CATALOG_EPOCH]);
 
 	return kernel_mcp_register_agent(agent_id, pid, uid_set, uid, binding_hash,
-					 binding_epoch);
+					 binding_epoch, opened_at_epoch);
 }
 
 static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *info)
@@ -1118,6 +1229,8 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	u64 ticket_id = 0;
 	u64 binding_hash = 0;
 	u64 binding_epoch = 0;
+	u64 request_catalog_epoch = 0;
+	u64 tool_registered_epoch = 0;
 	u32 decision = KERNEL_MCP_DECISION_ALLOW;
 	u32 risk_flags = 0;
 	u32 key;
@@ -1154,6 +1267,9 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	if (info->attrs[KERNEL_MCP_ATTR_BINARY_HASH])
 		requested_binary_hash =
 			nla_data(info->attrs[KERNEL_MCP_ATTR_BINARY_HASH]);
+	if (info->attrs[KERNEL_MCP_ATTR_CATALOG_EPOCH])
+		request_catalog_epoch = nla_get_u64(
+			info->attrs[KERNEL_MCP_ATTR_CATALOG_EPOCH]);
 
 	mutex_lock(&kernel_mcp_tools_lock);
 	tool = xa_load(&kernel_mcp_tools, tool_id);
@@ -1162,6 +1278,7 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 		return -ENOENT;
 	}
 	risk_flags = tool->risk_flags;
+	tool_registered_epoch = tool->registered_at_epoch;
 	if (requested_tool_hash && tool->hash[0] != '\0' &&
 	    strcmp(tool->hash, requested_tool_hash) != 0)
 		hash_mismatch = true;
@@ -1204,6 +1321,18 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	if (binary_mismatch) {
 		decision = KERNEL_MCP_DECISION_DENY;
 		reason = "binary_mismatch";
+		goto out_accounting;
+	}
+	/* Catalog staleness: if mcpd asserted a catalog epoch on the request
+	 * AND the agent's opened_at_epoch predates the tool's last registration,
+	 * force the client to rebind. Using request_catalog_epoch (rather than
+	 * agent->opened_at_epoch) makes this robust to old agents in the kernel
+	 * that were registered before AGENT_EPOCH was plumbed through.
+	 */
+	if (request_catalog_epoch > 0 &&
+	    request_catalog_epoch < tool_registered_epoch) {
+		decision = KERNEL_MCP_DECISION_DENY;
+		reason = "catalog_stale_rebind_required";
 		goto out_accounting;
 	}
 	if (agent->binding_hash != binding_hash ||
@@ -1469,6 +1598,11 @@ static int kernel_mcp_cmd_list_tools_dump(struct sk_buff *skb,
 			if (ret)
 				goto dump_nla_fail;
 		}
+		ret = nla_put_u64_64bit(skb, KERNEL_MCP_ATTR_CATALOG_EPOCH,
+					tool->registered_at_epoch,
+					KERNEL_MCP_ATTR_UNSPEC);
+		if (ret)
+			goto dump_nla_fail;
 
 		genlmsg_end(skb, msg_hdr);
 		cb->args[0] = index + 1;
@@ -1546,6 +1680,16 @@ static const struct genl_ops kernel_mcp_genl_ops[] = {
 		.maxattr = KERNEL_MCP_ATTR_MAX,
 		.doit = kernel_mcp_cmd_reset_tools,
 	},
+	{
+		/* Single-tool unregister: only mcpd may prune the tool registry.
+		 * Bumps the catalog epoch so surviving agent sessions rebind.
+		 */
+		.cmd = KERNEL_MCP_CMD_TOOL_UNREGISTER,
+		.flags = GENL_ADMIN_PERM,
+		.policy = kernel_mcp_policy,
+		.maxattr = KERNEL_MCP_ATTR_MAX,
+		.doit = kernel_mcp_cmd_tool_unregister,
+	},
 };
 
 static struct genl_family kernel_mcp_genl_family = {
@@ -1557,8 +1701,25 @@ static struct genl_family kernel_mcp_genl_family = {
 	.n_ops = ARRAY_SIZE(kernel_mcp_genl_ops),
 };
 
+static ssize_t kernel_mcp_tool_catalog_epoch_show(struct kobject *kobj,
+						  struct kobj_attribute *attr,
+						  char *buf)
+{
+	(void)kobj;
+	(void)attr;
+	return sysfs_emit(buf, "%llu\n",
+			  (unsigned long long)atomic64_read(
+				  &kernel_mcp_tool_catalog_epoch));
+}
+
+static struct kobj_attribute kernel_mcp_tool_catalog_epoch_attr =
+	__ATTR(tool_catalog_epoch, 0444,
+	       kernel_mcp_tool_catalog_epoch_show, NULL);
+
 static int kernel_mcp_sysfs_init(void)
 {
+	int ret;
+
 	kernel_mcp_sysfs_root = kobject_create_and_add("mcp", kernel_kobj);
 	if (!kernel_mcp_sysfs_root)
 		return -ENOMEM;
@@ -1573,8 +1734,16 @@ static int kernel_mcp_sysfs_init(void)
 	if (!kernel_mcp_sysfs_agents)
 		goto fail_tools;
 
+	ret = sysfs_create_file(kernel_mcp_sysfs_root,
+				&kernel_mcp_tool_catalog_epoch_attr.attr);
+	if (ret)
+		goto fail_agents;
+
 	return 0;
 
+fail_agents:
+	kobject_put(kernel_mcp_sysfs_agents);
+	kernel_mcp_sysfs_agents = NULL;
 fail_tools:
 	kobject_put(kernel_mcp_sysfs_tools);
 	kernel_mcp_sysfs_tools = NULL;
@@ -1586,6 +1755,9 @@ fail_root:
 
 static void kernel_mcp_sysfs_exit(void)
 {
+	if (kernel_mcp_sysfs_root)
+		sysfs_remove_file(kernel_mcp_sysfs_root,
+				  &kernel_mcp_tool_catalog_epoch_attr.attr);
 	if (kernel_mcp_sysfs_agents) {
 		kobject_put(kernel_mcp_sysfs_agents);
 		kernel_mcp_sysfs_agents = NULL;

@@ -289,6 +289,7 @@ class KernelMcpNetlinkClient:
         uid: int,
         binding_hash: int = 0,
         binding_epoch: int = 0,
+        catalog_epoch: int = 0,
     ) -> None:
         if not agent_id:
             raise ValueError("agent_id must be non-empty")
@@ -301,6 +302,8 @@ class KernelMcpNetlinkClient:
             attrs.append((ATTR["AGENT_BINDING"], struct.pack("=Q", binding_hash)))
         if binding_epoch > 0:
             attrs.append((ATTR["AGENT_EPOCH"], struct.pack("=Q", binding_epoch)))
+        if catalog_epoch > 0:
+            attrs.append((ATTR["CATALOG_EPOCH"], struct.pack("=Q", catalog_epoch)))
         self._request(
             msg_type=self._family_id,
             cmd=CMD["AGENT_REGISTER"],
@@ -345,6 +348,16 @@ class KernelMcpNetlinkClient:
             need_ack=True,
         )
 
+    def unregister_tool(self, tool_id: int) -> None:
+        if tool_id <= 0:
+            raise ValueError("tool_id must be positive")
+        self._request(
+            msg_type=self._family_id,
+            cmd=CMD["TOOL_UNREGISTER"],
+            attrs=[(ATTR["TOOL_ID"], struct.pack("=I", tool_id))],
+            need_ack=True,
+        )
+
     def list_tools(self) -> List[Dict[str, object]]:
         responses = self._request_dump(
             msg_type=self._family_id,
@@ -362,6 +375,7 @@ class KernelMcpNetlinkClient:
                 "status": _attr_u32(attrs, ATTR["STATUS"]) if ATTR["STATUS"] in attrs else 0,
                 "hash": _attr_string(attrs, ATTR["TOOL_HASH"]) if ATTR["TOOL_HASH"] in attrs else "",
                 "binary_hash": _attr_string(attrs, ATTR["BINARY_HASH"]) if ATTR["BINARY_HASH"] in attrs else "",
+                "registered_at_epoch": _attr_u64(attrs, ATTR["CATALOG_EPOCH"]) if ATTR["CATALOG_EPOCH"] in attrs else 0,
             }
             tools.append(tool)
         return tools
@@ -378,6 +392,7 @@ class KernelMcpNetlinkClient:
         ticket_id: int = 0,
         payload_hash: bytes = b"",
         binary_hash: str = "",
+        catalog_epoch: int = 0,
     ) -> ToolDecision:
         attrs = [
             (ATTR["AGENT_ID"], agent_id.encode("utf-8") + b"\x00"),
@@ -396,6 +411,8 @@ class KernelMcpNetlinkClient:
             attrs.append((ATTR["PAYLOAD_HASH"], payload_hash[:8]))
         if binary_hash:
             attrs.append((ATTR["BINARY_HASH"], binary_hash.encode("utf-8") + b"\x00"))
+        if catalog_epoch > 0:
+            attrs.append((ATTR["CATALOG_EPOCH"], struct.pack("=Q", catalog_epoch)))
 
         genl_cmd, resp_attrs = self._request(
             msg_type=self._family_id,

@@ -17,6 +17,7 @@ CMD: Final[dict[str, int]] = {
     "TOOL_COMPLETE": 12,
     "APPROVAL_DECIDE": 13,
     "RESET_TOOLS": 14,
+    "TOOL_UNREGISTER": 15,
 }
 
 ATTR: Final[dict[str, int]] = {
@@ -45,6 +46,7 @@ ATTR: Final[dict[str, int]] = {
     "RESPONSE_HASH": 31,
     "ERR_HEAD": 32,
     "BINARY_HASH": 33,
+    "CATALOG_EPOCH": 34,
 }
 
 # Data-plane call-summary sysfs record layout.

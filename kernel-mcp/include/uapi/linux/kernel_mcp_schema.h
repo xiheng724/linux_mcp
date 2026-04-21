@@ -14,7 +14,8 @@
 #define KERNEL_MCP_CMD_TOOL_COMPLETE 12
 #define KERNEL_MCP_CMD_APPROVAL_DECIDE 13
 #define KERNEL_MCP_CMD_RESET_TOOLS 14
-#define KERNEL_MCP_CMD_MAX KERNEL_MCP_CMD_RESET_TOOLS
+#define KERNEL_MCP_CMD_TOOL_UNREGISTER 15
+#define KERNEL_MCP_CMD_MAX KERNEL_MCP_CMD_TOOL_UNREGISTER
 
 /* Attributes: stable numeric IDs, append-only. */
 #define KERNEL_MCP_ATTR_UNSPEC 0
@@ -42,7 +43,8 @@
 #define KERNEL_MCP_ATTR_RESPONSE_HASH 31
 #define KERNEL_MCP_ATTR_ERR_HEAD 32
 #define KERNEL_MCP_ATTR_BINARY_HASH 33
-#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_BINARY_HASH
+#define KERNEL_MCP_ATTR_CATALOG_EPOCH 34
+#define KERNEL_MCP_ATTR_MAX KERNEL_MCP_ATTR_CATALOG_EPOCH
 
 /* Data-plane call-summary sysfs record layout.
  * Exposed as a fixed-size binary blob at /sys/kernel/mcp/agents/<id>/call_log.

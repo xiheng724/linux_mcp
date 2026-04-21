@@ -31,6 +31,7 @@ class AgentBinding:
     peer: PeerIdentity
     binding_hash: int
     binding_epoch: int
+    catalog_epoch: int = 0
 
 
 _approval_lock = threading.Lock()
@@ -85,7 +86,12 @@ def _new_agent_id(peer: PeerIdentity) -> str:
     return f"ag_{peer.uid:x}_{peer.pid:x}_{secrets.token_hex(4)}"
 
 
-def open_session(peer: PeerIdentity, client_name: str, ttl_ms: int) -> Dict[str, Any]:
+def open_session(
+    peer: PeerIdentity,
+    client_name: str,
+    ttl_ms: int,
+    catalog_epoch: int = 0,
+) -> Dict[str, Any]:
     cleanup_expired_sessions()
     session_id = secrets.token_hex(16)
     agent_id = _new_agent_id(peer)
@@ -99,6 +105,7 @@ def open_session(peer: PeerIdentity, client_name: str, ttl_ms: int) -> Dict[str,
         "peer": peer,
         "binding_hash": binding_hash,
         "binding_epoch": binding_epoch,
+        "catalog_epoch": catalog_epoch,
         "expires_at_ms": expires_at_ms,
         "created_at_ms": int(time.time() * 1000),
         "ttl_ms": ttl_ms,
@@ -112,6 +119,7 @@ def open_session(peer: PeerIdentity, client_name: str, ttl_ms: int) -> Dict[str,
         "client_name": client_name,
         "expires_at_ms": expires_at_ms,
         "ttl_ms": ttl_ms,
+        "catalog_epoch": catalog_epoch,
     }
 
 
@@ -135,7 +143,13 @@ def session_binding(session: Dict[str, Any]) -> AgentBinding:
     binding_epoch = ensure_int("binding_epoch", session.get("binding_epoch", 0))
     if binding_hash <= 0 or binding_epoch <= 0:
         raise ValueError("session is missing binding metadata")
-    return AgentBinding(peer=peer, binding_hash=binding_hash, binding_epoch=binding_epoch)
+    catalog_epoch = ensure_int("catalog_epoch", session.get("catalog_epoch", 0))
+    return AgentBinding(
+        peer=peer,
+        binding_hash=binding_hash,
+        binding_epoch=binding_epoch,
+        catalog_epoch=catalog_epoch,
+    )
 
 
 def remember_pending_approval(

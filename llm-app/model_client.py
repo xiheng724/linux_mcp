@@ -26,8 +26,11 @@ class SelectorConfig:
     deepseek_timeout_sec: int
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class SessionInfo:
+    # Not frozen: rebind-on-catalog-stale mutates session_id/agent_id in place
+    # so long-lived plan executions can transparently survive a kernel-side
+    # catalog_epoch bump without the planner having to re-thread state.
     session_id: str
     agent_id: str
     expires_at_ms: int

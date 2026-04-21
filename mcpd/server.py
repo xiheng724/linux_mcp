@@ -85,11 +85,27 @@ _manifest_signature = ""
 _backend_hash_cache: Dict[int, Tuple[int, str]] = {}
 _backend_hash_lock = threading.Lock()
 
+CATALOG_EPOCH_SYSFS = Path("/sys/kernel/mcp/tool_catalog_epoch")
+
 
 def _get_kernel_client() -> KernelMcpNetlinkClient:
     if _kernel_client is None:
         raise RuntimeError("kernel netlink client is not initialized")
     return _kernel_client
+
+
+def _read_catalog_epoch() -> int:
+    """Snapshot the kernel's current tool catalog epoch.
+
+    A session opened at epoch E can use any tool whose registered_at_epoch
+    is <= E; the kernel denies with catalog_stale_rebind_required as soon
+    as a tool is (re)registered or unregistered past that snapshot. We
+    read on every open_session so the window is as tight as possible.
+    """
+    try:
+        return int(CATALOG_EPOCH_SYSFS.read_text().strip())
+    except (FileNotFoundError, PermissionError, ValueError):
+        return 0
 
 
 def _register_tool_with_kernel(tool: ToolManifest) -> None:
@@ -115,19 +131,63 @@ def _compute_manifest_signature() -> str:
     return digest.hexdigest()
 
 
-def _load_runtime_registry() -> str:
+def _load_runtime_registry(*, force_reset: bool = False) -> str:
+    """Reconcile local manifest state with the kernel tool registry.
+
+    Does an incremental diff rather than wholesale reset_tools: only the
+    tools that are new, removed, or whose manifest_hash changed will trigger
+    kernel mutations. Each mutation bumps the kernel's catalog_epoch, which
+    invalidates sessions opened before the mutation and forces them to
+    rebind (see catalog_stale_rebind_required).
+
+    force_reset=True keeps the old startup behavior — useful once after
+    kernel module reload when the module's tool registry is known to be
+    inconsistent with whatever mcpd has cached.
+    """
     apps = load_all_manifests()
     app_registry: Dict[str, AppManifest] = {}
     tool_registry: Dict[int, ToolManifest] = {}
-    client = _get_kernel_client()
-
-    client.reset_tools()
-
     for app in apps:
         app_registry[app.app_id] = app
         for tool in app.tools:
-            _register_tool_with_kernel(tool)
             tool_registry[tool.tool_id] = tool
+
+    client = _get_kernel_client()
+
+    if force_reset:
+        client.reset_tools()
+        for tool in tool_registry.values():
+            _register_tool_with_kernel(tool)
+    else:
+        with _registry_lock:
+            previous_tool_ids = set(_tool_registry.keys())
+            previous_hashes = {
+                tid: t.manifest_hash for tid, t in _tool_registry.items()
+            }
+        new_tool_ids = set(tool_registry.keys())
+
+        removed = previous_tool_ids - new_tool_ids
+        added = new_tool_ids - previous_tool_ids
+        changed = {
+            tid for tid in (previous_tool_ids & new_tool_ids)
+            if previous_hashes.get(tid) != tool_registry[tid].manifest_hash
+        }
+
+        for tool_id in removed:
+            try:
+                client.unregister_tool(tool_id)
+            except RuntimeError as exc:
+                LOGGER.warning("kernel unregister failed tool=%d err=%s",
+                               tool_id, exc)
+            _backend_hash_cache.pop(tool_id, None)
+        for tool_id in added | changed:
+            _register_tool_with_kernel(tool_registry[tool_id])
+
+        if removed or added or changed:
+            LOGGER.info(
+                "reconciled kernel catalog added=%d removed=%d changed=%d",
+                len(added), len(removed), len(changed),
+            )
 
     with _registry_lock:
         _app_registry.clear()
@@ -151,7 +211,11 @@ def _ensure_runtime_registry_current(*, force: bool = False) -> None:
         current_signature = _compute_manifest_signature()
         if not force and current_signature == _manifest_signature:
             return
-        loaded_signature = _load_runtime_registry()
+        # force=True is only used at startup; do a hard reset so we don't
+        # trust whatever state survived in the kernel from a prior run.
+        # Subsequent on-demand reloads run incrementally so only mutated
+        # tools bump the catalog epoch.
+        loaded_signature = _load_runtime_registry(force_reset=force)
         _manifest_signature = loaded_signature
         LOGGER.info("manifest catalog refreshed signature=%s", loaded_signature[:12])
 
@@ -189,6 +253,7 @@ def _ensure_agent_registered(agent_id: str, binding: AgentBinding) -> None:
             uid=binding.peer.uid,
             binding_hash=binding.binding_hash,
             binding_epoch=binding.binding_epoch,
+            catalog_epoch=binding.catalog_epoch,
         )
     except RuntimeError as exc:
         if "Invalid argument" in str(exc):
@@ -197,12 +262,13 @@ def _ensure_agent_registered(agent_id: str, binding: AgentBinding) -> None:
             ) from exc
         raise
     LOGGER.info(
-        "agent registered via netlink: %s pid=%d uid=%d binding_hash=%016x epoch=%d",
+        "agent registered via netlink: %s pid=%d uid=%d binding_hash=%016x epoch=%d catalog_epoch=%d",
         agent_id,
         binding.peer.pid,
         binding.peer.uid,
         binding.binding_hash,
         binding.binding_epoch,
+        binding.catalog_epoch,
     )
 
     with _agents_lock:
@@ -219,6 +285,7 @@ def _kernel_arbitrate(
     ticket_id: int = 0,
     payload_hash: bytes = b"",
     binary_hash: str = "",
+    catalog_epoch: int = 0,
 ) -> Tuple[str, str, int]:
     client = _get_kernel_client()
     try:
@@ -232,6 +299,7 @@ def _kernel_arbitrate(
             ticket_id=ticket_id,
             payload_hash=payload_hash,
             binary_hash=binary_hash,
+            catalog_epoch=catalog_epoch,
         )
     except RuntimeError as exc:
         if "Invalid argument" in str(exc):
@@ -486,6 +554,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         ticket_id=approval_ticket_id,
         payload_hash=payload_hash,
         binary_hash=backend_binary_hash,
+        catalog_epoch=binding.catalog_epoch,
     )
     if decision == "DENY":
         return {
@@ -630,7 +699,12 @@ def _handle_connection(conn: socket.socket) -> None:
                     req_kind = "sys:open_session"
                     client_name = ensure_non_empty_str("client_name", req.get("client_name", "llm-app"))
                     ttl_ms = normalize_session_ttl_ms(req.get("ttl_ms", DEFAULT_SESSION_TTL_MS))
-                    resp = open_session(peer, client_name, ttl_ms)
+                    # Make sure the manifest catalog is fresh before we
+                    # snapshot the epoch; otherwise an lll-app concurrent
+                    # with a manifest change could bind to a stale epoch.
+                    _ensure_runtime_registry_current()
+                    catalog_epoch = _read_catalog_epoch()
+                    resp = open_session(peer, client_name, ttl_ms, catalog_epoch=catalog_epoch)
                     _bind_agent_identity(resp["agent_id"], session_binding(resolve_session(resp["session_id"], peer)))
                     send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
                     t_ms = int((time.perf_counter() - t0) * 1000)

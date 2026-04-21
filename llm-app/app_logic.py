@@ -381,6 +381,28 @@ def build_execution_plan(
     return {"reason": plan_reason, "steps": steps}
 
 
+def _rebind_session_in_place(session: SessionInfo, sock_path: str) -> bool:
+    """Open a fresh session and copy its fields onto the given SessionInfo.
+
+    Used to transparently recover from kernel-side catalog_stale_rebind_required
+    denials without restructuring the planner. Returns True iff the rebind
+    succeeded; on failure the caller should surface the original error.
+    """
+    try:
+        from model_client import open_session as _model_open_session
+    except ModuleNotFoundError:  # pragma: no cover
+        from .model_client import open_session as _model_open_session
+    try:
+        fresh = _model_open_session(sock_path, session.client_name, session.ttl_ms)
+    except Exception:  # noqa: BLE001
+        return False
+    session.session_id = fresh.session_id
+    session.agent_id = fresh.agent_id
+    session.expires_at_ms = fresh.expires_at_ms
+    session.ttl_ms = fresh.ttl_ms
+    return True
+
+
 def _exec_tool_request(
     *,
     session: SessionInfo,
@@ -393,18 +415,27 @@ def _exec_tool_request(
     request_id = req_id if req_id is not None else int(time.time_ns() & 0xFFFFFFFFFFFF)
     tool_hash_raw = step.tool.get("hash")
     tool_hash = tool_hash_raw if isinstance(tool_hash_raw, str) else ""
-    req_obj = {
-        "kind": "tool:exec",
-        "req_id": request_id,
-        "session_id": session.session_id,
-        "app_id": step.app_id,
-        "tool_id": step.tool_id,
-        "tool_hash": tool_hash,
-        "payload": payload,
-    }
-    if approval_ticket_id > 0:
-        req_obj["approval_ticket_id"] = approval_ticket_id
-    response = mcpd_call(req_obj, sock_path=sock_path, timeout_s=20)
+
+    def _send(current_session_id: str, rid: int) -> Dict[str, Any]:
+        req_obj = {
+            "kind": "tool:exec",
+            "req_id": rid,
+            "session_id": current_session_id,
+            "app_id": step.app_id,
+            "tool_id": step.tool_id,
+            "tool_hash": tool_hash,
+            "payload": payload,
+        }
+        if approval_ticket_id > 0:
+            req_obj["approval_ticket_id"] = approval_ticket_id
+        return mcpd_call(req_obj, sock_path=sock_path, timeout_s=20)
+
+    response = _send(session.session_id, request_id)
+    if response.get("reason") == "catalog_stale_rebind_required":
+        if _rebind_session_in_place(session, sock_path):
+            retry_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
+            response = _send(session.session_id, retry_id)
+            return {"req_id": retry_id, "response": response}
     return {"req_id": request_id, "response": response}
 
 
