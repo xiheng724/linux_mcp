@@ -129,7 +129,7 @@ sequenceDiagram
 - `path_semantics`
 - `approval_policy`
 
-`_semantic_hash()` 对这些字段做 canonical JSON 序列化后再做 SHA-256，最后截断为 8 位十六进制。这意味着：
+`_semantic_hash()` 对这些字段做 canonical JSON 序列化后取完整 SHA-256（64 位十六进制）。这意味着：
 
 - 运行时 endpoint 不参与工具语义身份
 - 改语义字段会改 hash

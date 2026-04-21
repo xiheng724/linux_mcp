@@ -65,7 +65,7 @@ APPROVAL_DECISION_MAP = {
     "revoke": 3,
 }
 LOGGER = logging.getLogger("mcpd")
-HASH_RE = re.compile(r"^[0-9a-fA-F]{8}$")
+HASH_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 _stop_event = threading.Event()
 _agents_lock = threading.Lock()
@@ -381,7 +381,7 @@ def _resolve_tool_hash(req: Dict[str, Any], tool: ToolManifest) -> str:
     if raw in (None, ""):
         return tool.manifest_hash
     if not isinstance(raw, str) or not HASH_RE.fullmatch(raw):
-        raise ValueError("tool_hash must be 8 hex chars")
+        raise ValueError("tool_hash must be 64 hex chars")
     return raw.lower()
 
 

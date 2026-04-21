@@ -70,7 +70,7 @@ llm-app -> mcpd -> kernel netlink
 {"sys":"list_tools","app_id":"notes_app"}
 {"sys":"open_session","client_name":"llm-app","ttl_ms":1800000}
 {"sys":"approval_reply","session_id":"32hex","ticket_id":2,"decision":"approve","reason":"approved in llm-app","ttl_ms":300000}
-{"kind":"tool:exec","req_id":1,"session_id":"32hex","app_id":"notes_app","tool_id":1,"tool_hash":"8hex","payload":{"title":"Daily Standup","body":"Blocked on review"}} 
+{"kind":"tool:exec","req_id":1,"session_id":"32hex","app_id":"notes_app","tool_id":1,"tool_hash":"64hex","payload":{"title":"Daily Standup","body":"Blocked on review"}} 
 ```
 
 `list_apps` 返回每个 app 的：
