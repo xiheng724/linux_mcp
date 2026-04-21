@@ -13,9 +13,9 @@ We present \texttt{linux-mcp}, a kernel-assisted control plane for LLM tool invo
 Rather than moving full tool logic into the kernel, \texttt{linux-mcp} keeps semantic parsing and tool execution in user space while moving a narrow set of control-plane responsibilities into a kernel module: admission decisions, approval-ticket lifecycle, and binding verification. 
 This design requires no modification to existing tools beyond a declarative JSON manifest, and makes approval state durable across daemon failure and protected from unprivileged user-space interference.
 
-We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened seccomp variant across latency, throughput, attack resistance, and failure recovery.
-Across the tested attack cases, the kernel path enforces all evaluated control-plane invariants, whereas the user-space and seccomp baselines exhibit bypass rates of 90.9\% and 36.4\%, respectively.
-The performance cost is small: latency remains within measurement noise at small and medium payloads and is about 3.4\% lower at 1~MB, where earlier rejection avoids a user-space payload copy; throughput stays within about 10\% of the user-space peak in an exploratory multi-agent sweep.
+We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened seccomp variant across latency, arbitration cost, throughput, registry scaling, attack resistance, and failure recovery.
+The kernel path enforces all evaluated control-plane invariants, while the user-space and seccomp baselines exhibit bypass rates of 90.9\% and 36.4\%; an extended-attack rerun surfaced a missing peer-credential check in the stock module, closed by a six-line patch at no measurable latency cost.
+Performance overhead is small: latency is within measurement noise at small and medium payloads and about 3.4\% lower at 1~MB, a paired microbenchmark attributes only \num{4.334}~$\mu$s to the full kernel arbitration path above a measured Netlink noise floor.
 The prototype supports 43 tools across 14 applications and is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
 
 }

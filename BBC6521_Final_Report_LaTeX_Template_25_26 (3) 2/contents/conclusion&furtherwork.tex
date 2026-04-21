@@ -16,8 +16,9 @@ A small Linux kernel module holds the registries, arbitrates admission, and owns
 The gateway is still fully trusted to populate the kernel's view of the world, but once that view is populated, its integrity no longer depends on the daemon staying alive or staying correct.
 Approval tickets and registry entries sit in kernel memory, out of reach of unprivileged processes, and still there after a daemon crash.
 
-In the tested prototype, the kernel path enforced all specified control-plane invariants across the targeted attack set, while both user-space baselines permitted meaningful bypass rates; latency and throughput remained close to the user-space baseline throughout. 
-These results are not intended as a claim of adversarial robustness or production-scale performance, since the attack set is a functional-correctness test of the specified invariants and the evaluation was conducted inside a single VM.
+In the tested prototype, the kernel path enforced all specified control-plane invariants across the targeted attack set, while both user-space baselines permitted meaningful bypass rates; latency and throughput remained close to the user-space baseline throughout.
+A separate extended-attack rerun covering TOCTOU, cross-UID session hijack, and a 30-minute Generic Netlink dumb fuzzer additionally surfaced a missing peer-credential check in the stock kernel module — the kind of absence that design-time review is unlikely to catch — and closed it with a six-line patch at no measurable latency cost.
+These results are not intended as a claim of adversarial robustness or production-scale performance, since the attack set remains a functional-correctness test of the specified invariants and the evaluation was conducted inside a single VM.
 They are nevertheless sufficient to show that the split is workable: the enforcement gains are real, the overhead is small, and neither the LLM client nor tool authors need to change anything beyond providing a JSON manifest.
 
 The position this work ends up arguing for is narrower than AIOS-style proposals that rebuild OS infrastructure around LLM abstractions, and less trusting than user-space frameworks that accept gateway correctness as a given.
@@ -68,8 +69,9 @@ A more mature design could provide more systematic restart handling, richer reco
 This becomes particularly important for long-running agent workflows, where failure and restart are routine occurrences.
 
 Fourth, the evaluation can be extended substantially.
-Future work should include bare-metal evaluation to eliminate hypervisor timing noise, concurrency levels well beyond the current maximum of 100 concurrent requests, tool registries an order of magnitude larger than those used here, and heterogeneous tool workloads with variable or network-dependent execution times.
-$p_{95}$ latency is characterised in Chapter~4; $p_{99}$ under sustained concurrency remains unmeasured and is a natural next step.
+The current study includes a dedicated registry-scaling experiment that already pushes the kernel catalogue to \num{16384} tools and shows flat lookup latency across three orders of magnitude of $N$, but several adjacent regimes remain uncharacterised.
+Future work should include bare-metal evaluation to eliminate hypervisor timing noise, sustained concurrency levels well beyond the current clean sweep ceiling of 100 concurrent requests (the \texttt{SOMAXCONN} saturation that blocked the present overload attempt needs addressing at the benchmark harness first), and heterogeneous tool workloads with variable or network-dependent execution times.
+$p_{95}$ latency is characterised in \hyperref[chap:evaluation]{Chapter~4}; $p_{99}$ under sustained concurrency remains unmeasured and is a natural next step.
 Comparison against additional hardened user-space designs would also help sharpen the argument by separating the benefits of kernel placement from those achievable through improved user-space engineering alone.
 
 Finally, this work opens a broader research question: which other agent-oriented abstractions deserve operating-system support?

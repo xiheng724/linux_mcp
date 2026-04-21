@@ -164,8 +164,8 @@
 \@writefile{toc}{\contentsline {section}{\textit  {Chapter 5: Conclusion and Further Work}}{41}{section*.14}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Conclusion}{41}{subsection.5.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Reflection}{42}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Further Work}{42}{subsection.5.3}\protected@file@percent }
-\newlabel{sec:further-work}{{5.3}{42}{Further Work}{subsection.5.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Further Work}{43}{subsection.5.3}\protected@file@percent }
+\newlabel{sec:further-work}{{5.3}{43}{Further Work}{subsection.5.3}{}}
 \bibdata{reference}
 \bibcite{yao2023react}{{1}{}{{}}{{}}}
 \bibcite{liu2024agentbench}{{2}{}{{}}{{}}}
@@ -183,7 +183,7 @@
 \bibcite{langchain2022}{{14}{}{{}}{{}}}
 \bibcite{langgraph2024}{{15}{}{{}}{{}}}
 \bibcite{autogpt2023}{{16}{}{{}}{{}}}
-\@writefile{toc}{\contentsline {section}{\textit  {References}}{44}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {References}}{45}{subsection.5.3}\protected@file@percent }
 \bibcite{crewai2024}{{17}{}{{}}{{}}}
 \bibcite{semantickernel2023}{{18}{}{{}}{{}}}
 \bibcite{wu2024oscopilot}{{19}{}{{}}{{}}}
@@ -217,39 +217,48 @@
 \bibcite{klein2010sel4}{{47}{}{{}}{{}}}
 \bibcite{netlink2026}{{48}{}{{}}{{}}}
 \bibcite{west2021welch}{{49}{}{{}}{{}}}
-\@writefile{toc}{\contentsline {section}{\textit  {Acknowledgment}}{48}{section*.15}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\textit  {Appendices}}{49}{section*.16}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Disclaimer}{49}{section*.17}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Acknowledgement of using Generative AI}{50}{section*.18}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Project specification}{51}{section*.19}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Early-term progress report}{58}{section*.20}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Mid-term progress report}{65}{section*.21}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Supervision log}{72}{section*.22}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Additional Appendices}{75}{section*.23}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{75}{section*.24}\protected@file@percent }
-\newlabel{sec:appendix-protocols}{{5.3}{75}{}{section*.24}{}}
-\@writefile{toc}{\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{75}{paragraph*.25}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}tool:exec request and response messages (llm-app $\to $ mcpd).}{75}{lstlisting.2}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3}approval\_reply message (llm-app $\to $ mcpd, issued after user confirms a deferred operation).}{75}{lstlisting.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Complete Netlink attribute encoding.}{75}{paragraph*.26}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {4}Python fragment: encoding a \texttt  {TOOL\_REQUEST} Generic Netlink message (mcpd $\to $ kernel).}{76}{lstlisting.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Semantic hash computation.}{76}{paragraph*.27}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {5}Python fragment: computing the manifest-derived semantic hash used for tool identity.}{76}{lstlisting.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Complete manifest field specification.}{77}{paragraph*.28}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Manifest field specification. {\Pifont {pzd}\char 51}~= included in the SHA-256 semantic identity hash; {\Pifont {pzd}\char 55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt  {app\_id}; tool-level fields appear once per tool entry.}}{77}{table.12}\protected@file@percent }
-\newlabel{tab:manifest-fields}{{12}{77}{Manifest field specification. \ding {51}~= included in the SHA-256 semantic identity hash; \ding {55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt {app\_id}; tool-level fields appear once per tool entry}{table.12}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Acknowledgment}}{49}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {Appendices}}{50}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Disclaimer}{50}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Acknowledgement of using Generative AI}{51}{section*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Project specification}{52}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Early-term progress report}{59}{section*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Mid-term progress report}{66}{section*.21}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Supervision log}{73}{section*.22}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Additional Appendices}{76}{section*.23}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{76}{section*.24}\protected@file@percent }
+\newlabel{sec:appendix-protocols}{{5.3}{76}{}{section*.24}{}}
+\@writefile{toc}{\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{76}{paragraph*.25}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}tool:exec request and response messages (llm-app $\to $ mcpd).}{76}{lstlisting.2}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3}approval\_reply message (llm-app $\to $ mcpd, issued after user confirms a deferred operation).}{76}{lstlisting.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Complete Netlink attribute encoding.}{76}{paragraph*.26}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {4}Python fragment: encoding a \texttt  {TOOL\_REQUEST} Generic Netlink message (mcpd $\to $ kernel).}{77}{lstlisting.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Semantic hash computation.}{77}{paragraph*.27}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {5}Python fragment: computing the manifest-derived semantic hash used for tool identity.}{77}{lstlisting.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Complete manifest field specification.}{78}{paragraph*.28}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Manifest field specification. {\Pifont {pzd}\char 51}~= included in the SHA-256 semantic identity hash; {\Pifont {pzd}\char 55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt  {app\_id}; tool-level fields appear once per tool entry.}}{78}{table.12}\protected@file@percent }
+\newlabel{tab:manifest-fields}{{12}{78}{Manifest field specification. \ding {51}~= included in the SHA-256 semantic identity hash; \ding {55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt {app\_id}; tool-level fields appear once per tool entry}{table.12}{}}
 \citation{openclaw2026}
 \citation{openclaw_security1,openclaw_security2}
 \citation{harness2025}
 \citation{mei2024aios,liu2026agentos}
 \citation{langchain2022,langgraph2024}
 \citation{apple2024pcc}
-\@writefile{toc}{\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{78}{section*.29}\protected@file@percent }
-\newlabel{sec:appendix-comparison}{{5.3}{78}{}{section*.29}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Comparison of representative agent systems. The key differentiator for \texttt  {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{78}{table.13}\protected@file@percent }
-\newlabel{tab:system_comparison}{{13}{78}{Comparison of representative agent systems. The key differentiator for \texttt {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.13}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{79}{section*.30}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{79}{section*.29}\protected@file@percent }
+\newlabel{sec:appendix-comparison}{{5.3}{79}{}{section*.29}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Comparison of representative agent systems. The key differentiator for \texttt  {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{79}{table.13}\protected@file@percent }
+\newlabel{tab:system_comparison}{{13}{79}{Comparison of representative agent systems. The key differentiator for \texttt {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.13}{}}
+\@writefile{toc}{\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{79}{section*.30}\protected@file@percent }
+\newlabel{sec:appendix-experiment-uapi}{{5.3}{79}{}{section*.30}{}}
+\@writefile{toc}{\contentsline {paragraph}{Noise-floor command: \texttt  {KMCP\_CMD\_NOOP}.}{79}{paragraph*.31}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {6}UAPI additions for the noise-floor command and the stage-ablation experiment flags (kernel-mcp/include/uapi/linux/kernel\_mcp\_schema.h).}{79}{lstlisting.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Peer-credential enforcement: \texttt  {require\_peer\_cred}.}{80}{paragraph*.32}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {7}Peer-credential enforcement patch in \texttt  {kernel\_mcp\_main.c}, gated behind the \texttt  {require\_peer\_cred} module parameter.}{80}{lstlisting.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Summary of experiment-only switches.}{81}{paragraph*.33}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Experiment-only kernel switches added for the \hyperref  [chap:evaluation]{Chapter~4} rerun. All four \texttt  {SKIP\_*} bits are ignored when the kernel is built without \texttt  {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt  {require\_peer\_cred} is runtime-toggleable on any build.}}{81}{table.14}\protected@file@percent }
+\newlabel{tab:experiment-switches}{{14}{81}{Experiment-only kernel switches added for the \hyperref [chap:evaluation]{Chapter~4} rerun. All four \texttt {SKIP\_*} bits are ignored when the kernel is built without \texttt {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt {require\_peer\_cred} is runtime-toggleable on any build}{table.14}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{82}{section*.34}\protected@file@percent }
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{81}{table.14}\protected@file@percent }
-\newlabel{tab:risk_assessment}{{14}{81}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.14}{}}
-\gdef \@abspage@last{82}
+\@writefile{lot}{\contentsline {table}{\numberline {15}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{84}{table.15}\protected@file@percent }
+\newlabel{tab:risk_assessment}{{15}{84}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.15}{}}
+\gdef \@abspage@last{85}

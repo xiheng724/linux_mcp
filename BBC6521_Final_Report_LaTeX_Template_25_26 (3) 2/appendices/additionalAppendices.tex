@@ -211,3 +211,84 @@ Apple Intelligence \cite{apple2024pcc}
 \caption{Comparison of representative agent systems. The key differentiator for \texttt{linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}
 \label{tab:system_comparison}
 \end{table}
+
+
+\subsubsection*{A.3\quad Experiment Kernel Interface}
+\phantomsection
+\addcontentsline{toc}{subsubsection}{A.3\quad Experiment Kernel Interface}
+\label{sec:appendix-experiment-uapi}
+
+The latency, stage-ablation, and extended-attack experiments in \hyperref[chap:evaluation]{Chapter~4} rely on three kernel-side additions that live behind compile-time and module-parameter switches so that a single binary can serve both production and benchmark roles.
+This section documents their UAPI footprint and the peer-credential patch surfaced by the cross-UID attack rerun.
+
+\paragraph{Noise-floor command: \texttt{KMCP\_CMD\_NOOP}.}
+
+The paired ablation anchors every stage cost against a Generic Netlink round-trip floor measured by a minimum-work handler that returns immediately after command dispatch.
+The command is appended to the existing \texttt{KERNEL\_MCP} family at a stable numeric ID so that older \texttt{mcpd} builds continue to work unchanged:
+
+\begin{lstlisting}[style=codestyle, language=C, caption={UAPI additions for the noise-floor command and the stage-ablation experiment flags (kernel-mcp/include/uapi/linux/kernel\_mcp\_schema.h).}]
+/* New command: stable numeric ID, append-only. */
+#define KERNEL_MCP_CMD_NOOP                15
+
+/* Compile-time experiment flags carried in KERNEL_MCP_ATTR_EXPERIMENT_FLAGS
+ * on KMCP_CMD_TOOL_REQUEST. Unknown bits are ignored. */
+#define KERNEL_MCP_EXPERIMENT_SKIP_LOOKUPS  (1U << 0)
+#define KERNEL_MCP_EXPERIMENT_SKIP_HASH     (1U << 1)
+#define KERNEL_MCP_EXPERIMENT_SKIP_BINDING  (1U << 2)
+#define KERNEL_MCP_EXPERIMENT_SKIP_TICKET   (1U << 3)
+\end{lstlisting}
+
+The \texttt{SKIP\_*} flags are honoured only when the kernel is built with \texttt{CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; production builds ignore the attribute entirely, so the mere presence of the UAPI constants does not weaken the enforcement path.
+Under the benign workload used by the ablation runner, the \texttt{SKIP\_HASH} and \texttt{SKIP\_BINDING} guards are statically dead code (short-circuited by a valid request before the flag is consulted) and their paired deltas correctly return zero to within noise; they are retained for methodology-consistency checks rather than as meaningful stage costs.
+
+\paragraph{Peer-credential enforcement: \texttt{require\_peer\_cred}.}
+
+The cross-UID attack rerun surfaced a defect in the stock kernel module: \texttt{kernel\_mcp\_cmd\_tool\_request} never compared the \texttt{NETLINK\_CB(skb)} peer credential against the \texttt{uid} recorded at agent registration, which allowed a crafted-credential replay from a second UID to reach the tool-request handler untouched.
+The fix is exposed as a module parameter so that the A/B comparison in \hyperref[chap:evaluation]{Chapter~4} could run against a single binary:
+
+\begin{lstlisting}[style=codestyle, language=C, caption={Peer-credential enforcement patch in \texttt{kernel\_mcp\_main.c}, gated behind the \texttt{require\_peer\_cred} module parameter.}]
+static bool require_peer_cred = false;
+module_param_named(require_peer_cred, require_peer_cred, bool, 0644);
+MODULE_PARM_DESC(require_peer_cred,
+    "Reject TOOL_REQUEST if NETLINK_CB peer UID != agent->uid");
+
+static int kernel_mcp_cmd_tool_request(struct sk_buff *skb,
+                                       struct genl_info *info)
+{
+    if (require_peer_cred) {
+        kuid_t peer = sock_i_uid(NETLINK_CB(skb).sk);
+        if (!uid_eq(peer, agent->uid))
+            return -EPERM;           /* cross-uid replay; reject */
+    }
+    /* ... existing admission pipeline ... */
+}
+\end{lstlisting}
+
+The parameter defaults to \texttt{false} in the artefact published alongside this report so that the extended-attack experiment can exercise both the pre-patch and post-patch code paths without a rebuild; production deployments should set it to \texttt{true} via \texttt{/sys/module/kernel\_mcp/parameters/require\_peer\_cred} on module load.
+The check reads the peer credential on the same cache line that the existing \texttt{NETLINK\_CB} access already touches, so the \hyperref[chap:evaluation]{Chapter~4} latency and throughput numbers are unchanged whether the gate is on or off.
+
+\paragraph{Summary of experiment-only switches.}
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{l l p{7.5cm}}
+\toprule
+\textbf{Artefact} & \textbf{Exposed as} & \textbf{Purpose} \\
+\midrule
+\rowcolor{gray!8}
+\texttt{KMCP\_CMD\_NOOP}            & UAPI command (\#15)           & Generic Netlink round-trip noise-floor measurement. Returns immediately after dispatch; used by the kernel-ablation runner to anchor μs-level claims. \\
+\texttt{SKIP\_LOOKUPS}              & \texttt{EXPERIMENT\_FLAGS} bit 0 & Bypasses the tool and agent registry walks. Used as the \texttt{skip\_lookups} bar in Figure~\ref{fig:chapter4-ablation} and as the bypass mode in the paired registry+lookup delta in Table~\ref{tab:ablation-stages}. \\
+\rowcolor{gray!8}
+\texttt{SKIP\_HASH}                 & \texttt{EXPERIMENT\_FLAGS} bit 1 & Bypasses the hash-mismatch guard. Guard body is dead under benign credentials; retained as a paired consistency check. \\
+\texttt{SKIP\_BINDING}              & \texttt{EXPERIMENT\_FLAGS} bit 2 & Bypasses the binding-mismatch guard. Also dead under benign credentials; paired consistency check. \\
+\rowcolor{gray!8}
+\texttt{SKIP\_TICKET}               & \texttt{EXPERIMENT\_FLAGS} bit 3 & Bypasses the approval-ticket issuance and consumption branch. Used as the \texttt{ticket\_trigger\_skip} mode to isolate the approval-ticket body cost. \\
+\texttt{require\_peer\_cred}        & Module parameter (\texttt{bool}, 0644) & Enables the \texttt{NETLINK\_CB} peer-UID check in \texttt{kernel\_mcp\_cmd\_tool\_request}. Default \texttt{false} so that the cross-UID experiment can toggle it at runtime; should be set to \texttt{true} in production. \\
+\bottomrule
+\end{tabular}
+\caption{Experiment-only kernel switches added for the \hyperref[chap:evaluation]{Chapter~4} rerun. All four \texttt{SKIP\_*} bits are ignored when the kernel is built without \texttt{CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt{require\_peer\_cred} is runtime-toggleable on any build.}
+\label{tab:experiment-switches}
+\end{table}
