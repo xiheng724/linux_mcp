@@ -46,10 +46,17 @@ allow_name_pattern = "^linux-mcp/[a-z0-9_.-]+$"
 # UIDs allowed to serve as tool backends. Enforced via SO_PEERCRED on
 # both the probe dial and the exec dial to prevent a process owned by
 # a different local user from impersonating a tool — the primary
-# mitigation against abstract-UDS name hijacking. If this key is
-# absent, mcpd defaults to a list containing only its own effective
-# uid, which is what the demo stack wants (run_tool_services.sh and
-# run_mcpd.sh execute as the same user). Heterogeneous deployments
-# (e.g. backends under a dedicated service account) must list every
-# backend uid here explicitly.
+# mitigation against abstract-UDS name hijacking.
+#
+# Defaults when this key is absent:
+#   - mcpd running unprivileged (euid != 0): defaults to [euid],
+#     matching the legacy "backends share mcpd's uid" model.
+#   - mcpd running as root: refuses to start unless either this key
+#     is set explicitly, OR the launcher passes
+#     LINUX_MCP_TRUST_SUDO_UID=1 to opt into trusting $SUDO_UID.
+#     The implicit [0] default was removed because it silently
+#     rejected every non-root backend and left binary_hash unpinned.
+#
+# Heterogeneous deployments (e.g. backends under a dedicated service
+# account) must list every backend uid here explicitly.
 # allowed_backend_uids = [1000]

@@ -36,6 +36,19 @@ except ModuleNotFoundError:  # pragma: no cover - package import fallback
 
 CONFIG_ENV = "LINUX_MCP_CONFIG"
 DEFAULT_CONFIG_PATH = "/etc/linux-mcp/mcpd.toml"
+TRUST_SUDO_UID_ENV = "LINUX_MCP_TRUST_SUDO_UID"
+
+
+class ConfigError(RuntimeError):
+    """Raised when mcpd cannot resolve a safe configuration.
+
+    The daemon must refuse to start rather than fall back to a default
+    that silently mismatches the runtime model — e.g. mcpd running as
+    root with an implicit allowlist of {0} while tool backends run as
+    a normal user. Catching this in main() and exiting non-zero is the
+    whole point.
+    """
+
 
 @dataclass
 class SecurityConfig:
@@ -44,7 +57,8 @@ class SecurityConfig:
     allowed_backend_uids:
       - Tuple of UIDs permitted to serve as tool backends, enforced via
         SO_PEERCRED on both the probe dial and the exec dial.
-      - `None` sentinel means "resolve to {os.geteuid()} at load time".
+      - `None` sentinel means "resolve at load time". Resolution depends
+        on euid and environment — see _resolve_security_defaults.
     """
     allowed_backend_uids: tuple[int, ...] | None = None
 
@@ -104,11 +118,60 @@ def _load_security_config_from_toml(data: Dict[str, Any]) -> SecurityConfig:
 
 def _resolve_security_defaults(cfg: SecurityConfig) -> None:
     """Fill in runtime-sensitive defaults that can't be hardcoded in the
-    dataclass. Today that's just the UID allowlist, which defaults to
-    mcpd's own effective UID so a freshly-deployed mcpd does not
-    accidentally trust every local user as a backend."""
-    if cfg.allowed_backend_uids is None:
-        cfg.allowed_backend_uids = (os.geteuid(),)
+    dataclass.
+
+    Decision matrix for `allowed_backend_uids` when not explicitly
+    configured:
+
+      - euid != 0 (unprivileged mcpd): default to `(euid,)`. Legacy
+        mode where mcpd and backends share a uid; trusting self is safe.
+
+      - euid == 0 (privileged mcpd): we CANNOT safely default to `(0,)`
+        because the intended deployment model has tool backends running
+        as a non-root service user. Silently trusting only root would
+        reject every real backend and leave every tool's binary_hash
+        unpinned — a security-significant state that used to be masked
+        by a sysfs empty string. Two ways out:
+
+          1. Operator configures [security].allowed_backend_uids in the
+             TOML — that always wins (handled above the dataclass fill).
+          2. Demo/launcher path sets LINUX_MCP_TRUST_SUDO_UID=1 to opt
+             in to trusting $SUDO_UID. That keeps "sudo bash scripts/
+             run_mcpd.sh" ergonomic without making the trust implicit.
+
+        Anything else is a ConfigError. The old behavior (auto-trust
+        $SUDO_UID without opt-in) was moved out on purpose: decisions
+        about who mcpd trusts should live in the daemon's config/env,
+        not in whichever launcher script happened to exec it.
+    """
+    if cfg.allowed_backend_uids is not None:
+        return
+
+    euid = os.geteuid()
+    if euid != 0:
+        cfg.allowed_backend_uids = (euid,)
+        return
+
+    if os.environ.get(TRUST_SUDO_UID_ENV, "").strip() in ("1", "true", "yes"):
+        sudo_uid_raw = os.environ.get("SUDO_UID", "").strip()
+        try:
+            sudo_uid = int(sudo_uid_raw) if sudo_uid_raw else -1
+        except ValueError:
+            sudo_uid = -1
+        if sudo_uid > 0:
+            cfg.allowed_backend_uids = (0, sudo_uid)
+            return
+
+    raise ConfigError(
+        "mcpd runs as root but security.allowed_backend_uids is not "
+        "configured. Refusing to start with the implicit allowlist "
+        "{0} because that silently rejects every non-root tool "
+        "backend and leaves binary_hash unpinned. Fix one of:\n"
+        f"  (a) set [security].allowed_backend_uids in ${CONFIG_ENV} "
+        f"or {DEFAULT_CONFIG_PATH};\n"
+        f"  (b) set {TRUST_SUDO_UID_ENV}=1 to trust $SUDO_UID (demo "
+        "launcher path)."
+    )
 
 
 def _resolve_config_path() -> Path | None:

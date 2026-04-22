@@ -3,10 +3,34 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+DEFAULT_DEMO_CONFIG="$ROOT_DIR/config/mcpd.demo.toml"
 
-if [[ "$(id -u)" -ne 0 ]]; then
-  echo "run_mcpd.sh must be run as root (kernel_mcp netlink ops require GENL_ADMIN_PERM)"
-  echo "use: sudo bash scripts/run_mcpd.sh"
+# Privilege check: mcpd needs CAP_NET_ADMIN (kernel_mcp netlink ops are
+# GENL_ADMIN_PERM) and CAP_SYS_PTRACE (probe reads /proc/<pid>/exe
+# across uids when backends run under a different service user).
+# Root has both; an unprivileged systemd unit can grant them via
+# AmbientCapabilities — see deploy/systemd/mcpd.service.
+mcpd_has_required_caps() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    return 0
+  fi
+  if ! command -v capsh >/dev/null 2>&1; then
+    return 1
+  fi
+  # capsh --has-p exits 0 when the capability is in the process's
+  # permitted set. Ambient/effective are sufficient for our uses once
+  # they land in permitted, so this is the right gate.
+  capsh --has-p=cap_net_admin >/dev/null 2>&1 \
+    && capsh --has-p=cap_sys_ptrace >/dev/null 2>&1
+}
+
+if ! mcpd_has_required_caps; then
+  echo "run_mcpd.sh requires root OR (CAP_NET_ADMIN + CAP_SYS_PTRACE)"
+  echo "  CAP_NET_ADMIN : kernel_mcp netlink ops are GENL_ADMIN_PERM"
+  echo "  CAP_SYS_PTRACE: probe reads /proc/<pid>/exe across uids"
+  echo "options:"
+  echo "  sudo bash scripts/run_mcpd.sh"
+  echo "  systemctl start mcpd   (via deploy/systemd/mcpd.service)"
   exit 1
 fi
 
@@ -19,8 +43,18 @@ fi
 # Default to the repo demo config when the operator has not pointed
 # LINUX_MCP_CONFIG elsewhere. Must match what run_tool_services.sh does
 # so both halves of the stack agree on transport allow-lists.
-if [[ -z "${LINUX_MCP_CONFIG:-}" ]] && [[ -f "$ROOT_DIR/config/mcpd.demo.toml" ]]; then
-  export LINUX_MCP_CONFIG="$ROOT_DIR/config/mcpd.demo.toml"
+if [[ -z "${LINUX_MCP_CONFIG:-}" ]] && [[ -f "$DEFAULT_DEMO_CONFIG" ]]; then
+  export LINUX_MCP_CONFIG="$DEFAULT_DEMO_CONFIG"
+fi
+
+# Demo path: this script runs mcpd as root (GENL_ADMIN_PERM) while the
+# tool backends run as the invoking user. mcpd's security policy, when
+# not given an explicit [security].allowed_backend_uids in the config,
+# refuses to start as root rather than silently defaulting to {0}. We
+# opt into "trust $SUDO_UID" on mcpd's behalf here — the decision is
+# made in mcpd itself; this script only declares intent.
+if [[ -n "${SUDO_UID:-}" && "${SUDO_UID}" != "0" ]]; then
+  export LINUX_MCP_TRUST_SUDO_UID=1
 fi
 
 SOCK_PATH="/tmp/mcpd.sock"

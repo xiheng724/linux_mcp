@@ -43,10 +43,17 @@ tool_binary_hash() {
   tr -d '\n\0 ' <"$path"
 }
 
+tool_binary_hash_state() {
+  local tool_id="$1"
+  local path="/sys/kernel/mcp/tools/${tool_id}/binary_hash_state"
+  [[ -r "$path" ]] || return 1
+  tr -d '\n\0 ' <"$path"
+}
+
 cleanup() {
   set +e
   run_as_user bash scripts/stop_tool_services.sh >/dev/null 2>&1 || true
-  ${SUDO} bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
+  run_as_user bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
   ${SUDO} bash scripts/unload_module.sh >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -64,26 +71,31 @@ ${SUDO} bash scripts/load_module.sh
 
 echo "[accept-new] step 3: stop stale user-space services"
 run_as_user bash scripts/stop_tool_services.sh >/dev/null 2>&1 || true
-${SUDO} bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
+run_as_user bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
 
 echo "[accept-new] step 4: start demo tool services"
 run_as_user bash scripts/run_tool_services.sh
 
 echo "[accept-new] step 5: start mcpd"
-export LINUX_MCP_MCPD_SUDO="${SUDO}"
-${SUDO} bash scripts/run_mcpd.sh
+run_as_user bash scripts/run_mcpd.sh
 
 echo "[accept-new] step 6: unit probe regressions"
 run_as_user python3 scripts/test_probe_unit.py
 
 echo "[accept-new] step 7: registration-time binary_hash and catalog epoch visible"
 for tool_id in 2 44 45; do
-  pinned="$(tool_binary_hash "$tool_id" || true)"
-  if [[ -z "$pinned" ]]; then
-    echo "FAIL: /sys/kernel/mcp/tools/${tool_id}/binary_hash is empty"
+  state="$(tool_binary_hash_state "$tool_id" || true)"
+  if [[ "$state" != "live_pinned" ]]; then
+    echo "FAIL: tool ${tool_id} binary_hash_state=${state:-<missing>} (expected live_pinned)"
+    echo "  hint: check mcpd log for probe failures (uid allowlist, endpoint refused, interpreter detection, ...)"
     exit 1
   fi
-  echo "  tool ${tool_id} binary_hash=${pinned:0:16}..."
+  pinned="$(tool_binary_hash "$tool_id" || true)"
+  if [[ -z "$pinned" ]]; then
+    echo "FAIL: tool ${tool_id} state=live_pinned but binary_hash is empty — kernel/sysfs disagreement"
+    exit 1
+  fi
+  echo "  tool ${tool_id} state=live_pinned hash=${pinned:0:16}..."
 done
 epoch="$(cat /sys/kernel/mcp/tool_catalog_epoch | tr -d '\n\0 ')" || {
   echo "FAIL: cannot read /sys/kernel/mcp/tool_catalog_epoch"

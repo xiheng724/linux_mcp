@@ -478,6 +478,28 @@ KERNEL_MCP_DEFINE_TOOL_SHOW_STR(hash, hash)
 KERNEL_MCP_DEFINE_TOOL_SHOW_STR(binary_hash, binary_hash)
 KERNEL_MCP_DEFINE_TOOL_SHOW_U32(risk_flags, risk_flags, "0x%08x")
 
+/* binary_hash_state disambiguates the two reasons binary_hash can be
+ * the empty string in sysfs: "never successfully pinned" (unpinned) vs.
+ * "pinned to some value now" (live_pinned). Verifiers (acceptance
+ * scripts, oncall) should check this rather than string-length, since
+ * an empty binary_hash is a security-significant half-failed state
+ * that used to be silently conflated with "probe hasn't run yet".
+ */
+static ssize_t kernel_mcp_tool_binary_hash_state_show(struct kobject *kobj,
+						       struct kobj_attribute *attr,
+						       char *buf)
+{
+	struct kernel_mcp_tool_snapshot snapshot;
+	int ret;
+	(void)attr;
+	ret = kernel_mcp_lookup_tool_snapshot(kobj, &snapshot);
+	if (ret)
+		return ret;
+	return sysfs_emit(buf, "%s\n",
+			  snapshot.binary_hash[0] != '\0' ? "live_pinned"
+							  : "unpinned");
+}
+
 static ssize_t kernel_mcp_tool_registered_at_epoch_show(struct kobject *kobj,
 							struct kobj_attribute *attr,
 							char *buf)
@@ -576,6 +598,9 @@ static struct kobj_attribute kernel_mcp_hash_attr =
 	__ATTR(hash, 0444, kernel_mcp_tool_hash_show, NULL);
 static struct kobj_attribute kernel_mcp_binary_hash_attr =
 	__ATTR(binary_hash, 0444, kernel_mcp_tool_binary_hash_show, NULL);
+static struct kobj_attribute kernel_mcp_binary_hash_state_attr =
+	__ATTR(binary_hash_state, 0444,
+	       kernel_mcp_tool_binary_hash_state_show, NULL);
 static struct kobj_attribute kernel_mcp_risk_flags_attr =
 	__ATTR(risk_flags, 0444, kernel_mcp_tool_risk_flags_show, NULL);
 static struct kobj_attribute kernel_mcp_tool_status_attr =
@@ -588,6 +613,7 @@ static struct attribute *kernel_mcp_tool_attrs[] = {
 	&kernel_mcp_name_attr.attr,
 	&kernel_mcp_hash_attr.attr,
 	&kernel_mcp_binary_hash_attr.attr,
+	&kernel_mcp_binary_hash_state_attr.attr,
 	&kernel_mcp_risk_flags_attr.attr,
 	&kernel_mcp_tool_status_attr.attr,
 	&kernel_mcp_tool_registered_at_epoch_attr.attr,

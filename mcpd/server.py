@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Tuple
 
 try:
-    from config import SecurityConfig, load_security_config
+    from config import ConfigError, SecurityConfig, load_security_config
     from manifest_loader import DEFAULT_MANIFEST_DIR, AppManifest, ToolManifest, load_all_manifests
     from netlink_client import KernelMcpNetlinkClient
     from public_catalog import list_apps_public, list_tools_public
@@ -38,7 +38,7 @@ try:
         validate_pending_approval_req,
     )
 except ModuleNotFoundError:  # pragma: no cover - package import fallback
-    from .config import SecurityConfig, load_security_config
+    from .config import ConfigError, SecurityConfig, load_security_config
     from .manifest_loader import DEFAULT_MANIFEST_DIR, AppManifest, ToolManifest, load_all_manifests
     from .netlink_client import KernelMcpNetlinkClient
     from .public_catalog import list_apps_public, list_tools_public
@@ -1492,6 +1492,19 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     signal.signal(signal.SIGTERM, _signal_handler)
     signal.signal(signal.SIGINT, _signal_handler)
+
+    # Resolve security config up front so an ambiguous uid-trust policy
+    # (e.g. root mcpd with no explicit allowed_backend_uids) causes a
+    # clean startup failure before we touch netlink or the socket.
+    try:
+        sec = _get_security_config()
+    except ConfigError as exc:
+        LOGGER.error("mcpd refusing to start: %s", exc)
+        return 2
+    LOGGER.info(
+        "security: allowed_backend_uids=%s (euid=%d)",
+        list(sec.allowed_backend_uids or ()), os.geteuid(),
+    )
 
     try:
         _kernel_client = KernelMcpNetlinkClient()

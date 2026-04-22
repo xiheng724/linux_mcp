@@ -1,0 +1,62 @@
+[Unit]
+Description=linux-mcp control-plane gateway (mcpd)
+Documentation=file:/opt/linux-mcp/CLAUDE.md
+After=network.target
+# kernel_mcp must be loaded first — mcpd speaks its Generic Netlink
+# family and reads /sys/kernel/mcp/ at startup.
+ConditionPathIsDirectory=/sys/kernel/mcp/tools
+ConditionPathIsDirectory=/sys/kernel/mcp/agents
+
+[Service]
+Type=simple
+
+# Run as a dedicated service user rather than root. The netlink admin
+# operations and /proc/<pid>/exe reads across uids are authorised
+# through AmbientCapabilities instead of uid=0, shrinking the TCB from
+# "full root daemon" to "unprivileged process + two narrow caps".
+#
+# Operator setup (once):
+#   useradd --system --no-create-home --shell /usr/sbin/nologin mcpd
+User=mcpd
+Group=mcpd
+
+AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_PTRACE
+# Cap the permitted set too — anything not listed here is dropped
+# irrevocably at exec, so a downstream subprocess cannot inherit more
+# than mcpd itself can use.
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_PTRACE
+NoNewPrivileges=true
+
+# Hardening that is safe for this workload:
+#   - mcpd only reads /proc and writes its UNIX socket under /tmp/.
+#   - tool-app endpoints live under /tmp/linux-mcp-apps/.
+# PrivateTmp is NOT enabled because /tmp/mcpd.sock and the tool-app
+# socket directory must be shared with the rest of the stack; a private
+# /tmp would make mcpd invisible to llm-app and tool-app.
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+PrivateDevices=true
+ReadWritePaths=/tmp /tmp/linux-mcp-apps
+
+# Config. The allowed_backend_uids key MUST be set explicitly in the
+# TOML for production: mcpd refuses to start with an implicit allowlist
+# when running privileged. See config/mcpd.demo.toml for an example.
+Environment=LINUX_MCP_CONFIG=/etc/linux-mcp/mcpd.toml
+# Explicitly NOT set: LINUX_MCP_TRUST_SUDO_UID. That opt-in is for the
+# demo launcher path only; systemd units must name backend uids in the
+# TOML.
+
+ExecStart=/usr/bin/python3 -u /opt/linux-mcp/mcpd/server.py
+
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target
