@@ -92,35 +92,40 @@ These proposals broaden scope by redesigning OS infrastructure; \texttt{linux-mc
 \begin{table}[t]
 \centering
 \small
-\begin{tabular}{l p{4.8cm} p{5.2cm}}
+\begin{tabular}{l p{4.4cm} p{5.8cm}}
 \toprule
-\textbf{Attack class} & \textbf{Representative attack} & \textbf{Defense in \texttt{linux-mcp}} \\
+\textbf{Attack class} & \textbf{Representative attack} & \textbf{Defence in \texttt{linux-mcp}} \\
 \midrule
 
 Spoofing
-& Forged session identity or mismatched tool hash
-& Kernel-verified identity binding and semantic-hash consistency \\
+& Forged session or tool hash; same-UID session reuse
+& \texttt{SO\_PEERCRED} binding hash over $(\text{uid},\text{gid},\text{pid},\text{session\_id})$; kernel-side hash check \\
 
 Replay
-& Reuse of stale approval tickets or prior requests
-& Kernel-enforced approval lifecycle with binding and lifetime validation \\
+& Stale ticket or session reused across manifest change
+& Ticket bound to \texttt{(binding\_hash, binding\_epoch)} with TTL; per-tool epoch forces rebind on re-registration \\
 
 Substitution
-& Executing a tool diverging from declared semantics
-& Verification of manifest-derived semantic identity \\
+& Tool diverges from declared semantics, or backend binary swapped behind a live socket
+& Kernel-verified manifest hash; TOFU \texttt{binary\_hash} over \texttt{/proc/<pid>/exe} (composite digest for interpreters) \\
 
 Escalation
-& Bypassing gateway checks via logic flaws
-& Mandatory kernel arbitration for all invocations \\
+& Gateway logic bypass
+& Mandatory kernel arbitration on every invocation \\
+
+Audit loss
+& Kill \texttt{mcpd} to erase recent history
+& Fixed-size per-agent \texttt{call\_log} in \texttt{sysfs}, survives daemon crash \\
 
 \bottomrule
 \end{tabular}
-\caption{Control-plane threats and defences (in scope).}
+\caption{Control-plane threats and defences (in scope). The last row is an observability property rather than a classical attack class.}
 \label{tab:threat_in_scope}
 \end{table}
 
 
 \subsection{Threat Model}
+\label{sec:threat-model}
 
 The above limitations suggest that the correctness of MCP-style systems depends on a small set of control-plane invariants, including identity binding, approval validity, and consistency between tool semantics and execution.
 We therefore ground our design in a threat model that focuses on attacks against these invariants in a local-host setting.
@@ -146,7 +151,12 @@ Within this scope, we focus on four classes of control-plane failures:
 (2) \emph{replay} of previously valid requests or approval decisions,
 (3) \emph{substitution} of tool identity or semantics, and
 (4) \emph{escalation} through bypassing admission checks in the gateway.
-These attack classes and their corresponding defences are summarised in Table~\ref{tab:threat_in_scope}.
+A fifth property, \emph{post-compromise audit continuity}, is orthogonal to these four: a gateway crash should not erase the record of recent activity.
+Table~\ref{tab:threat_in_scope} summarises the five and the corresponding kernel-anchored defences.
+Three of those defences go beyond manifest-hash admission alone: trust-on-first-use pinning of the backend binary identity, per-tool catalog-epoch rebind on manifest change, and a fixed-size kernel call log that survives daemon failure.
+Their mechanisms are described in Chapter~\ref{chap:design} and exercised adversarially in \hyperref[chap:evaluation]{Chapter~4}.
 
-These four attack classes directly inform the design of \texttt{linux-mcp} and are revisited in \hyperref[chap:evaluation]{Chapter~4} through targeted adversarial experiments.
+The trusted computing base is the kernel module, the operator's TOML configuration, and the manifest directory.
+\texttt{mcpd} is trusted to populate the kernel's view of the catalog and to bind sessions at connection time; once populated, the integrity of tickets, tool identity, and audit state does not depend on the daemon staying alive.
+The supplied systemd unit (Section~\ref{sec:daemon-implementation}) runs \texttt{mcpd} as an unprivileged user with only \texttt{CAP\_NET\_ADMIN} and \texttt{CAP\_SYS\_PTRACE}, as defence-in-depth rather than part of the model itself.
 

@@ -27,6 +27,7 @@ This property is particularly relevant in the context of daemon failure: if \tex
 These goals impose an explicit scope boundary on the design.
 \texttt{linux-mcp} does not attempt to verify tool semantics at runtime, enforce a general policy language, or address every attack surface in LLM-based systems.
 What it changes is specifically where admission decisions are made and where approval state is maintained.
+The threat model grounding this scope is given in Chapter~\ref{chap:background}, Section~``Threat Model'', and is referenced throughout the mechanism descriptions that follow.
 
 
 
@@ -292,13 +293,18 @@ The semantic hash is the concrete artefact that bridges the two: computed in use
 
 While deferring and resolving a request is mechanically straightforward, binding an approval to the exact session, requester, and operation that triggered it requires explicit ticket-level state and precise matching logic to prevent TOCTOU violations.
 
-In \texttt{linux-mcp}, each session maintained by \texttt{mcpd} is bound to the real peer credentials of its Unix domain socket connection~\cite{stevens2013unix}.
-From these credentials, the daemon derives a \emph{binding hash} and a \emph{binding epoch}.
-When a request enters the \texttt{DEFER} state, the kernel creates an approval ticket and associates it with this binding context.
-Upon receiving an \texttt{APPROVAL\_DECIDE} message, the kernel verifies that the binding context stored in the ticket still matches the current session state before permitting the deferred request to proceed.
+Each session is bound to the real peer credentials of its Unix domain socket connection~\cite{stevens2013unix}.
+From these the daemon derives a binding hash $\operatorname{BLAKE2b}(\text{uid}, \text{gid}, \text{pid}, \text{session\_id})$ and a binding epoch; including \texttt{pid} and a per-session random \texttt{session\_id} means that two processes sharing a UID still cannot reuse each other's session.
+When a request enters \texttt{DEFER}, the kernel creates an approval ticket tagged with this binding context and a five-minute expiry.
+On \texttt{APPROVAL\_DECIDE}, it checks that the ticket's binding still matches the current session before letting the request proceed.
 
-This mechanism ensures that approvals cannot be replayed across sessions or misdirected to structurally similar but distinct requests.
-More importantly, it guarantees that the system state validated at deferral time is identical to the state at execution time, eliminating time-of-check-to-time-of-use (TOCTOU) inconsistencies~\cite{bishop2003computer, lee2021exprace}.
+This rules out approval replay across sessions and ensures the state validated at deferral matches the state at execution, eliminating TOCTOU inconsistencies~\cite{bishop2003computer, lee2021exprace}.
+
+\paragraph{Catalog-epoch rebind on manifest change.}
+A second form of staleness arises when the catalog changes while a session is open: without further mechanism, a client could continue invoking a re-registered tool under its pre-change binding.
+The kernel therefore maintains a global \texttt{tool\_catalog\_epoch} counter, incremented on every (un)registration; each tool records its \texttt{registered\_at\_epoch}, and each session its \texttt{opened\_at\_epoch}.
+If a \texttt{TOOL\_REQUEST} targets a tool re-registered after the session opened, it is denied with \texttt{catalog\_stale\_rebind\_required} and the client must open a new session.
+The check is per-tool rather than global, so editing an unrelated manifest does not invalidate sessions that never touched it.
 
 Beyond basic ticket binding, the implementation exposes a more nuanced structure: \texttt{linux-mcp} employs \emph{two layers of arbitration} and supports \emph{two distinct approval paths}.
 
@@ -348,14 +354,29 @@ The arbitration logic is deliberately narrow.
 For a \texttt{TOOL\_REQUEST} to be admitted, three conditions must all hold: the submitting agent must appear in the agent registry, the target tool must appear in the tool registry, and the semantic hash supplied by \texttt{mcpd} must match the hash recorded at registration time.
 If the tool's manifest marks it as requiring explicit approval, the request is deferred rather than immediately allowed.
 
-The module also exports state through \texttt{sysfs}.
-Under \texttt{/sys/kernel/mcp/tools/}, each tool has a directory containing its name, hash, and associated metadata.
-Under \texttt{/sys/kernel/mcp/agents/}, per-agent entries record counters such as \texttt{allow}, \texttt{defer}, \texttt{completed\_ok}, and \texttt{last\_exec\_ms}, together with a human-readable \texttt{last\_reason} field.
-This observability is valuable both during development and during evaluation: the experimenter can verify which tools are registered, confirm which hashes the kernel regards as authoritative, and inspect the kernel's view of agent activity independently of any daemon-side logs.
+\paragraph{Trust-on-first-use backend binary pinning.}
+Semantic-hash admission guards what a tool claims to be, not which binary actually serves the socket.
+The kernel therefore keeps a per-tool \texttt{binary\_hash} slot populated on first use: \texttt{mcpd} reads the backend's peer PID via \texttt{SO\_PEERCRED} and hashes \texttt{/proc/<pid>/exe}, using a composite digest over interpreter plus script for interpreter-hosted tools so a script swap is still caught.
+The digest is attached to the first \texttt{TOOL\_REGISTER}; later registrations or requests carrying a different digest are rejected.
+A \texttt{binary\_hash\_state} field (\texttt{unpinned} or \texttt{live\_pinned}) distinguishes ``no probe yet'' from ``pinned'', since both previously read as an empty string.
+
+\paragraph{Kernel-resident call log.}
+Each agent carries a fixed-size circular buffer of invocation records.
+A record is a flat struct: request id, timestamp, tool id, status, execution latency, a tool status code (analogous to a process exit code), 8-byte payload and response hash prefixes, and the leading bytes of any error output.
+Records are written on both the \texttt{ALLOW}+\texttt{TOOL\_COMPLETE} and \texttt{DENY}/\texttt{DEFER} paths, so successful, rejected, and deferred invocations are all captured.
+The kernel does no JSON parsing; \texttt{mcpd} precomputes the hashes and passes them as fixed-width attributes.
+The buffer is exported through \texttt{sysfs} as a binary attribute, so recent history can be read back after \texttt{mcpd} crashes.
+This is crash-visible audit, not tamper-evident provenance: the buffer is bounded and the hashes are 8-byte prefixes.
+
+\paragraph{Sysfs surface.}
+Under \texttt{/sys/kernel/mcp/tools/}, each tool directory exposes \texttt{name}, semantic \texttt{hash}, \texttt{binary\_hash}, \texttt{binary\_hash\_state}, and \texttt{registered\_at\_epoch}; the global \texttt{tool\_catalog\_epoch} sits at the top of the tree.
+Under \texttt{/sys/kernel/mcp/agents/}, per-agent entries expose \texttt{allow}/\texttt{defer}/\texttt{completed\_ok}/\texttt{last\_exec\_ms} counters, a human-readable \texttt{last\_reason}, and the \texttt{call\_log} above with its head and count indices.
+This lets an operator check what the kernel regards as authoritative without relying on daemon-side logs.
 
 
 
 \subsection{Daemon Implementation}
+\label{sec:daemon-implementation}
 
 The kernel enforces the critical state transitions, but \texttt{mcpd} does most of the actual work.
 It is organised around four modules: manifest loading and semantic hashing, session storage and binding-context management, Netlink communication with the kernel, and request forwarding to tool services.
@@ -371,6 +392,16 @@ A dedicated, long-lived socket is maintained rather than opening a new connectio
 Per-stage timing covering session lookup, kernel arbitration, tool execution, and end-to-end latency can optionally be recorded for each invocation, which is useful for separating control-plane overhead from tool-side processing time during evaluation.
 
 The server-facing side of \texttt{mcpd} handles two distinct roles: it exposes the catalog and invocation interfaces consumed by \texttt{llm-app}, and it forwards admitted requests to the appropriate \texttt{tool-app} service via the same Unix domain socket transport used on the tool side.
+
+\paragraph{Deployment and fail-closed configuration.}
+\texttt{mcpd} needs \texttt{CAP\_NET\_ADMIN} for Netlink administration and \texttt{CAP\_SYS\_PTRACE} for reading \texttt{/proc/<pid>/exe} across uid boundaries during the backend probe.
+The supplied systemd unit grants both via \texttt{AmbientCapabilities} and runs the daemon as an unprivileged \texttt{mcpd} user with \texttt{NoNewPrivileges} and a read-only bind mount of the manifest directory, so gateway RCE cannot load kernel modules or mutate manifests.
+
+A separate question is which UIDs the daemon accepts as tool backends.
+\texttt{allowed\_backend\_uids} is checked via \texttt{SO\_PEERCRED} on both probe and exec dials.
+An unprivileged \texttt{mcpd} defaults to its own UID.
+A privileged \texttt{mcpd} has no safe default: trusting only UID~0 would reject every realistic non-root backend and leave \texttt{binary\_hash} unpinned, while trusting \texttt{\$SUDO\_UID} would fold launcher-script state into the daemon's trust boundary.
+The daemon therefore refuses to start unless the list is declared in the TOML or the operator explicitly opts in to \texttt{\$SUDO\_UID} trust via an environment variable.
 
 
 
@@ -391,12 +422,13 @@ A design that splits state across the kernel and a user-space daemon must handle
 \texttt{mcpd} may restart, intentionally during development or unintentionally following a crash, while the kernel module remains loaded with its existing registry state.
 If manifests change between a crash and a restart, the tool hashes registered in the kernel will no longer match the hashes derived from the current manifest files, and subsequent \texttt{TOOL\_REQUEST} messages will be denied with a \texttt{hash\_mismatch} error.
 
-\texttt{linux-mcp} addresses this with a conservative reconciliation strategy.
-On startup, \texttt{mcpd} issues a \texttt{RESET\_TOOLS} command to clear the kernel-side tool registry, then re-registers the full set of tools from the current manifest state.
-The system unconditionally rebuilds state from the manifest source of truth; no attempt is made to assess whether residual kernel state is still valid.
-This trade-off is appropriate for a research prototype, where state correctness and auditability take precedence over minimising re-registration overhead.
+Reconciliation runs in two modes.
+At cold start, \texttt{mcpd} issues \texttt{RESET\_TOOLS} and re-registers the full manifest set, rebuilding kernel state from scratch rather than trying to decide whether residual state is still valid.
+While the daemon is running, manifest changes are applied incrementally: only mutated tools re-register, and each such call advances both the tool's \texttt{registered\_at\_epoch} and the global \texttt{tool\_catalog\_epoch}.
+If the backend's peer UID or binary digest has changed, the kernel TOFU slot is cleared before re-registration so the new digest can be pinned without inheriting the stale one.
+Together with the epoch-driven rebind described earlier, this gives a real hot-reload path: only the affected tools re-register, and only the sessions that actually referenced them are forced to rebind.
 
-Session state is lost on crash, since the binding context for in-progress sessions exists only in the daemon process; approval tickets and registry state held in the kernel are not.
+Session state is lost on crash, since the binding context for in-progress sessions exists only in the daemon process; approval tickets, registry state, and the per-agent \texttt{call\_log} held in the kernel are not.
 The durability of that kernel-held state across daemon failure is verified experimentally in Section~\ref{sec:daemon-failure}.
 
 
@@ -428,5 +460,10 @@ The cost is that a full kernel module is needed, where a policy hook or a BPF pr
 
 \subsection{Limitations and Identified Optimisation Opportunities}
 
-The current implementation makes five deliberate simplifications appropriate for a prototype: a global registry lock, unconditional \texttt{RESET\_TOOLS} reconciliation on restart, per-registration Netlink round-trips, no hot-reload path, and no approval-ticket TTL or garbage collection.
-Each has a natural resolution direction; these are elaborated in Section~\ref{sec:further-work}.
+The prototype makes several deliberate simplifications.
+A single global lock protects the kernel registries; this is adequate at evaluated catalog sizes but a scalability concern under higher concurrency.
+Cold-start reconciliation is unconditional: every launch pays a \texttt{RESET\_TOOLS} plus a full \texttt{TOOL\_REGISTER} sweep, even when manifests are unchanged.
+Hot reload is supported at run time but not wired to \texttt{inotify}, so a manifest edit on disk needs an explicit signal into \texttt{mcpd}.
+Approval tickets carry a five-minute deadline but are not actively swept; expired tickets linger until touched.
+The kernel does no per-agent rate limiting; throttling is left to \texttt{mcpd}.
+Resolution directions are discussed in Section~\ref{sec:further-work}.
