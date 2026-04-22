@@ -99,15 +99,15 @@ These proposals broaden scope by redesigning OS infrastructure; \texttt{linux-mc
 
 Spoofing
 & Forged session or tool hash; same-UID session reuse
-& \texttt{SO\_PEERCRED} binding hash over $(\text{uid},\text{gid},\text{pid},\text{session\_id})$; kernel-side hash check \\
+& \texttt{SO\_\allowbreak PEERCRED} binding hash over $(\text{uid},\text{gid},\text{pid},\text{session\_id})$; kernel-side hash check \\
 
 Replay
 & Stale ticket or session reused across manifest change
-& Ticket bound to \texttt{(binding\_hash, binding\_epoch)} with TTL; per-tool epoch forces rebind on re-registration \\
+& Ticket bound to \texttt{(binding\_\allowbreak hash, binding\_\allowbreak epoch)} with TTL; per-tool epoch forces rebind on re-registration \\
 
 Substitution
 & Tool diverges from declared semantics, or backend binary swapped behind a live socket
-& Kernel-verified manifest hash; TOFU \texttt{binary\_hash} over \texttt{/proc/<pid>/exe} (composite digest for interpreters) \\
+& Kernel-verified manifest hash; TOFU \texttt{binary\_\allowbreak hash} over \texttt{/\allowbreak proc/\allowbreak <pid>/\allowbreak exe} (composite digest for interpreters) \\
 
 Escalation
 & Gateway logic bypass
@@ -137,16 +137,16 @@ Third, the two dominant remote-oriented threats in AI agent systems (prompt inje
 The threat model therefore focuses on what kernel enforcement can actually address: a co-located process that can observe, forge, or replay control-plane messages.
 
 Concretely, the adversary model has the following capabilities: (1) arbitrary code execution on the host as an unprivileged process; (2) access to Unix domain sockets exposed by the gateway; (3) ability to observe, craft, and replay JSON-RPC messages; and (4) full knowledge of the MCP protocol, tool manifests, and \texttt{linux-mcp} implementation (consistent with Kerckhoffs's principle).
-The attacker interacts exclusively through the \texttt{mcpd} JSON-RPC surface and holds no elevated capabilities: specifically, no \texttt{CAP\_NET\_ADMIN} (required to invoke the kernel module via Netlink), no \texttt{ptrace} access to \texttt{mcpd}, and no write access to manifest files.
-These three boundaries are critical: \texttt{CAP\_NET\_ADMIN} is the interface to kernel enforcement; \texttt{ptrace} would allow process manipulation; manifest write would break the trusted-input assumption.
+The attacker interacts exclusively through the \texttt{mcpd} JSON-RPC surface and holds no elevated capabilities: specifically, no \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} (required to invoke the kernel module via Netlink), no \texttt{ptrace} access to \texttt{mcpd}, and no write access to manifest files.
+These three boundaries are critical: \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} is the interface to kernel enforcement; \texttt{ptrace} would allow process manipulation; manifest write would break the trusted-input assumption.
 
 Two dominant attack categories in AI agent systems fall outside this scope.
 \emph{Prompt injection} operates at the model's reasoning layer, before any \texttt{tool:exec} request is submitted; kernel admission control has no visibility into the planning process \cite{greshake2023prompt, liu2023prompt}.
-\emph{Supply-chain compromise of manifests} requires file-system-level defences such as Integrity Measurement Architecture or device-mapper verity; \texttt{linux-mcp} treats on-disk manifests as trusted input and assumes the adversary lacks write access to \texttt{tool-app/manifests/}.
-Also excluded from our scope are process-level attacks on the gateway, including ptrace, memory corruption, and \texttt{LD\_PRELOAD}, as well as kernel-level attacks such as rootkits and hardware side channels, and remote adversaries.
+\emph{Supply-chain compromise of manifests} requires file-system-level defences such as Integrity Measurement Architecture or device-mapper verity; \texttt{linux-mcp} treats on-disk manifests as trusted input and assumes the adversary lacks write access to \texttt{tool-app/\allowbreak manifests/}.
+Also excluded from our scope are process-level attacks on the gateway, including ptrace, memory corruption, and \texttt{LD\_\allowbreak PRELOAD}, as well as kernel-level attacks such as rootkits and hardware side channels, and remote adversaries.
 Trust in \texttt{mcpd} is time-partitioned rather than absolute.
 At initialisation, the daemon is trusted to register manifest hashes and bind sessions to peer credentials; this is the one phase where kernel state depends on daemon correctness.
-At run time, no such trust is assumed: every \texttt{TOOL\_REQUEST} and \texttt{APPROVAL\_DECIDE} is re-checked against kernel-resident registry and ticket state, so the placement defends against (a) daemon logic bugs such as session-id mismatch, missed ticket transitions, or concurrent TOCTOU, and (b) unprivileged co-located adversaries observing or forging JSON-RPC traffic.
+At run time, no such trust is assumed: every \texttt{TOOL\_\allowbreak REQUEST} and \texttt{APPROVAL\_\allowbreak DECIDE} is re-checked against kernel-resident registry and ticket state, so the placement defends against (a) daemon logic bugs such as session-id mismatch, missed ticket transitions, or concurrent TOCTOU, and (b) unprivileged co-located adversaries observing or forging JSON-RPC traffic.
 It still does not protect against a gateway whose process memory has been directly compromised during the initialisation phase or otherwise.
 
 Within this scope, we focus on four classes of control-plane failures:
@@ -161,5 +161,5 @@ Their mechanisms are described in Chapter~\ref{chap:design} and exercised advers
 
 The trusted computing base is the kernel module, the operator's TOML configuration, and the manifest directory.
 \texttt{mcpd} is trusted to populate the kernel's view of the catalog and to bind sessions at connection time; once populated, the integrity of tickets, tool identity, and audit state does not depend on the daemon staying alive.
-The supplied systemd unit (Section~\ref{sec:daemon-implementation}) runs \texttt{mcpd} as an unprivileged user with only \texttt{CAP\_NET\_ADMIN} and \texttt{CAP\_SYS\_PTRACE}, as defence-in-depth rather than part of the model itself.
+The supplied systemd unit (Section~\ref{sec:daemon-implementation}) runs \texttt{mcpd} as an unprivileged user with only \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} and \texttt{CAP\_\allowbreak SYS\_\allowbreak PTRACE}, as defence-in-depth rather than part of the model itself.
 

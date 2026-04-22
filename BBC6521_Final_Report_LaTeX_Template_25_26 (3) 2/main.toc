@@ -32,10 +32,9 @@
 \contentsline {subsection}{\numberline {3.8}Daemon Implementation}{23}{subsection.3.8}%
 \contentsline {paragraph}{Deployment and fail-closed configuration.}{24}{paragraph*.14}%
 \contentsline {subsection}{\numberline {3.9}Tool-Side RPC and Execution Model}{24}{subsection.3.9}%
-\contentsline {subsection}{\numberline {3.10}State Reconciliation and Recovery}{25}{subsection.3.10}%
-\contentsline {subsection}{\numberline {3.11}Rationale for the Kernel--User-Space Split}{25}{subsection.3.11}%
-\contentsline {subsection}{\numberline {3.12}Limitations and Identified Optimisation Opportunities}{26}{subsection.3.12}%
-\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{27}{subsection.3.12}%
+\contentsline {subsection}{\numberline {3.10}Rationale for the Kernel--User-Space Split}{25}{subsection.3.10}%
+\contentsline {subsection}{\numberline {3.11}Limitations and Identified Optimisation Opportunities}{26}{subsection.3.11}%
+\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{27}{subsection.3.11}%
 \contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{27}{subsection.4.1}%
 \contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{33}{subsection.4.2}%
 \contentsline {subsection}{\numberline {4.3}Registry Scaling}{34}{subsection.4.3}%

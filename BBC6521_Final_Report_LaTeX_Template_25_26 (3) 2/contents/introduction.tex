@@ -23,14 +23,14 @@ This leads to a concrete question: which control-plane invariants in MCP-style t
 \texttt{linux-mcp} addresses this by moving admission control, approval state, binding checks, and durable observability into a Linux kernel module, while leaving semantic parsing and tool execution in user space.
 This is not a full AI-native operating system; the kernel role is deliberately narrow, enforcing only the invariants user-space cannot reliably hold.
 
-The architecture has four layers: an LLM client (\texttt{llm-app}), a manifest-aware gateway (\texttt{mcpd}), a Generic-Netlink-based kernel control plane (\texttt{kernel\_mcp}), and resident tool services over Unix domain sockets.
+The architecture has four layers: an LLM client (\texttt{llm-app}), a manifest-aware gateway (\texttt{mcpd}), a Generic-Netlink-based kernel control plane (\texttt{kernel\_\allowbreak mcp}), and resident tool services over Unix domain sockets.
 Every tool invocation follows a fixed path through all four layers; no request reaches a tool service without first obtaining an explicit kernel admission decision.
 The component responsibilities are detailed in Section~\ref{sec:system-architecture}, and the rationale for the kernel--user-space split is developed in Section~\ref{sec:design-alternatives}.
 
 This split partitions the gateway's trust along a time axis.
 At initialisation, \texttt{mcpd} is trusted to populate the kernel registries with manifest-derived tool identities and to bind sessions to peer credentials.
-At run time, it is no longer fully trusted: every \texttt{TOOL\_REQUEST} is independently re-checked in the kernel, so a session-id mismatch, a skipped ticket transition, or a TOCTOU race in the daemon is rejected rather than admitted.
-Registry entries, approval tickets, and binding checks therefore reside in the kernel, gated by \texttt{CAP\_NET\_ADMIN}-protected Generic Netlink access, durable across daemon failure, and inaccessible to unprivileged processes.
+At run time, it is no longer fully trusted: every \texttt{TOOL\_\allowbreak REQUEST} is independently re-checked in the kernel, so a session-id mismatch, a skipped ticket transition, or a TOCTOU race in the daemon is rejected rather than admitted.
+Registry entries, approval tickets, and binding checks therefore reside in the kernel, gated by \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-protected Generic Netlink access, durable across daemon failure, and inaccessible to unprivileged processes.
 
 This position is deliberately narrower than either extreme in prior work.
 AIOS-style proposals offer strong guarantees by replacing OS infrastructure, at the cost of deployability on existing systems.
@@ -89,7 +89,7 @@ Failure resilience
 This paper makes the following contributions:
 \begin{itemize}
     \item \textbf{A kernel-resident control-plane for tool invocation.}
-    We implement \texttt{kernel\_mcp}, a Linux kernel module that maintains tool and agent registries, arbitrates invocation decisions, and manages the approval-ticket lifecycle, all behind a \texttt{CAP\_NET\_ADMIN}-gated Generic Netlink interface.
+    We implement \texttt{kernel\_\allowbreak mcp}, a Linux kernel module that maintains tool and agent registries, arbitrates invocation decisions, and manages the approval-ticket lifecycle, all behind a \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-gated Generic Netlink interface.
     The module holds no JSON parser and executes no tool code; its sole role is to keep admission state durable across daemon failure and unreachable from unprivileged processes.
     
     \item \textbf{A manifest-aware gateway that bridges semantics and enforcement.}

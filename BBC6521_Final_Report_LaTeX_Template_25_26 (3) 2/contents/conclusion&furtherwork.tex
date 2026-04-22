@@ -12,12 +12,12 @@ These four properties are structurally hard to hold in a user-space gateway, bec
 Everything else has no such requirement and belongs in user space, where flexibility matters and mistakes are cheap to fix.
 
 \texttt{linux-mcp} is one concrete shape this split can take.
-A small Linux kernel module holds the registries, arbitrates admission, and owns the approval-ticket lifecycle behind a \texttt{CAP\_NET\_ADMIN}-gated Netlink interface; a user-space daemon loads manifests, derives semantic hashes, binds sessions to UDS peer credentials, and forwards admitted requests to tool services.
+A small Linux kernel module holds the registries, arbitrates admission, and owns the approval-ticket lifecycle behind a \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-gated Netlink interface; a user-space daemon loads manifests, derives semantic hashes, binds sessions to UDS peer credentials, and forwards admitted requests to tool services.
 The gateway is still fully trusted to populate the kernel's view of the world, but once that view is populated, its integrity no longer depends on the daemon staying alive or staying correct.
 Approval tickets and registry entries sit in kernel memory, out of reach of unprivileged processes, and still there after a daemon crash.
 
 In the tested prototype, the kernel path enforced all specified control-plane invariants across the targeted attack set, while both user-space baselines permitted meaningful bypass rates; latency and throughput remained close to the user-space baseline throughout.
-A separate extended-attack rerun covering TOCTOU, cross-UID session hijack, and a 30-minute Generic Netlink dumb fuzzer additionally surfaced a missing peer-credential check in the stock kernel module — the kind of absence that design-time review is unlikely to catch — and closed it with a six-line patch at no measurable latency cost.
+A separate extended-attack rerun covering TOCTOU, cross-UID session hijack, and a 30-minute Generic Netlink dumb fuzzer additionally surfaced a missing peer-credential check in the stock kernel module --- the kind of absence that design-time review is unlikely to catch --- and closed it with a six-line patch at no measurable latency cost.
 These results are not intended as a claim of adversarial robustness or production-scale performance, since the attack set remains a functional-correctness test of the specified invariants and the evaluation was conducted inside a single VM.
 They are nevertheless sufficient to show that the split is workable: the enforcement gains are real, the overhead is small, and neither the LLM client nor tool authors need to change anything beyond providing a JSON manifest.
 
@@ -64,9 +64,9 @@ Second, the approval mechanism can be developed into a more complete governance 
 The present design supports defer-and-decide control for sensitive operations, but real deployments may require approval delegation, bounded approval scope, revocation, expiry policies, and richer audit trails linking each decision to a concrete execution context. 
 Strengthening this path would make \texttt{linux-mcp} more suitable for environments with accountability or compliance requirements.
 
-Third, recovery behaviour can be improved further. The current prototype already preserves kernel-held registry and approval state across daemon failure, but reconciliation is deliberately conservative and session-level state is rebuilt after restart. 
-A more mature design could provide more systematic restart handling, richer recovery metadata, and clearer support for interrupted or partially completed requests.
-This becomes particularly important for long-running agent workflows, where failure and restart are routine occurrences.
+Third, recovery behaviour can be refined. The current prototype preserves kernel-held registry and approval state across daemon failure, but reconciliation is deliberately conservative: cold start unconditionally re-registers the full manifest set, and daemon-local state (sessions and the \texttt{req\_\allowbreak id}-to-ticket map) is discarded rather than reconstructed, so clients must reopen a session before they can resume.
+A more mature design could make the cold-start sweep conditional on an observable divergence signal, carry richer recovery metadata for interrupted requests, and expose a path for clients to resume a still-valid approval ticket without reopening a session.
+This matters most in long-running agent workflows, where failure and restart are routine.
 
 Fourth, the evaluation can be extended substantially.
 The current study includes a dedicated registry-scaling experiment that already pushes the kernel catalogue to \num{16384} tools and shows flat lookup latency across three orders of magnitude of $N$, but several adjacent regimes remain uncharacterised.
@@ -77,4 +77,4 @@ Comparison against additional hardened user-space designs would also help sharpe
 Finally, this work opens a broader research question: which other agent-oriented abstractions deserve operating-system support?
 \texttt{linux-mcp} shows that a small but consequential part of the MCP control plane benefits from OS-level support without requiring AI agents to become first-class OS citizens or requiring a new OS substrate.
 This project focuses on admission control for tool invocation, but similar arguments may extend to execution budgets, provenance across tool chains, durable approval logs, or agent-scoped resource accounting.
-Exploring these directions would help clarify whether support for AI agents should be understood as entirely new operating system substrates.
+Exploring these directions would help clarify whether agent-aware OS support is best added incrementally, as in the present design, or eventually justifies a dedicated substrate.
