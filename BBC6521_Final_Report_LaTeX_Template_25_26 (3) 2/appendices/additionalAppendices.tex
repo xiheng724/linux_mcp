@@ -83,8 +83,8 @@ def encode_tool_request(agent_id, tool_id, req_id,
 
 \paragraph{Semantic hash computation.}
 
-The semantic hash used for tool identity is a full 256-bit SHA-256 digest computed over a canonical JSON serialisation of the following manifest fields: \texttt{tool\_id}, \texttt{name}, \texttt{app\_id}, \texttt{app\_name}, \texttt{risk\_tags}, \texttt{description}, \texttt{input\_schema}, \texttt{examples}, \texttt{path\_semantics}, and \texttt{approval\_policy}.
-The \texttt{endpoint} field is deliberately excluded so that redeployment to a new socket path does not invalidate the kernel registration.
+The semantic hash used for tool identity is a full 256-bit SHA-256 digest computed over a canonical JSON serialisation of the following manifest fields: \texttt{tool\_id}, \texttt{name}, \texttt{app\_id}, \texttt{app\_name}, \texttt{risk\_tags}, \texttt{description}, \texttt{input\_schema}, \texttt{examples}, \texttt{path\_semantics}, \texttt{approval\_policy}, and \texttt{operation}.
+The \texttt{endpoint} and \texttt{transport} fields are deliberately excluded so that redeployment to a new socket path or transport does not invalidate the kernel registration; \texttt{operation} remains in-hash because it selects the RPC method actually executed on the backend.
 
 \begin{lstlisting}[style=codestyle, language=Python, caption={Python fragment: computing the manifest-derived semantic hash used for tool identity.}]
 import json, hashlib
@@ -140,7 +140,7 @@ A 32-bit prefix (8 hex characters) would be vulnerable to birthday collisions af
 \texttt{path\_semantics}  & \ding{51} & Path interpretation hints (e.g., \texttt{"repo\_rel"}) \\
 \texttt{approval\_policy} & \ding{51} & Policy name triggering kernel DEFER; null for unrestricted tools \\
 \rowcolor{gray!8}
-\texttt{operation}        & \ding{55} & Operation string forwarded to the tool service \\
+\texttt{operation}        & \ding{51} & RPC method invoked on the backend; in-hash so a retarget changes tool identity \\
 \texttt{timeout\_ms}      & \ding{55} & Per-invocation execution timeout (operational metadata) \\
 \bottomrule
 \end{tabular}

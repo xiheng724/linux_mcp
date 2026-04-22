@@ -366,11 +366,12 @@ On the kernel path, a daemon restart is just a reconciliation pass against state
 This is not a clever optimisation; it falls out of where the state lives.
 A forced restart mid-workflow is also, in practice, a far more common event than any of the controlled attack attempts the security evaluation tests.
 
-The extended-attack results introduce one piece of genuine bad news and one genuine good one.
-The bad news is that the cross-UID experiment surfaced a missing peer-credential check in the stock binary — exactly the kind of invariant a kernel-held control plane is supposed to enforce, and exactly the kind of defect a design-time review is unlikely to catch because the offending code is an absence rather than a presence.
-The good news is that the fix is six lines, costs no measurable latency, and closes the A/B gap completely.
-That kind of finding is the reason for running the extended-attack rerun at all: the design-time threat model and the category-level harness both pointed at 0\% bypass, and only a different experiment with a different premise was able to surface the hole.
-For any future kernel-assisted control plane the lesson is cheap — a peer-credential compare on entry to every privileged command handler, added at registration, not as an afterthought.
+The extended-attack results exposed a defect in the stock binary that the design-time harness did not cover.
+In the cross-UID experiment, \texttt{kernel\_mcp\_cmd\_tool\_request} did not compare \texttt{NETLINK\_CB(skb)} peer credentials against the UID recorded at agent registration, so requests from UID $B$ reached the handler as if they had originated from UID $A$.
+Of the 500 attempts, 174 passed the checks enforced by the stock binary and would have been admitted to tool execution.
+We fixed this with a six-line peer-credential check on entry to the handler, guarded by a \texttt{require\_peer\_cred} module parameter so the A/B comparison could use the same binary.
+With the check enabled, all 500 attempts were blocked before any registry work ran, and the added comparison had no measurable latency cost.
+The practical takeaway is that peer-credential checks belong at the entry point of every privileged command handler, not as an afterthought.
 
 What the evaluation does not settle is behaviour beyond the concurrency window it sweeps.
 Inside the clean window up to 100 concurrent requests the kernel path holds a stable $\sim$10\% throughput gap against plain user-space without diverging; outside it, the global registry lock is an obvious suspect for a bottleneck and the current prototype does not decompose it.

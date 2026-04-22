@@ -241,31 +241,31 @@
 \@writefile{toc}{\contentsline {paragraph}{Complete Netlink attribute encoding.}{77}{paragraph*.31}\protected@file@percent }
 \@writefile{lol}{\contentsline {lstlisting}{\numberline {4}Python fragment: encoding a \texttt  {TOOL\_REQUEST} Generic Netlink message (mcpd $\to $ kernel).}{78}{lstlisting.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Semantic hash computation.}{78}{paragraph*.32}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {5}Python fragment: computing the manifest-derived semantic hash used for tool identity.}{78}{lstlisting.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Complete manifest field specification.}{79}{paragraph*.33}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Manifest field specification. {\Pifont {pzd}\char 51}~= included in the SHA-256 semantic identity hash; {\Pifont {pzd}\char 55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt  {app\_id}; tool-level fields appear once per tool entry.}}{79}{table.12}\protected@file@percent }
-\newlabel{tab:manifest-fields}{{12}{79}{Manifest field specification. \ding {51}~= included in the SHA-256 semantic identity hash; \ding {55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt {app\_id}; tool-level fields appear once per tool entry}{table.12}{}}
 \citation{openclaw2026}
 \citation{openclaw_security1,openclaw_security2}
 \citation{harness2025}
 \citation{mei2024aios,liu2026agentos}
 \citation{langchain2022,langgraph2024}
 \citation{apple2024pcc}
-\@writefile{toc}{\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{80}{section*.34}\protected@file@percent }
-\newlabel{sec:appendix-comparison}{{5.3}{80}{}{section*.34}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Comparison of representative agent systems. The key differentiator for \texttt  {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{80}{table.13}\protected@file@percent }
-\newlabel{tab:system_comparison}{{13}{80}{Comparison of representative agent systems. The key differentiator for \texttt {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.13}{}}
-\@writefile{toc}{\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{80}{section*.35}\protected@file@percent }
-\newlabel{sec:appendix-experiment-uapi}{{5.3}{80}{}{section*.35}{}}
-\@writefile{toc}{\contentsline {paragraph}{Noise-floor command: \texttt  {KMCP\_CMD\_NOOP}.}{80}{paragraph*.36}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {6}UAPI additions for the noise-floor command and the stage-ablation experiment flags (kernel-mcp/include/uapi/linux/kernel\_mcp\_schema.h).}{80}{lstlisting.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Peer-credential enforcement: \texttt  {require\_peer\_cred}.}{81}{paragraph*.37}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {7}Peer-credential enforcement patch in \texttt  {kernel\_mcp\_main.c}, gated behind the \texttt  {require\_peer\_cred} module parameter.}{81}{lstlisting.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Summary of experiment-only switches.}{82}{paragraph*.38}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Experiment-only kernel switches added for the \hyperref  [chap:evaluation]{Chapter~4} rerun. All four \texttt  {SKIP\_*} bits are ignored when the kernel is built without \texttt  {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt  {require\_peer\_cred} is runtime-toggleable on any build.}}{82}{table.14}\protected@file@percent }
-\newlabel{tab:experiment-switches}{{14}{82}{Experiment-only kernel switches added for the \hyperref [chap:evaluation]{Chapter~4} rerun. All four \texttt {SKIP\_*} bits are ignored when the kernel is built without \texttt {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt {require\_peer\_cred} is runtime-toggleable on any build}{table.14}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{83}{section*.39}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {5}Python fragment: computing the manifest-derived semantic hash used for tool identity.}{79}{lstlisting.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Complete manifest field specification.}{79}{paragraph*.33}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{79}{section*.34}\protected@file@percent }
+\newlabel{sec:appendix-comparison}{{5.3}{79}{}{section*.34}{}}
+\@writefile{toc}{\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{79}{section*.35}\protected@file@percent }
+\newlabel{sec:appendix-experiment-uapi}{{5.3}{79}{}{section*.35}{}}
+\@writefile{toc}{\contentsline {paragraph}{Noise-floor command: \texttt  {KMCP\_CMD\_NOOP}.}{79}{paragraph*.36}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {6}UAPI additions for the noise-floor command and the stage-ablation experiment flags (kernel-mcp/include/uapi/linux/kernel\_mcp\_schema.h).}{79}{lstlisting.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Manifest field specification. {\Pifont {pzd}\char 51}~= included in the SHA-256 semantic identity hash; {\Pifont {pzd}\char 55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt  {app\_id}; tool-level fields appear once per tool entry.}}{80}{table.12}\protected@file@percent }
+\newlabel{tab:manifest-fields}{{12}{80}{Manifest field specification. \ding {51}~= included in the SHA-256 semantic identity hash; \ding {55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt {app\_id}; tool-level fields appear once per tool entry}{table.12}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Comparison of representative agent systems. The key differentiator for \texttt  {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{81}{table.13}\protected@file@percent }
+\newlabel{tab:system_comparison}{{13}{81}{Comparison of representative agent systems. The key differentiator for \texttt {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.13}{}}
+\@writefile{toc}{\contentsline {paragraph}{Peer-credential enforcement: \texttt  {require\_peer\_cred}.}{82}{paragraph*.37}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {7}Peer-credential enforcement patch in \texttt  {kernel\_mcp\_main.c}, gated behind the \texttt  {require\_peer\_cred} module parameter.}{82}{lstlisting.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Summary of experiment-only switches.}{83}{paragraph*.38}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Experiment-only kernel switches added for the \hyperref  [chap:evaluation]{Chapter~4} rerun. All four \texttt  {SKIP\_*} bits are ignored when the kernel is built without \texttt  {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt  {require\_peer\_cred} is runtime-toggleable on any build.}}{83}{table.14}\protected@file@percent }
+\newlabel{tab:experiment-switches}{{14}{83}{Experiment-only kernel switches added for the \hyperref [chap:evaluation]{Chapter~4} rerun. All four \texttt {SKIP\_*} bits are ignored when the kernel is built without \texttt {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt {require\_peer\_cred} is runtime-toggleable on any build}{table.14}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{84}{section*.39}\protected@file@percent }
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\@writefile{lot}{\contentsline {table}{\numberline {15}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{85}{table.15}\protected@file@percent }
-\newlabel{tab:risk_assessment}{{15}{85}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.15}{}}
-\gdef \@abspage@last{86}
+\@writefile{lot}{\contentsline {table}{\numberline {15}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{86}{table.15}\protected@file@percent }
+\newlabel{tab:risk_assessment}{{15}{86}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.15}{}}
+\gdef \@abspage@last{87}

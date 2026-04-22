@@ -27,10 +27,10 @@ The architecture has four layers: an LLM client (\texttt{llm-app}), a manifest-a
 Every tool invocation follows a fixed path through all four layers; no request reaches a tool service without first obtaining an explicit kernel admission decision.
 The component responsibilities are detailed in Section~\ref{sec:system-architecture}, and the rationale for the kernel--user-space split is developed in Section~\ref{sec:design-alternatives}.
 
-This split does not shrink the trusted footprint of \texttt{mcpd}.
-The gateway remains fully trusted and is responsible for populating the kernel registries in the first place.
-Instead, it partitions responsibility: registry entries, approval tickets, and binding checks reside in the kernel, gated by \texttt{CAP\_NET\_ADMIN}-protected Generic Netlink access, durable across daemon failure, and inaccessible to unprivileged processes.
-Gateway logic bugs therefore no longer threaten the critical state transitions; the kernel enforces them independently of the daemon's correctness.
+This split partitions the gateway's trust along a time axis.
+At initialisation, \texttt{mcpd} is trusted to populate the kernel registries with manifest-derived tool identities and to bind sessions to peer credentials.
+At run time, it is no longer fully trusted: every \texttt{TOOL\_REQUEST} is independently re-checked in the kernel, so a session-id mismatch, a skipped ticket transition, or a TOCTOU race in the daemon is rejected rather than admitted.
+Registry entries, approval tickets, and binding checks therefore reside in the kernel, gated by \texttt{CAP\_NET\_ADMIN}-protected Generic Netlink access, durable across daemon failure, and inaccessible to unprivileged processes.
 
 This position is deliberately narrower than either extreme in prior work.
 AIOS-style proposals offer strong guarantees by replacing OS infrastructure, at the cost of deployability on existing systems.

@@ -275,7 +275,8 @@ Binding identity to transport details such as socket paths or process identifier
 If identity is defined too coarsely, however, the system can no longer distinguish a semantically modified tool from one that has merely been redeployed at a different address.
 
 \texttt{linux-mcp} resolves this tension by separating semantic identity from transport location.
-Each tool is described by a JSON manifest whose logical attributes are: tool identifier, tool name, application identifier, application name, risk tags, description, input schema, examples, path semantics, and approval policy; these attributes describe what the tool is intended to do, not where it runs.
+Each tool is described by a JSON manifest whose logical attributes are: tool identifier, tool name, application identifier, application name, risk tags, description, input schema, examples, path semantics, approval policy, and operation; these attributes describe what the tool is intended to do, not where it runs.
+The \texttt{operation} field is the RPC method actually invoked on the backend, so a silent edit retargets execution to a different code path and must change the tool's identity.
 \texttt{mcpd} canonicalises these fields into a stable JSON serialisation and computes its SHA-256 digest, represented as a 64-character hexadecimal string.
 The full digest is used without truncation: a 32-bit prefix would reach a 50\% collision probability at roughly $2^{16}$ registrations by the birthday bound, and meaningful collision risk appears far earlier---even a few thousand tools put the collision probability well above acceptable thresholds for a primitive the kernel treats as a unique identity.
 
@@ -463,7 +464,6 @@ The cost is that a full kernel module is needed, where a policy hook or a BPF pr
 The prototype makes several deliberate simplifications.
 A single global lock protects the kernel registries; this is adequate at evaluated catalog sizes but a scalability concern under higher concurrency.
 Cold-start reconciliation is unconditional: every launch pays a \texttt{RESET\_TOOLS} plus a full \texttt{TOOL\_REGISTER} sweep, even when manifests are unchanged.
-Hot reload is supported at run time but not wired to \texttt{inotify}, so a manifest edit on disk needs an explicit signal into \texttt{mcpd}.
-Approval tickets carry a five-minute deadline but are not actively swept; expired tickets linger until touched.
+Hot reload is request-driven rather than filesystem-driven: \texttt{mcpd} recomputes a manifest-set signature on the \texttt{list\_apps}, \texttt{list\_tools}, and \texttt{tool:exec} paths and refreshes the kernel registry when the signature changes, so a manifest edit takes effect on the next request rather than the instant the file is written.
 The kernel does no per-agent rate limiting; throttling is left to \texttt{mcpd}.
 Resolution directions are discussed in Section~\ref{sec:further-work}.

@@ -66,9 +66,9 @@
 \contentsline {paragraph}{Complete Netlink attribute encoding.}{77}{paragraph*.31}%
 \contentsline {paragraph}{Semantic hash computation.}{78}{paragraph*.32}%
 \contentsline {paragraph}{Complete manifest field specification.}{79}{paragraph*.33}%
-\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{80}{section*.34}%
-\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{80}{section*.35}%
-\contentsline {paragraph}{Noise-floor command: \texttt {KMCP\_CMD\_NOOP}.}{80}{paragraph*.36}%
-\contentsline {paragraph}{Peer-credential enforcement: \texttt {require\_peer\_cred}.}{81}{paragraph*.37}%
-\contentsline {paragraph}{Summary of experiment-only switches.}{82}{paragraph*.38}%
-\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{83}{section*.39}%
+\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{79}{section*.34}%
+\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{79}{section*.35}%
+\contentsline {paragraph}{Noise-floor command: \texttt {KMCP\_CMD\_NOOP}.}{79}{paragraph*.36}%
+\contentsline {paragraph}{Peer-credential enforcement: \texttt {require\_peer\_cred}.}{82}{paragraph*.37}%
+\contentsline {paragraph}{Summary of experiment-only switches.}{83}{paragraph*.38}%
+\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{84}{section*.39}%

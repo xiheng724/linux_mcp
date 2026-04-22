@@ -144,7 +144,10 @@ Two dominant attack categories in AI agent systems fall outside this scope.
 \emph{Prompt injection} operates at the model's reasoning layer, before any \texttt{tool:exec} request is submitted; kernel admission control has no visibility into the planning process \cite{greshake2023prompt, liu2023prompt}.
 \emph{Supply-chain compromise of manifests} requires file-system-level defences such as Integrity Measurement Architecture or device-mapper verity; \texttt{linux-mcp} treats on-disk manifests as trusted input and assumes the adversary lacks write access to \texttt{tool-app/manifests/}.
 Also excluded from our scope are process-level attacks on the gateway, including ptrace, memory corruption, and \texttt{LD\_PRELOAD}, as well as kernel-level attacks such as rootkits and hardware side channels, and remote adversaries.
-The kernel placement therefore protects against two specific failure modes: (a) logic bugs in the gateway that would otherwise mis-handle control-plane state, and (b) unprivileged co-located adversaries observing or forging JSON-RPC traffic. It does not protect against a gateway whose process memory has been directly compromised.
+Trust in \texttt{mcpd} is time-partitioned rather than absolute.
+At initialisation, the daemon is trusted to register manifest hashes and bind sessions to peer credentials; this is the one phase where kernel state depends on daemon correctness.
+At run time, no such trust is assumed: every \texttt{TOOL\_REQUEST} and \texttt{APPROVAL\_DECIDE} is re-checked against kernel-resident registry and ticket state, so the placement defends against (a) daemon logic bugs such as session-id mismatch, missed ticket transitions, or concurrent TOCTOU, and (b) unprivileged co-located adversaries observing or forging JSON-RPC traffic.
+It still does not protect against a gateway whose process memory has been directly compromised during the initialisation phase or otherwise.
 
 Within this scope, we focus on four classes of control-plane failures:
 (1) \emph{spoofing} of identity or session context,
