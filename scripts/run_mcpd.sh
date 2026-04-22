@@ -245,5 +245,5 @@ if [[ "$registered_tools" != "$expected_tools" ]]; then
   exit 1
 fi
 
-echo "reconciling tool-app manifests with kernel registry"
+echo "verifying tool-app manifests against kernel registry"
 "$PYTHON_BIN" mcpd/reconcile_kernel.py

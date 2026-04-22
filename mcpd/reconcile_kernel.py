@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Reconcile user-space manifests with kernel tool registry."""
+"""Verify or reconcile user-space manifests with the kernel tool registry."""
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 from typing import Dict
 
@@ -91,10 +92,23 @@ def _verify_mapping(manifests: Dict[int, ToolManifest], kernel_tools: Dict[int, 
         raise RuntimeError("manifest and kernel registry are out of sync")
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="destructively reset and re-register kernel tools before verifying",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
+    args = _parse_args()
     _check_prerequisites()
     manifests = _load_tool_map()
-    _register_manifest_tools(manifests)
+    if args.apply:
+        print("[reconcile] apply=true: reset kernel tool registry from manifests", flush=True)
+        _register_manifest_tools(manifests)
     kernel_tools = _list_kernel_tools()
     _verify_mapping(manifests, kernel_tools)
     print(f"[reconcile] ok: manifest_tools={len(manifests)} kernel_tools={len(kernel_tools)}", flush=True)

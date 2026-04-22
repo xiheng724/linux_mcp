@@ -211,7 +211,7 @@ sudo bash scripts/unload_module.sh || true
 sudo bash scripts/load_module.sh
 make schema-verify
 bash scripts/run_tool_services.sh
-bash scripts/run_mcpd.sh
+sudo bash scripts/run_mcpd.sh
 export DEEPSEEK_API_KEY="your_key"
 python3 llm-app/cli.py --once "show system info"
 ```
@@ -221,7 +221,7 @@ python3 llm-app/cli.py --once "show system info"
 ### Shutdown
 
 ```bash
-bash scripts/stop_mcpd.sh
+sudo bash scripts/stop_mcpd.sh
 bash scripts/stop_tool_services.sh
 sudo bash scripts/unload_module.sh
 ```
@@ -259,7 +259,7 @@ sudo python3 scripts/mcpctl_dump_calls.py a1
 ### Userspace logs
 
 ```bash
-cat /tmp/mcpd-$(id -u).log
+sudo cat /tmp/mcpd-0.log
 ls /tmp/linux-mcp-app-*.log
 ```
 

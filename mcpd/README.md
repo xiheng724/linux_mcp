@@ -234,7 +234,7 @@ manifest loader 在 [manifest_loader.py](/home/lxh/Code/linux-mcp/mcpd/manifest_
 通常从仓库根目录：
 
 ```bash
-bash scripts/run_mcpd.sh
+sudo bash scripts/run_mcpd.sh
 ```
 
 这个脚本会先检查：
@@ -247,12 +247,12 @@ bash scripts/run_mcpd.sh
 - 后台启动 `mcpd`
 - 等待 `/tmp/mcpd.sock` ready
 - 等待 manifest tools 出现在 `list_tools`
-- 调用 [reconcile_kernel.py](/home/lxh/Code/linux-mcp/mcpd/reconcile_kernel.py) 做核对
+- 调用 [reconcile_kernel.py](/home/lxh/Code/linux-mcp/mcpd/reconcile_kernel.py) 做只读核对，不会重置内核工具目录
 
 停止：
 
 ```bash
-bash scripts/stop_mcpd.sh
+sudo bash scripts/stop_mcpd.sh
 ```
 
 ## 调试与观测
@@ -260,7 +260,7 @@ bash scripts/stop_mcpd.sh
 日志默认在：
 
 ```bash
-cat /tmp/mcpd-$(id -u).log
+sudo cat /tmp/mcpd-0.log
 ```
 
 如果只想做基本 RPC 自检，可运行：
