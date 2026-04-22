@@ -4,7 +4,7 @@
 
 
 
-\subsection{Agent Systems and the Limits of User-space Control Planes}
+\subsection{Agent Systems: Prior Work}
 \label{sec:agent-systems}
 
 Modern operating systems are built around the process as the primary unit of protection: address-space isolation, controlled file access, and well-defined IPC \cite{tanenbaum2022}.
@@ -76,7 +76,8 @@ Several existing mechanisms address related but distinct problems; understanding
 
 Existing kernel-native mechanisms such as seccomp-BPF, eBPF/LSM hooks, Landlock, and capability-based designs provide strong control over syscalls, kernel objects, and process-scoped authority~\cite{seccomp2026, lsm2026, landlock2026, watson2010capsicum, brimhall2023mac, lefeuvre2024sok}.
 However, they operate below the application-protocol layer and therefore do not natively express MCP-specific concepts such as manifest-derived tool identity, approval-ticket scope, or semantic equivalence between a declared tool and an executed endpoint.
-A tool's identity in this system is a SHA-256 digest of its JSON manifest, a concept that does not exist at the syscall or VFS layer; no hook in seccomp or LSM fires at the point where a JSON-RPC payload is interpreted, and the BPF verifier's loop and memory restrictions make runtime hash-registry lookups impractical.
+A tool's identity in this system is a SHA-256 digest of its JSON manifest, a concept that does not exist at the syscall or VFS layer; no hook in seccomp or LSM fires at the point where a JSON-RPC payload is interpreted.
+Modern eBPF can perform bounded map lookups, so runtime hash checks are not the hard part; the harder part is representing approval tickets and other state that spans multiple messages.
 For this reason, these mechanisms can harden the surrounding execution environment, but they do not directly enforce the control-plane invariants targeted in this work.
 
 The agent frameworks surveyed in Section~\ref{sec:agent-systems} locate the full control plane in user space; correctness depends entirely on the in-process runtime remaining uncompromised.

@@ -10,6 +10,7 @@
 \@writefile{toc}{\contentsline {section}{\textit  {Keywords}}{3}{section*.1}\protected@file@percent }
 \citation{yao2023react,liu2024agentbench,schick2023toolformer}
 \citation{park2023generative,qin2024toolllm,mei2024aios,liu2026agentos}
+\citation{mcp2025}
 \citation{packer2023memgpt,mei2024aios}
 \citation{openclaw2026}
 \citation{nousresearch2026hermesagent}
@@ -18,13 +19,14 @@
 \newlabel{chap:introduction}{{}{5}{}{section*.2}{}}
 \@writefile{toc}{\contentsline {section}{\textit  {Chapter 1: Introduction}}{5}{section*.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {1.1}Problem Statement}{5}{subsection.1.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Our Solution}{5}{subsection.1.2}\protected@file@percent }
+\citation{mei2024aios}
 \citation{openclaw2026}
 \citation{nousresearch2026hermesagent}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Our Solution}{6}{subsection.1.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Comparison with user-space systems.}{6}{paragraph*.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}Main Contributions}{6}{subsection.1.3}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Key design differences between \texttt  {linux-mcp}, OpenClaw, and Hermes Agent.}}{7}{table.1}\protected@file@percent }
 \newlabel{tab:comparison}{{1}{7}{Key design differences between \texttt {linux-mcp}, OpenClaw, and Hermes Agent}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}Main Contributions}{7}{subsection.1.3}\protected@file@percent }
 \citation{tanenbaum2022}
 \citation{park2023generative}
 \citation{langchain2022}
@@ -40,13 +42,13 @@
 \citation{apple2024pcc}
 \citation{mcp2025}
 \citation{mcp_anniversary_2025}
+\newlabel{chap:background}{{1.3}{9}{}{section*.4}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Chapter 2: Background}}{9}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Agent Systems: Prior Work}{9}{subsection.2.1}\protected@file@percent }
+\newlabel{sec:agent-systems}{{2.1}{9}{Agent Systems: Prior Work}{subsection.2.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}What MCP Provides}{9}{subsection.2.2}\protected@file@percent }
 \citation{schick2023toolformer,patil2023gorilla,mcp2025}
 \citation{liu2023prompt}
-\newlabel{chap:background}{{1.3}{8}{}{section*.4}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Chapter 2: Background}}{8}{section*.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Agent Systems and the Limits of User-space Control Planes}{8}{subsection.2.1}\protected@file@percent }
-\newlabel{sec:agent-systems}{{2.1}{8}{Agent Systems and the Limits of User-space Control Planes}{subsection.2.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}What MCP Provides}{8}{subsection.2.2}\protected@file@percent }
 \citation{yao2023react,autogpt2023,park2023generative}
 \citation{greshake2023prompt,openclaw_security1,openclaw_security2}
 \citation{packer2023memgpt}
@@ -54,9 +56,9 @@
 \citation{lim2024compartmentalization}
 \citation{schneider2022sok,lefeuvre2024sok,ji2026seagent,shi2025progent}
 \citation{seccomp2026,lsm2026,apparmor2026,selinux2026,landlock2026}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Limits of User-space Mediation}{9}{subsection.2.3}\protected@file@percent }
-\newlabel{sec:limits-user-space}{{2.3}{9}{Limits of User-space Mediation}{subsection.2.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Relation to Native Linux Security Mechanisms}{9}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Limits of User-space Mediation}{10}{subsection.2.3}\protected@file@percent }
+\newlabel{sec:limits-user-space}{{2.3}{10}{Limits of User-space Mediation}{subsection.2.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Relation to Native Linux Security Mechanisms}{10}{subsection.2.4}\protected@file@percent }
 \citation{seccomp2026,lsm2026,landlock2026,watson2010capsicum,brimhall2023mac,lefeuvre2024sok}
 \citation{openclaw2026}
 \citation{openclaw_security1,openclaw_security2}
@@ -64,114 +66,115 @@
 \citation{ji2026seagent}
 \citation{shi2025progent}
 \citation{mei2024aios,liu2026agentos,packer2023memgpt,wu2024oscopilot}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Related Work}{10}{subsection.2.5}\protected@file@percent }
-\newlabel{sec:related-work}{{2.5}{10}{Related Work}{subsection.2.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6}Threat Model}{10}{subsection.2.6}\protected@file@percent }
-\newlabel{sec:threat-model}{{2.6}{10}{Threat Model}{subsection.2.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Related Work}{11}{subsection.2.5}\protected@file@percent }
+\newlabel{sec:related-work}{{2.5}{11}{Related Work}{subsection.2.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6}Threat Model}{11}{subsection.2.6}\protected@file@percent }
+\newlabel{sec:threat-model}{{2.6}{11}{Threat Model}{subsection.2.6}{}}
 \citation{greshake2023prompt,liu2023prompt}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Control-plane threats and defences (in scope). The last row is an observability property rather than a classical attack class.}}{11}{table.2}\protected@file@percent }
-\newlabel{tab:threat_in_scope}{{2}{11}{Control-plane threats and defences (in scope). The last row is an observability property rather than a classical attack class}{table.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Control-plane threats and defences (in scope). The last row is an observability property rather than a classical attack class.}}{12}{table.2}\protected@file@percent }
+\newlabel{tab:threat_in_scope}{{2}{12}{Control-plane threats and defences (in scope). The last row is an observability property rather than a classical attack class}{table.2}{}}
 \citation{chen2016shreds,brimhall2023mac}
-\newlabel{chap:design}{{2.6}{13}{}{section*.5}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Chapter 3: Design and Implementation}}{13}{section*.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Design Goals}{13}{subsection.3.1}\protected@file@percent }
-\newlabel{sec:design-goals}{{3.1}{13}{Design Goals}{subsection.3.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}System Architecture}{13}{subsection.3.2}\protected@file@percent }
-\newlabel{sec:system-architecture}{{3.2}{13}{System Architecture}{subsection.3.2}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overall architecture of \texttt  {linux-mcp}.}}{14}{figure.1}\protected@file@percent }
-\newlabel{fig:linux-mcp-overview}{{1}{14}{Overall architecture of \texttt {linux-mcp}}{figure.1}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Concrete layers in \texttt  {linux-mcp}.}}{15}{table.3}\protected@file@percent }
-\newlabel{tab:architecture_layers}{{3}{15}{Concrete layers in \texttt {linux-mcp}}{table.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Control-Plane Workflow}{15}{subsection.3.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Invocation lifecycle in \texttt  {linux-mcp}.}}{16}{figure.2}\protected@file@percent }
-\newlabel{fig:chapter3-lifecycle}{{2}{16}{Invocation lifecycle in \texttt {linux-mcp}}{figure.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Wire Protocols}{16}{subsection.3.4}\protected@file@percent }
-\newlabel{sec:wire-protocols}{{3.4}{16}{Wire Protocols}{subsection.3.4}{}}
-\@writefile{toc}{\contentsline {paragraph}{llm-app to mcpd.}{17}{paragraph*.6}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Principal messages on the \texttt  {llm-app}--\texttt  {mcpd} JSON-RPC channel. All messages are framed with a 4-byte big-endian length prefix. The \texttt  {tool:exec} response carries the kernel's \texttt  {decision} field (\texttt  {ALLOW}/\texttt  {DENY}/\texttt  {DEFER}) and, on deferral, a \texttt  {ticket\_id} the client uses to issue the subsequent \texttt  {approval\_reply}.}}{17}{table.4}\protected@file@percent }
-\newlabel{tab:llm-mcpd}{{4}{17}{Principal messages on the \texttt {llm-app}--\texttt {mcpd} JSON-RPC channel. All messages are framed with a 4-byte big-endian length prefix. The \texttt {tool:exec} response carries the kernel's \texttt {decision} field (\texttt {ALLOW}/\texttt {DENY}/\texttt {DEFER}) and, on deferral, a \texttt {ticket\_id} the client uses to issue the subsequent \texttt {approval\_reply}}{table.4}{}}
-\@writefile{toc}{\contentsline {paragraph}{mcpd to tool-app.}{17}{paragraph*.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{mcpd to kernel\_mcp (Generic Netlink).}{17}{paragraph*.8}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces \texttt  {mcpd}--\texttt  {tool-app} JSON-RPC message fields. Tool services implement only this contract; they require no knowledge of sessions, kernel tickets, or the Netlink protocol.}}{18}{table.5}\protected@file@percent }
-\newlabel{tab:mcpd-toolapp}{{5}{18}{\texttt {mcpd}--\texttt {tool-app} JSON-RPC message fields. Tool services implement only this contract; they require no knowledge of sessions, kernel tickets, or the Netlink protocol}{table.5}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces \texttt  {KERNEL\_MCP} Generic Netlink command set. All commands except \texttt  {LIST\_TOOLS} require \texttt  {CAP\_NET\_ADMIN}.}}{18}{table.6}\protected@file@percent }
-\newlabel{tab:netlink-cmds}{{6}{18}{\texttt {KERNEL\_MCP} Generic Netlink command set. All commands except \texttt {LIST\_TOOLS} require \texttt {CAP\_NET\_ADMIN}}{table.6}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Principal \texttt  {KERNEL\_MCP} TLV attributes. All strings are NUL-terminated and 4-byte aligned. \texttt  {AGENT\_BINDING} and \texttt  {AGENT\_EPOCH} together constitute the session identity embedded in each approval ticket.}}{19}{table.7}\protected@file@percent }
-\newlabel{tab:netlink-attrs}{{7}{19}{Principal \texttt {KERNEL\_MCP} TLV attributes. All strings are NUL-terminated and 4-byte aligned. \texttt {AGENT\_BINDING} and \texttt {AGENT\_EPOCH} together constitute the session identity embedded in each approval ticket}{table.7}{}}
-\@writefile{toc}{\contentsline {paragraph}{Tool registration via manifests.}{19}{paragraph*.9}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}Representative tool manifest (JSON). The \texttt  {endpoint} field is excluded from the semantic hash; all other fields shown here are included.}{19}{lstlisting.1}\protected@file@percent }
+\newlabel{chap:design}{{2.6}{14}{}{section*.5}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Chapter 3: Design and Implementation}}{14}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Design Goals}{14}{subsection.3.1}\protected@file@percent }
+\newlabel{sec:design-goals}{{3.1}{14}{Design Goals}{subsection.3.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}System Architecture}{14}{subsection.3.2}\protected@file@percent }
+\newlabel{sec:system-architecture}{{3.2}{14}{System Architecture}{subsection.3.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overall architecture of \texttt  {linux-mcp}.}}{15}{figure.1}\protected@file@percent }
+\newlabel{fig:linux-mcp-overview}{{1}{15}{Overall architecture of \texttt {linux-mcp}}{figure.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Concrete layers in \texttt  {linux-mcp}.}}{16}{table.3}\protected@file@percent }
+\newlabel{tab:architecture_layers}{{3}{16}{Concrete layers in \texttt {linux-mcp}}{table.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Control-Plane Workflow}{16}{subsection.3.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Invocation lifecycle in \texttt  {linux-mcp}.}}{17}{figure.2}\protected@file@percent }
+\newlabel{fig:chapter3-lifecycle}{{2}{17}{Invocation lifecycle in \texttt {linux-mcp}}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Wire Protocols}{17}{subsection.3.4}\protected@file@percent }
+\newlabel{sec:wire-protocols}{{3.4}{17}{Wire Protocols}{subsection.3.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{llm-app to mcpd.}{18}{paragraph*.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Principal messages on the \texttt  {llm-app}--\texttt  {mcpd} JSON-RPC channel. All messages are framed with a 4-byte big-endian length prefix. The \texttt  {tool:exec} response carries the kernel's \texttt  {decision} field (\texttt  {ALLOW}/\texttt  {DENY}/\texttt  {DEFER}) and, on deferral, a \texttt  {ticket\_id} the client uses to issue the subsequent \texttt  {approval\_\allowbreak  reply}.}}{18}{table.4}\protected@file@percent }
+\newlabel{tab:llm-mcpd}{{4}{18}{Principal messages on the \texttt {llm-app}--\texttt {mcpd} JSON-RPC channel. All messages are framed with a 4-byte big-endian length prefix. The \texttt {tool:exec} response carries the kernel's \texttt {decision} field (\texttt {ALLOW}/\texttt {DENY}/\texttt {DEFER}) and, on deferral, a \texttt {ticket\_id} the client uses to issue the subsequent \texttt {approval\_\allowbreak reply}}{table.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{mcpd to tool-app.}{18}{paragraph*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{mcpd to kernel\_mcp (Generic Netlink).}{18}{paragraph*.8}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces \texttt  {mcpd}--\texttt  {tool-app} JSON-RPC message fields. Tool services implement only this contract; they require no knowledge of sessions, kernel tickets, or the Netlink protocol.}}{19}{table.5}\protected@file@percent }
+\newlabel{tab:mcpd-toolapp}{{5}{19}{\texttt {mcpd}--\texttt {tool-app} JSON-RPC message fields. Tool services implement only this contract; they require no knowledge of sessions, kernel tickets, or the Netlink protocol}{table.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces \texttt  {KERNEL\_\allowbreak  MCP} Generic Netlink command set. All commands except \texttt  {LIST\_\allowbreak  TOOLS} require \texttt  {CAP\_\allowbreak  NET\_\allowbreak  ADMIN}.}}{19}{table.6}\protected@file@percent }
+\newlabel{tab:netlink-cmds}{{6}{19}{\texttt {KERNEL\_\allowbreak MCP} Generic Netlink command set. All commands except \texttt {LIST\_\allowbreak TOOLS} require \texttt {CAP\_\allowbreak NET\_\allowbreak ADMIN}}{table.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Principal \texttt  {KERNEL\_\allowbreak  MCP} TLV attributes. All strings are NUL-terminated and 4-byte aligned. \texttt  {AGENT\_\allowbreak  BINDING} and \texttt  {AGENT\_\allowbreak  EPOCH} together constitute the session identity embedded in each approval ticket.}}{20}{table.7}\protected@file@percent }
+\newlabel{tab:netlink-attrs}{{7}{20}{Principal \texttt {KERNEL\_\allowbreak MCP} TLV attributes. All strings are NUL-terminated and 4-byte aligned. \texttt {AGENT\_\allowbreak BINDING} and \texttt {AGENT\_\allowbreak EPOCH} together constitute the session identity embedded in each approval ticket}{table.7}{}}
+\@writefile{toc}{\contentsline {paragraph}{Tool registration via manifests.}{20}{paragraph*.9}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}Representative tool manifest (JSON). The \texttt  {endpoint} field is excluded from the semantic hash; all other fields shown here are included.}{20}{lstlisting.1}\protected@file@percent }
 \citation{stevens2013unix}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Manifest Semantics and Tool Identity}{20}{subsection.3.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.6}Session Management and Approval Binding}{20}{subsection.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Manifest Semantics and Tool Identity}{21}{subsection.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6}Session Management and Approval Binding}{21}{subsection.3.6}\protected@file@percent }
 \citation{bishop2003computer,lee2021exprace}
 \citation{klein2010sel4}
-\@writefile{toc}{\contentsline {paragraph}{Catalog-epoch rebind on manifest change.}{21}{paragraph*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Catalog-epoch rebind on manifest change.}{22}{paragraph*.10}\protected@file@percent }
 \citation{netlink2026}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Approval-ticket flow in \texttt  {linux-mcp}: the \texttt  {ALLOW}/\texttt  {DENY}/\texttt  {DEFER} state machine enforced by the kernel module.}}{22}{figure.3}\protected@file@percent }
-\newlabel{fig:chapter3-approval}{{3}{22}{Approval-ticket flow in \texttt {linux-mcp}: the \texttt {ALLOW}/\texttt {DENY}/\texttt {DEFER} state machine enforced by the kernel module}{figure.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.7}Kernel Module Design}{22}{subsection.3.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Trust-on-first-use backend binary pinning.}{23}{paragraph*.11}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Kernel-resident call log.}{23}{paragraph*.12}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Sysfs surface.}{23}{paragraph*.13}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.8}Daemon Implementation}{23}{subsection.3.8}\protected@file@percent }
-\newlabel{sec:daemon-implementation}{{3.8}{23}{Daemon Implementation}{subsection.3.8}{}}
-\@writefile{toc}{\contentsline {paragraph}{Deployment and fail-closed configuration.}{24}{paragraph*.14}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.9}Tool-Side RPC and Execution Model}{24}{subsection.3.9}\protected@file@percent }
-\newlabel{sec:reconciliation}{{3.9}{24}{Tool-Side RPC and Execution Model}{subsection.3.9}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.10}Rationale for the Kernel--User-Space Split}{25}{subsection.3.10}\protected@file@percent }
-\newlabel{sec:design-alternatives}{{3.10}{25}{Rationale for the Kernel--User-Space Split}{subsection.3.10}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.11}Limitations and Identified Optimisation Opportunities}{26}{subsection.3.11}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Approval-ticket flow in \texttt  {linux-mcp}: the \texttt  {ALLOW}/\texttt  {DENY}/\texttt  {DEFER} state machine enforced by the kernel module.}}{23}{figure.3}\protected@file@percent }
+\newlabel{fig:chapter3-approval}{{3}{23}{Approval-ticket flow in \texttt {linux-mcp}: the \texttt {ALLOW}/\texttt {DENY}/\texttt {DEFER} state machine enforced by the kernel module}{figure.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7}Kernel Module Design}{23}{subsection.3.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Trust-on-first-use backend binary pinning.}{24}{paragraph*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Kernel-resident call log.}{24}{paragraph*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Sysfs surface.}{24}{paragraph*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.8}Daemon Implementation}{24}{subsection.3.8}\protected@file@percent }
+\newlabel{sec:daemon-implementation}{{3.8}{24}{Daemon Implementation}{subsection.3.8}{}}
+\@writefile{toc}{\contentsline {paragraph}{Deployment and fail-closed configuration.}{25}{paragraph*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.9}Tool-Side RPC and Execution Model}{25}{subsection.3.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.10}State Reconciliation and Recovery}{26}{subsection.3.10}\protected@file@percent }
+\newlabel{sec:reconciliation}{{3.10}{26}{State Reconciliation and Recovery}{subsection.3.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.11}Rationale for the Kernel--User-Space Split}{26}{subsection.3.11}\protected@file@percent }
+\newlabel{sec:design-alternatives}{{3.11}{26}{Rationale for the Kernel--User-Space Split}{subsection.3.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.12}Limitations and Identified Optimisation Opportunities}{27}{subsection.3.12}\protected@file@percent }
 \citation{west2021welch}
-\@writefile{toc}{\contentsline {section}{\textit  {Chapter 4: Results and Discussion}}{27}{subsection.3.11}\protected@file@percent }
-\newlabel{chap:evaluation}{{3.11}{27}{}{section*.15}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{27}{subsection.4.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Mean end-to-end latency (ms) by payload size ($n = 30$ runs $\times $ 2000 requests). Bold values indicate the lowest latency per row. $p$-values are two-sided Welch's $t$-tests against the \texttt  {userspace} baseline; \textsuperscript  {ns} = not significant ($p > 0.05$).}}{28}{table.8}\protected@file@percent }
-\newlabel{tab:latency}{{8}{28}{Mean end-to-end latency (ms) by payload size ($n = 30$ runs $\times $ 2000 requests). Bold values indicate the lowest latency per row. $p$-values are two-sided Welch's $t$-tests against the \texttt {userspace} baseline; \textsuperscript {ns} = not significant ($p > 0.05$)}{table.8}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KB are not flattened by the much larger absolute values at 1~MB. Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt  {userspace} baseline.}}{28}{figure.4}\protected@file@percent }
-\newlabel{fig:chapter4-latency}{{4}{28}{Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KB are not flattened by the much larger absolute values at 1~MB. Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt {userspace} baseline}{figure.4}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Mean-latency ratio of each hardened variant to the plain \texttt  {userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KB visible alongside the larger effect at 1~MB. The \texttt  {seccomp} path is significantly slower at every payload size; the \texttt  {kernel} path is statistically indistinguishable from \texttt  {userspace} at small and medium payloads and measurably faster at 1~MB.}}{29}{figure.5}\protected@file@percent }
-\newlabel{fig:chapter4-overhead}{{5}{29}{Mean-latency ratio of each hardened variant to the plain \texttt {userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KB visible alongside the larger effect at 1~MB. The \texttt {seccomp} path is significantly slower at every payload size; the \texttt {kernel} path is statistically indistinguishable from \texttt {userspace} at small and medium payloads and measurably faster at 1~MB}{figure.5}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces $p_{95}$ latency by payload size for the three systems ($n = 30$ runs of 2000 requests each). Error bars show 95\% confidence intervals. At 100~B and 10~KB the kernel path is statistically indistinguishable from the userspace baseline; at 1~MB the kernel $p_{95}$ (\num {8.422}~ms) is lower than both userspace (\num {8.716}~ms, $p = 0.049$) and seccomp (\num {10.903}~ms), confirming that the enforcement boundary does not widen the tail under the tested workload.}}{30}{figure.6}\protected@file@percent }
-\newlabel{fig:chapter4-p95}{{6}{30}{$p_{95}$ latency by payload size for the three systems ($n = 30$ runs of 2000 requests each). Error bars show 95\% confidence intervals. At 100~B and 10~KB the kernel path is statistically indistinguishable from the userspace baseline; at 1~MB the kernel $p_{95}$ (\num {8.422}~ms) is lower than both userspace (\num {8.716}~ms, $p = 0.049$) and seccomp (\num {10.903}~ms), confirming that the enforcement boundary does not widen the tail under the tested workload}{figure.6}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Invocation-stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes session\_lookup (around 4~\textmu s) visible alongside tool\_exec (around 4~ms). The \texttt  {kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num {0.04}~ms and is invisible relative to the tool-execution component.}}{30}{figure.7}\protected@file@percent }
-\newlabel{fig:chapter4-breakdown}{{7}{30}{Invocation-stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes session\_lookup (around 4~\textmu s) visible alongside tool\_exec (around 4~ms). The \texttt {kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num {0.04}~ms and is invisible relative to the tool-execution component}{figure.7}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Kernel path ablation at realistic registry scale ($N = 1024$ tools, $M = 64$ agents). The leftmost bar is the measured noise floor from the \texttt  {KMCP\_CMD\_NOOP} handler, which establishes the irreducible Generic Netlink round-trip cost. The \texttt  {full} bar is the complete \texttt  {TOOL\_REQUEST} arbitration path; \texttt  {skip\_lookups} disables the tool and agent registry walks. The two \texttt  {ticket\_trigger} bars exercise a high-risk tool whose execution is gated by the approval-ticket machinery, with and without the approval branch bypassed. All error bars are 95\% bootstrap CIs across $n = 10$ repetitions.}}{31}{figure.8}\protected@file@percent }
-\newlabel{fig:chapter4-ablation}{{8}{31}{Kernel path ablation at realistic registry scale ($N = 1024$ tools, $M = 64$ agents). The leftmost bar is the measured noise floor from the \texttt {KMCP\_CMD\_NOOP} handler, which establishes the irreducible Generic Netlink round-trip cost. The \texttt {full} bar is the complete \texttt {TOOL\_REQUEST} arbitration path; \texttt {skip\_lookups} disables the tool and agent registry walks. The two \texttt {ticket\_trigger} bars exercise a high-risk tool whose execution is gated by the approval-ticket machinery, with and without the approval branch bypassed. All error bars are 95\% bootstrap CIs across $n = 10$ repetitions}{figure.8}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Paired per-stage ablation deltas. Each row alternates a baseline mode and a bypass mode request-by-request inside a single phase; the $\Delta $ column is the mean of $\text  {baseline}_i - \text  {bypass}_i$ across all pairs. BH-corrected paired $t$-tests are reported across all four comparisons.}}{32}{table.9}\protected@file@percent }
-\newlabel{tab:ablation-stages}{{9}{32}{Paired per-stage ablation deltas. Each row alternates a baseline mode and a bypass mode request-by-request inside a single phase; the $\Delta $ column is the mean of $\text {baseline}_i - \text {bypass}_i$ across all pairs. BH-corrected paired $t$-tests are reported across all four comparisons}{table.9}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Paired per-stage deltas across the four ablation comparisons. The first two bars are the meaningful stage costs (registry+agent lookup and the approval-ticket body); the last two are methodology consistency checks against dead guard bodies and are expected to fall on zero.}}{33}{figure.9}\protected@file@percent }
-\newlabel{fig:chapter4-ablation-stages}{{9}{33}{Paired per-stage deltas across the four ablation comparisons. The first two bars are the meaningful stage costs (registry+agent lookup and the approval-ticket body); the last two are methodology consistency checks against dead guard bodies and are expected to fall on zero}{figure.9}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{33}{subsection.4.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Peak throughput (RPS) at one agent, across concurrency levels ($n = 5$ repetitions per cell). The \texttt  {userspace} column is the highest in every row; the \texttt  {kernel} path sits roughly 10\% below it at every concurrency level, without collapsing.}}{33}{table.10}\protected@file@percent }
-\newlabel{tab:throughput}{{10}{33}{Peak throughput (RPS) at one agent, across concurrency levels ($n = 5$ repetitions per cell). The \texttt {userspace} column is the highest in every row; the \texttt {kernel} path sits roughly 10\% below it at every concurrency level, without collapsing}{table.10}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Registry Scaling}{34}{subsection.4.3}\protected@file@percent }
-\newlabel{sec:registry-scaling}{{4.3}{34}{Registry Scaling}{subsection.4.3}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Registry register-path per-tool cost as a function of registry size $N$. The dashed line is the asymptotic per-tool cost $b = 6.011$~$\mu $s from the linear fit $\text  {total\_ms}(N) = a + b N$ ($R^2 = 0.9996$); the curve approaches this asymptote monotonically with no degradation at large $N$.}}{35}{figure.10}\protected@file@percent }
-\newlabel{fig:chapter4-registry-curve}{{10}{35}{Registry register-path per-tool cost as a function of registry size $N$. The dashed line is the asymptotic per-tool cost $b = 6.011$~$\mu $s from the linear fit $\text {total\_ms}(N) = a + b N$ ($R^2 = 0.9996$); the curve approaches this asymptote monotonically with no degradation at large $N$}{figure.10}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Steady-state \texttt  {tool\_id} lookup latency as a function of registry size $N$, on a log-$N$ axis. The fitted log-linear slope is $2.9\times 10^{-5}$~ms per doubling (bootstrap 95\% CI $[-2\times 10^{-6}, +6.1\times 10^{-5}]$, containing zero), consistent with the $O(1)$ xarray lookup invariant.}}{35}{figure.11}\protected@file@percent }
-\newlabel{fig:chapter4-registry-lookup}{{11}{35}{Steady-state \texttt {tool\_id} lookup latency as a function of registry size $N$, on a log-$N$ axis. The fitted log-linear slope is $2.9\times 10^{-5}$~ms per doubling (bootstrap 95\% CI $[-2\times 10^{-6}, +6.1\times 10^{-5}]$, containing zero), consistent with the $O(1)$ xarray lookup invariant}{figure.11}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Security Evaluation}{36}{subsection.4.4}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Category-level attack outcomes by system (110 attempts each: 3 spoof, 4 replay, 3 substitution, 1 escalation, $\times $ 10 repeats). The bypass rate measures the fraction of attempts that succeeded in circumventing the intended control. The user-space bypass rates reflect deliberate per-category instrumented weakening of the mediator and do not represent the performance of a fully hardened user-space implementation.}}{36}{table.11}\protected@file@percent }
-\newlabel{tab:attacks}{{11}{36}{Category-level attack outcomes by system (110 attempts each: 3 spoof, 4 replay, 3 substitution, 1 escalation, $\times $ 10 repeats). The bypass rate measures the fraction of attempts that succeeded in circumventing the intended control. The user-space bypass rates reflect deliberate per-category instrumented weakening of the mediator and do not represent the performance of a fully hardened user-space implementation}{table.11}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt  {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax.}}{37}{figure.12}\protected@file@percent }
-\newlabel{fig:chapter4-security}{{12}{37}{Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax}{figure.12}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Extended Threat Model}{38}{subsection.4.5}\protected@file@percent }
-\newlabel{sec:extended-attacks}{{4.5}{38}{Extended Threat Model}{subsection.4.5}{}}
-\@writefile{toc}{\contentsline {paragraph}{TOCTOU on the approval window.}{38}{paragraph*.16}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Cross-UID session hijack.}{38}{paragraph*.17}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Generic Netlink dumb fuzzer.}{39}{paragraph*.18}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Errno distribution for the Generic Netlink dumb fuzzer, binned by the \texttt  {KMCP\_CMD\_*} opcode under test. Every rejection falls into one of three deterministic errno classes (\texttt  {-EINVAL}, \texttt  {-EBADMSG}, \texttt  {-EPERM}); zero mutated messages produced a kernel oops, \texttt  {WARN}, or \texttt  {kmemleak} report across \num {880640} total inputs.}}{39}{figure.13}\protected@file@percent }
-\newlabel{fig:chapter4-fuzz}{{13}{39}{Errno distribution for the Generic Netlink dumb fuzzer, binned by the \texttt {KMCP\_CMD\_*} opcode under test. Every rejection falls into one of three deterministic errno classes (\texttt {-EINVAL}, \texttt {-EBADMSG}, \texttt {-EPERM}); zero mutated messages produced a kernel oops, \texttt {WARN}, or \texttt {kmemleak} report across \num {880640} total inputs}{figure.13}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Daemon Failure and Recovery}{39}{subsection.4.6}\protected@file@percent }
-\newlabel{sec:daemon-failure}{{4.6}{39}{Daemon Failure and Recovery}{subsection.4.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}Discussion}{40}{subsection.4.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.8}Threats to Validity}{41}{subsection.4.8}\protected@file@percent }
-\newlabel{chap:conclusion}{{4.8}{42}{}{section*.19}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Chapter 5: Conclusion and Further Work}}{42}{section*.19}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Conclusion}{42}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Reflection}{43}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Further Work}{44}{subsection.5.3}\protected@file@percent }
-\newlabel{sec:further-work}{{5.3}{44}{Further Work}{subsection.5.3}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Chapter 4: Results and Discussion}}{28}{subsection.3.12}\protected@file@percent }
+\newlabel{chap:evaluation}{{3.12}{28}{}{section*.15}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{28}{subsection.4.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Mean end-to-end latency (ms) by payload size ($n = 30$ runs $\times $ 2000 requests). Bold values indicate the lowest latency per row. $p$-values are two-sided Welch's $t$-tests against the \texttt  {userspace} baseline; \textsuperscript  {ns} = not significant ($p > 0.05$).}}{29}{table.8}\protected@file@percent }
+\newlabel{tab:latency}{{8}{29}{Mean end-to-end latency (ms) by payload size ($n = 30$ runs $\times $ 2000 requests). Bold values indicate the lowest latency per row. $p$-values are two-sided Welch's $t$-tests against the \texttt {userspace} baseline; \textsuperscript {ns} = not significant ($p > 0.05$)}{table.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KB are not flattened by the much larger absolute values at 1~MB. Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt  {userspace} baseline.}}{29}{figure.4}\protected@file@percent }
+\newlabel{fig:chapter4-latency}{{4}{29}{Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KB are not flattened by the much larger absolute values at 1~MB. Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt {userspace} baseline}{figure.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Mean-latency ratio of each hardened variant to the plain \texttt  {userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KB visible alongside the larger effect at 1~MB. The \texttt  {seccomp} path is significantly slower at every payload size; the \texttt  {kernel} path is statistically indistinguishable from \texttt  {userspace} at small and medium payloads and measurably faster at 1~MB.}}{30}{figure.5}\protected@file@percent }
+\newlabel{fig:chapter4-overhead}{{5}{30}{Mean-latency ratio of each hardened variant to the plain \texttt {userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KB visible alongside the larger effect at 1~MB. The \texttt {seccomp} path is significantly slower at every payload size; the \texttt {kernel} path is statistically indistinguishable from \texttt {userspace} at small and medium payloads and measurably faster at 1~MB}{figure.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces $p_{95}$ latency by payload size for the three systems ($n = 30$ runs of 2000 requests each). Error bars show 95\% confidence intervals. At 100~B and 10~KB the kernel path is statistically indistinguishable from the userspace baseline; at 1~MB the kernel $p_{95}$ (\num {8.422}~ms) is lower than both userspace (\num {8.716}~ms, $p = 0.049$) and seccomp (\num {10.903}~ms), confirming that the enforcement boundary does not widen the tail under the tested workload.}}{31}{figure.6}\protected@file@percent }
+\newlabel{fig:chapter4-p95}{{6}{31}{$p_{95}$ latency by payload size for the three systems ($n = 30$ runs of 2000 requests each). Error bars show 95\% confidence intervals. At 100~B and 10~KB the kernel path is statistically indistinguishable from the userspace baseline; at 1~MB the kernel $p_{95}$ (\num {8.422}~ms) is lower than both userspace (\num {8.716}~ms, $p = 0.049$) and seccomp (\num {10.903}~ms), confirming that the enforcement boundary does not widen the tail under the tested workload}{figure.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Invocation-stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes session\_lookup (around 4~\textmu s) visible alongside tool\_exec (around 4~ms). The \texttt  {kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num {0.04}~ms and is invisible relative to the tool-execution component.}}{31}{figure.7}\protected@file@percent }
+\newlabel{fig:chapter4-breakdown}{{7}{31}{Invocation-stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes session\_lookup (around 4~\textmu s) visible alongside tool\_exec (around 4~ms). The \texttt {kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num {0.04}~ms and is invisible relative to the tool-execution component}{figure.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Kernel path ablation at realistic registry scale ($N = 1024$ tools, $M = 64$ agents). The leftmost bar is the measured noise floor from the \texttt  {KMCP\_\allowbreak  CMD\_\allowbreak  NOOP} handler, which establishes the irreducible Generic Netlink round-trip cost. The \texttt  {full} bar is the complete \texttt  {TOOL\_\allowbreak  REQUEST} arbitration path; \texttt  {skip\_\allowbreak  lookups} disables the tool and agent registry walks. The two \texttt  {ticket\_\allowbreak  trigger} bars exercise a high-risk tool whose execution is gated by the approval-ticket machinery, with and without the approval branch bypassed. All error bars are 95\% bootstrap CIs across $n = 10$ repetitions.}}{32}{figure.8}\protected@file@percent }
+\newlabel{fig:chapter4-ablation}{{8}{32}{Kernel path ablation at realistic registry scale ($N = 1024$ tools, $M = 64$ agents). The leftmost bar is the measured noise floor from the \texttt {KMCP\_\allowbreak CMD\_\allowbreak NOOP} handler, which establishes the irreducible Generic Netlink round-trip cost. The \texttt {full} bar is the complete \texttt {TOOL\_\allowbreak REQUEST} arbitration path; \texttt {skip\_\allowbreak lookups} disables the tool and agent registry walks. The two \texttt {ticket\_\allowbreak trigger} bars exercise a high-risk tool whose execution is gated by the approval-ticket machinery, with and without the approval branch bypassed. All error bars are 95\% bootstrap CIs across $n = 10$ repetitions}{figure.8}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Paired per-stage ablation deltas. Each row alternates a baseline mode and a bypass mode request-by-request inside a single phase; the $\Delta $ column is the mean of $\text  {baseline}_i - \text  {bypass}_i$ across all pairs. BH-corrected paired $t$-tests are reported across all four comparisons.}}{33}{table.9}\protected@file@percent }
+\newlabel{tab:ablation-stages}{{9}{33}{Paired per-stage ablation deltas. Each row alternates a baseline mode and a bypass mode request-by-request inside a single phase; the $\Delta $ column is the mean of $\text {baseline}_i - \text {bypass}_i$ across all pairs. BH-corrected paired $t$-tests are reported across all four comparisons}{table.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Paired per-stage deltas across the four ablation comparisons. The first two bars are the meaningful stage costs (registry+agent lookup and the approval-ticket body); the last two are methodology consistency checks against dead guard bodies and are expected to fall on zero.}}{34}{figure.9}\protected@file@percent }
+\newlabel{fig:chapter4-ablation-stages}{{9}{34}{Paired per-stage deltas across the four ablation comparisons. The first two bars are the meaningful stage costs (registry+agent lookup and the approval-ticket body); the last two are methodology consistency checks against dead guard bodies and are expected to fall on zero}{figure.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{34}{subsection.4.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Peak throughput (RPS) at one agent, across concurrency levels ($n = 5$ repetitions per cell). The \texttt  {userspace} column is the highest in every row; the \texttt  {kernel} path sits roughly 10\% below it at every concurrency level, without collapsing.}}{34}{table.10}\protected@file@percent }
+\newlabel{tab:throughput}{{10}{34}{Peak throughput (RPS) at one agent, across concurrency levels ($n = 5$ repetitions per cell). The \texttt {userspace} column is the highest in every row; the \texttt {kernel} path sits roughly 10\% below it at every concurrency level, without collapsing}{table.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Registry Scaling}{35}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:registry-scaling}{{4.3}{35}{Registry Scaling}{subsection.4.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Registry register-path per-tool cost as a function of registry size $N$. The dashed line is the asymptotic per-tool cost $b = 6.011$~$\mu $s from the linear fit $\text  {total\_ms}(N) = a + b N$ ($R^2 = 0.9996$); the curve approaches this asymptote monotonically with no degradation at large $N$.}}{36}{figure.10}\protected@file@percent }
+\newlabel{fig:chapter4-registry-curve}{{10}{36}{Registry register-path per-tool cost as a function of registry size $N$. The dashed line is the asymptotic per-tool cost $b = 6.011$~$\mu $s from the linear fit $\text {total\_ms}(N) = a + b N$ ($R^2 = 0.9996$); the curve approaches this asymptote monotonically with no degradation at large $N$}{figure.10}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Steady-state \texttt  {tool\_id} lookup latency as a function of registry size $N$, on a log-$N$ axis. The fitted log-linear slope is $2.9\times 10^{-5}$~ms per doubling (bootstrap 95\% CI $[-2\times 10^{-6}, +6.1\times 10^{-5}]$, containing zero), consistent with the $O(1)$ xarray lookup invariant.}}{36}{figure.11}\protected@file@percent }
+\newlabel{fig:chapter4-registry-lookup}{{11}{36}{Steady-state \texttt {tool\_id} lookup latency as a function of registry size $N$, on a log-$N$ axis. The fitted log-linear slope is $2.9\times 10^{-5}$~ms per doubling (bootstrap 95\% CI $[-2\times 10^{-6}, +6.1\times 10^{-5}]$, containing zero), consistent with the $O(1)$ xarray lookup invariant}{figure.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Security Evaluation}{37}{subsection.4.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Category-level attack outcomes by system (110 attempts each: 3 spoof, 4 replay, 3 substitution, 1 escalation, $\times $ 10 repeats). The bypass rate measures the fraction of attempts that succeeded in circumventing the intended control. The user-space bypass rates reflect deliberate per-category instrumented weakening of the mediator and do not represent the performance of a fully hardened user-space implementation.}}{37}{table.11}\protected@file@percent }
+\newlabel{tab:attacks}{{11}{37}{Category-level attack outcomes by system (110 attempts each: 3 spoof, 4 replay, 3 substitution, 1 escalation, $\times $ 10 repeats). The bypass rate measures the fraction of attempts that succeeded in circumventing the intended control. The user-space bypass rates reflect deliberate per-category instrumented weakening of the mediator and do not represent the performance of a fully hardened user-space implementation}{table.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt  {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax.}}{38}{figure.12}\protected@file@percent }
+\newlabel{fig:chapter4-security}{{12}{38}{Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt {kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax}{figure.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Extended Threat Model}{39}{subsection.4.5}\protected@file@percent }
+\newlabel{sec:extended-attacks}{{4.5}{39}{Extended Threat Model}{subsection.4.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{TOCTOU on the approval window.}{39}{paragraph*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Cross-UID session hijack.}{39}{paragraph*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Generic Netlink dumb fuzzer.}{40}{paragraph*.18}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Errno distribution for the Generic Netlink dumb fuzzer, binned by the \texttt  {KMCP\_\allowbreak  CMD\_\allowbreak  *} opcode under test. Every rejection falls into one of three deterministic errno classes (\texttt  {-EINVAL}, \texttt  {-EBADMSG}, \texttt  {-EPERM}); zero mutated messages produced a kernel oops, \texttt  {WARN}, or \texttt  {kmemleak} report across \num {880640} total inputs.}}{40}{figure.13}\protected@file@percent }
+\newlabel{fig:chapter4-fuzz}{{13}{40}{Errno distribution for the Generic Netlink dumb fuzzer, binned by the \texttt {KMCP\_\allowbreak CMD\_\allowbreak *} opcode under test. Every rejection falls into one of three deterministic errno classes (\texttt {-EINVAL}, \texttt {-EBADMSG}, \texttt {-EPERM}); zero mutated messages produced a kernel oops, \texttt {WARN}, or \texttt {kmemleak} report across \num {880640} total inputs}{figure.13}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Daemon Failure and Recovery}{40}{subsection.4.6}\protected@file@percent }
+\newlabel{sec:daemon-failure}{{4.6}{40}{Daemon Failure and Recovery}{subsection.4.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}Discussion}{41}{subsection.4.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.8}Threats to Validity}{42}{subsection.4.8}\protected@file@percent }
+\newlabel{chap:conclusion}{{4.8}{43}{}{section*.19}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Chapter 5: Conclusion and Further Work}}{43}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Conclusion}{43}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Reflection}{44}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Further Work}{45}{subsection.5.3}\protected@file@percent }
+\newlabel{sec:further-work}{{5.3}{45}{Further Work}{subsection.5.3}{}}
 \bibdata{reference}
 \bibcite{yao2023react}{{1}{}{{}}{{}}}
 \bibcite{liu2024agentbench}{{2}{}{{}}{{}}}
@@ -180,23 +183,23 @@
 \bibcite{qin2024toolllm}{{5}{}{{}}{{}}}
 \bibcite{mei2024aios}{{6}{}{{}}{{}}}
 \bibcite{liu2026agentos}{{7}{}{{}}{{}}}
-\bibcite{packer2023memgpt}{{8}{}{{}}{{}}}
-\bibcite{openclaw2026}{{9}{}{{}}{{}}}
-\bibcite{nousresearch2026hermesagent}{{10}{}{{}}{{}}}
-\bibcite{peter2014arrakis}{{11}{}{{}}{{}}}
-\bibcite{greshake2023prompt}{{12}{}{{}}{{}}}
-\bibcite{tanenbaum2022}{{13}{}{{}}{{}}}
-\bibcite{langchain2022}{{14}{}{{}}{{}}}
-\bibcite{langgraph2024}{{15}{}{{}}{{}}}
-\bibcite{autogpt2023}{{16}{}{{}}{{}}}
-\@writefile{toc}{\contentsline {section}{\textit  {References}}{46}{subsection.5.3}\protected@file@percent }
-\bibcite{crewai2024}{{17}{}{{}}{{}}}
-\bibcite{semantickernel2023}{{18}{}{{}}{{}}}
-\bibcite{wu2024oscopilot}{{19}{}{{}}{{}}}
-\bibcite{openharness2026}{{20}{}{{}}{{}}}
-\bibcite{harness2025}{{21}{}{{}}{{}}}
-\bibcite{apple2024pcc}{{22}{}{{}}{{}}}
-\bibcite{mcp2025}{{23}{}{{}}{{}}}
+\bibcite{mcp2025}{{8}{}{{}}{{}}}
+\bibcite{packer2023memgpt}{{9}{}{{}}{{}}}
+\bibcite{openclaw2026}{{10}{}{{}}{{}}}
+\bibcite{nousresearch2026hermesagent}{{11}{}{{}}{{}}}
+\bibcite{peter2014arrakis}{{12}{}{{}}{{}}}
+\bibcite{greshake2023prompt}{{13}{}{{}}{{}}}
+\bibcite{tanenbaum2022}{{14}{}{{}}{{}}}
+\bibcite{langchain2022}{{15}{}{{}}{{}}}
+\bibcite{langgraph2024}{{16}{}{{}}{{}}}
+\@writefile{toc}{\contentsline {section}{\textit  {References}}{47}{subsection.5.3}\protected@file@percent }
+\bibcite{autogpt2023}{{17}{}{{}}{{}}}
+\bibcite{crewai2024}{{18}{}{{}}{{}}}
+\bibcite{semantickernel2023}{{19}{}{{}}{{}}}
+\bibcite{wu2024oscopilot}{{20}{}{{}}{{}}}
+\bibcite{openharness2026}{{21}{}{{}}{{}}}
+\bibcite{harness2025}{{22}{}{{}}{{}}}
+\bibcite{apple2024pcc}{{23}{}{{}}{{}}}
 \bibcite{mcp_anniversary_2025}{{24}{}{{}}{{}}}
 \bibcite{patil2023gorilla}{{25}{}{{}}{{}}}
 \bibcite{liu2023prompt}{{26}{}{{}}{{}}}
@@ -223,48 +226,48 @@
 \bibcite{klein2010sel4}{{47}{}{{}}{{}}}
 \bibcite{netlink2026}{{48}{}{{}}{{}}}
 \bibcite{west2021welch}{{49}{}{{}}{{}}}
-\@writefile{toc}{\contentsline {section}{\textit  {Acknowledgment}}{50}{section*.20}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\textit  {Appendices}}{51}{section*.21}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Disclaimer}{51}{section*.22}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Acknowledgement of using Generative AI}{52}{section*.23}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Project specification}{53}{section*.24}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Early-term progress report}{60}{section*.25}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Mid-term progress report}{67}{section*.26}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Supervision log}{74}{section*.27}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{Additional Appendices}{77}{section*.28}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{77}{section*.29}\protected@file@percent }
-\newlabel{sec:appendix-protocols}{{5.3}{77}{}{section*.29}{}}
-\@writefile{toc}{\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{77}{paragraph*.30}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}tool:exec request and response messages (llm-app $\to $ mcpd).}{77}{lstlisting.2}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {3}approval\_reply message (llm-app $\to $ mcpd, issued after user confirms a deferred operation).}{77}{lstlisting.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Complete Netlink attribute encoding.}{77}{paragraph*.31}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {4}Python fragment: encoding a \texttt  {TOOL\_REQUEST} Generic Netlink message (mcpd $\to $ kernel).}{78}{lstlisting.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Semantic hash computation.}{78}{paragraph*.32}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {Acknowledgment}}{51}{section*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\textit  {Appendices}}{52}{section*.21}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Disclaimer}{52}{section*.22}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Acknowledgement of using Generative AI}{53}{section*.23}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Project specification}{54}{section*.24}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Early-term progress report}{61}{section*.25}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Mid-term progress report}{68}{section*.26}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Supervision log}{75}{section*.27}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Additional Appendices}{78}{section*.28}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{78}{section*.29}\protected@file@percent }
+\newlabel{sec:appendix-protocols}{{5.3}{78}{}{section*.29}{}}
+\@writefile{toc}{\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{78}{paragraph*.30}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}tool:exec request and response messages (llm-app $\to $ mcpd).}{78}{lstlisting.2}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3}approval\_reply message (llm-app $\to $ mcpd, issued after user confirms a deferred operation).}{78}{lstlisting.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Complete Netlink attribute encoding.}{78}{paragraph*.31}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {4}Python fragment: encoding a \texttt  {TOOL\_REQUEST} Generic Netlink message (mcpd $\to $ kernel).}{79}{lstlisting.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Semantic hash computation.}{79}{paragraph*.32}\protected@file@percent }
 \citation{openclaw2026}
 \citation{openclaw_security1,openclaw_security2}
 \citation{harness2025}
 \citation{mei2024aios,liu2026agentos}
 \citation{langchain2022,langgraph2024}
 \citation{apple2024pcc}
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {5}Python fragment: computing the manifest-derived semantic hash used for tool identity.}{79}{lstlisting.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Complete manifest field specification.}{79}{paragraph*.33}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{79}{section*.34}\protected@file@percent }
-\newlabel{sec:appendix-comparison}{{5.3}{79}{}{section*.34}{}}
-\@writefile{toc}{\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{79}{section*.35}\protected@file@percent }
-\newlabel{sec:appendix-experiment-uapi}{{5.3}{79}{}{section*.35}{}}
-\@writefile{toc}{\contentsline {paragraph}{Noise-floor command: \texttt  {KMCP\_CMD\_NOOP}.}{79}{paragraph*.36}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {6}UAPI additions for the noise-floor command and the stage-ablation experiment flags (kernel-mcp/include/uapi/linux/kernel\_mcp\_schema.h).}{79}{lstlisting.6}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Manifest field specification. {\Pifont {pzd}\char 51}~= included in the SHA-256 semantic identity hash; {\Pifont {pzd}\char 55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt  {app\_id}; tool-level fields appear once per tool entry.}}{80}{table.12}\protected@file@percent }
-\newlabel{tab:manifest-fields}{{12}{80}{Manifest field specification. \ding {51}~= included in the SHA-256 semantic identity hash; \ding {55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt {app\_id}; tool-level fields appear once per tool entry}{table.12}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Comparison of representative agent systems. The key differentiator for \texttt  {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{81}{table.13}\protected@file@percent }
-\newlabel{tab:system_comparison}{{13}{81}{Comparison of representative agent systems. The key differentiator for \texttt {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.13}{}}
-\@writefile{toc}{\contentsline {paragraph}{Peer-credential enforcement: \texttt  {require\_peer\_cred}.}{82}{paragraph*.37}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {7}Peer-credential enforcement patch in \texttt  {kernel\_mcp\_main.c}, gated behind the \texttt  {require\_peer\_cred} module parameter.}{82}{lstlisting.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Summary of experiment-only switches.}{83}{paragraph*.38}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Experiment-only kernel switches added for the \hyperref  [chap:evaluation]{Chapter~4} rerun. All four \texttt  {SKIP\_*} bits are ignored when the kernel is built without \texttt  {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt  {require\_peer\_cred} is runtime-toggleable on any build.}}{83}{table.14}\protected@file@percent }
-\newlabel{tab:experiment-switches}{{14}{83}{Experiment-only kernel switches added for the \hyperref [chap:evaluation]{Chapter~4} rerun. All four \texttt {SKIP\_*} bits are ignored when the kernel is built without \texttt {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt {require\_peer\_cred} is runtime-toggleable on any build}{table.14}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{84}{section*.39}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {5}Python fragment: computing the manifest-derived semantic hash used for tool identity.}{80}{lstlisting.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Complete manifest field specification.}{80}{paragraph*.33}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{80}{section*.34}\protected@file@percent }
+\newlabel{sec:appendix-comparison}{{5.3}{80}{}{section*.34}{}}
+\@writefile{toc}{\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{80}{section*.35}\protected@file@percent }
+\newlabel{sec:appendix-experiment-uapi}{{5.3}{80}{}{section*.35}{}}
+\@writefile{toc}{\contentsline {paragraph}{Noise-floor command: \texttt  {KMCP\_CMD\_NOOP}.}{80}{paragraph*.36}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {6}UAPI additions for the noise-floor command and the stage-ablation experiment flags (kernel-mcp/include/uapi/linux/kernel\_mcp\_schema.h).}{80}{lstlisting.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Manifest field specification. {\Pifont {pzd}\char 51}~= included in the SHA-256 semantic identity hash; {\Pifont {pzd}\char 55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt  {app\_id}; tool-level fields appear once per tool entry.}}{81}{table.12}\protected@file@percent }
+\newlabel{tab:manifest-fields}{{12}{81}{Manifest field specification. \ding {51}~= included in the SHA-256 semantic identity hash; \ding {55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt {app\_id}; tool-level fields appear once per tool entry}{table.12}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Comparison of representative agent systems. The key differentiator for \texttt  {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{82}{table.13}\protected@file@percent }
+\newlabel{tab:system_comparison}{{13}{82}{Comparison of representative agent systems. The key differentiator for \texttt {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.13}{}}
+\@writefile{toc}{\contentsline {paragraph}{Peer-credential enforcement: \texttt  {require\_peer\_cred}.}{83}{paragraph*.37}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {7}Peer-credential enforcement patch in \texttt  {kernel\_mcp\_main.c}, gated behind the \texttt  {require\_peer\_cred} module parameter.}{83}{lstlisting.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Summary of experiment-only switches.}{84}{paragraph*.38}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Experiment-only kernel switches added for the \hyperref  [chap:evaluation]{Chapter~4} rerun. All four \texttt  {SKIP\_*} bits are ignored when the kernel is built without \texttt  {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt  {require\_peer\_cred} is runtime-toggleable on any build.}}{84}{table.14}\protected@file@percent }
+\newlabel{tab:experiment-switches}{{14}{84}{Experiment-only kernel switches added for the \hyperref [chap:evaluation]{Chapter~4} rerun. All four \texttt {SKIP\_*} bits are ignored when the kernel is built without \texttt {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt {require\_peer\_cred} is runtime-toggleable on any build}{table.14}{}}
+\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{85}{section*.39}\protected@file@percent }
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\@writefile{lot}{\contentsline {table}{\numberline {15}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{86}{table.15}\protected@file@percent }
-\newlabel{tab:risk_assessment}{{15}{86}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.15}{}}
-\gdef \@abspage@last{87}
+\@writefile{lot}{\contentsline {table}{\numberline {15}{\ignorespaces Summary of identified risks and mitigation strategies for \texttt  {linux-mcp}.}}{87}{table.15}\protected@file@percent }
+\newlabel{tab:risk_assessment}{{15}{87}{Summary of identified risks and mitigation strategies for \texttt {linux-mcp}}{table.15}{}}
+\gdef \@abspage@last{88}

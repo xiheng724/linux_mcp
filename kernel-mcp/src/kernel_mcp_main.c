@@ -17,6 +17,7 @@
 #include <net/genetlink.h>
 
 #include <linux/kernel_mcp_schema.h>
+#include <linux/kernel_mcp_reasons.h>
 
 #define KERNEL_MCP_TOOL_NAME_MAX 128
 #define KERNEL_MCP_TOOL_HASH_MAX 65	/* full SHA-256: 64 hex chars + NUL */
@@ -53,13 +54,36 @@
  */
 #define KERNEL_MCP_APPROVAL_REQUIRED_FLAGS KERNEL_MCP_HIGH_RISK_FLAGS
 
+/* Per-tool state. linux-mcp draws a hard line between two kinds of tool
+ * identity, and this struct holds one of each:
+ *
+ *   Logical identity  -> `hash`
+ *       SHA-256 over the manifest's semantic fields (name, description,
+ *       input_schema, risk_tags, operation, ...). Answers "what is this
+ *       tool semantically". Registered by mcpd from ToolManifest.manifest_hash.
+ *       Checked at cmd_tool_request against the client-asserted tool_hash:
+ *       any mismatch -> DENY hash_mismatch. Stable across host moves.
+ *
+ *   Serving identity  -> `binary_hash`
+ *       TOFU-locked SHA-256 hex of the currently-serving backend, as
+ *       observed by mcpd at probe time. Answers "who is actually running
+ *       this tool right now". Empty until the first TOOL_REQUEST carries a
+ *       non-empty binary_hash, after which any mismatch -> DENY
+ *       binary_mismatch. Composed in userspace from /proc/<pid>/exe plus
+ *       (optionally) the manifest-declared entry-script digest; the kernel
+ *       only sees the composite and does not know the composition strategy.
+ *
+ * The two axes are orthogonal: a schema edit bumps logical identity without
+ * touching serving identity; an endpoint-only relocation resets serving
+ * identity (mcpd unregisters+registers so the TOFU slot clears) without
+ * changing logical identity.
+ */
 struct kernel_mcp_tool {
 	u32 id;
 	char name[KERNEL_MCP_TOOL_NAME_MAX];
+	/* Logical identity: manifest semantic hash. */
 	char hash[KERNEL_MCP_TOOL_HASH_MAX];
-	/* TOFU-locked SHA-256 hex of the backend executable; '' until first
-	 * TOOL_REQUEST carries a binary_hash, after which any mismatch denies.
-	 */
+	/* Serving identity: composite TOFU pin of the live backend. */
 	char binary_hash[KERNEL_MCP_TOOL_HASH_MAX];
 	u32 risk_flags;
 	/* Monotonic catalog epoch at which this tool was last (re)registered.
@@ -142,6 +166,28 @@ struct kernel_mcp_agent_snapshot {
 	char last_reason[KERNEL_MCP_REASON_MAX];
 };
 
+/* Approval ticket lifecycle states. Internal to the kernel module — not part
+ * of UAPI. Legal transitions are enforced by kernel_mcp_ticket_transition_locked()
+ * and mirror the userspace TicketState enum in mcpd/session_store.py:
+ *
+ *   (new)  --create-->  PENDING  --approve-->  APPROVED  --consume-->  CONSUMED
+ *                          |                      |
+ *                          +----- deny ---------->+------> DENIED
+ *                                                 |
+ *                                                 +----- revoke --> DENIED
+ *
+ * EXPIRED is represented by removal from the ticket hash table rather than a
+ * state value — an expired ticket is freed, not observable. Callers that need
+ * to distinguish "never existed" from "expired and freed" should rely on
+ * kernel_mcp_find_ticket_locked() returning NULL plus purge timestamps.
+ */
+enum kernel_mcp_ticket_state {
+	KERNEL_MCP_TICKET_PENDING = 0,
+	KERNEL_MCP_TICKET_APPROVED = 1,
+	KERNEL_MCP_TICKET_DENIED = 2,
+	KERNEL_MCP_TICKET_CONSUMED = 3,
+};
+
 struct kernel_mcp_approval_ticket {
 	u64 ticket_id;
 	u64 req_id;
@@ -150,9 +196,11 @@ struct kernel_mcp_approval_ticket {
 	u64 binding_hash;
 	u64 binding_epoch;
 	char tool_hash[KERNEL_MCP_TOOL_HASH_MAX];
-	bool decided;
-	bool approved;
-	bool consumed;
+	/* Single explicit lifecycle field. Replaced the previous
+	 * {decided, approved, consumed} bool triple so every state change goes
+	 * through kernel_mcp_ticket_transition_locked() for uniform logging.
+	 */
+	enum kernel_mcp_ticket_state state;
 	unsigned long expires_jiffies;
 	char approver[KERNEL_MCP_APPROVER_MAX];
 	char reason[KERNEL_MCP_REASON_MAX];
@@ -721,6 +769,18 @@ static void kernel_mcp_tool_free(struct kernel_mcp_tool *tool)
 	kfree(tool);
 }
 
+/* Wipe the entire tool registry in one shot. Used by KERNEL_MCP_CMD_RESET_TOOLS
+ * (mcpd cold-start and reconcile_kernel.py --apply).
+ *
+ * Catalog-epoch invariant: destroy_all deliberately does NOT bump
+ * kernel_mcp_tool_catalog_epoch. Surviving agent sessions are forced to
+ * rebind by the subsequent per-tool kernel_mcp_register_tool() calls made
+ * by the caller — every one of those bumps the counter, so the per-tool
+ * registered_at_epoch of any re-registered tool is strictly greater than
+ * every pre-reset agent's opened_at_epoch. Callers MUST follow destroy_all
+ * with register_tool() for each manifest tool; calling destroy_all in
+ * isolation is only safe when no sessions exist (e.g. at kernel unload).
+ */
 static void kernel_mcp_tools_destroy_all(void)
 {
 	struct kernel_mcp_tool *tool;
@@ -955,6 +1015,73 @@ static int kernel_mcp_register_agent(const char *agent_id, u32 pid, bool uid_set
 	return 0;
 }
 
+static const char *kernel_mcp_ticket_state_name(enum kernel_mcp_ticket_state s)
+{
+	switch (s) {
+	case KERNEL_MCP_TICKET_PENDING:
+		return "PENDING";
+	case KERNEL_MCP_TICKET_APPROVED:
+		return "APPROVED";
+	case KERNEL_MCP_TICKET_DENIED:
+		return "DENIED";
+	case KERNEL_MCP_TICKET_CONSUMED:
+		return "CONSUMED";
+	}
+	return "UNKNOWN";
+}
+
+/* Chokepoint for every ticket state mutation. Callers MUST hold
+ * kernel_mcp_approval_lock. Rejects illegal transitions via WARN_ON_ONCE so
+ * a buggy caller is visible in dmesg but does not corrupt the hash table.
+ * Returns 0 on success, -EINVAL on illegal transition.
+ *
+ * Legal transitions (initial state is set by caller via this helper with
+ * prev=KERNEL_MCP_TICKET_PENDING matching kzalloc'd zero):
+ *   PENDING  -> APPROVED   (trigger="approve")
+ *   PENDING  -> DENIED     (trigger="deny" or "revoke")
+ *   APPROVED -> DENIED     (trigger="revoke")
+ *   APPROVED -> CONSUMED   (trigger="consume")
+ * Callers drive "create" (allocating a PENDING ticket) and "expire" /
+ * "invalidate" (removing from table) outside this function; those log
+ * separately since they are not state-field mutations.
+ */
+static int kernel_mcp_ticket_transition_locked(
+	struct kernel_mcp_approval_ticket *ticket,
+	enum kernel_mcp_ticket_state new_state,
+	const char *trigger)
+{
+	enum kernel_mcp_ticket_state prev = ticket->state;
+	bool legal = false;
+
+	switch (prev) {
+	case KERNEL_MCP_TICKET_PENDING:
+		legal = (new_state == KERNEL_MCP_TICKET_APPROVED ||
+			 new_state == KERNEL_MCP_TICKET_DENIED);
+		break;
+	case KERNEL_MCP_TICKET_APPROVED:
+		legal = (new_state == KERNEL_MCP_TICKET_CONSUMED ||
+			 new_state == KERNEL_MCP_TICKET_DENIED);
+		break;
+	case KERNEL_MCP_TICKET_DENIED:
+	case KERNEL_MCP_TICKET_CONSUMED:
+		legal = false;
+		break;
+	}
+
+	if (WARN_ON_ONCE(!legal)) {
+		pr_warn("kernel_mcp: illegal ticket=%llu transition %s -> %s trigger=%s\n",
+			ticket->ticket_id, kernel_mcp_ticket_state_name(prev),
+			kernel_mcp_ticket_state_name(new_state), trigger);
+		return -EINVAL;
+	}
+
+	ticket->state = new_state;
+	pr_info("kernel_mcp: ticket=%llu state_prev=%s state=%s trigger=%s\n",
+		ticket->ticket_id, kernel_mcp_ticket_state_name(prev),
+		kernel_mcp_ticket_state_name(new_state), trigger);
+	return 0;
+}
+
 static void kernel_mcp_approval_ticket_free(struct kernel_mcp_approval_ticket *ticket)
 {
 	kfree(ticket);
@@ -968,6 +1095,9 @@ static void kernel_mcp_approval_destroy_all(void)
 
 	mutex_lock(&kernel_mcp_approval_lock);
 	hash_for_each_safe(kernel_mcp_approval_tickets, bkt, tmp, ticket, hnode) {
+		pr_info("kernel_mcp: ticket=%llu state=%s trigger=invalidate\n",
+			ticket->ticket_id,
+			kernel_mcp_ticket_state_name(ticket->state));
 		hash_del(&ticket->hnode);
 		kernel_mcp_approval_ticket_free(ticket);
 	}
@@ -995,6 +1125,9 @@ static void kernel_mcp_purge_expired_tickets_locked(void)
 
 	hash_for_each_safe(kernel_mcp_approval_tickets, bkt, tmp, ticket, hnode) {
 		if (time_after_eq(jiffies, ticket->expires_jiffies)) {
+			pr_info("kernel_mcp: ticket=%llu state=%s trigger=expire\n",
+				ticket->ticket_id,
+				kernel_mcp_ticket_state_name(ticket->state));
 			hash_del(&ticket->hnode);
 			kernel_mcp_approval_ticket_free(ticket);
 		}
@@ -1040,11 +1173,17 @@ static int kernel_mcp_issue_approval_ticket(const char *agent_id, u64 binding_ha
 	if (tool_hash)
 		strscpy(ticket->tool_hash, tool_hash, sizeof(ticket->tool_hash));
 	strscpy(ticket->reason, "pending_approval", sizeof(ticket->reason));
+	/* kzalloc already zeroed -> state == KERNEL_MCP_TICKET_PENDING. Make the
+	 * create transition visible in dmesg alongside all other transitions.
+	 */
+	ticket->state = KERNEL_MCP_TICKET_PENDING;
 	ticket->expires_jiffies =
 		jiffies + msecs_to_jiffies(KERNEL_MCP_DEFAULT_APPROVAL_TTL_MS);
 
 	kernel_mcp_purge_expired_tickets_locked();
 	hash_add(kernel_mcp_approval_tickets, &ticket->hnode, ticket->ticket_id);
+	pr_info("kernel_mcp: ticket=%llu state=%s trigger=create\n",
+		ticket->ticket_id, kernel_mcp_ticket_state_name(ticket->state));
 	mutex_unlock(&kernel_mcp_approval_lock);
 
 	*ticket_id_out = ticket_id;
@@ -1059,7 +1198,7 @@ static bool kernel_mcp_consume_approval_ticket(u64 ticket_id, const char *agent_
 {
 	struct kernel_mcp_approval_ticket *ticket;
 	bool allow = false;
-	const char *reason = "approval_missing";
+	const char *reason = KERNEL_MCP_REASON_APPROVAL_MISSING;
 
 	if (ticket_id == 0) {
 		*reason_out = reason;
@@ -1070,39 +1209,49 @@ static bool kernel_mcp_consume_approval_ticket(u64 ticket_id, const char *agent_
 	kernel_mcp_purge_expired_tickets_locked();
 	ticket = kernel_mcp_find_ticket_locked(ticket_id);
 	if (!ticket) {
-		reason = "approval_ticket_unknown";
+		reason = KERNEL_MCP_REASON_TICKET_UNKNOWN;
 		goto out;
 	}
-	if (ticket->consumed) {
-		reason = "approval_ticket_consumed";
+	if (ticket->state == KERNEL_MCP_TICKET_CONSUMED) {
+		reason = KERNEL_MCP_REASON_TICKET_CONSUMED;
 		goto out;
 	}
 	if (ticket->req_id != req_id || ticket->tool_id != tool_id ||
 	    strcmp(ticket->agent_id, agent_id) != 0) {
-		reason = "approval_ticket_scope_mismatch";
+		reason = KERNEL_MCP_REASON_TICKET_SCOPE_MISMATCH;
 		goto out;
 	}
 	if (ticket->binding_hash != binding_hash ||
 	    ticket->binding_epoch != binding_epoch) {
-		reason = "approval_ticket_binding_mismatch";
+		reason = KERNEL_MCP_REASON_TICKET_BINDING_MISMATCH;
 		goto out;
 	}
 	if (tool_hash && ticket->tool_hash[0] != '\0' &&
 	    strcmp(ticket->tool_hash, tool_hash) != 0) {
-		reason = "approval_ticket_hash_mismatch";
+		reason = KERNEL_MCP_REASON_TICKET_HASH_MISMATCH;
 		goto out;
 	}
-	if (!ticket->decided) {
-		reason = "approval_pending";
+	switch (ticket->state) {
+	case KERNEL_MCP_TICKET_PENDING:
+		reason = KERNEL_MCP_REASON_TICKET_PENDING;
+		goto out;
+	case KERNEL_MCP_TICKET_DENIED:
+		reason = KERNEL_MCP_REASON_TICKET_DENIED;
+		goto out;
+	case KERNEL_MCP_TICKET_APPROVED:
+		break;
+	case KERNEL_MCP_TICKET_CONSUMED:
+		/* handled above; unreachable here */
+		reason = KERNEL_MCP_REASON_TICKET_CONSUMED;
 		goto out;
 	}
-	if (!ticket->approved) {
-		reason = "approval_denied";
+	if (kernel_mcp_ticket_transition_locked(
+		    ticket, KERNEL_MCP_TICKET_CONSUMED, "consume") < 0) {
+		reason = KERNEL_MCP_REASON_TICKET_CONSUMED;
 		goto out;
 	}
-	ticket->consumed = true;
 	allow = true;
-	reason = "approval_ticket_consumed";
+	reason = KERNEL_MCP_REASON_TICKET_CONSUMED;
 out:
 	mutex_unlock(&kernel_mcp_approval_lock);
 	*reason_out = reason;
@@ -1248,8 +1397,8 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	const char *agent_id;
 	const char *requested_tool_hash = NULL;
 	const char *requested_binary_hash = NULL;
-	const char *reason = "allow";
-	const char *ticket_reason = "approval_missing";
+	const char *reason = KERNEL_MCP_REASON_ALLOW;
+	const char *ticket_reason = KERNEL_MCP_REASON_APPROVAL_MISSING;
 	const u8 *payload_hash = NULL;
 	size_t payload_hash_len = 0;
 	u32 tool_id;
@@ -1335,7 +1484,7 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	agent = kernel_mcp_find_agent_locked(agent_id, key);
 	if (!agent) {
 		decision = KERNEL_MCP_DECISION_DENY;
-		reason = "deny_unknown_agent";
+		reason = KERNEL_MCP_REASON_AGENT_UNKNOWN;
 		mutex_unlock(&kernel_mcp_agents_lock);
 		return kernel_mcp_reply_tool_decision(info, agent_id, tool_id, req_id,
 						      decision, reason, ticket_id);
@@ -1343,12 +1492,12 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 
 	if (hash_mismatch) {
 		decision = KERNEL_MCP_DECISION_DENY;
-		reason = "hash_mismatch";
+		reason = KERNEL_MCP_REASON_HASH_MISMATCH;
 		goto out_accounting;
 	}
 	if (binary_mismatch) {
 		decision = KERNEL_MCP_DECISION_DENY;
-		reason = "binary_mismatch";
+		reason = KERNEL_MCP_REASON_BINARY_MISMATCH;
 		goto out_accounting;
 	}
 	/* Catalog staleness: if mcpd asserted a catalog epoch on the request
@@ -1360,13 +1509,13 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 	if (request_catalog_epoch > 0 &&
 	    request_catalog_epoch < tool_registered_epoch) {
 		decision = KERNEL_MCP_DECISION_DENY;
-		reason = "catalog_stale_rebind_required";
+		reason = KERNEL_MCP_REASON_CATALOG_STALE;
 		goto out_accounting;
 	}
 	if (agent->binding_hash != binding_hash ||
 	    agent->binding_epoch != binding_epoch) {
 		decision = KERNEL_MCP_DECISION_DENY;
-		reason = "binding_mismatch";
+		reason = KERNEL_MCP_REASON_BINDING_MISMATCH;
 		goto out_accounting;
 	}
 
@@ -1378,7 +1527,7 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 						      requested_tool_hash,
 						      &ticket_reason)) {
 			decision = KERNEL_MCP_DECISION_ALLOW;
-			reason = "allow_approved";
+			reason = KERNEL_MCP_REASON_ALLOW_APPROVED;
 			goto out_accounting;
 		}
 
@@ -1391,15 +1540,15 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb, struct genl_info *in
 							     req_id,
 							     requested_tool_hash,
 							     &ticket_id) == 0)
-				reason = "require_approval";
+				reason = KERNEL_MCP_REASON_APPROVAL_REQUIRED;
 			else
-				reason = "approval_unavailable";
+				reason = KERNEL_MCP_REASON_APPROVAL_UNAVAILABLE;
 		}
 		goto out_accounting;
 	}
 
 	decision = KERNEL_MCP_DECISION_ALLOW;
-	reason = "allow";
+	reason = KERNEL_MCP_REASON_ALLOW;
 
 out_accounting:
 	if (decision == KERNEL_MCP_DECISION_ALLOW) {
@@ -1557,7 +1706,7 @@ static int kernel_mcp_cmd_approval_decide(struct sk_buff *skb,
 		mutex_unlock(&kernel_mcp_approval_lock);
 		return -ENOENT;
 	}
-	if (ticket->consumed) {
+	if (ticket->state == KERNEL_MCP_TICKET_CONSUMED) {
 		mutex_unlock(&kernel_mcp_approval_lock);
 		return -EPERM;
 	}
@@ -1568,20 +1717,41 @@ static int kernel_mcp_cmd_approval_decide(struct sk_buff *skb,
 		return -EPERM;
 	}
 
-	strscpy(ticket->approver, approver, sizeof(ticket->approver));
-	strscpy(ticket->reason, reason, sizeof(ticket->reason));
-	if (decision == KERNEL_MCP_APPROVAL_APPROVE)
+	if (decision == KERNEL_MCP_APPROVAL_APPROVE) {
 		approved = true;
-	else if (decision == KERNEL_MCP_APPROVAL_DENY ||
-		 decision == KERNEL_MCP_APPROVAL_REVOKE)
+	} else if (decision == KERNEL_MCP_APPROVAL_DENY ||
+		   decision == KERNEL_MCP_APPROVAL_REVOKE) {
 		approved = false;
-	else {
+	} else {
 		mutex_unlock(&kernel_mcp_approval_lock);
 		return -EINVAL;
 	}
 
-	ticket->decided = true;
-	ticket->approved = approved;
+	{
+		enum kernel_mcp_ticket_state target = approved
+			? KERNEL_MCP_TICKET_APPROVED
+			: KERNEL_MCP_TICKET_DENIED;
+		const char *trigger = approved ? "approve" :
+			(decision == KERNEL_MCP_APPROVAL_REVOKE ? "revoke"
+							       : "deny");
+		int rc;
+
+		/* A re-decide that does not change state (e.g. deny-after-deny)
+		 * would be flagged illegal by the transition helper. Treat it
+		 * as idempotent: only refresh approver/reason/expiry.
+		 */
+		if (ticket->state != target) {
+			rc = kernel_mcp_ticket_transition_locked(
+				ticket, target, trigger);
+			if (rc < 0) {
+				mutex_unlock(&kernel_mcp_approval_lock);
+				return rc;
+			}
+		}
+	}
+
+	strscpy(ticket->approver, approver, sizeof(ticket->approver));
+	strscpy(ticket->reason, reason, sizeof(ticket->reason));
 	ticket->expires_jiffies = jiffies + msecs_to_jiffies(ttl_ms);
 	mutex_unlock(&kernel_mcp_approval_lock);
 	return 0;

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import enum
 import hashlib
 import json
 import logging
@@ -13,6 +14,7 @@ import socket
 import struct
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Tuple
 
@@ -27,6 +29,8 @@ try:
     from session_store import (
         AgentBinding,
         PeerIdentity,
+        approve_pending_approval,
+        deny_pending_approval,
         normalize_session_ttl_ms,
         open_session,
         peek_pending_approval,
@@ -37,6 +41,7 @@ try:
         take_pending_approval,
         validate_pending_approval_req,
     )
+    from client.kernel_mcp import reasons as reason_taxonomy
 except ModuleNotFoundError:  # pragma: no cover - package import fallback
     from .config import ConfigError, SecurityConfig, load_security_config
     from .manifest_loader import DEFAULT_MANIFEST_DIR, AppManifest, ToolManifest, load_all_manifests
@@ -48,6 +53,8 @@ except ModuleNotFoundError:  # pragma: no cover - package import fallback
     from .session_store import (
         AgentBinding,
         PeerIdentity,
+        approve_pending_approval,
+        deny_pending_approval,
         normalize_session_ttl_ms,
         open_session,
         peek_pending_approval,
@@ -58,6 +65,7 @@ except ModuleNotFoundError:  # pragma: no cover - package import fallback
         take_pending_approval,
         validate_pending_approval_req,
     )
+    from client.kernel_mcp import reasons as reason_taxonomy
 
 SOCK_PATH = "/tmp/mcpd.sock"
 MAX_MSG_SIZE = 16 * 1024 * 1024
@@ -70,6 +78,44 @@ APPROVAL_DECISION_MAP = {
 }
 LOGGER = logging.getLogger("mcpd")
 HASH_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+def _log_decision_event(
+    *,
+    source: str,
+    req_id: int,
+    agent_id: str,
+    tool_id: int,
+    decision: str,
+    reason: str,
+    ticket_id: int,
+) -> None:
+    """Single chokepoint for every tool:exec decision outcome.
+
+    Grepping `event=decision` in mcpd stderr yields the complete stream
+    of allow / deny / defer decisions regardless of source:
+      source=arb           -> kernel arbitration reply
+      source=probe         -> mcpd-side probe failure (never reached kernel)
+      source=user_decline  -> sys:approval_reply deny from the session
+
+    The category is looked up through the reason taxonomy; an unknown
+    reason emits category=unknown and a one-shot warning so drift becomes
+    visible at runtime rather than buried in an experiment-results join.
+    """
+    category_enum = reason_taxonomy.classify(reason)
+    if category_enum is None:
+        LOGGER.warning(
+            "event=decision_unknown_reason source=%s reason=%s", source, reason,
+        )
+        category = "unknown"
+    else:
+        category = category_enum.value
+    LOGGER.info(
+        "event=decision source=%s req_id=%d agent=%s tool=%d "
+        "decision=%s reason=%s category=%s ticket_id=%d",
+        source, req_id, agent_id, tool_id,
+        decision, reason, category, ticket_id,
+    )
 
 _stop_event = threading.Event()
 _agents_lock = threading.Lock()
@@ -163,6 +209,106 @@ def _fresh_script_digest(script_path: str) -> str:
     except OSError:
         return ""
 
+
+# Serving identity — what is actually running right now.
+#
+# linux-mcp draws a hard line between two kinds of tool identity:
+#
+#   * Logical tool identity (ToolManifest.manifest_hash + kernel tool->hash):
+#     "what this tool is semantically". Derived from manifest fields —
+#     name, description, input_schema, risk_tags, operation, ... Stable
+#     across host moves. See manifest_loader.SEMANTIC_HASH_FIELDS.
+#
+#   * Serving backend identity (ServingIdentity.composite_digest + kernel
+#     tool->binary_hash): "who is running this tool right now". Derived
+#     from a live probe of the backend process. Changes every time the
+#     actual executable or script on disk changes.
+#
+# The two identities live on separate axes: a binding-only endpoint move
+# resets serving identity without touching logical identity; a schema edit
+# changes logical identity without touching the running backend. The
+# kernel enforces each independently (hash_mismatch vs binary_mismatch).
+@dataclass(frozen=True)
+class ServingIdentity:
+    """Composite of exe bytes + (optional) entry-script bytes.
+
+    Fields:
+      exe_digest       SHA-256 of /proc/<pid>/exe bytes.
+      script_digest    SHA-256 of the manifest-declared entry script on
+                       disk (empty for native-binary tools).
+      composite_digest The value actually stored in the kernel TOFU slot:
+                       HASH(exe_digest + ":" + script_digest) when a script
+                       is declared, otherwise exe_digest verbatim.
+      strategy         "native" | "scripted" | "scripted_degraded" — for
+                       logs and the paper table; does not affect the digest
+                       sent to the kernel.
+    """
+    exe_digest: str
+    script_digest: str
+    composite_digest: str
+    strategy: str
+
+
+def _compute_serving_identity(
+    exe_digest: str, tool: ToolManifest
+) -> ServingIdentity:
+    """Single chokepoint for serving-identity composition.
+
+    Rule (one rule, no special cases):
+      * tool.script_path is empty -> strategy="native". Composite is the
+        raw exe_digest. This is the case for any tool whose manifest did
+        not declare `demo_entrypoint`.
+      * tool.script_path is non-empty -> strategy="scripted". Try to
+        re-hash the script from disk for freshness; if that fails, fall
+        back to the manifest-time script_digest (strategy stays "scripted"
+        because the declared script is still locking the composite). If
+        BOTH live and manifest-cached digests are empty, degrade to
+        "scripted_degraded" and return exe_digest alone — the caller
+        should log that the application-code TOFU is not active for this
+        tool.
+
+    Interpreter-exe detection (_is_interpreter_exe) is deliberately NOT
+    consulted here. The composite strategy is driven by whether the
+    manifest declares an entry script, not by guessing from the kernel's
+    /proc view. The heuristic remains available as a diagnostic warning
+    emitted separately by the caller when a manifest without script_path
+    happens to serve from an interpreter binary — see
+    _probe_backend_binary_hash.
+    """
+    if not tool.script_path:
+        return ServingIdentity(
+            exe_digest=exe_digest,
+            script_digest="",
+            composite_digest=exe_digest,
+            strategy="native",
+        )
+
+    script_digest = _fresh_script_digest(tool.script_path)
+    if not script_digest:
+        # Live re-read failed; fall back to manifest-cached digest so a
+        # transient filesystem hiccup does not nuke an otherwise valid
+        # pin. The next successful probe will DENY via binary_mismatch if
+        # the script actually changed.
+        script_digest = tool.script_digest
+
+    if not script_digest:
+        # Declared but unreadable both live and at manifest load time.
+        # Operator needs to investigate — we return the exe-only digest so
+        # the control plane stays usable but the TOFU guarantee is weaker.
+        return ServingIdentity(
+            exe_digest=exe_digest,
+            script_digest="",
+            composite_digest=exe_digest,
+            strategy="scripted_degraded",
+        )
+
+    return ServingIdentity(
+        exe_digest=exe_digest,
+        script_digest=script_digest,
+        composite_digest=_composite_interpreter_hash(exe_digest, script_digest),
+        strategy="scripted",
+    )
+
 # Loaded on demand so tests and importing tools don't hit the filesystem.
 _security_config: SecurityConfig | None = None
 
@@ -215,13 +361,13 @@ def _register_tool_with_kernel(tool: ToolManifest) -> None:
     # actually observe this round.
     if pr.live and pr.digest:
         LOGGER.info(
-            "register tool=%d name=%s risk=0x%x binary_hash=%s",
+            "event=tool_register tool=%d name=%s risk=0x%x binary_hash=%s",
             tool.tool_id, tool.name, tool.risk_flags, pr.digest[:16] + "...",
         )
     else:
         LOGGER.warning(
-            "register tool=%d name=%s probe live=%s digest_empty=%s "
-            "transport=%s endpoint=%s (will retry at exec)",
+            "event=tool_register_degraded tool=%d name=%s probe_live=%s "
+            "digest_empty=%s transport=%s endpoint=%s",
             tool.tool_id, tool.name, pr.live, not pr.digest,
             tool.transport, tool.endpoint,
         )
@@ -251,38 +397,163 @@ def _compute_manifest_signature() -> str:
     return digest.hexdigest()
 
 
+class ReconcileAction(str, enum.Enum):
+    """Explicit per-tool reconcile decision.
+
+    The diff between the previous and the new manifest registry collapses
+    into exactly one of these actions for each tool_id touched. See
+    _plan_reconcile for the decision rules and _apply_reconcile_action for
+    the kernel calls each rule emits.
+    """
+
+    # tool_id present in both and both fingerprints unchanged — no kernel call.
+    KEEP = "keep"
+    # tool_id new in this reload — register_tool() (bumps epoch, probes TOFU).
+    ADD = "add"
+    # tool_id disappeared — unregister_tool() (bumps epoch, frees TOFU slot).
+    REMOVE = "remove"
+    # manifest_hash changed, binding_fingerprint unchanged. In-place
+    # register_tool() refreshes name/hash/risk_flags and bumps epoch;
+    # kernel_mcp_register_tool preserves the TOFU binary_hash slot because
+    # the serving backend is the same process.
+    RE_REGISTER_SEMANTIC = "re_register_semantic"
+    # binding_fingerprint changed (transport/endpoint); manifest_hash may or
+    # may not have changed. The backend may now be a different process with
+    # a different binary, so we must unregister_tool() first to clear the
+    # TOFU slot, drop mcpd's hash cache, and then register_tool() so the
+    # next live probe can pin a fresh binary_hash. Two epoch bumps (one per
+    # kernel op) — harmless, surviving sessions just see the later one.
+    RE_REGISTER_BINDING_MOVE = "re_register_binding_move"
+
+
+def _plan_reconcile(
+    prev: Dict[int, ToolManifest],
+    new: Dict[int, ToolManifest],
+) -> Dict[int, ReconcileAction]:
+    """Pure function: compute a per-tool action table from two registries.
+
+    Rules (applied in priority order per tool_id):
+      - id in new only                 -> ADD
+      - id in prev only                -> REMOVE
+      - id in both:
+          binding_fingerprint changed  -> RE_REGISTER_BINDING_MOVE
+                                          (covers simultaneous semantic
+                                          change — binding move is strictly
+                                          more disruptive and handles both)
+          manifest_hash changed        -> RE_REGISTER_SEMANTIC
+          otherwise                    -> KEEP
+    """
+    plan: Dict[int, ReconcileAction] = {}
+    prev_ids = set(prev.keys())
+    new_ids = set(new.keys())
+
+    for tid in new_ids - prev_ids:
+        plan[tid] = ReconcileAction.ADD
+    for tid in prev_ids - new_ids:
+        plan[tid] = ReconcileAction.REMOVE
+    for tid in prev_ids & new_ids:
+        p, n = prev[tid], new[tid]
+        if p.binding_fingerprint != n.binding_fingerprint:
+            plan[tid] = ReconcileAction.RE_REGISTER_BINDING_MOVE
+        elif p.manifest_hash != n.manifest_hash:
+            plan[tid] = ReconcileAction.RE_REGISTER_SEMANTIC
+        else:
+            plan[tid] = ReconcileAction.KEEP
+    return plan
+
+
+def _apply_reconcile_action(
+    client: KernelMcpNetlinkClient,
+    tool_id: int,
+    action: ReconcileAction,
+    new_tool: ToolManifest | None,
+) -> None:
+    """Single dispatch point for reconcile actions. Every reconcile-driven
+    mutation of the kernel registry must go through this function so logs
+    and error handling stay uniform. `new_tool` is the post-reload manifest
+    (None for REMOVE).
+    """
+    if action is ReconcileAction.KEEP:
+        return
+
+    if action is ReconcileAction.REMOVE:
+        try:
+            client.unregister_tool(tool_id)
+        except RuntimeError as exc:
+            LOGGER.error(
+                "event=reconcile_step_failed tool=%d action=%s step=kernel_unregister err=%s",
+                tool_id, action.value, exc,
+            )
+            raise RuntimeError(
+                f"reconcile {action.value} failed for tool {tool_id}: "
+                f"kernel unregister did not complete"
+            ) from exc
+        _backend_hash_cache.pop(tool_id, None)
+        LOGGER.info("event=reconcile tool=%d action=%s", tool_id, action.value)
+        return
+
+    assert new_tool is not None, "ADD/RE_REGISTER_* require new_tool"
+
+    if action is ReconcileAction.RE_REGISTER_BINDING_MOVE:
+        # Clear the kernel's TOFU slot first. Without this, register_tool
+        # would leave the old binary_hash in place and every tool:exec
+        # would DENY with binary_mismatch once the new backend is probed.
+        try:
+            client.unregister_tool(tool_id)
+        except RuntimeError as exc:
+            LOGGER.error(
+                "event=reconcile_step_failed tool=%d action=%s step=kernel_unregister err=%s",
+                tool_id, action.value, exc,
+            )
+            raise RuntimeError(
+                f"reconcile {action.value} failed for tool {tool_id}: "
+                f"kernel unregister did not complete"
+            ) from exc
+        _backend_hash_cache.pop(tool_id, None)
+
+    _register_tool_with_kernel(new_tool)
+    LOGGER.info("event=reconcile tool=%d action=%s", tool_id, action.value)
+
+
 def _load_runtime_registry(*, force_reset: bool = False) -> str:
     """Reconcile local manifest state with the kernel tool registry.
 
     Two fingerprints drive the diff, tracked separately on purpose:
 
       - manifest_hash  : semantic identity (name, description, schema,
-                         risk_tags, ...). Changing it means the tool looks
-                         like a different tool to llm-app. Semantic-only
-                         changes trigger a plain register_tool() — the
-                         kernel refreshes name/hash/risk_flags and bumps
-                         catalog_epoch. The TOFU binary_hash slot is
-                         intentionally preserved; same backend runs it.
-      - binding_fingerprint : runtime routing (transport, endpoint,
-                         operation). Changing this means the tool may now
-                         be served by a *different process with a different
-                         binary*. The old TOFU binary_hash pin would make
-                         every subsequent call DENY as binary_mismatch, so
-                         we must unregister_tool() first to clear the slot,
-                         then register_tool() so the next probe can learn
-                         the new backend's hash cleanly. Each mutation also
-                         advances catalog_epoch, which is what forces any
-                         pre-change session to hit catalog_stale_rebind_required
-                         instead of silently routing to the new endpoint.
+                         risk_tags, operation, ...). Changing it means the
+                         tool looks like a different tool to llm-app.
+      - binding_fingerprint : runtime routing (transport, endpoint).
+                         Changing this means the backend may be a different
+                         process with a different executable.
 
-    Both fingerprints are compared explicitly; we do NOT fold binding into
-    manifest_hash because that would make a host-move look like a tool
-    identity change to external consumers, which is the opposite of what
-    the semantic-hash design guarantees.
+    The two fingerprints drive distinct ReconcileAction values per tool
+    (KEEP / ADD / REMOVE / RE_REGISTER_SEMANTIC / RE_REGISTER_BINDING_MOVE);
+    see ReconcileAction and _plan_reconcile for the full decision table and
+    kernel-side consequences.
 
-    force_reset=True keeps the old startup behavior — useful once after
-    kernel module reload when the module's tool registry is known to be
-    inconsistent with whatever mcpd has cached.
+    Control-plane invariants this function relies on:
+      I1 TOFU `binary_hash` is NOT catalog state; filling the slot does not
+         bump catalog_epoch. Only {name, hash, risk_flags} mutations do.
+      I2 kernel reset_tools() (destroy_all) does NOT bump catalog_epoch;
+         the subsequent per-tool register calls do. Cold-start relies on
+         this: surviving agents still see a strictly-later tool epoch.
+      I3 unregister_tool() DOES bump catalog_epoch; a single removal is
+         sufficient to force any session holding that tool's old epoch to
+         rebind before its next call.
+      I4 catalog_stale detection is per-tool (request_catalog_epoch <
+         tool_registered_epoch). An unrelated tool change does NOT force
+         unrelated sessions to rebind.
+      I5 mcpd userspace state (_sessions, _pending_approvals) is NOT
+         persisted; it is lost on restart. Kernel state (tools, agents,
+         approval tickets) survives as long as the module stays loaded —
+         any stranded approval tickets expire via the kernel's cleanup
+         timer.
+
+    force_reset=True selects the cold-start path: reset_tools() wipes the
+    kernel table, then every manifest tool is re-registered from scratch.
+    Used exactly once at daemon boot, where trusting whatever survived in
+    the kernel from a prior mcpd run is not worth the debugging risk.
     """
     apps = load_all_manifests()
     app_registry: Dict[str, AppManifest] = {}
@@ -295,77 +566,58 @@ def _load_runtime_registry(*, force_reset: bool = False) -> str:
     client = _get_kernel_client()
 
     if force_reset:
+        # Cold-start path. Treat every manifest tool as ADD after wipe.
         client.reset_tools()
         for tool in tool_registry.values():
             _register_tool_with_kernel(tool)
+        LOGGER.info(
+            "event=reconcile_summary mode=cold_start tools=%d",
+            len(tool_registry),
+        )
     else:
+        # Live-reload path. Compute decision table against the in-memory
+        # snapshot of what mcpd last pushed to the kernel.
         with _registry_lock:
-            previous_tool_ids = set(_tool_registry.keys())
-            previous_manifest_hashes = {
-                tid: t.manifest_hash for tid, t in _tool_registry.items()
-            }
-            previous_binding_fingerprints = {
-                tid: t.binding_fingerprint for tid, t in _tool_registry.items()
-            }
-        new_tool_ids = set(tool_registry.keys())
+            prev_snapshot: Dict[int, ToolManifest] = dict(_tool_registry)
 
-        removed = previous_tool_ids - new_tool_ids
-        added = new_tool_ids - previous_tool_ids
+        plan = _plan_reconcile(prev_snapshot, tool_registry)
 
-        intersect = previous_tool_ids & new_tool_ids
-        semantic_changed = {
-            tid for tid in intersect
-            if previous_manifest_hashes.get(tid)
-            != tool_registry[tid].manifest_hash
-        }
-        binding_changed = {
-            tid for tid in intersect
-            if previous_binding_fingerprints.get(tid)
-            != tool_registry[tid].binding_fingerprint
-        }
-
-        for tool_id in removed:
-            try:
-                client.unregister_tool(tool_id)
-            except RuntimeError as exc:
-                LOGGER.warning("kernel unregister failed tool=%d err=%s",
-                               tool_id, exc)
-            _backend_hash_cache.pop(tool_id, None)
-
-        # Binding changes must clear the kernel TOFU slot before re-registering;
-        # if we only call register_tool(), kernel_mcp_register_tool preserves
-        # the old binary_hash and every subsequent tool:exec will DENY as
-        # binary_mismatch after a genuine backend move. Also drop mcpd's
-        # per-tool hash cache so the next probe starts clean.
-        for tool_id in binding_changed:
-            try:
-                client.unregister_tool(tool_id)
-            except RuntimeError as exc:
-                LOGGER.warning(
-                    "kernel unregister during binding-change failed tool=%d err=%s",
-                    tool_id, exc,
+        # Apply REMOVE before RE_REGISTER_BINDING_MOVE before RE_REGISTER_SEMANTIC
+        # before ADD — the ordering is not semantically required today (each
+        # tool_id is in the plan at most once and kernel ops are independent)
+        # but keeps the log deterministic and matches how a reviewer would
+        # read the decision table top-to-bottom.
+        order = (
+            ReconcileAction.REMOVE,
+            ReconcileAction.RE_REGISTER_BINDING_MOVE,
+            ReconcileAction.RE_REGISTER_SEMANTIC,
+            ReconcileAction.ADD,
+        )
+        counts: Dict[ReconcileAction, int] = {a: 0 for a in ReconcileAction}
+        for action in order:
+            for tool_id, act in plan.items():
+                if act is not action:
+                    continue
+                _apply_reconcile_action(
+                    client, tool_id, action,
+                    tool_registry.get(tool_id),
                 )
-            _backend_hash_cache.pop(tool_id, None)
-            LOGGER.warning(
-                "tool=%d runtime binding changed (transport/endpoint/operation); "
-                "cleared kernel TOFU slot and local hash cache before re-register",
-                tool_id,
-            )
+                counts[action] += 1
+        # KEEP is not in `order`; count it separately for the summary.
+        counts[ReconcileAction.KEEP] = sum(
+            1 for a in plan.values() if a is ReconcileAction.KEEP
+        )
 
-        # A binding_changed tool also needs to be re-registered. A
-        # semantic_changed tool whose binding is unchanged only needs the
-        # in-place register (kernel updates metadata and bumps epoch, TOFU
-        # slot intentionally preserved).
-        to_register = added | binding_changed | semantic_changed
-        for tool_id in to_register:
-            _register_tool_with_kernel(tool_registry[tool_id])
-
-        if removed or added or semantic_changed or binding_changed:
+        mutated = any(counts[a] for a in ReconcileAction if a is not ReconcileAction.KEEP)
+        if mutated:
             LOGGER.info(
-                "reconciled kernel catalog added=%d removed=%d "
-                "semantic_changed=%d binding_changed=%d",
-                len(added), len(removed),
-                len(semantic_changed), len(binding_changed),
+                "event=reconcile_summary mode=live_reload add=%d remove=%d "
+                "re_register_semantic=%d re_register_binding_move=%d keep=%d",
+                counts[ReconcileAction.ADD],
+                counts[ReconcileAction.REMOVE],
+                counts[ReconcileAction.RE_REGISTER_SEMANTIC],
+                counts[ReconcileAction.RE_REGISTER_BINDING_MOVE],
+                counts[ReconcileAction.KEEP],
             )
 
     with _registry_lock:
@@ -375,7 +627,7 @@ def _load_runtime_registry(*, force_reset: bool = False) -> str:
         _tool_registry.update(tool_registry)
 
     LOGGER.info(
-        "loaded manifests apps=%d tools=%d app_ids=%s",
+        "event=catalog_loaded apps=%d tools=%d app_ids=%s",
         len(app_registry),
         len(tool_registry),
         sorted(app_registry.keys()),
@@ -384,19 +636,37 @@ def _load_runtime_registry(*, force_reset: bool = False) -> str:
 
 
 def _ensure_runtime_registry_current(*, force: bool = False) -> None:
+    """Drive the control-plane reconcile state machine.
+
+    Two modes, explicit at the call site via `force`:
+
+      force=True  -> COLD_START. Used exactly once at daemon boot. Discards
+                     whatever survived in the kernel registry from a prior
+                     mcpd run and re-registers every manifest tool from
+                     scratch. Userspace-side state (_sessions,
+                     _pending_approvals) is already empty at this point
+                     because the process just started; there is nothing to
+                     invalidate in userspace. Any kernel-side approval
+                     tickets or agent records that outlived the old mcpd
+                     are left to expire naturally — they will not match
+                     freshly-issued ticket_ids or binding_hashes.
+
+      force=False -> LIVE_RELOAD. The normal path, hit on session open and
+                     catalog listing. Cheap in the common case: if the
+                     on-disk manifest bundle's signature is unchanged we
+                     return immediately. Otherwise _load_runtime_registry
+                     computes the per-tool ReconcileAction table and
+                     applies only the minimum kernel ops.
+    """
     global _manifest_signature
 
     with _manifest_reload_lock:
         current_signature = _compute_manifest_signature()
         if not force and current_signature == _manifest_signature:
             return
-        # force=True is only used at startup; do a hard reset so we don't
-        # trust whatever state survived in the kernel from a prior run.
-        # Subsequent on-demand reloads run incrementally so only mutated
-        # tools bump the catalog epoch.
         loaded_signature = _load_runtime_registry(force_reset=force)
         _manifest_signature = loaded_signature
-        LOGGER.info("manifest catalog refreshed signature=%s", loaded_signature[:12])
+        LOGGER.info("event=catalog_refreshed signature=%s", loaded_signature[:12])
 
 
 def _read_peer_identity(conn: socket.socket) -> PeerIdentity:
@@ -441,7 +711,7 @@ def _ensure_agent_registered(agent_id: str, binding: AgentBinding) -> None:
             ) from exc
         raise
     LOGGER.info(
-        "agent registered via netlink: %s pid=%d uid=%d binding_hash=%016x epoch=%d catalog_epoch=%d",
+        "event=agent_register agent=%s pid=%d uid=%d binding_hash=%016x epoch=%d catalog_epoch=%d",
         agent_id,
         binding.peer.pid,
         binding.peer.uid,
@@ -486,14 +756,14 @@ def _kernel_arbitrate(
                 "kernel request ABI mismatch: rebuild and reload kernel_mcp from this repo"
             ) from exc
         raise
-    LOGGER.info(
-        "arb req_id=%d agent=%s tool=%d decision=%s reason=%s ticket_id=%d",
-        req_id,
-        agent_id,
-        tool_id,
-        decision_reply.decision,
-        decision_reply.reason,
-        decision_reply.ticket_id,
+    _log_decision_event(
+        source="arb",
+        req_id=req_id,
+        agent_id=agent_id,
+        tool_id=tool_id,
+        decision=decision_reply.decision,
+        reason=decision_reply.reason,
+        ticket_id=decision_reply.ticket_id,
     )
     return (
         decision_reply.decision,
@@ -780,48 +1050,38 @@ def _probe_backend_binary_hash(
             )
             continue
 
-        # Interpreter-aware composite hash. When the backend is hosted
-        # by an interpreter, hashing /proc/<pid>/exe alone pins the
-        # interpreter, NOT the application code. We combine with a
-        # live-read digest of the entry script so a change to the
-        # script on disk invalidates the kernel TOFU pin immediately —
-        # the manifest-cached digest is only refreshed when the
-        # manifest JSON itself changes, so relying on it would leave a
-        # swapped .py trusted until mcpd bounces.
+        # Route through the single serving-identity chokepoint. The
+        # composite strategy is driven by manifest declaration (is this a
+        # scripted tool?), not by introspecting /proc. _is_interpreter_exe
+        # is still consulted, but only as a diagnostic: if the backend
+        # looks interpreter-hosted yet the manifest did not declare a
+        # script, the operator has a supply-chain gap — the TOFU slot
+        # pins the interpreter bytes but not the loaded application code.
+        serving = _compute_serving_identity(exe_digest, tool)
         exe_target = id_before[0]
-        if _is_interpreter_exe(exe_target):
-            live_script_digest = _fresh_script_digest(tool.script_path)
-            if not live_script_digest:
-                # Fall back to whatever we captured at manifest load so
-                # a transient read failure doesn't nuke an otherwise
-                # valid pin; the next successful read will DENY via
-                # binary_mismatch if the script actually changed.
-                live_script_digest = tool.script_digest
-                if live_script_digest:
-                    LOGGER.warning(
-                        "tool=%d name=%s script re-read failed "
-                        "(path=%s); using manifest-cached digest",
-                        tool.tool_id, tool.name, tool.script_path,
-                    )
-            if live_script_digest:
-                digest = _composite_interpreter_hash(exe_digest, live_script_digest)
-            else:
-                LOGGER.warning(
-                    "tool=%d name=%s backend is interpreter-hosted (exe=%s) but "
-                    "no script_digest available — binary_hash pins interpreter "
-                    "only; application code is NOT TOFU-protected",
-                    tool.tool_id, tool.name, exe_target,
-                )
-                digest = exe_digest
-        else:
-            digest = exe_digest
+        if not tool.script_path and _is_interpreter_exe(exe_target):
+            LOGGER.warning(
+                "tool=%d name=%s backend exe=%s looks interpreter-hosted "
+                "but manifest has no demo_entrypoint; serving_identity "
+                "strategy=native covers interpreter bytes only, application "
+                "code is NOT TOFU-protected",
+                tool.tool_id, tool.name, exe_target,
+            )
+        elif serving.strategy == "scripted_degraded":
+            LOGGER.warning(
+                "tool=%d name=%s script_path=%s unreadable both live and "
+                "at manifest load; serving_identity degraded to exe-only pin",
+                tool.tool_id, tool.name, tool.script_path,
+            )
 
         with _backend_hash_lock:
-            _backend_hash_cache[tool.tool_id] = (backend_pid, id_before, digest)
+            _backend_hash_cache[tool.tool_id] = (
+                backend_pid, id_before, serving.composite_digest,
+            )
         if not hold:
             probe.close()
         return ProbeResult(
-            digest=digest, live=True,
+            digest=serving.composite_digest, live=True,
             conn=probe if hold else None,
             pid=backend_pid, identity=id_before,
         )
@@ -998,6 +1258,84 @@ def _approval_decide(
     )
 
 
+def _build_rejection_response(
+    *,
+    req_id: int,
+    decision: str,
+    reason: str,
+    error_message: str,
+    ticket_id: int,
+) -> Dict[str, Any]:
+    """Single source for the DENY/DEFER response envelope.
+
+    All rejection paths (probe-failed, kernel arbitration denied, kernel
+    arbitration deferred) return the same field set; only `decision`,
+    `reason`, `error_message`, and `ticket_id` vary. Keeping one builder
+    makes it impossible for the three paths to drift apart.
+    """
+    return {
+        "req_id": req_id,
+        "status": "error",
+        "result": {},
+        "error": error_message,
+        "t_ms": 0,
+        "decision": decision,
+        "reason": reason,
+        "ticket_id": ticket_id,
+    }
+
+
+def _discard_probe_conn(probe_result: "ProbeResult") -> None:
+    """Idempotent best-effort close of a held probe socket.
+
+    The tool_exec path keeps the probe's verified socket open across
+    kernel arbitration so it can reuse the same connection for the real
+    RPC. On DENY or DEFER we never run that RPC, so the socket must be
+    closed. The close may legitimately fail (already closed, peer gone);
+    we swallow those — this function is audit/cleanup, not load-bearing.
+    """
+    if probe_result.conn is None:
+        return
+    try:
+        probe_result.conn.close()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _record_probe_failed_audit(
+    *,
+    req_id: int,
+    agent_id: str,
+    tool_id: int,
+    binding: AgentBinding,
+    payload_hash: bytes,
+) -> None:
+    """Push a probe_failed entry into the kernel's per-agent call_log so
+    the denial survives an mcpd crash and shows up in sysfs.
+
+    Must register the agent first so cmd_tool_complete can resolve it.
+    Failure to write the audit is logged but does not propagate — we
+    still want to return the DENY to the caller.
+    """
+    try:
+        _ensure_agent_registered(agent_id, binding)
+        _kernel_report_complete(
+            agent_id=agent_id,
+            tool_id=tool_id,
+            req_id=req_id,
+            status_code=1,
+            exec_ms=0,
+            payload_hash=payload_hash,
+            err_head=reason_taxonomy.PROBE_FAILED.name.encode("ascii"),
+            tool_status_code=TSC_PROBE_FAILED,
+        )
+    except Exception as audit_exc:  # noqa: BLE001
+        LOGGER.error(
+            "event=audit_failed kind=probe_failed req_id=%d agent=%s tool=%d err=%s",
+            req_id, agent_id, tool_id, audit_exc,
+        )
+
+
 def _resolve_tool_hash(req: Dict[str, Any], tool: ToolManifest) -> str:
     raw = req.get("tool_hash", "")
     if raw in (None, ""):
@@ -1007,140 +1345,33 @@ def _resolve_tool_hash(req: Dict[str, Any], tool: ToolManifest) -> str:
     return raw.lower()
 
 
-def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
-    _ensure_runtime_registry_current()
-    req_id = ensure_int("req_id", req.get("req_id", 0))
-    session_id = ensure_non_empty_str("session_id", req.get("session_id", ""))
-    peer = req.get("_peer")
-    if not isinstance(peer, PeerIdentity):
-        raise ValueError("missing peer identity")
-    session = resolve_session(session_id, peer)
-    binding = session_binding(session)
-    agent_id = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
-    app_id = ensure_non_empty_str("app_id", req.get("app_id", ""))
-    tool_id = ensure_int("tool_id", req.get("tool_id", 0))
+def _dispatch_tool_call(
+    *,
+    tool: ToolManifest,
+    req_id: int,
+    agent_id: str,
+    payload: Any,
+    probe_result: "ProbeResult",
+    decision: str,
+    reason: str,
+    ticket_id: int,
+    payload_hash: bytes,
+) -> Dict[str, Any]:
+    """Forward the approved request to the backend and report completion.
 
-    with _registry_lock:
-        tool = _tool_registry.get(tool_id)
-    if tool is None:
-        raise ValueError(f"unsupported tool_id: {tool_id}")
-    if tool.app_id != app_id:
-        raise ValueError(
-            f"tool_id={tool_id} does not belong to app_id={app_id} (expected {tool.app_id})"
-        )
+    Stage 6 of _handle_tool_exec. Owns three things:
+      1. Call _call_tool_service over the held probe socket (same-PID
+         guarantee) and classify the outcome (ok / tool_error / mcpd
+         forwarding failure).
+      2. Build the success/tool-error response envelope.
+      3. Always push a tool_complete record to the kernel call_log in
+         finally{}, whether the call succeeded, the tool returned
+         status=error, or mcpd itself failed to forward.
 
-    payload = req.get("payload", {})
-    validate_payload(tool.input_schema, payload)
-    payload_hash = _summary_hash_prefix(_canonical_payload_bytes(payload))
-    # hold=True: keep the probe's verified socket open so we can send the
-    # actual payload on the same connection after kernel arbitration.
-    # That closes the TOCTOU window between probe and exec dial.
-    probe_result = _probe_backend_binary_hash(tool, hold=True)
-    backend_binary_hash = probe_result.digest
-
-    # Refuse any request whose live backend identity we could not confirm
-    # this round. Serving the cached digest on a failed live probe would
-    # let a swapped backend pass the kernel TOFU check.
-    if not probe_result.live:
-        LOGGER.warning(
-            "refusing tool=%d name=%s: live probe failed "
-            "(cached_digest_present=%s)",
-            tool_id, tool.name, bool(backend_binary_hash),
-        )
-        # Record the denial in the kernel's per-agent call_log so it
-        # survives an mcpd crash and shows up in sysfs. Register the
-        # agent first so tool_complete has an agent to look up.
-        try:
-            _ensure_agent_registered(agent_id, binding)
-            _kernel_report_complete(
-                agent_id=agent_id,
-                tool_id=tool_id,
-                req_id=req_id,
-                status_code=1,
-                exec_ms=0,
-                payload_hash=payload_hash,
-                err_head=b"probe_failed",
-                tool_status_code=TSC_PROBE_FAILED,
-            )
-        except Exception as audit_exc:  # noqa: BLE001
-            LOGGER.error(
-                "failed to record probe_failed audit req_id=%d agent=%s tool=%d err=%s",
-                req_id, agent_id, tool_id, audit_exc,
-            )
-        return {
-            "req_id": req_id,
-            "status": "error",
-            "result": {},
-            "error": "binary_hash probe failed",
-            "t_ms": 0,
-            "decision": "DENY",
-            "reason": "probe_failed",
-            "ticket_id": 0,
-        }
-    tool_hash = _resolve_tool_hash(req, tool)
-    _ensure_agent_registered(agent_id, binding)
-    approval_ticket_id = ensure_int("approval_ticket_id", req.get("approval_ticket_id", 0))
-    decision, reason, ticket_id = _kernel_arbitrate(
-        req_id=req_id,
-        agent_id=agent_id,
-        binding_hash=binding.binding_hash,
-        binding_epoch=binding.binding_epoch,
-        tool_id=tool_id,
-        tool_hash=tool_hash,
-        ticket_id=approval_ticket_id,
-        payload_hash=payload_hash,
-        binary_hash=backend_binary_hash,
-        catalog_epoch=binding.catalog_epoch,
-    )
-    if decision == "DENY":
-        # Kernel rejected: close the probed socket, do NOT forward.
-        if probe_result.conn is not None:
-            try:
-                probe_result.conn.close()
-            except Exception:  # noqa: BLE001
-                pass
-        return {
-            "req_id": req_id,
-            "status": "error",
-            "result": {},
-            "error": f"kernel arbitration denied: {reason}",
-            "t_ms": 0,
-            "decision": decision,
-            "reason": reason,
-            "ticket_id": ticket_id,
-        }
-    if decision == "DEFER":
-        # Deferred awaiting approval: close probe socket, the retry
-        # after approval opens a fresh probe.
-        if probe_result.conn is not None:
-            try:
-                probe_result.conn.close()
-            except Exception:  # noqa: BLE001
-                pass
-        if ticket_id > 0:
-            remember_pending_approval(
-                ticket_id=ticket_id,
-                session_id=session_id,
-                req_id=req_id,
-                agent_id=agent_id,
-                binding_hash=binding.binding_hash,
-                binding_epoch=binding.binding_epoch,
-                app_id=app_id,
-                tool_id=tool_id,
-                payload=payload,
-                tool_hash=tool_hash,
-            )
-        return {
-            "req_id": req_id,
-            "status": "error",
-            "result": {},
-            "error": f"kernel arbitration deferred: {reason}",
-            "t_ms": 0,
-            "decision": decision,
-            "reason": reason,
-            "ticket_id": ticket_id,
-        }
-
+    Any exception that escapes _call_tool_service propagates to the
+    caller; the finally{} block still records the failure so the kernel
+    call_log reflects it.
+    """
     exec_start = time.perf_counter()
     status_code = 1
     response_hash = b""
@@ -1207,7 +1438,7 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
         try:
             _kernel_report_complete(
                 agent_id=agent_id,
-                tool_id=tool_id,
+                tool_id=tool.tool_id,
                 req_id=req_id,
                 status_code=status_code,
                 exec_ms=exec_ms,
@@ -1218,12 +1449,335 @@ def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
             )
         except Exception as exc:  # noqa: BLE001
             LOGGER.error(
-                "tool_complete report failed req_id=%d agent=%s tool=%d err=%s",
+                "event=tool_complete_failed req_id=%d agent=%s tool=%d err=%s",
                 req_id,
                 agent_id,
-                tool_id,
+                tool.tool_id,
                 exc,
             )
+
+
+def _handle_tool_exec(req: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute a tool:exec request. The stages below mirror the paper's
+    control-plane description; keep them in lock-step with the section
+    headers so a reviewer grepping ``# === stage:`` sees the same split.
+    """
+
+    # === stage: reconcile trigger ===
+    _ensure_runtime_registry_current()
+
+    # === stage: semantic validation ===
+    req_id = ensure_int("req_id", req.get("req_id", 0))
+    session_id = ensure_non_empty_str("session_id", req.get("session_id", ""))
+    peer = req.get("_peer")
+    if not isinstance(peer, PeerIdentity):
+        raise ValueError("missing peer identity")
+    app_id = ensure_non_empty_str("app_id", req.get("app_id", ""))
+    tool_id = ensure_int("tool_id", req.get("tool_id", 0))
+    with _registry_lock:
+        tool = _tool_registry.get(tool_id)
+    if tool is None:
+        raise ValueError(f"unsupported tool_id: {tool_id}")
+    if tool.app_id != app_id:
+        raise ValueError(
+            f"tool_id={tool_id} does not belong to app_id={app_id} (expected {tool.app_id})"
+        )
+    payload = req.get("payload", {})
+    validate_payload(tool.input_schema, payload)
+    payload_hash = _summary_hash_prefix(_canonical_payload_bytes(payload))
+
+    # === stage: binding / session lookup ===
+    session = resolve_session(session_id, peer)
+    binding = session_binding(session)
+    agent_id = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
+
+    # === stage: serving-identity probe ===
+    # hold=True: keep the probe's verified socket open so the real RPC
+    # reuses the same connection after kernel arbitration. That closes
+    # the TOCTOU window between probe and exec dial.
+    probe_result = _probe_backend_binary_hash(tool, hold=True)
+    backend_binary_hash = probe_result.digest
+    if not probe_result.live:
+        # Refuse any request whose live backend identity we could not
+        # confirm this round. Serving the cached digest on a failed live
+        # probe would let a swapped backend pass the kernel TOFU check.
+        LOGGER.warning(
+            "event=probe_failed tool=%d name=%s cached_digest_present=%s",
+            tool_id, tool.name, bool(backend_binary_hash),
+        )
+        _log_decision_event(
+            source="probe",
+            req_id=req_id,
+            agent_id=agent_id,
+            tool_id=tool_id,
+            decision="DENY",
+            reason=reason_taxonomy.PROBE_FAILED.name,
+            ticket_id=0,
+        )
+        _record_probe_failed_audit(
+            req_id=req_id, agent_id=agent_id, tool_id=tool_id,
+            binding=binding, payload_hash=payload_hash,
+        )
+        return _build_rejection_response(
+            req_id=req_id,
+            decision="DENY",
+            reason=reason_taxonomy.PROBE_FAILED.name,
+            error_message="binary_hash probe failed",
+            ticket_id=0,
+        )
+
+    # === stage: kernel arbitration ===
+    tool_hash = _resolve_tool_hash(req, tool)
+    _ensure_agent_registered(agent_id, binding)
+    approval_ticket_id = ensure_int("approval_ticket_id", req.get("approval_ticket_id", 0))
+    decision, reason, ticket_id = _kernel_arbitrate(
+        req_id=req_id,
+        agent_id=agent_id,
+        binding_hash=binding.binding_hash,
+        binding_epoch=binding.binding_epoch,
+        tool_id=tool_id,
+        tool_hash=tool_hash,
+        ticket_id=approval_ticket_id,
+        payload_hash=payload_hash,
+        binary_hash=backend_binary_hash,
+        catalog_epoch=binding.catalog_epoch,
+    )
+
+    # === stage: approval continuation / rejection shortcut ===
+    if decision == "DENY":
+        _discard_probe_conn(probe_result)
+        return _build_rejection_response(
+            req_id=req_id, decision=decision, reason=reason,
+            error_message=f"kernel arbitration denied: {reason}",
+            ticket_id=ticket_id,
+        )
+    if decision == "DEFER":
+        # Deferred awaiting approval: close probe socket, the retry
+        # after approval opens a fresh probe.
+        _discard_probe_conn(probe_result)
+        if ticket_id > 0:
+            remember_pending_approval(
+                ticket_id=ticket_id,
+                session_id=session_id,
+                req_id=req_id,
+                agent_id=agent_id,
+                binding_hash=binding.binding_hash,
+                binding_epoch=binding.binding_epoch,
+                app_id=app_id,
+                tool_id=tool_id,
+                payload=payload,
+                tool_hash=tool_hash,
+            )
+        return _build_rejection_response(
+            req_id=req_id, decision=decision, reason=reason,
+            error_message=f"kernel arbitration deferred: {reason}",
+            ticket_id=ticket_id,
+        )
+
+    # === stage: tool dispatch + completion reporting ===
+    return _dispatch_tool_call(
+        tool=tool,
+        req_id=req_id,
+        agent_id=agent_id,
+        payload=payload,
+        probe_result=probe_result,
+        decision=decision,
+        reason=reason,
+        ticket_id=ticket_id,
+        payload_hash=payload_hash,
+    )
+
+
+def _handle_sys_approval_decide(
+    conn: socket.socket, req: Dict[str, Any], t0: float
+) -> None:
+    """Operator-driven approval decision path.
+
+    No session binding is required — the operator tool issues the decide
+    out-of-band. The pending_approval entry is inspected read-only for
+    binding_hash/agent_id recovery; after the kernel accepts the decide,
+    the userspace record's state is mirrored (approve / deny / revoke)
+    but the entry itself stays so the client's eventual tool:exec retry
+    can find it. Idempotent re-decide is tolerated on both sides.
+    """
+    ticket_id_raw = req.get("ticket_id", 0)
+    decision_raw = req.get("decision", "")
+    operator_raw = req.get("operator", "")
+    agent_id_raw = req.get("agent_id", "")
+    reason_raw = req.get("reason", "")
+    ttl_ms_raw = req.get("ttl_ms", DEFAULT_APPROVAL_TTL_MS)
+    ticket_id = ensure_int("ticket_id", ticket_id_raw)
+    decision_text = ensure_non_empty_str("decision", decision_raw)
+    operator_text = ensure_non_empty_str("operator", operator_raw)
+    reason_text = ensure_non_empty_str("reason", reason_raw)
+    ttl_ms = ensure_int("ttl_ms", ttl_ms_raw)
+    binding_hash = 0
+    binding_epoch = 0
+    agent_id_text = agent_id_raw if isinstance(agent_id_raw, str) else ""
+    pending_known = False
+    try:
+        pending = peek_pending_approval(ticket_id)
+        replay_req = validate_pending_approval_req(pending)
+        if not agent_id_text:
+            agent_id_text = replay_req["agent_id"]
+        binding_hash = replay_req["binding_hash"]
+        binding_epoch = replay_req["binding_epoch"]
+        pending_known = True
+    except ValueError:
+        if not agent_id_text:
+            agent_id_text = operator_text
+    agent_id_text = ensure_non_empty_str("agent_id", agent_id_text)
+    _approval_decide(
+        ticket_id,
+        decision_text,
+        agent_id_text,
+        operator_text,
+        reason_text,
+        ttl_ms,
+        binding_hash=binding_hash,
+        binding_epoch=binding_epoch,
+    )
+    # Mirror the kernel decide into the userspace pending record so its
+    # state and the kernel ticket state stay observably coherent. Skip if
+    # we never had a pending entry (operator-only flow or already-
+    # consumed ticket).
+    if pending_known:
+        normalized_decision = decision_text.strip().lower()
+        try:
+            if normalized_decision == "approve":
+                approve_pending_approval(
+                    ticket_id, trigger="operator_approve"
+                )
+            elif normalized_decision in ("deny", "revoke"):
+                deny_pending_approval(
+                    ticket_id,
+                    trigger=(
+                        "operator_revoke"
+                        if normalized_decision == "revoke"
+                        else "operator_deny"
+                    ),
+                )
+        except ValueError:
+            # Race: entry was taken/invalidated between peek and state
+            # update. Kernel side is already authoritative; nothing to
+            # mirror.
+            pass
+    resp = {
+        "status": "ok",
+        "ticket_id": ticket_id,
+        "decision": decision_text.lower(),
+        "operator": operator_text,
+        "agent_id": agent_id_text,
+        "ttl_ms": ttl_ms,
+    }
+    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
+    t_ms = int((time.perf_counter() - t0) * 1000)
+    LOGGER.info(
+        "kind=%s status=ok ticket_id=%d decision=%s t_ms=%d",
+        "sys:approval_decide",
+        ticket_id,
+        decision_text.lower(),
+        t_ms,
+    )
+
+
+def _handle_sys_approval_reply(
+    conn: socket.socket,
+    req: Dict[str, Any],
+    peer: PeerIdentity,
+    t0: float,
+) -> None:
+    """Session-bound client approval reply path.
+
+    Unlike approval_decide (operator-only), this path runs inside the
+    client's own session. Order is strict: kernel decide -> mirror
+    userspace state -> take. Keeping the record in place across the
+    kernel call means an exception from _approval_decide leaves PENDING
+    intact without needing a put_back rollback. On approve we replay the
+    deferred tool:exec via _handle_tool_exec; if that replay raises
+    before the kernel has consumed the ticket, we put the pending entry
+    back so a subsequent tool:exec carrying ticket_id can still land.
+    """
+    session_id = ensure_non_empty_str("session_id", req.get("session_id", ""))
+    ticket_id = ensure_int("ticket_id", req.get("ticket_id", 0))
+    decision_text = ensure_non_empty_str("decision", req.get("decision", ""))
+    reason_text = ensure_non_empty_str("reason", req.get("reason", ""))
+    ttl_ms = ensure_int("ttl_ms", req.get("ttl_ms", DEFAULT_APPROVAL_TTL_MS))
+    normalized = decision_text.strip().lower()
+    if normalized not in ("approve", "deny"):
+        raise ValueError("decision must be approve or deny")
+    session = resolve_session(session_id, peer)
+    pending = peek_pending_approval(ticket_id)
+    if pending.get("session_id") != session_id:
+        raise ValueError("approval ticket is bound to a different session")
+    operator_text = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
+    binding = session_binding(session)
+    _approval_decide(
+        ticket_id=ticket_id,
+        decision=normalized,
+        agent_id=operator_text,
+        approver=operator_text,
+        reason=reason_text,
+        ttl_ms=ttl_ms,
+        binding_hash=binding.binding_hash,
+        binding_epoch=binding.binding_epoch,
+    )
+    if normalized == "approve":
+        approve_pending_approval(ticket_id, trigger="user_approve")
+        pending = take_pending_approval(ticket_id, trigger="consume")
+        try:
+            replay_req = validate_pending_approval_req(pending)
+            replay_req["approval_ticket_id"] = ticket_id
+            replay_req["_peer"] = peer
+            replay_req["session_id"] = session_id
+            resp = _handle_tool_exec(replay_req)
+            # Only discard the userspace mirror when the replay actually
+            # consumed the approved kernel ticket. A normal error response
+            # (e.g. probe_failed, catalog_stale, binding/hash mismatch,
+            # or a deferred retry) leaves the kernel ticket unconsumed, so
+            # dropping the pending record here would strand mcpd's view.
+            if resp.get("decision") != "ALLOW":
+                put_pending_approval(ticket_id, pending)
+        except Exception:
+            # Retry failed before kernel consumed the ticket; restore the
+            # pending entry so a subsequent tool:exec carrying ticket_id
+            # can still land.
+            put_pending_approval(ticket_id, pending)
+            raise
+    else:  # deny
+        deny_pending_approval(ticket_id, trigger="user_deny")
+        take_pending_approval(ticket_id, trigger="user_deny_terminal")
+        # The replay req_id is the original deferred request's id; recover
+        # it from pending before we log so the event line lines up with
+        # the earlier arb-side DEFER event for the same req_id.
+        replay_req = validate_pending_approval_req(pending)
+        _log_decision_event(
+            source="user_decline",
+            req_id=replay_req["req_id"],
+            agent_id=replay_req["agent_id"],
+            tool_id=replay_req["tool_id"],
+            decision="DENY",
+            reason=reason_taxonomy.USER_DECLINED.name,
+            ticket_id=ticket_id,
+        )
+        resp = {
+            "status": "error",
+            "error": "approval declined by user",
+            "ticket_id": ticket_id,
+            "decision": "DENY",
+            "reason": reason_taxonomy.USER_DECLINED.name,
+            "t_ms": 0,
+        }
+    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
+    t_ms = int((time.perf_counter() - t0) * 1000)
+    LOGGER.info(
+        "kind=%s status=%s ticket_id=%d decision=%s t_ms=%d",
+        "sys:approval_reply",
+        resp.get("status"),
+        ticket_id,
+        normalized,
+        t_ms,
+    )
 
 
 def _handle_connection(conn: socket.socket) -> None:
@@ -1298,117 +1852,12 @@ def _handle_connection(conn: socket.socket) -> None:
 
                 if req.get("sys") == "approval_decide":
                     req_kind = "sys:approval_decide"
-                    ticket_id_raw = req.get("ticket_id", 0)
-                    decision_raw = req.get("decision", "")
-                    operator_raw = req.get("operator", "")
-                    agent_id_raw = req.get("agent_id", "")
-                    reason_raw = req.get("reason", "")
-                    ttl_ms_raw = req.get("ttl_ms", DEFAULT_APPROVAL_TTL_MS)
-                    ticket_id = ensure_int("ticket_id", ticket_id_raw)
-                    decision_text = ensure_non_empty_str("decision", decision_raw)
-                    operator_text = ensure_non_empty_str("operator", operator_raw)
-                    reason_text = ensure_non_empty_str("reason", reason_raw)
-                    ttl_ms = ensure_int("ttl_ms", ttl_ms_raw)
-                    binding_hash = 0
-                    binding_epoch = 0
-                    agent_id_text = agent_id_raw if isinstance(agent_id_raw, str) else ""
-                    try:
-                        pending = peek_pending_approval(ticket_id)
-                        replay_req = validate_pending_approval_req(pending)
-                        if not agent_id_text:
-                            agent_id_text = replay_req["agent_id"]
-                        binding_hash = replay_req["binding_hash"]
-                        binding_epoch = replay_req["binding_epoch"]
-                    except ValueError:
-                        if not agent_id_text:
-                            agent_id_text = operator_text
-                    agent_id_text = ensure_non_empty_str("agent_id", agent_id_text)
-                    _approval_decide(
-                        ticket_id,
-                        decision_text,
-                        agent_id_text,
-                        operator_text,
-                        reason_text,
-                        ttl_ms,
-                        binding_hash=binding_hash,
-                        binding_epoch=binding_epoch,
-                    )
-                    resp = {
-                        "status": "ok",
-                        "ticket_id": ticket_id,
-                        "decision": decision_text.lower(),
-                        "operator": operator_text,
-                        "agent_id": agent_id_text,
-                        "ttl_ms": ttl_ms,
-                    }
-                    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
-                    t_ms = int((time.perf_counter() - t0) * 1000)
-                    LOGGER.info(
-                        "kind=%s status=ok ticket_id=%d decision=%s t_ms=%d",
-                        req_kind,
-                        ticket_id,
-                        decision_text.lower(),
-                        t_ms,
-                    )
+                    _handle_sys_approval_decide(conn, req, t0)
                     continue
 
                 if req.get("sys") == "approval_reply":
                     req_kind = "sys:approval_reply"
-                    session_id = ensure_non_empty_str("session_id", req.get("session_id", ""))
-                    ticket_id = ensure_int("ticket_id", req.get("ticket_id", 0))
-                    decision_text = ensure_non_empty_str("decision", req.get("decision", ""))
-                    reason_text = ensure_non_empty_str("reason", req.get("reason", ""))
-                    ttl_ms = ensure_int("ttl_ms", req.get("ttl_ms", DEFAULT_APPROVAL_TTL_MS))
-                    normalized = decision_text.strip().lower()
-                    if normalized not in ("approve", "deny"):
-                        raise ValueError("decision must be approve or deny")
-                    session = resolve_session(session_id, peer)
-                    pending = peek_pending_approval(ticket_id)
-                    if pending.get("session_id") != session_id:
-                        raise ValueError("approval ticket is bound to a different session")
-                    pending = take_pending_approval(ticket_id)
-                    try:
-                        replay_req = validate_pending_approval_req(pending)
-                        operator_text = ensure_non_empty_str("agent_id", session.get("agent_id", ""))
-                        binding = session_binding(session)
-                        _approval_decide(
-                            ticket_id=ticket_id,
-                            decision=normalized,
-                            agent_id=operator_text,
-                            approver=operator_text,
-                            reason=reason_text,
-                            ttl_ms=ttl_ms,
-                            binding_hash=binding.binding_hash,
-                            binding_epoch=binding.binding_epoch,
-                        )
-                        if normalized == "deny":
-                            resp = {
-                                "status": "error",
-                                "error": "approval declined by user",
-                                "ticket_id": ticket_id,
-                                "decision": "DENY",
-                                "reason": "user_declined",
-                                "t_ms": 0,
-                            }
-                        else:
-                            replay_req["approval_ticket_id"] = ticket_id
-                            replay_req["_peer"] = peer
-                            replay_req["session_id"] = session_id
-                            resp = _handle_tool_exec(replay_req)
-                    except Exception:
-                        if normalized == "approve":
-                            put_pending_approval(ticket_id, pending)
-                        raise
-                    send_frame(conn, json.dumps(resp, ensure_ascii=True).encode("utf-8"), max_msg_size=MAX_MSG_SIZE)
-                    t_ms = int((time.perf_counter() - t0) * 1000)
-                    LOGGER.info(
-                        "kind=%s status=%s ticket_id=%d decision=%s t_ms=%d",
-                        req_kind,
-                        resp.get("status"),
-                        ticket_id,
-                        normalized,
-                        t_ms,
-                    )
+                    _handle_sys_approval_reply(conn, req, peer, t0)
                     continue
 
                 if "kind" in req and req.get("kind") != "tool:exec":
@@ -1499,7 +1948,7 @@ def main() -> int:
     try:
         sec = _get_security_config()
     except ConfigError as exc:
-        LOGGER.error("mcpd refusing to start: %s", exc)
+        LOGGER.error("event=startup_refused reason=%s", exc)
         return 2
     LOGGER.info(
         "security: allowed_backend_uids=%s (euid=%d)",
@@ -1510,7 +1959,7 @@ def main() -> int:
         _kernel_client = KernelMcpNetlinkClient()
         _ensure_runtime_registry_current(force=True)
     except Exception as exc:  # noqa: BLE001
-        LOGGER.error("failed to initialize mcpd runtime: %s", exc)
+        LOGGER.error("event=startup_failed reason=%s", exc)
         if _kernel_client is not None:
             _kernel_client.close()
             _kernel_client = None
@@ -1524,7 +1973,7 @@ def main() -> int:
             os.chmod(SOCK_PATH, 0o666)
             server.listen(128)
             server.settimeout(0.5)
-            LOGGER.info("mcpd listening on %s", SOCK_PATH)
+            LOGGER.info("event=startup sock=%s", SOCK_PATH)
 
             accept_thread = threading.Thread(target=_accept_loop, args=(server,), daemon=True)
             accept_thread.start()
@@ -1537,7 +1986,7 @@ def main() -> int:
         if _kernel_client is not None:
             _kernel_client.close()
             _kernel_client = None
-        LOGGER.info("mcpd stopped")
+        LOGGER.info("event=shutdown")
 
 
 if __name__ == "__main__":

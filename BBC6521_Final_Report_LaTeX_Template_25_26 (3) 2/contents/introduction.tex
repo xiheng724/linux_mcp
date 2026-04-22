@@ -4,6 +4,7 @@
 
 Recent advances in Large Language Models (LLMs) have enabled instruction following, reasoning, and interaction with external environments, forming the foundation for autonomous agentic systems \cite{yao2023react, liu2024agentbench, schick2023toolformer}.
 LLM-based agents are now deployed across a wide range of applications, from direct-acting assistants to sophisticated multi-step reasoning and problem-solving systems \cite{park2023generative, qin2024toolllm, mei2024aios, liu2026agentos}.
+Model Context Protocol (MCP) has emerged as a common interface between LLM agents and external tools \cite{mcp2025}.
 
 \subsection{Problem Statement}
 
@@ -11,6 +12,7 @@ Tool-using, stateful AI agents expose a fundamental mismatch between modern agen
 While conventional operating systems effectively manage processes, files, and network resources, MCP-style workflows are organized around higher-level concepts such as semantic tool descriptions, session context, approval boundaries, and cross-step state.
 This mismatch leads to fragile control planes when enforcement remains entirely in user-space. 
 Frameworks such as OpenClaw~\cite{openclaw2026} and Hermes Agent~\cite{nousresearch2026hermesagent} demonstrate that granting agents execution capability and persistent context can lead to security risks including prompt injection, privilege escalation, and cross-step exploitation. 
+Among these, prompt injection originates at the model–input boundary and is orthogonal to the control plane; this work focuses on the latter two classes, where the integrity of approval, identity binding, and cross-step state determines whether a compromised or manipulated request can actually take effect.
 
 A single gateway process is typically responsible for interpreting tool manifests, binding requests to identities, and authorizing execution, effectively placing the control plane in user space. 
 Such a design introduces a single point of failure and expands the trusted computing base, making it vulnerable to crashes, logic bugs, or compromised control paths~\cite{peter2014arrakis}.
@@ -20,7 +22,7 @@ This leads to a concrete question: which control-plane invariants in MCP-style t
 
 \subsection{Our Solution}
 
-\texttt{linux-mcp} addresses this by moving admission control, approval state, binding checks, and durable observability into a Linux kernel module, while leaving semantic parsing and tool execution in user space.
+\texttt{linux-mcp} addresses this by moving admission control, approval state, binding checks, and durable observability (i.e., kernel-resident audit records that survive gateway restart) into a Linux kernel module, while leaving semantic parsing and tool execution in user space.
 This is not a full AI-native operating system; the kernel role is deliberately narrow, enforcing only the invariants user-space cannot reliably hold.
 
 The architecture has four layers: an LLM client (\texttt{llm-app}), a manifest-aware gateway (\texttt{mcpd}), a Generic-Netlink-based kernel control plane (\texttt{kernel\_\allowbreak mcp}), and resident tool services over Unix domain sockets.
@@ -33,14 +35,14 @@ At run time, it is no longer fully trusted: every \texttt{TOOL\_\allowbreak REQU
 Registry entries, approval tickets, and binding checks therefore reside in the kernel, gated by \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-protected Generic Netlink access, durable across daemon failure, and inaccessible to unprivileged processes.
 
 This position is deliberately narrower than either extreme in prior work.
-AIOS-style proposals offer strong guarantees by replacing OS infrastructure, at the cost of deployability on existing systems.
+AIOS-style proposals that reimagine OS abstractions for agents, at the cost of deployability on existing systems \cite{mei2024aios}.
 User-space frameworks preserve deployment flexibility but inherit the structural weaknesses identified in \hyperref[chap:background]{Chapter~2}.
 \texttt{linux-mcp} instead moves only those invariants that require protection \emph{from the gateway itself} into the kernel, leaving semantic parsing, tool execution, and everything else in user space.
 Nor does it replace existing Linux security mechanisms such as seccomp or LSM; it complements them at a layer those mechanisms cannot reach.
 The central hypothesis is that this targeted placement improves binding safety and failure resilience at acceptable performance cost; \hyperref[chap:evaluation]{Chapter~4} tests this claim empirically.
 
 \paragraph{Comparison with user-space systems.}
-To contextualise the design, we compare \texttt{linux-mcp} with two representative user-space tool-invocation frameworks: OpenClaw~\cite{openclaw2026}, which uses a monolithic user-space gateway, and Hermes Agent~\cite{nousresearch2026hermesagent}, which runs the entire control and execution pipeline inside a single Python process.
+To contextualise the design, we compare \texttt{linux-mcp} with two representative user-space tool-invocation frameworks: OpenClaw~\cite{openclaw2026}, which uses a monolithic user-space gateway, and Hermes Agent~\cite{nousresearch2026hermesagent}, which runs the entire control pipeline inside a single Python process, with tool execution dispatched to in-process handlers or MCP subprocess servers.
 Table~\ref{tab:comparison} highlights the key architectural differences.
 \begin{table}[t]
 \centering

@@ -1,5 +1,32 @@
 #!/usr/bin/env python3
-"""Verify or reconcile user-space manifests with the kernel tool registry."""
+"""Verify or reconcile user-space manifests with the kernel tool registry.
+
+This is a standalone CLI utility, NOT the control plane's live reconcile
+path. The live path lives in mcpd/server.py (_ensure_runtime_registry_current
+/ _load_runtime_registry / ReconcileAction). This script is intended for:
+
+  * one-shot post-deploy sanity checks (`reconcile_kernel.py`) — read-only,
+    diffs the on-disk manifest bundle against what the kernel reports via
+    KERNEL_MCP_CMD_LIST_TOOLS and exits non-zero on any divergence.
+  * operator-forced re-sync (`reconcile_kernel.py --apply`) — destructively
+    wipes the kernel registry via reset_tools() and re-registers every
+    manifest tool. This is the same primitive mcpd uses at COLD_START.
+
+Catalog-epoch invariant (see kernel_mcp_tools_destroy_all in
+kernel-mcp/src/kernel_mcp_main.c): reset_tools() does NOT bump the global
+catalog epoch; the per-tool register calls that follow do. Surviving agent
+sessions holding a pre-apply opened_at_epoch will therefore be denied with
+reason="catalog_stale_rebind_required" on their next tool_request against
+any re-registered tool — this is the intended recovery path and matches
+mcpd's cold-start behaviour. If you run --apply without following up with
+register calls (empty manifest bundle), surviving sessions stay unaware
+until a tool is added back.
+
+This CLI does not carry binary_hash across reset — mcpd re-pins the TOFU
+slot on the next live probe, not here. If you reset via this tool and then
+immediately invoke a risky operation through a pre-existing session, expect
+one rebind round-trip plus one probe-driven TOFU lock before allow fires.
+"""
 
 from __future__ import annotations
 

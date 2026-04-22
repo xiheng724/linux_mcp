@@ -9,6 +9,8 @@ Reallocated glb_str_end (elt_size=4) to 20 items from 10.
 Reallocated wiz_functions (elt_size=4) to 6000 items from 3000.
 Database file #1: reference.bib
 Warning--empty pages in park2023generative
+Warning--empty author and editor in mcp2025
+Warning--missing publisher in mcp2025
 Warning--empty author and editor in openclaw2026
 Warning--missing publisher in openclaw2026
 Warning--empty author and editor in nousresearch2026hermesagent
@@ -30,8 +32,6 @@ Warning--empty author and editor in harness2025
 Warning--missing publisher in harness2025
 Warning--empty author and editor in apple2024pcc
 Warning--missing publisher in apple2024pcc
-Warning--empty author and editor in mcp2025
-Warning--missing publisher in mcp2025
 Warning--empty author and editor in mcp_anniversary_2025
 Warning--missing publisher in mcp_anniversary_2025
 Warning--empty author and editor in patil2023gorilla

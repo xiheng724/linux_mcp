@@ -1,5 +1,38 @@
 #!/usr/bin/env python3
-"""Shared manifest loading for mcpd runtime and kernel reconciliation."""
+"""Shared manifest loading for mcpd runtime and kernel reconciliation.
+
+This module is the source of truth for the *logical* side of the two-layer
+tool identity model. It parses tool-app/manifests/*.json and produces, per
+tool:
+
+  manifest_hash        Logical tool identity. SHA-256 over the fields in
+                       SEMANTIC_HASH_FIELDS (name, description, schema,
+                       risk_tags, operation, ...). What llm-app and the
+                       kernel see as "this tool's semantic identity".
+
+  binding_fingerprint  Runtime routing identity. SHA-256 over transport +
+                       endpoint only. Drives reconcile actions but is NOT
+                       part of logical identity — a host move must not
+                       change the tool's identity as seen by consumers.
+
+  script_digest        SHA-256 of the manifest-declared demo_entrypoint
+                       script, computed at load time. Empty for native
+                       binary tools. This is an INPUT to the serving
+                       identity computed by mcpd/server.py:
+                       _compute_serving_identity; it is not itself an
+                       identity.
+
+  script_path          Absolute filesystem path of demo_entrypoint, kept
+                       so the probe can re-read the script at tool:exec
+                       time — catching a script swap between daemon
+                       startups that would otherwise stay trusted.
+
+The *serving* side of the two-layer model (observation of /proc/<pid>/exe,
+TOFU pinning in the kernel, composite digest strategy) lives in
+mcpd/server.py. See ServingIdentity / _compute_serving_identity there and
+the kernel comment block on `struct kernel_mcp_tool` for how the two
+layers meet at the netlink boundary.
+"""
 
 from __future__ import annotations
 

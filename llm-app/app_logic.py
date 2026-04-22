@@ -21,6 +21,9 @@ from plan_support import (
     validate_payload_against_schema,
 )
 from rpc import mcpd_call
+# plan_support above inserts the repo root onto sys.path, so this import
+# resolves without further bootstrapping.
+from client.kernel_mcp import reasons as reason_taxonomy
 
 MAX_PLAN_STEPS = 4
 MAX_PLAN_CANDIDATE_TOOLS = 6
@@ -431,7 +434,7 @@ def _exec_tool_request(
         return mcpd_call(req_obj, sock_path=sock_path, timeout_s=20)
 
     response = _send(session.session_id, request_id)
-    if response.get("reason") == "catalog_stale_rebind_required":
+    if response.get("reason") == reason_taxonomy.CATALOG_STALE.name:
         if _rebind_session_in_place(session, sock_path):
             retry_id = int(time.time_ns() & 0xFFFFFFFFFFFF)
             response = _send(session.session_id, retry_id)

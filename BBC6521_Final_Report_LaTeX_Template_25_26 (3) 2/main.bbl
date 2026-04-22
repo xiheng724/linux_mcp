@@ -35,6 +35,10 @@ Liu R, Zhe T, Wang D, et~al.
 \newblock AgentOS: From Application Silos to a Natural Language-Driven Data Ecosystem.
 \newblock arXiv preprint arXiv:260308938. 2026.
 
+\bibitem{mcp2025}
+{Model Context Protocol}. Architecture Specification; 2025.
+\newblock \url{https://modelcontextprotocol.io/specification/2025-06-18/architecture}.
+
 \bibitem{packer2023memgpt}
 Packer C, Fang V, Patil SG, Lin K, Wooders S, Gonzalez JE.
 \newblock MemGPT: Towards LLMs as Operating Systems.
@@ -107,10 +111,6 @@ Wu Z, et~al.
 \bibitem{apple2024pcc}
 {Apple Inc }. Private Cloud Compute: A new frontier for {AI} privacy in the cloud; 2024.
 \newblock \url{https://security.apple.com/blog/private-cloud-compute/}.
-
-\bibitem{mcp2025}
-{Model Context Protocol}. Architecture Specification; 2025.
-\newblock \url{https://modelcontextprotocol.io/specification/2025-06-18/architecture}.
 
 \bibitem{mcp_anniversary_2025}
 {MCP Core Maintainers}. One Year of MCP: November 2025 Spec Release; 2025.

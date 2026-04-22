@@ -283,14 +283,36 @@ def test_interpreter_backend_composite_hash_reflects_script_change() -> None:
             chunk = self._data[:n]; self._data = self._data[n:]
             return chunk
 
+    # Phase 4 unified serving-identity composition is driven by
+    # `script_path`, not a /proc/<pid>/exe basename heuristic. A
+    # non-empty script_digest without script_path is not a state any
+    # real manifest can produce (they are emitted together by
+    # _compute_script_digest), so encode the realistic shape here:
+    # when the caller wants a scripted identity, we pin a fake path
+    # alongside the digest. The open() monkey-patch routes the fake
+    # script path to OSError so _fresh_script_digest fails and the
+    # chokepoint falls back to the manifest-cached digest — the code
+    # path this test is about to exercise.
+    SCRIPT_FAKE = "/tmp/_probe_unit_missing.py"
+
+    def _probe_open(p, m="r", *a, **kw):
+        if str(p) == SCRIPT_FAKE:
+            raise OSError("no such file (test stub)")
+        return _FH(b"python-interp-bytes")
+
     def run_probe(script_digest: str) -> str:
         _reset_state()
         identities = [id_interp, id_interp, id_interp]  # current, pre, post
         server.transport_dial = lambda *a, **kw: _FakeSocket()
         server._read_peercred = lambda conn: (fake_pid, os.geteuid())
         server._exe_identity = lambda pid: identities.pop(0) if identities else id_interp
-        server.open = lambda p, m="r", *a, **kw: _FH(b"python-interp-bytes")  # type: ignore[attr-defined]
-        tool = _tool(tool_id=9100, script_digest=script_digest)
+        server.open = _probe_open  # type: ignore[attr-defined]
+        script_path = SCRIPT_FAKE if script_digest else ""
+        tool = _tool(
+            tool_id=9100,
+            script_digest=script_digest,
+            script_path=script_path,
+        )
         pr = server._probe_backend_binary_hash(tool)
         return pr.digest
 
