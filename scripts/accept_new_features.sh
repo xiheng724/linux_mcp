@@ -53,7 +53,7 @@ tool_binary_hash_state() {
 cleanup() {
   set +e
   run_as_user bash scripts/stop_tool_services.sh >/dev/null 2>&1 || true
-  run_as_user bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
+  ${SUDO} bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
   ${SUDO} bash scripts/unload_module.sh >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -71,13 +71,18 @@ ${SUDO} bash scripts/load_module.sh
 
 echo "[accept-new] step 3: stop stale user-space services"
 run_as_user bash scripts/stop_tool_services.sh >/dev/null 2>&1 || true
-run_as_user bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
+${SUDO} bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
 
 echo "[accept-new] step 4: start demo tool services"
 run_as_user bash scripts/run_tool_services.sh
 
+# mcpd must run privileged (CAP_NET_ADMIN for netlink, CAP_SYS_PTRACE
+# for cross-uid /proc/<pid>/exe reads). In the demo flow that means
+# root. run_mcpd.sh itself exports LINUX_MCP_TRUST_SUDO_UID=1 so mcpd's
+# allowed_backend_uids resolves to {0, $SUDO_UID} and accepts the
+# tool-app backends that step 4 launched as the invoking user.
 echo "[accept-new] step 5: start mcpd"
-run_as_user bash scripts/run_mcpd.sh
+${SUDO} bash scripts/run_mcpd.sh
 
 echo "[accept-new] step 6: unit probe regressions"
 run_as_user python3 scripts/test_probe_unit.py
@@ -104,9 +109,13 @@ epoch="$(cat /sys/kernel/mcp/tool_catalog_epoch | tr -d '\n\0 ')" || {
 echo "  catalog_epoch=$epoch"
 
 echo "[accept-new] step 8: uds_abstract demo path"
-abstract_out="$(run_as_user python3 scripts/mcpctl_exec_smoke.py \
+# Assignment RHS does not word-split, so we can drop the outer double
+# quotes and use plain single quotes for the JSON payload. Wrapping
+# this in "$(...)" would re-parse the inner \" escapes and hand python
+# literal-backslash JSON that json.loads rejects.
+abstract_out=$(run_as_user python3 scripts/mcpctl_exec_smoke.py \
   --app-id abstract_demo_app --tool-id 45 \
-  --payload '{\"note\":\"hello via abstract acceptance\"}' 2>&1)"
+  --payload '{"note":"hello via abstract acceptance"}' 2>&1)
 echo "$abstract_out"
 if ! grep -q "status=ok" <<<"$abstract_out"; then
   echo "FAIL: uds_abstract demo call did not succeed"

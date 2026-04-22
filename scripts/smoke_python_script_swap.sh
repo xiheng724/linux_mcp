@@ -35,23 +35,23 @@ fi
 
 run_mcpd_control() {
   local action="$1"
+  # mcpd lifecycle scripts require root/caps. When invoked as part of
+  # the acceptance flow we are typically already running under the
+  # original caller's uid (run_as_user dropped privileges), so auto-
+  # escalate via sudo. An explicit LINUX_MCP_MCPD_SUDO override still
+  # wins so operators who preconfigured it aren't ignored.
   local sudo_prefix="${LINUX_MCP_MCPD_SUDO:-}"
-  if [[ "$action" == "start" ]]; then
-    if [[ -n "$sudo_prefix" ]]; then
-      ${sudo_prefix} bash "$ROOT_DIR/scripts/run_mcpd.sh"
-    else
-      bash "$ROOT_DIR/scripts/run_mcpd.sh"
-    fi
-  elif [[ "$action" == "stop" ]]; then
-    if [[ -n "$sudo_prefix" ]]; then
-      ${sudo_prefix} bash "$ROOT_DIR/scripts/stop_mcpd.sh"
-    else
-      bash "$ROOT_DIR/scripts/stop_mcpd.sh"
-    fi
-  else
-    echo "FAIL: unsupported mcpd control action: $action"
-    exit 1
+  if [[ -z "$sudo_prefix" && "$(id -u)" -ne 0 ]]; then
+    sudo_prefix="sudo"
   fi
+  case "$action" in
+    start) ${sudo_prefix} bash "$ROOT_DIR/scripts/run_mcpd.sh" ;;
+    stop)  ${sudo_prefix} bash "$ROOT_DIR/scripts/stop_mcpd.sh" ;;
+    *)
+      echo "FAIL: unsupported mcpd control action: $action"
+      exit 1
+      ;;
+  esac
 }
 
 respawn_backend() {

@@ -139,20 +139,31 @@ def scenario_add_triggers_rebind() -> None:
     expect(any(t.get("tool_id") == PROBE_TOOL_ID_BASE for t in tools),
            "list_tools includes the newly added tool")
 
-    # Old session now tries to exec a *different* (pre-existing) tool;
-    # kernel must still DENY with catalog_stale_rebind_required because
-    # the global epoch advanced past the session's snapshot.
-    resp = exec_tool(sid, app_id="notes_app", tool_id=2)
+    # Per-tool epoch semantics (commit 23351a5): only tools whose own
+    # registered_at_epoch advanced past the session's opened_at_epoch
+    # should be denied with catalog_stale_rebind_required. The newly
+    # added probe tool is exactly such a tool — it was registered at
+    # post_epoch, after the session opened at pre_epoch — so exec'ing
+    # it through the old session must DENY with catalog_stale. Calls
+    # against unrelated tools (e.g. notes_app's tool_id=2) stay ALLOW
+    # and are intentionally NOT asserted here; that was the old global-
+    # invalidation contract.
+    resp = exec_tool(sid, app_id=PROBE_APP_ID, tool_id=PROBE_TOOL_ID_BASE)
     expect(resp.get("decision") == "DENY",
-           f"old session got DENY (got {resp.get('decision')!r}) on stale epoch")
+           f"old session got DENY (got {resp.get('decision')!r}) on stale-epoch tool")
     expect("catalog_stale_rebind_required" in resp.get("reason", ""),
            f"reason says catalog_stale_rebind_required (got {resp.get('reason')!r})")
 
-    # Rebind and confirm the same exec works.
+    # Rebind and confirm the same exec gets past kernel arbitration.
+    # We don't assert status=ok because the probe tool's backend is a
+    # real notes_app that doesn't implement tool_id=900 semantically —
+    # what matters is that the kernel no longer returns
+    # catalog_stale_rebind_required.
     sess2 = open_session("dyn-add-rebind")
-    resp2 = exec_tool(sess2["session_id"], app_id="notes_app", tool_id=2)
-    expect(resp2.get("status") == "ok",
-           "rebound session executes cleanly")
+    resp2 = exec_tool(sess2["session_id"],
+                      app_id=PROBE_APP_ID, tool_id=PROBE_TOOL_ID_BASE)
+    expect(resp2.get("reason") != "catalog_stale_rebind_required",
+           f"rebound session clears catalog_stale (got {resp2.get('reason')!r})")
 
 
 def scenario_remove_unknown_tool_id() -> None:
@@ -161,10 +172,6 @@ def scenario_remove_unknown_tool_id() -> None:
     write_manifest(probe_manifest(risk_tags=[]))
     list_tools()  # ensure mcpd has absorbed the manifest
 
-    # Rebind first so we have a fresh session bound to the current epoch.
-    sess = open_session("dyn-remove")
-    sid = sess["session_id"]
-
     pre_epoch = read_catalog_epoch()
     remove_manifest()
     list_tools()  # trigger reload that drops the tool
@@ -172,10 +179,13 @@ def scenario_remove_unknown_tool_id() -> None:
     expect(post_epoch > pre_epoch,
            f"catalog_epoch advanced ({pre_epoch} -> {post_epoch}) after remove")
 
-    # First call after remove: old session sees stale_rebind DENY (kernel).
-    resp = exec_tool(sid, app_id="notes_app", tool_id=2)
-    expect(resp.get("decision") == "DENY",
-           f"old session DENY post-remove (got {resp.get('decision')!r})")
+    # Per-tool epoch semantics: removing a manifest unregisters that
+    # tool and bumps the global epoch, but leaves every surviving
+    # tool's registered_at_epoch untouched. So the old session remains
+    # valid for unrelated tools — we do NOT assert a DENY on notes_app
+    # anymore. The real contract for remove is the next assertion:
+    # mcpd userspace must reject calls to the removed tool_id before
+    # they ever reach netlink arbitration.
 
     # Rebound session targeting the removed tool: mcpd userspace rejects
     # before netlink arbitration — no kernel record should be emitted.

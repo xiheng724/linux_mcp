@@ -197,9 +197,25 @@ int main(int argc, char **argv) {
 
     g_endpoint = endpoint;
     atexit(cleanup);
-    signal(SIGINT, on_signal);
-    signal(SIGTERM, on_signal);
-    signal(SIGUSR1, on_sigusr1);
+
+    /* Use sigaction, NOT signal(). Linux's signal() sets SA_RESTART by
+     * default, which auto-restarts accept() after the handler returns.
+     * We want accept() to return EINTR so the main loop can act on
+     * g_stop / g_reexec — otherwise SIGUSR1 flips the flag but the
+     * process stays blocked in the kernel forever. */
+    struct sigaction sa_stop = {0};
+    sa_stop.sa_handler = on_signal;
+    sigemptyset(&sa_stop.sa_mask);
+    sa_stop.sa_flags = 0;
+    sigaction(SIGINT, &sa_stop, NULL);
+    sigaction(SIGTERM, &sa_stop, NULL);
+
+    struct sigaction sa_usr1 = {0};
+    sa_usr1.sa_handler = on_sigusr1;
+    sigemptyset(&sa_usr1.sa_mask);
+    sa_usr1.sa_flags = 0;
+    sigaction(SIGUSR1, &sa_usr1, NULL);
+
     signal(SIGPIPE, SIG_IGN);
 
     int srv = bind_uds(endpoint);
