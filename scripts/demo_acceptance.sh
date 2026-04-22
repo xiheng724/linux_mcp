@@ -25,7 +25,7 @@ run_as_user() {
 cleanup() {
   set +e
   run_as_user bash scripts/stop_tool_services.sh >/dev/null 2>&1 || true
-  run_as_user bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
+  ${SUDO} bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -42,14 +42,15 @@ echo "[demo] step 3: load module"
 ${SUDO} bash scripts/load_module.sh
 
 echo "[demo] step 4: ensure no stale user-space services remain"
-run_as_user bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
 run_as_user bash scripts/stop_tool_services.sh >/dev/null 2>&1 || true
+${SUDO} bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
 
 echo "[demo] step 5: start demo app services"
 run_as_user bash scripts/run_tool_services.sh
 
 echo "[demo] step 6: start mcpd"
-run_as_user bash scripts/run_mcpd.sh
+export LINUX_MCP_MCPD_SUDO="${SUDO}"
+${SUDO} bash scripts/run_mcpd.sh
 
 echo "[demo] step 7: verify DeepSeek API key is configured"
 run_as_user bash -lc 'test -n "${DEEPSEEK_API_KEY:-}"' || {
@@ -91,7 +92,7 @@ echo "[demo] step 10h: call_log survives mcpd crash"
 bash scripts/acceptance_call_log_after_crash.sh
 
 echo "[demo] step 11: stop mcpd"
-run_as_user bash scripts/stop_mcpd.sh
+${SUDO} bash scripts/stop_mcpd.sh
 
 echo "[demo] step 12: stop demo app services"
 run_as_user bash scripts/stop_tool_services.sh

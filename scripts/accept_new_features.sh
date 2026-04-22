@@ -46,7 +46,7 @@ tool_binary_hash() {
 cleanup() {
   set +e
   run_as_user bash scripts/stop_tool_services.sh >/dev/null 2>&1 || true
-  run_as_user bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
+  ${SUDO} bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
   ${SUDO} bash scripts/unload_module.sh >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -64,13 +64,14 @@ ${SUDO} bash scripts/load_module.sh
 
 echo "[accept-new] step 3: stop stale user-space services"
 run_as_user bash scripts/stop_tool_services.sh >/dev/null 2>&1 || true
-run_as_user bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
+${SUDO} bash scripts/stop_mcpd.sh >/dev/null 2>&1 || true
 
 echo "[accept-new] step 4: start demo tool services"
 run_as_user bash scripts/run_tool_services.sh
 
 echo "[accept-new] step 5: start mcpd"
-run_as_user bash scripts/run_mcpd.sh
+export LINUX_MCP_MCPD_SUDO="${SUDO}"
+${SUDO} bash scripts/run_mcpd.sh
 
 echo "[accept-new] step 6: unit probe regressions"
 run_as_user python3 scripts/test_probe_unit.py

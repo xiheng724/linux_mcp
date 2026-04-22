@@ -33,6 +33,27 @@ if [[ ! -f "$SCRIPT_PATH" ]]; then
   exit 1
 fi
 
+run_mcpd_control() {
+  local action="$1"
+  local sudo_prefix="${LINUX_MCP_MCPD_SUDO:-}"
+  if [[ "$action" == "start" ]]; then
+    if [[ -n "$sudo_prefix" ]]; then
+      ${sudo_prefix} bash "$ROOT_DIR/scripts/run_mcpd.sh"
+    else
+      bash "$ROOT_DIR/scripts/run_mcpd.sh"
+    fi
+  elif [[ "$action" == "stop" ]]; then
+    if [[ -n "$sudo_prefix" ]]; then
+      ${sudo_prefix} bash "$ROOT_DIR/scripts/stop_mcpd.sh"
+    else
+      bash "$ROOT_DIR/scripts/stop_mcpd.sh"
+    fi
+  else
+    echo "FAIL: unsupported mcpd control action: $action"
+    exit 1
+  fi
+}
+
 respawn_backend() {
   local oldpid=""
   [[ -f "$PIDFILE" ]] && oldpid="$(cat "$PIDFILE" 2>/dev/null || true)"
@@ -62,8 +83,8 @@ cleanup() {
     # Force mcpd to re-probe on the next call — the old cached digest
     # (of the swapped script) would otherwise linger until an identity
     # drift is detected.
-    bash "$ROOT_DIR/scripts/stop_mcpd.sh" >/dev/null 2>&1 || true
-    bash "$ROOT_DIR/scripts/run_mcpd.sh" >/dev/null 2>&1 || true
+    run_mcpd_control stop >/dev/null 2>&1 || true
+    run_mcpd_control start >/dev/null 2>&1 || true
   fi
   exit "$rc"
 }
@@ -108,8 +129,8 @@ fi
 echo "=== step 4: restore, respawn, reset mcpd ==="
 mv -f "$BACKUP" "$SCRIPT_PATH"
 respawn_backend
-bash "$ROOT_DIR/scripts/stop_mcpd.sh" >/dev/null 2>&1 || true
-bash "$ROOT_DIR/scripts/run_mcpd.sh" >/dev/null
+run_mcpd_control stop >/dev/null 2>&1 || true
+run_mcpd_control start >/dev/null
 trap - EXIT
 
 echo "=== pass: python-script swap regression green ==="

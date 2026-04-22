@@ -4,6 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "run_mcpd.sh must be run as root (kernel_mcp netlink ops require GENL_ADMIN_PERM)"
+  echo "use: sudo bash scripts/run_mcpd.sh"
+  exit 1
+fi
+
 if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
   PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
 else

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "stop_mcpd.sh must be run as root because mcpd is started via sudo/root"
+  echo "use: sudo bash scripts/stop_mcpd.sh"
+  exit 1
+fi
+
 RUNTIME_UID="$(id -u)"
 PID_PATH="/tmp/mcpd-${RUNTIME_UID}.pid"
 SOCK_PATH="/tmp/mcpd.sock"
