@@ -94,7 +94,15 @@ def probe_manifest(risk_tags: list[str]) -> dict:
                 "operation": "note_list",
                 "timeout_ms": 5000,
                 "description": "Transient tool used by the dynamic re-registration acceptance test. Never invoked directly.",
-                "input_schema": {"type": "object", "additionalProperties": False, "properties": {}},
+                # Permissive schema: the scenarios send various ad-hoc
+                # payload shapes ({"limit":1}, {"query":"..."}), and we
+                # care about kernel arbitration + epoch behaviour, not
+                # about exercising the payload validator here. A strict
+                # schema would make validate_payload raise ValueError
+                # *before* arbitration, yielding responses with no
+                # decision field — which reads as a spurious test
+                # failure unrelated to what the scenario is probing.
+                "input_schema": {"type": "object"},
                 "examples": [{"payload": {}}],
             }
         ],
@@ -240,14 +248,30 @@ def scenario_binding_change_resets_kernel() -> None:
     pre_epoch = read_catalog_epoch()
     pre_manifest_hash = _manifest_hash_of_probe_tool()
 
-    # Change ONLY the endpoint. Keep `operation` identical so nothing in
-    # SEMANTIC_HASH_FIELDS moves — we're isolating the binding path.
-    # Pointing at a non-existent endpoint is fine: we only check that
-    # the kernel reset happened; we don't need the rebound exec to
-    # succeed because any such behavior would depend on the attacker
-    # scenario the guard is meant to prevent.
+    # Change the binding fields (endpoint + demo_entrypoint) to point
+    # at a DIFFERENT live backend. `operation` stays the same so nothing
+    # in SEMANTIC_HASH_FIELDS moves — we're isolating the binding path.
+    #
+    # Two reasons we switch demo_entrypoint in addition to endpoint:
+    #
+    #   (1) We want the probe to succeed, so the kernel actually runs
+    #       its per-tool epoch check on the stale session. A nonexistent
+    #       endpoint would short-circuit to DENY probe_failed in mcpd
+    #       userspace and never reach netlink arbitration.
+    #
+    #   (2) The TOFU-reset assertion below compares sysfs binary_hash
+    #       before vs. after. binary_hash for interpreter-hosted tools
+    #       is composite(interpreter_digest, script_digest). Changing
+    #       only the endpoint while keeping demo_entrypoint pointed at
+    #       notes_app.py yields the SAME composite — the unregister/
+    #       re-register cycle happens, but sysfs repins to an
+    #       indistinguishable value and the test can't tell the slot
+    #       was cleared. Pointing demo_entrypoint at workspace_app.py
+    #       changes the script digest too, so the re-pin is visibly
+    #       different.
     rotated = probe_manifest(risk_tags=[])
-    rotated["endpoint"] = "/tmp/linux-mcp-apps/nonexistent_rotation_target.sock"
+    rotated["endpoint"] = "/tmp/linux-mcp-apps/workspace_app.sock"
+    rotated["demo_entrypoint"] = "tool-app/demo_apps/workspace_app.py"
     rotated["tools"][0]["operation"] = "note_list"  # unchanged
     write_manifest(rotated)
     list_tools()  # trigger reload

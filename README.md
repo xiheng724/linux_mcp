@@ -30,12 +30,15 @@ The repository is not a phase-based sketch. It is a runnable end-to-end system w
 
 - Kernel-visible control-plane state without moving tool execution into the kernel
 - Manifest-driven catalog export through `list_apps` and `list_tools`
-- Session binding against real UDS peer credentials
-- Incremental catalog reconciliation with kernel-enforced `catalog_epoch` and `llm-app` auto-rebind on stale sessions
+- Session binding against real UDS peer credentials, enforced by `allowed_backend_uids` on every probe and exec dial
+- Incremental catalog reconciliation with kernel-enforced **per-tool** `registered_at_epoch` and `llm-app` auto-rebind on stale sessions (adding or changing one tool no longer invalidates sessions bound to unrelated tools)
 - TOFU-locked backend `binary_hash` so manifest-stable tools cannot silently swap executables at runtime. For native backends the kernel pin is the full SHA-256 of `/proc/<pid>/exe`; for interpreter-hosted backends (Python, Ruby, ...) the pin is `sha256(interpreter_digest ":" script_digest)` so swapping the script on disk invalidates the pin on the next restart. Application code cannot be verified live because interpreters only read the script at startup.
+- Explicit `binary_hash_state` (`unpinned` / `live_pinned`) exported under sysfs so a half-failed probe cannot masquerade as a freshly-started tool via an empty digest string
 - Approval-gated mediation for risky tools
 - Per-agent kernel `call_log` with payload/response summary hashes for post-crash audit
 - Operator-configurable transport policy in `mcpd` (`uds_rpc` + `uds_abstract`; `vsock_rpc` is a reserved name that is intentionally not implemented)
+- Capability-based runtime path: `mcpd` can run as a dedicated service user with only `CAP_NET_ADMIN + CAP_SYS_PTRACE` instead of full root — see [deploy/systemd/mcpd.service](deploy/systemd/mcpd.service)
+- Fail-closed security policy: when `mcpd` runs privileged without an explicit `allowed_backend_uids`, it refuses to start instead of defaulting to a self-only allowlist that silently rejects every non-root backend
 - A paper-ready `linux_mcp` snapshot with controlled-noise latency, throughput, attack, and daemon-failure results
 - Sysfs-backed observability for debugging and post-crash inspection
 
@@ -197,7 +200,7 @@ The manifest layer is the semantic source of truth for the system.
 | OS | Linux |
 | Build | `bash`, `make`, `gcc`, `python3` |
 | Kernel build | headers for `$(uname -r)` at `/lib/modules/$(uname -r)/build` |
-| Privileges | root for kernel module load/unload |
+| Privileges | root for kernel module load/unload; `mcpd` needs `CAP_NET_ADMIN` + `CAP_SYS_PTRACE` (root or systemd `AmbientCapabilities`) |
 | LLM client | `DEEPSEEK_API_KEY` |
 | GUI | `PySide6` |
 
@@ -243,6 +246,7 @@ ls /sys/kernel/mcp/tools
 cat /sys/kernel/mcp/tools/2/name
 cat /sys/kernel/mcp/tools/2/hash
 cat /sys/kernel/mcp/tools/2/binary_hash
+cat /sys/kernel/mcp/tools/2/binary_hash_state      # unpinned | live_pinned
 cat /sys/kernel/mcp/tools/2/registered_at_epoch
 cat /sys/kernel/mcp/tool_catalog_epoch
 
@@ -255,6 +259,8 @@ cat /sys/kernel/mcp/agents/a1/last_exec_ms
 cat /sys/kernel/mcp/agents/a1/opened_at_epoch
 sudo python3 scripts/mcpctl_dump_calls.py a1
 ```
+
+`binary_hash_state` is the authoritative signal for "did registration successfully TOFU-lock a backend identity?". An empty `binary_hash` string alone used to conflate "never pinned" with "pinned to a currently-empty value after a reset"; the explicit state string removes that ambiguity and is what `scripts/accept_new_features.sh` asserts on.
 
 ### Userspace logs
 
@@ -369,10 +375,22 @@ Purpose: reproduce the supplementary microbenchmark separating bare Generic Netl
 
 ## Acceptance Workflow
 
-For the most complete local confidence check:
+For the most complete local confidence check (includes an `llm-app` end-to-end call, so requires `DEEPSEEK_API_KEY`):
 
 ```bash
 sudo bash scripts/demo_acceptance.sh
 ```
 
 It covers kernel/module lifecycle, tool and `mcpd` startup, DeepSeek-key validation, a small end-to-end CLI flow, sysfs inspection, shutdown, and reload validation.
+
+For the control-plane / runtime-hardening regressions on their own (no DeepSeek key, no planner; 14 focused steps):
+
+```bash
+sudo bash scripts/accept_new_features.sh
+```
+
+Covers registration-time `binary_hash` pin via `binary_hash_state=live_pinned`, the `uds_abstract` demo path, native binary replacement, same-PID `execve` replacement, interpreter-hosted Python script swap, probe-failure-must-not-reuse-cached-digest, dynamic manifest re-registration with per-tool epoch semantics, and kernel `call_log` readability after an `mcpd` crash.
+
+### Running `mcpd` unprivileged under systemd
+
+`deploy/systemd/mcpd.service` runs `mcpd` as a dedicated `mcpd` service user with `AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_PTRACE` instead of full root. See [deploy/systemd/README.md](deploy/systemd/README.md) for the one-time `useradd` / config-install / `daemon-reload` steps. Under this path, `LINUX_MCP_TRUST_SUDO_UID` is intentionally not honored — backend uid trust must be declared in `/etc/linux-mcp/mcpd.toml`.
