@@ -8,9 +8,9 @@
 \label{sec:agent-systems}
 
 Modern operating systems are built around the process as the primary unit of protection: address-space isolation, controlled file access, and well-defined IPC \cite{tanenbaum2022}.
-These abstractions remain fundamental, but agent-based workloads introduce a layer of intent between the user and execution that they do not directly address.
-An agent plans over semantically described tools, constructs structured requests, and acts on behalf of a user. 
-Correctness therefore depends not only on process isolation, but also on whether the requested semantics match the operation that is actually executed.
+These abstractions remain fundamental.
+Agent-based workloads introduce a layer of intent between the user and execution that they do not directly address: an agent plans over semantically described tools, constructs structured requests, and acts on behalf of a user.
+Correctness therefore depends on process isolation and on whether the requested semantics match the operation that actually runs.
 
 Several lines of work have responded to this gap.
 Systems such as generative agents demonstrate long-lived entities capable of maintaining memory and coordinating workflows~\cite{park2023generative}.
@@ -72,10 +72,13 @@ This gap motivates introducing a dedicated control layer that validates semantic
 \subsection{Related Work}
 \label{sec:related-work}
 
-Several existing mechanisms address related but distinct problems; understanding why they fall short for MCP-style enforcement motivates the present design.
+Suppose an attacker replaces a registered tool's JSON-RPC payload at runtime so that the \texttt{operation} field now targets a different backend handler, while the socket address and the enclosing syscalls stay identical.
+An LSM hook at \texttt{security\_\allowbreak socket\_\allowbreak recvmsg} fires on the same kernel operation as before; a seccomp filter sees the same syscall numbers; a Landlock policy sees the same file descriptors.
+None of them has a place to hang a check that says ``this tool's manifest hash no longer matches what was registered''.
+That is the gap this section is about.
 
 Existing kernel-native mechanisms such as seccomp-BPF, eBPF/LSM hooks, Landlock, and capability-based designs provide strong control over syscalls, kernel objects, and process-scoped authority~\cite{seccomp2026, wright2002lsm, landlock2026, salaun2017landlock, watson2010capsicum, brimhall2023mac, lefeuvre2024sok}.
-However, they operate below the application-protocol layer and therefore do not natively express MCP-specific concepts such as manifest-derived tool identity or semantic equivalence between a declared tool and an executed endpoint.
+They operate below the application-protocol layer, so they do not natively express MCP-specific concepts such as manifest-derived tool identity or semantic equivalence between a declared tool and an executed endpoint.
 A tool's identity in this system is a SHA-256 digest of its JSON manifest, a concept that does not exist at the syscall or VFS layer; no hook in seccomp or LSM fires at the point where a JSON-RPC payload is interpreted.
 Modern eBPF can perform bounded map lookups and keep per-session state in pinned maps, so neither hash checks nor ticket storage is the hard part. 
 The harder part lies at the attachment point. 
@@ -84,12 +87,12 @@ For this reason, these mechanisms can harden the surrounding execution environme
 
 The agent frameworks surveyed in Section~\ref{sec:agent-systems} locate the full control plane in user space; correctness depends entirely on the in-process runtime remaining uncompromised.
 OpenClaw~\cite{openclaw2026} operationalises this pattern at scale, and independent security analyses confirm the resulting structural vulnerabilities~\cite{openclaw_security1, openclaw_security2}.
-Industrial deployments such as Harness~\cite{harness2025} add platform-level Role-Based Access Control (RBAC) on top, but the trust anchor is relocated to a cloud control plane rather than eliminated.
+Industrial deployments such as Harness~\cite{harness2025} add platform-level Role-Based Access Control (RBAC) on top, but the trust anchor simply moves to a cloud control plane; it is not eliminated.
 Recent systems on application-layer mandatory access control including privilege-escalation defences for LLM agents~\cite{ji2026seagent} and programmable privilege control for tool-calling agents~\cite{shi2025progent} have enforced policy inside a modified agent runtime, so invariant correctness depends on the runtime itself remaining intact.
 Most of these approaches keep the trust anchor in user-space or in a cloud-hosted control plane; their correctness degrades when the runtime or gateway is compromised.
 Apple Intelligence is the exception, it anchors trust in the Secure Enclave and PCC attestation, but that hardware-rooted model is not available to general Linux MCP deployments~\cite{apple2024pcc}.
 
-AIOS-style proposals such as AIOS, OS-Copilot, MemGPT, and AgentOS~\cite{mei2024aios, liu2026agentos, packer2023memgpt, wu2024oscopilot} pursue a broader scope: they embed LLM-specific abstractions---scheduling, memory management, tool access---into a new OS substrate.
+AIOS-style proposals such as AIOS, OS-Copilot, MemGPT, and AgentOS~\cite{mei2024aios, liu2026agentos, packer2023memgpt, wu2024oscopilot} pursue a broader scope: they embed LLM-specific abstractions (scheduling, memory management, tool access) into a new OS substrate.
 These proposals broaden scope by redesigning OS infrastructure; \texttt{linux-mcp} instead adds a narrow kernel role to an otherwise unchanged Linux system, targeting a bounded set of MCP-style control-plane invariants.
 
 
@@ -116,7 +119,7 @@ Substitution
 
 Escalation
 & Tool invoked without a valid approval via an \texttt{mcpd} logic bug (missed state transition, mis-routed approval, ticket-state TOCTOU).
-& Kernel is the authoritative store for ticket state, so forwarding errors in \texttt{mcpd} surface as kernel-side rejection rather than silent admission. \\
+& Kernel is the authoritative store for ticket state, so forwarding errors in \texttt{mcpd} surface as kernel-side rejections instead of silent admissions. \\
 
 Audit loss
 & Kill \texttt{mcpd} to erase recent call history.
@@ -124,7 +127,7 @@ Audit loss
 
 \bottomrule
 \end{tabularx}
-\caption{Control-plane threats and defences (in scope). The last row is an observability property rather than a classical attack class.}
+\caption{Control-plane threats and defences (in scope). The last row is an observability property, not a classical attack class.}
 \label{tab:threat_in_scope}
 \end{table}
 
@@ -149,7 +152,7 @@ Two dominant attack categories in AI agent systems fall outside this scope.
 \emph{Prompt injection} operates at the model's reasoning layer, before any \texttt{tool:exec} request is submitted; kernel admission control has no visibility into the planning process \cite{greshake2023prompt, liu2023prompt}.
 \emph{Supply-chain compromise of manifests} requires file-system-level defences such as Integrity Measurement Architecture or device-mapper verity; \texttt{linux-mcp} treats on-disk manifests as trusted input and assumes the adversary lacks write access to \texttt{tool-app/\allowbreak manifests/}.
 
-Trust in \texttt{mcpd} is structural rather than continuous.
+Trust in \texttt{mcpd} is structural, not continuous.
 The daemon is trusted to perform two translations correctly: at startup, converting manifest contents into SHA-256 hashes and registering them with the kernel; and at each session open, converting the client's \texttt{SO\_\allowbreak PEERCRED} into a binding hash anchored in the kernel.
 Once these registrations and bindings are in place, the kernel holds canonical state and re-checks it on every \texttt{TOOL\_\allowbreak REQUEST} and \texttt{APPROVAL\_\allowbreak DECIDE}, so the daemon's runtime correctness is no longer load-bearing for individual request validation.
 This placement defends against (a) daemon logic bugs in request forwarding such as session-id mismatch, missed ticket transitions, or concurrent TOCTOU on ticket state, (b) daemon crashes, since tickets and audit state survive in the kernel, and (c) unprivileged co-located adversaries forging UDS traffic, since session binding is anchored to peer credentials they cannot spoof.
@@ -160,12 +163,12 @@ Within this scope, we focus on four classes of control-plane failures:
 (2) \emph{replay} of previously valid requests or approval decisions,
 (3) \emph{substitution} of tool identity or semantics, and
 (4) \emph{escalation} through bypassing admission checks in the gateway.
-A fifth property, \emph{post-compromise audit continuity}, is orthogonal to these four: a gateway crash should not erase the record of recent activity.
+A fifth property, \emph{post-compromise audit continuity}, sits alongside these four: a gateway crash should not erase the record of recent activity.
 Table~\ref{tab:threat_in_scope} summarises the five and the corresponding kernel-anchored defences.
 Three of those defences go beyond manifest-hash admission alone: trust-on-first-use pinning of the backend binary identity, per-tool catalog-epoch rebind on manifest change, and a fixed-size kernel call log that survives daemon failure.
 Their mechanisms are described in Chapter~\ref{chap:design} and exercised adversarially in \hyperref[chap:evaluation]{Chapter~4}.
 
 The trusted computing base is the kernel module, the operator's TOML configuration, and the manifest directory.
 \texttt{mcpd} is trusted to populate the kernel's view of the catalog and to bind sessions at connection time; once populated, the integrity of tickets, tool identity, and audit state does not depend on the daemon staying alive.
-The supplied systemd unit (Section~\ref{sec:daemon-implementation}) runs \texttt{mcpd} as an unprivileged user with only \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} and \texttt{CAP\_\allowbreak SYS\_\allowbreak PTRACE}, as defence-in-depth rather than part of the model itself.
+The supplied systemd unit (Section~\ref{sec:daemon-implementation}) runs \texttt{mcpd} as an unprivileged user with only \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} and \texttt{CAP\_\allowbreak SYS\_\allowbreak PTRACE}; this is defence-in-depth, not part of the model itself.
 

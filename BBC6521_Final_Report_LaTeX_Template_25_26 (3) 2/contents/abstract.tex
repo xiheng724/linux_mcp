@@ -10,7 +10,7 @@ Modern AI agents rely heavily on external tools, but on Linux today the operatin
 That leaves a set of properties one would normally expect the kernel to guarantee resting instead on a single daemon: that the executed tool actually matches the one that was approved, that requests stay bound to the session that opened them, and that approval state survives a crash.
 
 We present \texttt{linux-mcp}, a kernel-assisted control plane for LLM tool invocation on Linux.
-Rather than moving full tool logic into the kernel, \texttt{linux-mcp} keeps semantic parsing and tool execution in user space; only a part of control-plane state is moved inside a kernel module --- which tools and agents are registered, which approval tickets are live, and which session a request belongs to.
+Semantic parsing and tool execution stay in user space; the kernel module holds only a narrow slice of control-plane state (which tools and agents are registered, which approval tickets are live, and which session a request belongs to).
 This design requires no modification to existing tools beyond a declarative JSON manifest, and makes approval state durable across daemon failure and protected from unprivileged user-space interference.
 
 We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened seccomp variant, looking at both performance and behavior under attack and after daemon failure.

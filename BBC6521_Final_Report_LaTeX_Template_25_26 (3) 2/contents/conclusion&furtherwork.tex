@@ -4,56 +4,66 @@
 
 \subsection{Conclusion}
 
-The broader question behind this project is what a traditional Linux system needs in order to host AI agents well.
-This work takes the narrower angle of asking it through the MCP protocol: if an agent's interaction with the outside world flows through a standardised tool-invocation layer, which parts of that layer genuinely need operating-system support, and which are fine where they are?
+The broader question behind this project is what a traditional Linux system needs in order to host AI agents well, asked narrowly through MCP: which parts of a tool-invocation control plane genuinely need operating-system support, and which are fine in user space?
+For the control-plane side the answer is a small set of invariants (semantic consistency between a registered tool and the one actually executed, identity binding between a request and its session, approval validity across the defer-approve-execute lifecycle, and state durability across gateway failure), each structurally hard to hold in a user-space gateway, because each has to survive the failure or compromise of the very process that enforces it.
+Everything else belongs in user space.
 
-For the control-plane side of MCP, the answer is a small set of invariants: semantic consistency between a registered tool and the one actually executed, identity binding between a request and the session that made it, approval validity across the defer-approve-execute lifecycle, and state durability across gateway failure.
-These four properties are structurally hard to hold in a user-space gateway, because each one has to survive the failure or compromise of the very process that enforces it.
-Everything else belongs in user space, where flexibility matters and mistakes are cheap to fix.
+\texttt{linux-mcp} is one concrete shape this split can take: a small kernel module holds registries, admission decisions, and the approval-ticket lifecycle behind a \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-gated Netlink interface, while \texttt{mcpd} handles manifests, semantic hashes, session binding, and forwarding.
+\texttt{mcpd} is trusted to populate the kernel's view at initialisation, but its integrity is no longer load-bearing at run time.
+In the tested prototype, the kernel path enforced all specified control-plane invariants across the targeted attack set while both user-space baselines permitted meaningful bypass rates, with latency and throughput close to the user-space baseline throughout; a subsequent extended-attack rerun surfaced a missing peer-credential check in the stock module, closed by a six-line patch at no measurable latency cost.
+These are functional-correctness results inside a single VM, not a claim of adversarial robustness or production-scale performance, but they are enough to show the split is workable.
 
-\texttt{linux-mcp} is one concrete shape this split can take.
-A small Linux kernel module holds the registries, arbitrates admission, and owns the approval-ticket lifecycle behind a \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-gated Netlink interface; a user-space daemon loads manifests, derives semantic hashes, binds sessions to UDS peer credentials, and forwards admitted requests to tool services.
-Once the daemon has populated the kernel's view of the world, the integrity of that view no longer depends on the daemon staying alive or correct, and the tickets and registry entries stay in kernel memory after a daemon crash.
-
-In the tested prototype, the kernel path enforced all specified control-plane invariants across the targeted attack set while both user-space baselines permitted meaningful bypass rates; latency and throughput stayed close to the user-space baseline throughout.
-A separate extended-attack rerun (TOCTOU, cross-UID session hijack, 30-minute Generic Netlink dumb fuzzer) surfaced a missing peer-credential check in the stock kernel module and closed it with a six-line patch at no measurable latency cost.
-These results are a functional-correctness test of specified invariants inside a single VM, not a claim of adversarial robustness or production-scale performance.
-They are nevertheless enough to show the split is workable: the enforcement gains are real, the overhead is small, and neither the LLM client nor tool authors need to change anything beyond providing a JSON manifest.
-
-The position argued here is narrower than AIOS-style proposals that rebuild OS infrastructure around LLM abstractions, and less trusting than user-space frameworks that accept gateway correctness as given.
-Whether AI agents eventually deserve a full operating system of their own is an open question and probably a long way off; in the meantime, a conventional Linux system extended with a few carefully scoped agent-aware mechanisms can already host an MCP control plane that neither a user-space gateway nor existing Linux security primitives can match alone.
-\texttt{linux-mcp} is one such mechanism for one such concern, and finding the others is the longer-term project.
+The position is narrower than AIOS-style proposals that rebuild OS infrastructure around LLM abstractions, and less trusting than user-space frameworks that accept gateway correctness as given.
+Whether AI agents eventually deserve an operating system of their own is probably a long way off; in the meantime, a conventional Linux system extended with a few carefully scoped agent-aware mechanisms can already carry an MCP control plane that neither a user-space gateway nor existing Linux security primitives can match alone.
 
 \subsection{Reflection}
 
 The initial framing of this project was too broad.
-Work became substantially clearer once the problem was narrowed to a specific question: which invariants break when the gateway crashes or misbehaves, and are those the ones that benefit from kernel enforcement?
-That reframing aligned the threat model, the implementation, and the evaluation criteria.
+For several weeks early on I was trying to argue for ``AI-native OS support'' as a general proposition, and the design kept accumulating features (richer policy, more in-kernel state, larger claims) without the scope actually closing anywhere.
+The project only became tractable after I forced myself to name four specific properties the gateway cannot hold on its own (tool identity, approval-ticket lifecycle, session binding, state durability across daemon failure) and declared everything else explicitly out of scope.
+In hindsight the narrowing should have come earlier.
+A non-trivial amount of the first month's implementation work ended up deleted when the scope finally shrank, and the project became much easier to write about almost immediately afterwards.
 
-The kernel interface went through several candidates before settling on Generic Netlink.
-eBPF was considered first, and state storage turned out not to be the obstacle; \texttt{bpf\_\allowbreak timer} and pinned maps are adequate for approval-ticket lifecycle.
-The real obstacle is the hook-attachment model: eBPF LSM fires on kernel operations, not on parsed JSON-RPC messages, so an in-kernel enforcer would have to re-parse MCP framing from raw socket bytes under verifier bounded-loop constraints on every invocation.
-LSM hooks were also considered, but they fire at the syscall boundary while tool identity is an application-layer concept, and the layers do not align.
-Generic Netlink supports the full lifecycle state the design needs, at the cost of a loadable module where a simpler policy hook would have been lighter.
+Choosing the kernel interface took longer than I expected, and the first serious candidate was not Netlink.
+I started on eBPF.
+State storage turned out not to be the obstacle; \texttt{bpf\_\allowbreak timer} and pinned maps can carry an approval-ticket lifecycle without much trouble.
+What eventually killed that path was the hook-attachment model: eBPF LSM fires on kernel operations, not on parsed JSON-RPC messages, so any in-kernel enforcer would have had to re-parse MCP framing out of raw socket bytes, under verifier bounded-loop limits, on every invocation.
+Straight LSM hooks had the mirror-image problem: they fire at the syscall boundary, where tool identity simply does not exist yet.
+Generic Netlink was the only interface that carried the lifecycle state the design needs, and I accepted shipping a loadable module as the cost.
 
-Working across the kernel-user-space boundary was technically demanding.
-Attribute packing bugs in Netlink produce no compiler errors; they silently corrupt fields, surfacing only as unexpected kernel decisions deep into a test run.
-The most useful mitigation was writing standalone per-command test scripts before integrating with \texttt{mcpd}.
+The hardest class of bug I hit was Netlink attribute-packing mismatches.
+When the kernel's attribute layout and the user-side layout drift apart (a field advertised as \texttt{u32} but packed as \texttt{u64}, or two attributes whose order disagreed between \texttt{mcpd} and the module), the kernel still receives a well-formed message, still makes a deterministic decision, but on the wrong bytes.
+There is no compiler warning and, frustratingly, almost no log signal either: the \texttt{tool\_id} silently becomes zero and the request is denied for what reads like a plausible policy reason.
+I lost roughly two days to one of these before I started writing small per-command Python scripts that constructed each Netlink message by hand and checked the response before the path was wired into \texttt{mcpd}.
+That discipline felt redundant at the time.
+It saved me repeatedly after.
 
-The most persistent design tension was the temptation to move more logic into the kernel.
-Each additional check there is one the gateway cannot bypass, which is attractive, but manifest parsing, schema validation, and tool execution belong in user space where iteration is fast and debugging does not require a module reload.
-The narrow kernel role was not a limitation; it was the point.
+The most persistent design temptation was to move more logic into the kernel.
+Every time I noticed something \texttt{mcpd} could plausibly skip if it were compromised, the instinct was to replicate the check inside the module.
+I gave in once, on partial schema validation at registration, on the grounds that \texttt{mcpd} could otherwise register arbitrary nonsense.
+It worked, up until the schema needed to change: at that point I was rebuilding and reloading the module for what should have been a five-line user-space edit, and the kernel copy duplicated logic \texttt{mcpd} had to run anyway.
+I removed it.
+The rule I converged on, and have kept since, is that the kernel verifies \emph{membership} but never computes \emph{content}: \texttt{mcpd} decides what is registered, and the kernel only has to check that a request is asking for something that was registered.
+Holding that line was the single most useful discipline of the project.
+Without a clear rule, every incident report naturally suggests ``one more kernel check'', and those accumulate into a second tool-execution engine sitting inside kernel space.
 
-More broadly, the scope of a security claim matters as much as the claim itself.
-Framing \texttt{linux-mcp} as protecting four specific control-plane properties against a local unprivileged adversary made the evaluation honest and the argument defensible.
-A system that claims to solve the full AI-agent security problem is harder to evaluate and trust than one that solves a well-defined sub-problem and says so.
+The evaluation phase taught me something that was more about the scope of security claims than design.
+An early version of the attack suite reported a clean pass across the cross-UID hijack cases, which I was pleased with until I realised the kernel had no peer-credential check on the \texttt{TOOL\_\allowbreak REQUEST} path at all; the cases were ``passing'' only because the harness was not really exercising them.
+The extended-attack rerun (committed as the E4 cross-UID A/B mode on 14 April) caught this, and the fix came out to six lines adding a peer-uid comparison against the session's bound uid at request time, gated behind a \texttt{require\_\allowbreak peer\_\allowbreak cred} module parameter so the before/after comparison could be measured on the same binary.
+Latency was unaffected within noise.
+A separate incident on the overload benchmark made the same point from the other direction: an earlier run reported $\sim$99\% error rate and microsecond-scale $p_{99}$ latency at high concurrency, which initially looked like the kernel was failing, until it turned out the harness was opening a fresh UDS connection per request and saturating the default \texttt{SOMAXCONN=128} accept queue well before anything kernel-side was involved.
+The shared lesson behind both incidents is the one I would flag to anyone doing similar work.
+A precisely scoped claim (four named invariants, one threat model, one VM) is not only rhetorically safer than ``we secure AI-agent tool invocation''; it is the only kind of claim where an honest evaluation can catch you when you are wrong.
+Broader claims fail silently.
+Narrow claims either pass or fail in a specific, locatable way.
+That asymmetry, more than any individual design choice, is what I would want to carry into the next project.
 
 \subsection{Further Work}
 \label{sec:further-work}
 
 Several directions follow naturally from the prototype.
 
-First, kernel arbitration is intentionally minimal: tool and agent identity, semantic-hash consistency, and approval-ticket validity, but no richer policy framework.
+First, kernel arbitration covers a small set of checks (tool and agent identity, semantic-hash consistency, and approval-ticket validity) with no richer policy framework.
 Per-tool permissions, role-scoped access control, rate limits, and execution budgets are the obvious next step, subject to the narrow-kernel principle that the kernel verifies policy membership but never computes policy decisions.
 
 Second, the approval mechanism can be developed into a fuller governance path.
@@ -61,9 +71,8 @@ The present design supports defer-and-decide control for sensitive operations, b
 Strengthening this path would make \texttt{linux-mcp} more suitable for accountability and compliance contexts.
 
 Third, recovery behaviour can be refined.
-The prototype preserves kernel-held registry and approval state across daemon failure, but cold-start reconciliation is unconditional, and daemon-local state (sessions and the \texttt{req\_\allowbreak id}-to-ticket map) is discarded rather than reconstructed, so clients must reopen a session before resuming.
+The prototype preserves kernel-held registry and approval state across daemon failure, but cold-start reconciliation is unconditional, and daemon-local state (sessions and the \texttt{req\_\allowbreak id}-to-ticket map) is discarded on restart, so clients must reopen a session before resuming.
 A more mature design would gate the cold-start sweep on an observable divergence signal, carry richer recovery metadata for interrupted requests, and let clients resume a still-valid approval ticket without reopening.
-This matters most in long-running agent workflows, where failure and restart are routine.
 
 Fourth, the evaluation can be extended substantially.
 The current registry-scaling experiment already pushes the kernel catalogue to \num{16384} tools with flat lookup latency across three orders of magnitude of $N$, but several adjacent regimes remain uncharacterised: bare-metal evaluation to eliminate hypervisor timing noise, sustained concurrency well beyond the clean-sweep ceiling of 100 concurrent requests (the \texttt{SOMAXCONN} saturation that blocked the present overload attempt needs addressing in the harness first), heterogeneous tool workloads with variable or network-dependent execution times, and $p_{99}$ latency under sustained concurrency (the $p_{95}$ characterisation in \hyperref[chap:evaluation]{Chapter~4} does not extend that far).
