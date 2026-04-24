@@ -68,10 +68,8 @@
 \contentsline {paragraph}{mcpd to tool-app message schema.}{79}{paragraph*.34}%
 \contentsline {paragraph}{Complete Netlink attribute encoding.}{80}{paragraph*.35}%
 \contentsline {paragraph}{Semantic hash computation.}{82}{paragraph*.36}%
-\contentsline {paragraph}{Complete manifest field specification.}{82}{paragraph*.37}%
-\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{82}{section*.38}%
-\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{82}{section*.39}%
-\contentsline {paragraph}{Noise-floor command: \texttt {KERNEL\_MCP\_CMD\_NOOP}.}{82}{paragraph*.40}%
-\contentsline {paragraph}{Peer-credential enforcement: \texttt {require\_peer\_cred}.}{84}{paragraph*.41}%
-\contentsline {paragraph}{Summary of experiment-only switches.}{85}{paragraph*.42}%
-\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{86}{section*.43}%
+\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{85}{section*.37}%
+\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{85}{section*.38}%
+\contentsline {paragraph}{Noise-floor command: \texttt {KERNEL\_MCP\_CMD\_NOOP}.}{85}{paragraph*.39}%
+\contentsline {paragraph}{Peer-credential enforcement: \texttt {require\_peer\_cred}.}{86}{paragraph*.40}%
+\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{89}{section*.41}%

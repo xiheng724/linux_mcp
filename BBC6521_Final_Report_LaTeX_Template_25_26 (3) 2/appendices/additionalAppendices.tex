@@ -51,7 +51,8 @@ Once the kernel returns \texttt{ALLOW}, \texttt{mcpd} forwards the request to th
 Tool services implement only this contract; they require no knowledge of sessions, kernel tickets, or the Netlink protocol.
 The \texttt{operation} field is the dispatch string a tool service routes on and is declared per-tool in the manifest; it is distinct from the \texttt{tool\_id} (numeric, used by the kernel for registry indexing) and from the tool's human-readable \texttt{name}.
 
-\begin{table}[htbp]
+\needspace{16\baselineskip}
+\begin{table}[H]
 \centering\small
 \begin{tabular}{@{}lll p{5.5cm}@{}}
 \toprule
@@ -80,6 +81,7 @@ All attributes are 4-byte aligned.
 String attributes are NUL-terminated and passed as raw bytes.
 The following Python fragment shows how \texttt{mcpd} encodes a \texttt{TOOL\_REQUEST} message:
 
+\needspace{32\baselineskip}
 \begin{lstlisting}[style=codestyle, language=Python, caption={Python fragment: encoding a \texttt{TOOL\_REQUEST} Generic Netlink message (mcpd $\to$ kernel).}]
 import struct, socket, hashlib
 
@@ -113,7 +115,8 @@ def encode_tool_request(agent_id, tool_id, req_id,
 Table~\ref{tab:netlink-attrs-full} lists the attributes exercised on the admission-critical \texttt{TOOL\_\allowbreak REQUEST}/\texttt{TOOL\_\allowbreak DECISION} and approval paths.
 The full family also defines auxiliary attributes for registration, status reporting, payload/response audit hashing, and epoch bookkeeping; the subset reproduced inline in Section~\ref{sec:wire-protocols} is a further reduction of the request-critical fields shown here.
 
-\begin{table}[htbp]
+\needspace{20\baselineskip}
+\begin{table}[H]
 \centering\small
 \begin{tabular}{@{}lcl p{5.8cm}@{}}
 \toprule
@@ -139,6 +142,7 @@ The full family also defines auxiliary attributes for registration, status repor
 
 The reference implementation of the semantic hash defined in Section~\ref{sec:manifest-semantics} is reproduced below; the rationale for the field selection and the no-truncation policy is in that section and is not repeated here.
 
+\needspace{20\baselineskip}
 \begin{lstlisting}[style=codestyle, language=Python, caption={Python fragment: computing the manifest-derived semantic hash used for tool identity.}]
 import json, hashlib
 
@@ -158,9 +162,8 @@ def semantic_hash(tool_manifest: dict) -> str:
     return hashlib.sha256(blob).hexdigest()  # 64-char hex; never truncated
 \end{lstlisting}
 
-\paragraph{Complete manifest field specification.}
-
-\begin{table}[htbp]
+\needspace{30\baselineskip}
+\begin{table}[H]
 \centering
 \footnotesize
 \renewcommand{\arraystretch}{1.3}
@@ -199,12 +202,13 @@ def semantic_hash(tool_manifest: dict) -> str:
 \label{tab:manifest-fields}
 \end{table}
 
+\clearpage
 \subsubsection*{A.2\quad System Comparison Table}
 \phantomsection
 \addcontentsline{toc}{subsubsection}{A.2\quad System Comparison Table}
 \label{sec:appendix-comparison}
 
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \footnotesize
 \renewcommand{\arraystretch}{1.35}
@@ -277,6 +281,7 @@ This section documents their UAPI footprint and the peer-credential patch surfac
 The paired ablation anchors every stage cost against a Generic Netlink round-trip floor measured by a minimum-work handler that returns immediately after command dispatch.
 The command is appended to the existing \texttt{KERNEL\_\allowbreak MCP} family at a stable numeric ID so that older \texttt{mcpd} builds continue to work unchanged:
 
+\needspace{16\baselineskip}
 \begin{lstlisting}[style=codestyle, language=C, caption={UAPI additions for the noise-floor command and the stage-ablation experiment flags (kernel-mcp/include/uapi/linux/kernel\_mcp\_schema.h).}]
 /* New command: stable numeric ID, append-only. */
 #define KERNEL_MCP_CMD_NOOP                15
@@ -297,6 +302,7 @@ Under the benign workload used by the ablation runner, the \texttt{SKIP\_HASH} a
 The cross-UID attack rerun surfaced a defect in the stock kernel module: \texttt{kernel\_mcp\_cmd\_tool\_request} never compared the \texttt{NETLINK\_CB(skb)} peer credential against the \texttt{uid} recorded at agent registration, which allowed a crafted-credential replay from a second UID to reach the tool-request handler untouched.
 The fix is exposed as a module parameter so that the A/B comparison in \hyperref[chap:evaluation]{Chapter~4} could run against a single binary:
 
+\needspace{22\baselineskip}
 \begin{lstlisting}[style=codestyle, language=C, caption={Peer-credential enforcement patch in \texttt{kernel\_mcp\_main.c}, gated behind the \texttt{require\_peer\_cred} module parameter.}]
 static bool require_peer_cred = false;
 module_param_named(require_peer_cred, require_peer_cred, bool, 0644);
@@ -318,9 +324,8 @@ static int kernel_mcp_cmd_tool_request(struct sk_buff *skb,
 The parameter defaults to \texttt{false} in the artefact published alongside this report so that the extended-attack experiment can exercise both the pre-patch and post-patch code paths without a rebuild; production deployments should set it to \texttt{true} via \texttt{/sys/\allowbreak module/\allowbreak kernel\_\allowbreak mcp/\allowbreak parameters/\allowbreak require\_\allowbreak peer\_\allowbreak cred} on module load.
 The check reads the peer credential on the same cache line that the existing \texttt{NETLINK\_CB} access already touches, so the \hyperref[chap:evaluation]{Chapter~4} latency and throughput numbers are unchanged whether the gate is on or off.
 
-\paragraph{Summary of experiment-only switches.}
-
-\begin{table}[htbp]
+\needspace{20\baselineskip}
+\begin{table}[H]
 \centering
 \footnotesize
 \renewcommand{\arraystretch}{1.25}
