@@ -2,8 +2,8 @@
 \setcounter{section}{1} \setcounter{subsection}{0}
 \phantomsection \label{chap:introduction} \addcontentsline{toc}{section}{\textit{Chapter 1: Introduction}}
 
-Recent advances in Large Language Models (LLMs) have enabled instruction following, reasoning, and interaction with external environments, forming the foundation for autonomous agentic systems \cite{yao2023react, liu2024agentbench, schick2023toolformer}.
-LLM-based agents are now deployed across a wide range of applications, from direct-acting assistants to sophisticated multi-step reasoning and problem-solving systems \cite{park2023generative, qin2024toolllm, mei2024aios, liu2026agentos}.
+Recent advances in Large Language Models (LLMs) have enabled instruction following, reasoning, and interaction with external environments, forming the foundation for autonomous agentic systems \cite{yao2023react, schick2023toolformer}.
+LLM-based agents are now deployed across a wide range of applications, from direct-acting assistants to sophisticated multi-step reasoning and problem-solving systems \cite{park2023generative, qin2024toolllm}.
 Model Context Protocol (MCP) has emerged as a common interface between LLM agents and external tools \cite{mcp2025}.
 
 \subsection{Problem Statement}
@@ -47,8 +47,7 @@ The kernel is changed only where the gateway provably cannot protect an invarian
 The central hypothesis that follows from this placement is that binding safety and failure resilience can be improved at acceptable performance cost, and \hyperref[chap:evaluation]{Chapter~4} tests that claim empirically.
 
 \paragraph{Comparison with user-space systems.}
-To contextualise the design, we compare \texttt{linux-mcp} with two representative user-space tool-invocation frameworks: OpenClaw~\cite{openclaw2026}, which uses a monolithic user-space gateway, and Hermes Agent~\cite{nousresearch2026hermesagent}, which runs the entire control pipeline inside a single Python process, with tool execution dispatched to in-process handlers or MCP subprocess servers.
-Table~\ref{tab:comparison} highlights the key architectural differences.
+Table~\ref{tab:comparison} contextualises the design against two representative user-space tool-invocation frameworks: the monolithic-gateway OpenClaw~\cite{openclaw2026} and the in-process Hermes Agent~\cite{nousresearch2026hermesagent}.
 \begin{table}[t]
 \centering
 \footnotesize
@@ -106,6 +105,5 @@ This paper makes the following contributions:
     \texttt{mcpd} concentrates all manifest-handling complexity in one place, leaving both the kernel and the LLM client unaware of it.
     
     \item \textbf{An empirical evaluation of kernel placement as a design choice.}
-    We compare \texttt{linux-mcp} against pure and hardened (seccomp) user-space baselines across latency, throughput, attack resistance, and daemon failure.
-    The results quantify the cost of moving admission into the kernel, demonstrate that the specified control-plane invariants hold under 30 repetitions of 11 attack cases across four categories, and show that kernel-held approval state survives daemon failure in a way neither user-space baseline can match.
+    We compare \texttt{linux-mcp} against pure and hardened (seccomp) user-space baselines across latency, throughput, attack resistance, and daemon failure, showing that the specified control-plane invariants hold under the targeted attack set while both user-space baselines permit meaningful bypass rates, at latency close to the user-space baseline throughout.
 \end{itemize}

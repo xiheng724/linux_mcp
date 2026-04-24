@@ -220,8 +220,7 @@ The kernel never reads \texttt{/proc} itself; its role is to store and compare, 
 
 \paragraph{Tool registration via manifests.}
 Tool services do not self-register; each application is described by a JSON manifest in \texttt{tool-app/\allowbreak manifests/} from which \texttt{mcpd} derives semantic hashes and issues \texttt{TOOL\_\allowbreak REGISTER} Netlink commands at startup.
-Both the \texttt{endpoint} and the \texttt{transport} fields are excluded from the semantic hash: they describe where the backend is reached, not what it does, so either can change without altering the tool's identity to planners or to the kernel.
-A separate binding fingerprint over these two fields drives kernel-side rebind when either changes, which clears the TOFU \texttt{binary\_\allowbreak hash} pin at the new address; the mechanism is detailed in Section~\ref{sec:manifest-semantics}.
+The separation of the semantic hash (what the tool is) from the binding fingerprint over \texttt{endpoint} and \texttt{transport} (where the backend is reached), and the rebind-on-address-change mechanism it drives, are detailed in Section~\ref{sec:manifest-semantics}.
 The complete field specification and a representative manifest are given in Appendix~A.1 (Table~\ref{tab:manifest-fields}).
 
 

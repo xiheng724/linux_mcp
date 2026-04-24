@@ -5,11 +5,6 @@ Yao S, Zhao J, Yu D, et~al.
 \newblock ReAct: Synergizing reasoning and acting in language models.
 \newblock arXiv preprint arXiv:221003629. 2023.
 
-\bibitem{liu2024agentbench}
-Liu X, Yu H, Zhang H, et~al.
-\newblock AgentBench: Evaluating LLMs as agents.
-\newblock arXiv preprint arXiv:230803688. 2024.
-
 \bibitem{schick2023toolformer}
 Schick T, Dwivedi-Yu J, et~al.
 \newblock Toolformer: Language models can teach themselves to use tools.
@@ -25,16 +20,6 @@ Qin Y, Liang S, Ye Y, et~al.
 \newblock ToolLLM: Facilitating Large Language Models to Master 16000+ Real-world APIs.
 \newblock arXiv preprint arXiv:230716789. 2024.
 
-\bibitem{mei2024aios}
-Mei K, et~al.
-\newblock AIOS: LLM Agent Operating System.
-\newblock arXiv preprint arXiv:240316971. 2024.
-
-\bibitem{liu2026agentos}
-Liu R, Zhe T, Wang D, et~al.
-\newblock AgentOS: From Application Silos to a Natural Language-Driven Data Ecosystem.
-\newblock arXiv preprint arXiv:260308938. 2026.
-
 \bibitem{mcp2025}
 {Model Context Protocol}. Architecture Specification; 2025.
 \newblock \url{https://modelcontextprotocol.io/specification/2025-06-18/architecture}.
@@ -43,6 +28,11 @@ Liu R, Zhe T, Wang D, et~al.
 Packer C, Fang V, Patil SG, Lin K, Wooders S, Gonzalez JE.
 \newblock MemGPT: Towards LLMs as Operating Systems.
 \newblock arXiv preprint arXiv:231008560. 2023.
+
+\bibitem{mei2024aios}
+Mei K, et~al.
+\newblock AIOS: LLM Agent Operating System.
+\newblock arXiv preprint arXiv:240316971. 2024.
 
 \bibitem{openclaw2026}
 Steinberger P. OpenClaw: Open-source Autonomous AI Agent; 2026.
@@ -97,6 +87,11 @@ Gravitas S. {AutoGPT}: An Autonomous {GPT}-4 Experiment; 2023.
 Wu Z, et~al.
 \newblock OS-Copilot: Towards Generalist Computer Agents with Self-Improvement.
 \newblock arXiv preprint arXiv:240207456. 2024.
+
+\bibitem{liu2026agentos}
+Liu R, Zhe T, Wang D, et~al.
+\newblock AgentOS: From Application Silos to a Natural Language-Driven Data Ecosystem.
+\newblock arXiv preprint arXiv:260308938. 2026.
 
 \bibitem{openharness2026}
 {HKUDS}. {OpenHarness}: Open Agent Harness with a Built-in Personal Agent---Ohmo!; 2026.

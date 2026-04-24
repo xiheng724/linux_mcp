@@ -271,13 +271,10 @@ Outcomes are summarised in Table~\ref{tab:attacks} and Figure~\ref{fig:chapter4-
 \label{fig:chapter4-security}
 \end{figure}
 
-The plain user-space baseline fails to block 100 of 110 attempts (90.9\% bypass).
-A caveat: the harness selectively weakens the baseline's code paths per category (\texttt{tamper\_\allowbreak session}, \texttt{tamper\_\allowbreak approval}, \texttt{tamper\_\allowbreak metadata}, \texttt{compromised\_\allowbreak userspace}) so that each test exercises the specific check it targets.
-The 90.9\% figure shows what a user-space mediator cannot structurally protect when its own state is under attack, not what a fully hardened version could achieve.
-The seccomp variant brings the bypass rate down to 36.4\% through stricter checks and a narrower syscall surface, but admission is still a user-space decision.
-Attacks that do not need to cross a privilege boundary (particularly substitution and spoofing) still get through.
+The plain user-space baseline is the weakest of the three: the harness selectively weakens its code paths per category (\texttt{tamper\_\allowbreak session}, \texttt{tamper\_\allowbreak approval}, \texttt{tamper\_\allowbreak metadata}, \texttt{compromised\_\allowbreak userspace}) so that each test exercises the specific check it targets, and the resulting bypass rate in Table~\ref{tab:attacks} shows what a user-space mediator cannot structurally protect when its own state is under attack, not what a fully hardened version could achieve.
+The seccomp variant tightens checks and narrows the syscall surface but keeps admission as a user-space decision, so attacks that do not need to cross a privilege boundary (particularly substitution and spoofing) still get through.
 
-The kernel path blocks every one of the 110 attempts.
+The kernel path blocks every attempt in the table.
 
 Spoofing fails because agent identity is tied to a kernel-registered identifier that the control plane verifies independently of the daemon's session state.
 Replay fails because approval tickets are kernel-resident lifecycle objects with explicit \texttt{consumed} and \texttt{expired} fields; once a ticket has been advanced or has passed its validity window, no subsequent \texttt{APPROVAL\_\allowbreak DECIDE} can reopen it.
@@ -292,7 +289,8 @@ First, each attack category maps one-to-one onto an enforcement mechanism in the
 A 0\% bypass rate on the kernel path is therefore a functional-correctness test of four specified invariants against inputs constructed to exercise exactly those invariants, not evidence of adversarial robustness against unknown attacks.
 
 Second, the combined attack set is scoped to the stated control-plane invariants and does not include: attacks assuming compromise of the kernel module itself; attacks exploiting semantic vulnerabilities in tool logic; attacks requiring already-obtained privileged capabilities (such as \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}); or attacks against the LLM prompt-construction pipeline.
-The 0\% bypass rate is a statement about the specified control-plane invariants, not about the full attack surface of an LLM-integrated system.
+The two dominant threat classes in AI-agent deployments, prompt injection \cite{greshake2023prompt, liu2023prompt} and supply-chain compromise of manifests, live at layers where kernel admission control has no visibility (the planner's reasoning layer and the filesystem integrity layer respectively) and are addressed by complementary defences rather than by this work.
+The 0\% bypass rate is therefore a statement about the specified control-plane invariants, not about the full attack surface of an LLM-integrated system.
 
 Third, the user-space bypass rates reflect the instrumented tamper modes described above, not the performance of an optimally hardened user-space implementation.
 
@@ -364,7 +362,7 @@ The security and performance results are easier to read as a pair than in isolat
 
 Consider the seccomp baseline.
 It does strictly more work than the plain user-space mediator: tighter syscall filters, extra input validation, audit logging.
-It still admits 36.4\% of the attack attempts, and under a megabyte-class payload it is the slowest system in the table.
+It still admits a substantial fraction of the attack attempts (Table~\ref{tab:attacks}), and under a megabyte-class payload it is the slowest system in the table.
 The kernel path reaches a zero bypass rate by placing the admission state somewhere no unprivileged process can reach; the seccomp baseline keeps filtering around the same mutable process that holds the decision, and the numbers reflect the difference.
 
 The 1~MB latency inversion is the same architectural fact showing up on the performance side, and it was not something we anticipated going in.
@@ -381,11 +379,8 @@ Recovery means starting over.
 On the kernel path, a daemon restart is a reconciliation pass against state that was never in the daemon to begin with.
 A forced restart mid-workflow is, in practice, a far more common event than any of the controlled attack attempts the security evaluation tests.
 
-The extended-attack results exposed a defect in the stock binary that the design-time harness did not cover.
-In the cross-UID experiment, \texttt{kernel\_\allowbreak mcp\_\allowbreak cmd\_\allowbreak tool\_\allowbreak request} did not compare \texttt{NETLINK\_\allowbreak CB(skb)} peer credentials against the UID recorded at agent registration, so requests from UID $B$ reached the handler as if they had originated from UID $A$.
-Of the 500 attempts, 174 passed the checks enforced by the stock binary and would have been admitted to tool execution.
-We fixed this with a six-line peer-credential check on entry to the handler, guarded by a \texttt{require\_\allowbreak peer\_\allowbreak cred} module parameter so the A/B comparison could use the same binary.
-With the check enabled, all 500 attempts were blocked before any registry work ran, and the added comparison had no measurable latency cost.
+The cross-UID experiment in Section~\ref{sec:extended-attacks} is the clearest reminder that the zero-bypass table measures only design-time invariants: it exposed a peer-credential gap that the category-level harness did not probe, and that was closed by a six-line patch with no measurable latency cost.
+The design-time and extended-attack layers are complementary, and neither on its own would have caught this.
 
 What the evaluation does not settle is behaviour beyond the concurrency window it sweeps.
 Inside the clean window up to 100 concurrent requests the kernel path holds a stable $\sim$10\% throughput gap against plain user-space without diverging; outside it, the global registry lock is an obvious suspect for a bottleneck and the current prototype does not decompose it.

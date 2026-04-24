@@ -137,8 +137,7 @@ The full family also defines auxiliary attributes for registration, status repor
 
 \paragraph{Semantic hash computation.}
 
-The semantic hash used for tool identity is a full 256-bit SHA-256 digest computed over a canonical JSON serialisation of the eleven manifest fields enumerated in the \texttt{SEMANTIC\_FIELDS} array of the listing below.
-The \texttt{endpoint} and \texttt{transport} fields are deliberately excluded so that redeployment to a new socket path or transport does not invalidate the kernel registration; \texttt{operation} remains in-hash because it selects the RPC method actually executed on the backend.
+The reference implementation of the semantic hash defined in Section~\ref{sec:manifest-semantics} is reproduced below; the rationale for the field selection and the no-truncation policy is in that section and is not repeated here.
 
 \begin{lstlisting}[style=codestyle, language=Python, caption={Python fragment: computing the manifest-derived semantic hash used for tool identity.}]
 import json, hashlib
@@ -158,9 +157,6 @@ def semantic_hash(tool_manifest: dict) -> str:
                       ensure_ascii=True).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()  # 64-char hex; never truncated
 \end{lstlisting}
-
-The full 64-character digest is used without truncation.
-A 32-bit prefix (8 hex characters) would be vulnerable to birthday collisions after approximately $2^{16}$ distinct tool registrations, which is a realistic size for a production deployment spanning multiple applications.
 
 \paragraph{Complete manifest field specification.}
 
