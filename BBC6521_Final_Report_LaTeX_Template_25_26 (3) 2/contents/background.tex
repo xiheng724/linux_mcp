@@ -74,17 +74,20 @@ This gap motivates introducing a dedicated control layer that validates semantic
 
 Several existing mechanisms address related but distinct problems; understanding why they fall short for MCP-style enforcement motivates the present design.
 
-Existing kernel-native mechanisms such as seccomp-BPF, eBPF/LSM hooks, Landlock, and capability-based designs provide strong control over syscalls, kernel objects, and process-scoped authority~\cite{seccomp2026, lsm2026, landlock2026, watson2010capsicum, brimhall2023mac, lefeuvre2024sok}.
-However, they operate below the application-protocol layer and therefore do not natively express MCP-specific concepts such as manifest-derived tool identity, approval-ticket scope, or semantic equivalence between a declared tool and an executed endpoint.
+Existing kernel-native mechanisms such as seccomp-BPF, eBPF/LSM hooks, Landlock, and capability-based designs provide strong control over syscalls, kernel objects, and process-scoped authority~\cite{seccomp2026, wright2002lsm, landlock2026, salaun2017landlock, watson2010capsicum, brimhall2023mac, lefeuvre2024sok}.
+However, they operate below the application-protocol layer and therefore do not natively express MCP-specific concepts such as manifest-derived tool identity or semantic equivalence between a declared tool and an executed endpoint.
 A tool's identity in this system is a SHA-256 digest of its JSON manifest, a concept that does not exist at the syscall or VFS layer; no hook in seccomp or LSM fires at the point where a JSON-RPC payload is interpreted.
-Modern eBPF can perform bounded map lookups, so runtime hash checks are not the hard part; the harder part is representing approval tickets and other state that spans multiple messages.
+Modern eBPF can perform bounded map lookups and keep per-session state in pinned maps, so neither hash checks nor ticket storage is the hard part. 
+The harder part lies at the attachment point. 
+eBPF LSM hooks fire on kernel operations such as socket receive and file open, not on parsed JSON-RPC messages, so any in-kernel enforcer would have to re-parse MCP framing and reconstruct tool identity from raw socket bytes on every hook invocation, all under the eBPF verifier's bounded-loop and instruction-count constraints.
 For this reason, these mechanisms can harden the surrounding execution environment, but they do not directly enforce the control-plane invariants targeted in this work.
 
 The agent frameworks surveyed in Section~\ref{sec:agent-systems} locate the full control plane in user space; correctness depends entirely on the in-process runtime remaining uncompromised.
 OpenClaw~\cite{openclaw2026} operationalises this pattern at scale, and independent security analyses confirm the resulting structural vulnerabilities~\cite{openclaw_security1, openclaw_security2}.
 Industrial deployments such as Harness~\cite{harness2025} add platform-level Role-Based Access Control (RBAC) on top, but the trust anchor is relocated to a cloud control plane rather than eliminated.
-Recent work on application-layer mandatory access control including privilege-escalation frameworks for LLM agents~\cite{ji2026seagent} and programmable privilege control for tool-calling agents~\cite{shi2025progent} have enforced policy inside a modified agent runtime, so invariant correctness depends on the runtime itself remaining intact.
-All of these approaches keep the trust anchor in user-space or in a cloud-hosted control plane; their correctness degrades when the runtime or gateway is compromised.
+Recent systems on application-layer mandatory access control including privilege-escalation defences for LLM agents~\cite{ji2026seagent} and programmable privilege control for tool-calling agents~\cite{shi2025progent} have enforced policy inside a modified agent runtime, so invariant correctness depends on the runtime itself remaining intact.
+Most of these approaches keep the trust anchor in user-space or in a cloud-hosted control plane; their correctness degrades when the runtime or gateway is compromised.
+Apple Intelligence is the exception, it anchors trust in the Secure Enclave and PCC attestation, but that hardware-rooted model is not available to general Linux MCP deployments~\cite{apple2024pcc}.
 
 AIOS-style proposals such as AIOS, OS-Copilot, MemGPT, and AgentOS~\cite{mei2024aios, liu2026agentos, packer2023memgpt, wu2024oscopilot} pursue a broader scope: they embed LLM-specific abstractions---scheduling, memory management, tool access---into a new OS substrate.
 These proposals broaden scope by redesigning OS infrastructure; \texttt{linux-mcp} instead adds a narrow kernel role to an otherwise unchanged Linux system, targeting a bounded set of MCP-style control-plane invariants.
@@ -92,34 +95,35 @@ These proposals broaden scope by redesigning OS infrastructure; \texttt{linux-mc
 
 \begin{table}[t]
 \centering
-\small
-\begin{tabular}{l p{4.4cm} p{5.8cm}}
+\footnotesize
+\setlength{\tabcolsep}{5pt}\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\linewidth}{@{}l X X@{}}
 \toprule
 \textbf{Attack class} & \textbf{Representative attack} & \textbf{Defence in \texttt{linux-mcp}} \\
 \midrule
 
 Spoofing
-& Forged session or tool hash; same-UID session reuse
-& \texttt{SO\_\allowbreak PEERCRED} binding hash over $(\text{uid},\text{gid},\text{pid},\text{session\_id})$; kernel-side hash check \\
+& Forged \texttt{session\_id} (including same-UID hijack) or unregistered \texttt{tool\_hash}.
+& \texttt{SO\_PEERCRED} binding hash over $(\text{uid},\text{gid},\text{pid},\text{session\_id})$ checked on every request; \texttt{tool\_hash} must match a kernel-resident manifest entry. \\
 
 Replay
-& Stale ticket or session reused across manifest change
-& Ticket bound to \texttt{(binding\_\allowbreak hash, binding\_\allowbreak epoch)} with TTL; per-tool epoch forces rebind on re-registration \\
+& Ticket reused past its TTL, or after the referenced tool was re-registered.
+& Tickets carry \texttt{(binding\_hash, binding\_epoch)} + TTL; re-registering a tool bumps its catalog epoch, invalidating dependent tickets and forcing session rebind. \\
 
 Substitution
-& Tool diverges from declared semantics, or backend binary swapped behind a live socket
-& Kernel-verified manifest hash; TOFU \texttt{binary\_\allowbreak hash} over \texttt{/\allowbreak proc/\allowbreak <pid>/\allowbreak exe} (composite digest for interpreters) \\
+& Manifest edited post-registration, or backend binary swapped behind a live socket.
+& Kernel-verified manifest SHA-256; first successful probe pins a TOFU \texttt{binary\_hash} over \texttt{/proc/<pid>/exe} (composite for interpreters), re-checked on every invocation. \\
 
 Escalation
-& Gateway logic bypass
-& Mandatory kernel arbitration on every invocation \\
+& Tool invoked without a valid approval via an \texttt{mcpd} logic bug (missed state transition, mis-routed approval, ticket-state TOCTOU).
+& Kernel is the authoritative store for ticket state, so forwarding errors in \texttt{mcpd} surface as kernel-side rejection rather than silent admission. \\
 
 Audit loss
-& Kill \texttt{mcpd} to erase recent history
-& Fixed-size per-agent \texttt{call\_log} in \texttt{sysfs}, survives daemon crash \\
+& Kill \texttt{mcpd} to erase recent call history.
+& Per-agent \texttt{call\_log} is a fixed-size kernel ring buffer, exposed read-only via \texttt{sysfs}; survives daemon termination. \\
 
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Control-plane threats and defences (in scope). The last row is an observability property rather than a classical attack class.}
 \label{tab:threat_in_scope}
 \end{table}
@@ -132,23 +136,24 @@ The above limitations suggest that the correctness of MCP-style systems depends 
 We therefore ground our design in a threat model that focuses on attacks against these invariants in a local-host setting.
 
 The local-adversary model is appropriate for MCP-style deployments for three reasons.
-First, tool services in a typical deployment run on the same host as the gateway; the attack surface that most immediately needs hardening is therefore local, not remote.
-Second, a remote adversary who has already achieved code execution on the host is, by definition, a local adversary: the local threat model subsumes this class without requiring a separate treatment.
-Third, the two dominant remote-oriented threats in AI agent systems (prompt injection and supply-chain compromise of manifests) operate at different layers and fall outside the scope of kernel-level admission control, as discussed later in this section.
-The threat model therefore focuses on what kernel enforcement can actually address: a co-located process that can observe, forge, or replay control-plane messages.
+First, typical MCP deployments co-locate tool services with the gateway on a single host, so the control plane itself is a local attack surface.
+Second, \texttt{mcpd} exposes no network interface but only a Unix domain socket, so a remote adversary without on-host code execution cannot reach the control plane at all, while one with code execution is indistinguishable from a local unprivileged process; the local model therefore captures both cases without a separate remote treatment.
+Third, two threats frequently raised in the AI agent setting fall outside this model because they live at other layers, namely prompt injection at the model's reasoning layer and supply-chain compromise of manifests at the filesystem integrity layer; neither is an appropriate target for kernel-level admission control, and both are addressed by complementary defences at those layers, as discussed later in this section.
+The threat model therefore focuses on what kernel enforcement can actually address: a co-located unprivileged process that can observe, forge, or replay control-plane messages exchanged with the gateway.
 
-Concretely, the adversary model has the following capabilities: (1) arbitrary code execution on the host as an unprivileged process; (2) access to Unix domain sockets exposed by the gateway; (3) ability to observe, craft, and replay JSON-RPC messages; and (4) full knowledge of the MCP protocol, tool manifests, and \texttt{linux-mcp} implementation (consistent with Kerckhoffs's principle).
-The attacker interacts exclusively through the \texttt{mcpd} JSON-RPC surface and holds no elevated capabilities: specifically, no \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} (required to invoke the kernel module via Netlink), no \texttt{ptrace} access to \texttt{mcpd}, and no write access to manifest files.
-These three boundaries are critical: \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} is the interface to kernel enforcement; \texttt{ptrace} would allow process manipulation; manifest write would break the trusted-input assumption.
+Concretely, the adversary model grants the attacker four capabilities: (1) arbitrary code execution under an unprivileged uid distinct from the one under which \texttt{mcpd} runs; (2) access to any Unix domain socket the gateway exposes to unprivileged processes; (3) the ability to craft and replay arbitrary JSON-RPC messages on that socket, including messages observed in prior interactions; and (4) full knowledge of the MCP protocol, tool manifests, and \texttt{linux-mcp} implementation, consistent with Kerckhoffs's principle.
+Correspondingly, the attacker interacts with \texttt{linux-mcp} exclusively through the \texttt{mcpd} JSON-RPC surface and holds none of the three elevated capabilities that would bypass this interface: no \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}, no \texttt{ptrace} access to \texttt{mcpd}, and no write access to the manifest directory.
+Each boundary closes a distinct bypass path: \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} would let the attacker talk to the kernel module directly via Netlink, skipping \texttt{mcpd} entirely; \texttt{ptrace} would let the attacker read or modify \texttt{mcpd}'s address space and forge control-plane state from within the gateway; and manifest write would poison the kernel registry at the next registration, since manifests are the trusted input from which tool identity is derived.
 
 Two dominant attack categories in AI agent systems fall outside this scope.
 \emph{Prompt injection} operates at the model's reasoning layer, before any \texttt{tool:exec} request is submitted; kernel admission control has no visibility into the planning process \cite{greshake2023prompt, liu2023prompt}.
 \emph{Supply-chain compromise of manifests} requires file-system-level defences such as Integrity Measurement Architecture or device-mapper verity; \texttt{linux-mcp} treats on-disk manifests as trusted input and assumes the adversary lacks write access to \texttt{tool-app/\allowbreak manifests/}.
-Also excluded from our scope are process-level attacks on the gateway, including ptrace, memory corruption, and \texttt{LD\_\allowbreak PRELOAD}, as well as kernel-level attacks such as rootkits and hardware side channels, and remote adversaries.
-Trust in \texttt{mcpd} is time-partitioned rather than absolute.
-At initialisation, the daemon is trusted to register manifest hashes and bind sessions to peer credentials; this is the one phase where kernel state depends on daemon correctness.
-At run time, no such trust is assumed: every \texttt{TOOL\_\allowbreak REQUEST} and \texttt{APPROVAL\_\allowbreak DECIDE} is re-checked against kernel-resident registry and ticket state, so the placement defends against (a) daemon logic bugs such as session-id mismatch, missed ticket transitions, or concurrent TOCTOU, and (b) unprivileged co-located adversaries observing or forging JSON-RPC traffic.
-It still does not protect against a gateway whose process memory has been directly compromised during the initialisation phase or otherwise.
+
+Trust in \texttt{mcpd} is structural rather than continuous.
+The daemon is trusted to perform two translations correctly: at startup, converting manifest contents into SHA-256 hashes and registering them with the kernel; and at each session open, converting the client's \texttt{SO\_\allowbreak PEERCRED} into a binding hash anchored in the kernel.
+Once these registrations and bindings are in place, the kernel holds canonical state and re-checks it on every \texttt{TOOL\_\allowbreak REQUEST} and \texttt{APPROVAL\_\allowbreak DECIDE}, so the daemon's runtime correctness is no longer load-bearing for individual request validation.
+This placement defends against (a) daemon logic bugs in request forwarding such as session-id mismatch, missed ticket transitions, or concurrent TOCTOU on ticket state, (b) daemon crashes, since tickets and audit state survive in the kernel, and (c) unprivileged co-located adversaries forging UDS traffic, since session binding is anchored to peer credentials they cannot spoof.
+It does \emph{not} defend against a \texttt{mcpd} whose process memory is directly compromised at any point in its lifetime: a compromised daemon still holds a valid \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} handle and can drive the Netlink interface with apparently legitimate calls.
 
 Within this scope, we focus on four classes of control-plane failures:
 (1) \emph{spoofing} of identity or session context,

@@ -45,6 +45,35 @@ The \texttt{approval\_reply} message is issued by the client after the user conf
   "reason": "user confirmed",  "ttl_ms": 30000 }
 \end{lstlisting}
 
+\paragraph{mcpd to tool-app message schema.}
+
+Once the kernel returns \texttt{ALLOW}, \texttt{mcpd} forwards the request to the relevant tool service over a per-application UDS connection using the minimal five-field schema below.
+Tool services implement only this contract; they require no knowledge of sessions, kernel tickets, or the Netlink protocol.
+The \texttt{operation} field is the dispatch string a tool service routes on and is declared per-tool in the manifest; it is distinct from the \texttt{tool\_id} (numeric, used by the kernel for registry indexing) and from the tool's human-readable \texttt{name}.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}lll p{5.5cm}@{}}
+\toprule
+\textbf{Field} & \textbf{Dir} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\texttt{req\_id}   & req  & \textit{u64}    & Per-invocation correlator \\
+\texttt{agent\_id} & req  & \textit{string} & Requesting agent identifier \\
+\texttt{tool\_id}  & req  & \textit{u32}    & Numeric tool identifier from the manifest \\
+\texttt{operation} & req  & \textit{string} & Operation name within the tool \\
+\texttt{payload}   & req  & \textit{object} & Validated input matching the tool's schema \\
+\midrule
+\texttt{req\_id}   & resp & \textit{u64}    & Must echo the request \texttt{req\_id} \\
+\texttt{status}    & resp & \textit{string} & \texttt{"ok"} or \texttt{"error"} \\
+\texttt{result}    & resp & \textit{object} & Tool output on success; \texttt{\{\}} on failure \\
+\texttt{error}     & resp & \textit{string} & Empty on success; error description on failure \\
+\texttt{t\_ms}     & resp & \textit{u32}    & Tool-side execution time in milliseconds \\
+\bottomrule
+\end{tabular}
+\caption{\texttt{mcpd}--\texttt{tool-app} JSON-RPC message fields.}
+\label{tab:mcpd-toolapp}
+\end{table}
+
 \paragraph{Complete Netlink attribute encoding.}
 
 All attributes are 4-byte aligned.
@@ -80,6 +109,31 @@ def encode_tool_request(agent_id, tool_id, req_id,
     genl_hdr = struct.pack("BBH", CMD_TOOL_REQUEST, 1, 0)
     return genl_hdr + attrs
 \end{lstlisting}
+
+Table~\ref{tab:netlink-attrs-full} lists the full \texttt{KERNEL\_\allowbreak MCP} attribute set.
+The subset carried on the critical \texttt{TOOL\_\allowbreak REQUEST}/\texttt{TOOL\_\allowbreak DECISION} path is reproduced inline in Section~\ref{sec:wire-protocols}.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}lcl p{5.8cm}@{}}
+\toprule
+\textbf{Attribute} & \textbf{\#} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\texttt{REQ\_ID}                & 1  & \textit{u64}    & Per-invocation request identifier \\
+\texttt{TOOL\_ID}               & 2  & \textit{u32}    & Numeric tool identifier \\
+\texttt{AGENT\_ID}              & 4  & \textit{string} & Agent identifier \\
+\texttt{TOOL\_HASH}             & 19 & \textit{string} & 64-char hex SHA-256 of manifest fields \\
+\texttt{BINARY\_\allowbreak HASH}       & 33 & \textit{string} & SHA-256 of backend's \texttt{/proc/<pid>/exe}; composite with on-disk script bytes for interpreter-hosted tools; computed by \texttt{mcpd} at live probe time \\
+\texttt{DECISION}               & 17 & \textit{u32}    & Kernel verdict: 1=ALLOW, 2=DENY, 3=DEFER \\
+\texttt{TICKET\_ID}             & 22 & \textit{u64}    & Approval ticket handle (DEFER path) \\
+\texttt{APPROVAL\_\allowbreak DECISION} & 23 & \textit{u32}    & 1=approve, 2=deny, 3=revoke \\
+\texttt{AGENT\_\allowbreak BINDING}     & 28 & \textit{u64}    & Session binding hash over \texttt{SO\_PEERCRED}, computed by \texttt{mcpd} \\
+\texttt{AGENT\_\allowbreak EPOCH}       & 29 & \textit{u64}    & Session opened-at epoch, gating cross-session replay \\
+\bottomrule
+\end{tabular}
+\caption{Complete \texttt{KERNEL\_\allowbreak MCP} TLV attribute set. All strings are NUL-terminated and 4-byte aligned. The per-tool catalog epoch (bumped when a tool's manifest is re-registered) is maintained internally by the kernel and is not transmitted as an attribute.}
+\label{tab:netlink-attrs-full}
+\end{table}
 
 \paragraph{Semantic hash computation.}
 

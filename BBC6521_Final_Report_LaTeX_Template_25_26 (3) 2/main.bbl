@@ -186,6 +186,16 @@ Shi T, He J, Wang Z, Wu L, Li H, Guo W, et~al.
 {Linux Kernel Documentation}. Landlock; 2026.
 \newblock \url{https://docs.kernel.org/userspace-api/landlock.html}.
 
+\bibitem{wright2002lsm}
+Wright C, Cowan C, Smalley S, Morris J, Kroah-Hartman G.
+\newblock Linux Security Modules: General Security Support for the {Linux} Kernel.
+\newblock In: Proceedings of the 11th {USENIX} Security Symposium. USENIX Association; 2002. p. 17-31.
+
+\bibitem{salaun2017landlock}
+Salaün M.
+\newblock Landlock {LSM}: Toward Unprivileged Sandboxing.
+\newblock In: Linux Security Summit; 2017. .
+
 \bibitem{watson2010capsicum}
 Watson RNM, Anderson J, Laurie B, Kennaway K.
 \newblock Capsicum: Practical Capabilities for {UNIX}.
@@ -195,11 +205,6 @@ Watson RNM, Anderson J, Laurie B, Kennaway K.
 Brimhall B, Garrard J, de~la Garza C, Coffman J.
 \newblock A Comparative Analysis of {Linux} Mandatory Access Control Policy Enforcement Mechanisms.
 \newblock In: Proceedings of the 16th European Workshop on System Security ({EuroSec}); 2023. .
-
-\bibitem{chen2016shreds}
-Chen Y, Reymondjohnson S, Sun Z, Lu L.
-\newblock Shreds: Fine-grained Execution Units with Private Memory.
-\newblock In: Proceedings of the {IEEE} Symposium on Security and Privacy ({S\&P}); 2016. p. 56-71.
 
 \bibitem{stevens2013unix}
 Stevens WR, Rago SA.

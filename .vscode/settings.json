@@ -1,10 +1,11 @@
 {
   "latex-workshop.latex.recipes": [
     {
-      "name": "xelatex -> bibtex -> xelatex x2",
+      "name": "xelatex → bibtex → xelatex×2",
       "tools": ["xelatex", "bibtex", "xelatex", "xelatex"]
     }
   ],
+  "latex-workshop.latex.recipe.default": "xelatex → bibtex → xelatex×2",
   "latex-workshop.latex.tools": [
     {
       "name": "xelatex",
@@ -22,7 +23,8 @@
       "args": ["%DOCFILE%"]
     }
   ],
-  "latex-workshop.latex.autoBuild.run": "onSave",
+  "latex-workshop.latex.autoBuild.run": "onFileChange",
+  "latex-workshop.latex.autoBuild.interval": 1000,
   "latex-workshop.latex.outDir": "%DIR%",
   "latex-workshop.view.pdf.viewer": "tab"
 }

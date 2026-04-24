@@ -50,49 +50,50 @@ Warning--empty author and editor in selinux2026
 Warning--missing publisher in selinux2026
 Warning--empty author and editor in landlock2026
 Warning--missing publisher in landlock2026
+Warning--empty pages in salaun2017landlock
 Warning--empty pages in watson2010capsicum
 Warning--empty pages in brimhall2023mac
 Warning--empty author and editor in netlink2026
 Warning--missing publisher in netlink2026
-You've used 49 entries,
+You've used 50 entries,
             3507 wiz_defined-function locations,
-            908 strings with 12821 characters,
-and the built_in function-call counts, 65371 in all, are:
-= -- 7837
-> -- 607
+            914 strings with 12961 characters,
+and the built_in function-call counts, 66371 in all, are:
+= -- 7955
+> -- 615
 < -- 76
-+ -- 311
-- -- 147
-* -- 5088
-:= -- 7168
-add.period$ -- 154
-call.type$ -- 49
-change.case$ -- 25
++ -- 315
+- -- 149
+* -- 5166
+:= -- 7280
+add.period$ -- 158
+call.type$ -- 50
+change.case$ -- 27
 chr.to.int$ -- 166
-cite$ -- 95
-duplicate$ -- 5474
-empty$ -- 6350
-format.name$ -- 172
-if$ -- 15373
+cite$ -- 97
+duplicate$ -- 5558
+empty$ -- 6450
+format.name$ -- 174
+if$ -- 15608
 int.to.chr$ -- 0
-int.to.str$ -- 49
-missing$ -- 416
-newline$ -- 233
-num.names$ -- 49
-pop$ -- 1025
+int.to.str$ -- 50
+missing$ -- 424
+newline$ -- 238
+num.names$ -- 50
+pop$ -- 1047
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 954
+skip$ -- 970
 stack$ -- 0
-substring$ -- 11684
-swap$ -- 902
+substring$ -- 11843
+swap$ -- 920
 text.length$ -- 31
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
-warning$ -- 46
-while$ -- 348
-width$ -- 51
-write$ -- 490
-(There were 46 warnings)
+warning$ -- 47
+while$ -- 353
+width$ -- 52
+write$ -- 501
+(There were 47 warnings)

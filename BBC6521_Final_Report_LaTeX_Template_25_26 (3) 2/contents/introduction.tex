@@ -10,11 +10,11 @@ Model Context Protocol (MCP) has emerged as a common interface between LLM agent
 
 Tool-using, stateful AI agents expose a fundamental mismatch between modern agent frameworks and the abstractions provided by conventional operating systems \cite{packer2023memgpt, mei2024aios}.
 While conventional operating systems effectively manage processes, files, and network resources, MCP-style workflows are organized around higher-level concepts such as semantic tool descriptions, session context, approval boundaries, and cross-step state.
-This mismatch leads to fragile control planes when enforcement remains entirely in user-space. 
-Frameworks such as OpenClaw~\cite{openclaw2026} and Hermes Agent~\cite{nousresearch2026hermesagent} demonstrate that granting agents execution capability and persistent context can lead to security risks including prompt injection, privilege escalation, and cross-step exploitation. 
+This mismatch leads to fragile control planes when enforcement remains entirely in user-space.
+Frameworks such as OpenClaw~\cite{openclaw2026} and Hermes Agent~\cite{nousresearch2026hermesagent} demonstrate that granting agents execution capability and persistent context can lead to security risks including prompt injection, privilege escalation, and cross-step exploitation.
 Among these, prompt injection originates at the model–input boundary and is orthogonal to the control plane; this work focuses on the latter two classes, where the integrity of approval, identity binding, and cross-step state determines whether a compromised or manipulated request can actually take effect.
 
-A single gateway process is typically responsible for interpreting tool manifests, binding requests to identities, and authorizing execution, effectively placing the control plane in user space. 
+A single gateway process is typically responsible for interpreting tool manifests, binding requests to identities, and authorizing execution, effectively placing the control plane in user space.
 Such a design introduces a single point of failure and expands the trusted computing base, making it vulnerable to crashes, logic bugs, or compromised control paths~\cite{peter2014arrakis}.
 Under such a design, three properties become difficult to guarantee reliably: (1) semantic consistency between declared tool behaviour and executed operations, (2) durability of approval state across gateway crashes, and (3) robust identity binding in the presence of replay and session confusion~\cite{qin2024toolllm,greshake2023prompt}.
 
@@ -71,13 +71,7 @@ Binding correctness
 Failure resilience
 & State persists in kernel
 & Lost on gateway failure
-& Approval state lost on restart \\[6pt]
-\midrule
-\multicolumn{4}{c}{\textit{Security model}} \\
-\midrule
-\multicolumn{4}{p{\dimexpr\textwidth-2\tabcolsep\relax}}{\textbf{linux-mcp:} TCB partitioned; kernel holds durable control-plane state, inaccessible to unprivileged processes.} \\[4pt]
-\multicolumn{4}{p{\dimexpr\textwidth-2\tabcolsep\relax}}{\textbf{OpenClaw:} Monolithic TCB; all control-plane state in user-space process.} \\[4pt]
-\multicolumn{4}{p{\dimexpr\textwidth-2\tabcolsep\relax}}{\textbf{Hermes Agent:} No kernel-level enforcement; approval decisions held as module-global Python state keyed by session id, and lost on process restart. Optional Docker backend provides filesystem sandboxing but does not mediate tool-invocation semantics.} \\
+& Approval state lost on restart \\
 \bottomrule
 \end{tabularx}
 \caption{Key design differences between \texttt{linux-mcp}, OpenClaw, and Hermes Agent.}

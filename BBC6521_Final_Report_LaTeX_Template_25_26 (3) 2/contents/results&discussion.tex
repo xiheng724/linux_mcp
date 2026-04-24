@@ -3,6 +3,13 @@
 \addcontentsline{toc}{section}{\textit{Chapter 4: Results and Discussion}}
 \phantomsection \label{chap:evaluation}
 
+% Discourage float-only pages: require ≥85% text on a regular page,
+% and demand ≥90% fill before a page is promoted to a float-only page.
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.15}
+\renewcommand{\floatpagefraction}{0.9}
+
 \texttt{linux-mcp} is evaluated along four dimensions: control-plane latency and its breakdown across invocation stages, throughput under concurrent load, resistance to a representative set of control-plane attacks, and system behaviour under daemon failure and restart.
 The central claim under test is that relocating admission-control state into the kernel strengthens enforcement without making the tool invocation path prohibitively expensive.
 Two baselines isolate this effect from user-space hardening alone: a conventional user-space mediator (\textbf{userspace}), in which registration, admission, and approval all reside in the daemon, and a hardened variant (\textbf{seccomp}) that augments the same control path with stricter syscall filtering, additional validation, and audit logging.
@@ -50,7 +57,7 @@ At 10~KB the kernel path is nominally slower (\num{0.899}~ms versus \num{0.863}~
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/figure_latency_mean_by_payload.pdf}
+\includegraphics[width=0.95\linewidth]{figures/figure_latency_mean_by_payload.pdf}
 \caption{Mean end-to-end latency by payload size for the three systems. Each subplot auto-scales its own y-axis so that the sub-millisecond differences at 100~B and 10~KB are not flattened by the much larger absolute values at 1~MB.
 Error bars show 95\% confidence intervals across $n = 30$ independent runs; significance markers are Welch's $t$-test against the \texttt{userspace} baseline.}
 \label{fig:chapter4-latency}
@@ -66,7 +73,7 @@ The modest speedup against plain user-space, we believe, reflects early-reject b
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.95\linewidth]{figures/figure_latency_overhead.pdf}
+\includegraphics[width=0.8\linewidth]{figures/figure_latency_overhead.pdf}
 \caption{Mean-latency ratio of each hardened variant to the plain \texttt{userspace} baseline, with 95\% confidence intervals propagated from the 30-run per-repetition means. The y-axis is zoomed around the parity line (ratio = 1.00) to make the sub-4\% effects at 100~B and 10~KB visible alongside the larger effect at 1~MB. The \texttt{seccomp} path is significantly slower at every payload size; the \texttt{kernel} path is statistically indistinguishable from \texttt{userspace} at small and medium payloads and measurably faster at 1~MB.}
 \label{fig:chapter4-overhead}
 \end{figure}
@@ -78,7 +85,7 @@ The tail does not widen under the enforcement boundary.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/figure_latency_p95_by_payload.pdf}
+\includegraphics[width=0.95\linewidth]{figures/figure_latency_p95_by_payload.pdf}
 \caption{$p_{95}$ latency by payload size for the three systems ($n = 30$ runs of 2000 requests each). Error bars show 95\% confidence intervals. At 100~B and 10~KB the kernel path is statistically indistinguishable from the userspace baseline; at 1~MB the kernel $p_{95}$ (\num{8.422}~ms) is lower than both userspace (\num{8.716}~ms, $p = 0.049$) and seccomp (\num{10.903}~ms), confirming that the enforcement boundary does not widen the tail under the tested workload.}
 \label{fig:chapter4-p95}
 \end{figure}
@@ -89,7 +96,7 @@ At 1~MB, tool execution accounts for \num{89.3}\% of total end-to-end time on th
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/figure_latency_breakdown.pdf}
+\includegraphics[width=0.95\linewidth]{figures/figure_latency_breakdown.pdf}
 \caption{Invocation-stage breakdown (session lookup, arbitration, tool execution) for each system at all three payload sizes, on a log y-axis. The log scale makes session\_lookup (around 4~\textmu s) visible alongside tool\_exec (around 4~ms). The \texttt{kernel} path spends roughly one order of magnitude more time in arbitration than the user-space baselines, but that extra cost is well under \num{0.04}~ms and is invisible relative to the tool-execution component.}
 \label{fig:chapter4-breakdown}
 \end{figure}
@@ -101,7 +108,7 @@ The total kernel arbitration cost is therefore \num{4.334}~$\mu$s above the nois
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.95\linewidth]{figures/figure_ablation_mean_rtt.pdf}
+\includegraphics[width=0.65\linewidth]{figures/figure_ablation_mean_rtt.pdf}
 \caption{Kernel path ablation at realistic registry scale ($N = 1024$ tools, $M = 64$ agents). The leftmost bar is the measured noise floor from the \texttt{KMCP\_\allowbreak CMD\_\allowbreak NOOP} handler, which establishes the irreducible Generic Netlink round-trip cost. The \texttt{full} bar is the complete \texttt{TOOL\_\allowbreak REQUEST} arbitration path; \texttt{skip\_\allowbreak lookups} disables the tool and agent registry walks. The two \texttt{ticket\_\allowbreak trigger} bars exercise a high-risk tool whose execution is gated by the approval-ticket machinery, with and without the approval branch bypassed. All error bars are 95\% bootstrap CIs across $n = 10$ repetitions.}
 \label{fig:chapter4-ablation}
 \end{figure}
@@ -137,7 +144,7 @@ binding\_guard\_body     & 100\,000 & $-0.007$ & $[-0.027, +0.013]$ & $-0.65$  &
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.95\linewidth]{figures/figure_ablation_stage_delta.pdf}
+\includegraphics[width=0.65\linewidth]{figures/figure_ablation_stage_delta.pdf}
 \caption{Paired per-stage deltas across the four ablation comparisons. The first two bars are the meaningful stage costs (registry+agent lookup and the approval-ticket body); the last two are methodology consistency checks against dead guard bodies and are expected to fall on zero.}
 \label{fig:chapter4-ablation-stages}
 \end{figure}
@@ -205,7 +212,7 @@ The per-tool cost curve (Figure~\ref{fig:chapter4-registry-curve}) approaches th
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.95\linewidth]{figures/figure_registry_register_curve.pdf}
+\includegraphics[width=0.65\linewidth]{figures/figure_registry_register_curve.pdf}
 \caption{Registry register-path per-tool cost as a function of registry size $N$. The dashed line is the asymptotic per-tool cost $b = 6.011$~$\mu$s from the linear fit $\text{total\_ms}(N) = a + b N$ ($R^2 = 0.9996$); the curve approaches this asymptote monotonically with no degradation at large $N$.}
 \label{fig:chapter4-registry-curve}
 \end{figure}
@@ -217,7 +224,7 @@ Mean lookup latency stays within the 7.1--7.7~$\mu$s band across three orders of
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.95\linewidth]{figures/figure_registry_lookup_scaling.pdf}
+\includegraphics[width=0.65\linewidth]{figures/figure_registry_lookup_scaling.pdf}
 \caption{Steady-state \texttt{tool\_id} lookup latency as a function of registry size $N$, on a log-$N$ axis. The fitted log-linear slope is $2.9\times 10^{-5}$~ms per doubling (bootstrap 95\% CI $[-2\times 10^{-6}, +6.1\times 10^{-5}]$, containing zero), consistent with the $O(1)$ xarray lookup invariant.}
 \label{fig:chapter4-registry-lookup}
 \end{figure}
@@ -248,7 +255,7 @@ System & Bypasses & Total & Bypass rate \\
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/figure_attack_heatmap.png}
+\includegraphics[width=0.8\linewidth]{figures/figure_attack_heatmap.png}
 \caption{Attack bypass rate by category and system. Each cell shows the absolute count (successes/attempts) and the percentage bypass rate; darker cells indicate a higher bypass rate. The \texttt{kernel} column is uniformly zero across all four categories, while the two user-space baselines permit bypasses on the specific checks that their instrumented tamper profiles relax.}
 \label{fig:chapter4-security}
 \end{figure}
@@ -314,7 +321,7 @@ The fuzzer's design time was limited, so the result is read as a robustness smok
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.9\linewidth]{figures/figure_fuzz_errno_distribution.pdf}
+\includegraphics[width=0.8\linewidth]{figures/figure_fuzz_errno_distribution.pdf}
 \caption{Errno distribution for the Generic Netlink dumb fuzzer, binned by the \texttt{KMCP\_\allowbreak CMD\_\allowbreak *} opcode under test. Every rejection falls into one of three deterministic errno classes (\texttt{-EINVAL}, \texttt{-EBADMSG}, \texttt{-EPERM}); zero mutated messages produced a kernel oops, \texttt{WARN}, or \texttt{kmemleak} report across \num{880640} total inputs.}
 \label{fig:chapter4-fuzz}
 \end{figure}
