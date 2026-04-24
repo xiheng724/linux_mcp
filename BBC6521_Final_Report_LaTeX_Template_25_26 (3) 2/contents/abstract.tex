@@ -6,15 +6,15 @@
 {\fontsize{12pt}{18pt}\selectfont
 % replace the paragraph below with your abstract
 
-AI agents increasingly rely on external tools, yet existing tool-invocation frameworks provide little operating-system support for enforcing control-plane safety.
-When mediation remains entirely in a user-space gateway, key invariants depend on the correctness and availability of that process, including semantic consistency between approved and executed operations, identity binding that resists session confusion and replay, and preservation of approval state across failures.
+Modern AI agents rely heavily on external tools, but on Linux today the operating system plays no part in how those calls are gated, and the entire control plane sits in a user-space gateway.
+That leaves a set of properties one would normally expect the kernel to guarantee resting instead on a single daemon: that the executed tool actually matches the one that was approved, that requests stay bound to the session that opened them, and that approval state survives a crash.
 
 We present \texttt{linux-mcp}, a kernel-assisted control plane for LLM tool invocation on Linux.
-Rather than moving full tool logic into the kernel, \texttt{linux-mcp} keeps semantic parsing and tool execution in user space while moving a narrow set of control-plane responsibilities into a kernel module: admission decisions, approval-ticket lifecycle, and binding verification.
+Rather than moving full tool logic into the kernel, \texttt{linux-mcp} keeps semantic parsing and tool execution in user space; only a part of control-plane state is moved inside a kernel module --- which tools and agents are registered, which approval tickets are live, and which session a request belongs to.
 This design requires no modification to existing tools beyond a declarative JSON manifest, and makes approval state durable across daemon failure and protected from unprivileged user-space interference.
 
-We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened seccomp variant across latency, arbitration cost, throughput, registry scaling, attack resistance, and failure recovery.
-The kernel path enforces all evaluated control-plane invariants, while the user-space and seccomp baselines exhibit bypass rates of 90.9\% and 36.4\%; an extended-attack rerun surfaced a missing peer-credential check in the stock module, closed by a six-line patch at no measurable latency cost.
+We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened seccomp variant, looking at both performance and behavior under attack and after daemon failure.
+The kernel module blocks every attack in the test suite, while the user-space and seccomp baselines leave bypass rates of 90.9\% and 36.4\%; an extended-attack rerun surfaced a missing peer-credential check in the stock module, closed by a six-line patch at no measurable latency cost.
 Performance overhead is small: latency is within measurement noise at small and medium payloads and about 3.4\% lower at 1~MB, and a paired microbenchmark attributes only \num{4.334}~$\mu$s to the full kernel arbitration path above the measured Netlink noise floor.
 The prototype supports 43 tools across 14 applications and is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
 
