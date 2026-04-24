@@ -3,7 +3,7 @@
 
 Opens a session and invokes a low-risk tool directly via the mcpd UDS JSON
 RPC so that we can validate the audit pipeline (kernel call_log, sysfs)
-without depending on DEEPSEEK_API_KEY or any LLM planning.
+without depending on an LLM API key or any LLM planning.
 
 Default target is tool_id=2 (note_list), which is read-only (risk_flags=0x20).
 """

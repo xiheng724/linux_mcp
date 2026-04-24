@@ -50,8 +50,8 @@ from gui_support import (
     render_catalog_view,
 )
 from model_client import (
-    DEFAULT_DEEPSEEK_MODEL,
-    DEFAULT_DEEPSEEK_URL,
+    DEFAULT_MODEL_NAME,
+    DEFAULT_MODEL_URL,
     SelectorConfig,
     SessionInfo,
     open_session,
@@ -758,9 +758,25 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Linux MCP GUI client")
     parser.add_argument("--sock", default=DEFAULT_SOCK_PATH)
     parser.add_argument("--agent-id", default="a1", help="client name hint for session opening")
-    parser.add_argument("--deepseek-model", default=DEFAULT_DEEPSEEK_MODEL)
-    parser.add_argument("--deepseek-url", default=os.getenv("DEEPSEEK_API_URL", DEFAULT_DEEPSEEK_URL))
-    parser.add_argument("--deepseek-timeout-sec", type=int, default=20)
+    parser.add_argument(
+        "--model-name",
+        "--deepseek-model",
+        dest="model_name",
+        default=DEFAULT_MODEL_NAME,
+    )
+    parser.add_argument(
+        "--model-url",
+        "--deepseek-url",
+        dest="model_url",
+        default=DEFAULT_MODEL_URL,
+    )
+    parser.add_argument(
+        "--model-timeout-sec",
+        "--deepseek-timeout-sec",
+        dest="model_timeout_sec",
+        type=int,
+        default=20,
+    )
     parser.add_argument("--mode", choices=("user", "dev"), default="user")
     args = parser.parse_args()
 
@@ -777,9 +793,9 @@ def main() -> int:
     app.setApplicationName("Linux MCP")
     app.setOrganizationName("linux-mcp")
     selector_cfg = SelectorConfig(
-        deepseek_url=args.deepseek_url,
-        deepseek_model=args.deepseek_model,
-        deepseek_timeout_sec=args.deepseek_timeout_sec,
+        model_url=args.model_url,
+        model_name=args.model_name,
+        model_timeout_sec=args.model_timeout_sec,
     )
     win = MainWindow(
         sock_path=args.sock,

@@ -14,8 +14,8 @@ from typing import Any, Dict, List, Literal
 from app_logic import ApprovalRequest, execute_plan, load_catalog
 from debug_render import render_execution_debug_lines
 from model_client import (
-    DEFAULT_DEEPSEEK_MODEL,
-    DEFAULT_DEEPSEEK_URL,
+    DEFAULT_MODEL_NAME,
+    DEFAULT_MODEL_URL,
     SelectorConfig,
     SessionInfo,
     open_session,
@@ -579,12 +579,30 @@ def main() -> int:
     )
     parser.add_argument("--once", help="single prompt to run")
     parser.add_argument("--repl", action="store_true", help="interactive loop mode")
-    parser.add_argument("--deepseek-model", default=DEFAULT_DEEPSEEK_MODEL)
+    # Primary model flags (provider-neutral). Defaults target any OpenAI-compatible
+    # endpoint; the legacy --deepseek-* aliases below are retained so existing
+    # scripts continue to work.
     parser.add_argument(
-        "--deepseek-url",
-        default=os.getenv("DEEPSEEK_API_URL", DEFAULT_DEEPSEEK_URL),
+        "--model-name",
+        "--deepseek-model",
+        dest="model_name",
+        default=DEFAULT_MODEL_NAME,
+        help="model id to pass in the request body (e.g. gpt-4o-mini, llama3.1, deepseek-chat)",
     )
-    parser.add_argument("--deepseek-timeout-sec", type=int, default=20)
+    parser.add_argument(
+        "--model-url",
+        "--deepseek-url",
+        dest="model_url",
+        default=DEFAULT_MODEL_URL,
+        help="OpenAI-compatible /chat/completions URL (overrides LLM_MODEL_URL / DEEPSEEK_API_URL)",
+    )
+    parser.add_argument(
+        "--model-timeout-sec",
+        "--deepseek-timeout-sec",
+        dest="model_timeout_sec",
+        type=int,
+        default=20,
+    )
     parser.add_argument("--agent-id", default="a1", help="client name hint for session opening")
     parser.add_argument("--sock", default=SOCK_PATH, help="mcpd unix socket path")
     parser.add_argument("--show-tools", action="store_true", help="always print full tool list in REPL")
@@ -609,9 +627,9 @@ def main() -> int:
     client_name = args.agent_id
     sock_path = args.sock
     cfg = SelectorConfig(
-        deepseek_url=args.deepseek_url,
-        deepseek_model=args.deepseek_model,
-        deepseek_timeout_sec=args.deepseek_timeout_sec,
+        model_url=args.model_url,
+        model_name=args.model_name,
+        model_timeout_sec=args.model_timeout_sec,
     )
     show_payload = args.show_payload or _env_flag(SHOW_PAYLOAD_ENV)
 

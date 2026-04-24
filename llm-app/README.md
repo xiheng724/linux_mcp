@@ -5,7 +5,7 @@
 它的职责不是直接执行工具，而是：
 
 1. 从 `mcpd` 获取 app/tool 语义目录
-2. 用 DeepSeek 生成一个最小可执行 plan
+2. 调一个 OpenAI 兼容的 Chat Completions 端点生成一个最小可执行 plan（DeepSeek / OpenAI / Groq / Together / OpenRouter / 本地 Ollama 或 vLLM 都行）
 3. 按 plan 顺序执行 1 到 N 个 tool step
 4. 在 step 间传递上一步结果里的标识符或字段
 5. 把每一步 `tool:exec` 请求发给 `mcpd`
@@ -35,7 +35,7 @@ llm-app
 
 1. 调 `{"sys":"list_apps"}`
 2. 调 `{"sys":"list_tools"}`
-3. 用 DeepSeek 先从 catalog 里选出一小组候选 tool
+3. 调模型端点先从 catalog 里选出一小组候选 tool
 4. 再基于候选 tool 生成一个严格 JSON plan
 5. 每个 plan step 选择一个 `tool_id`
 6. 每个 step 先解析 partial payload，再按 schema 补全最终 payload
@@ -47,11 +47,11 @@ llm-app
 
 这意味着当前 `llm-app` 强依赖：
 
-- `DEEPSEEK_API_KEY`
+- 一个 OpenAI 兼容的 Chat Completions 端点（`--model-url`）和对应的 API key（`LLM_API_KEY`，或历史遗留的 `DEEPSEEK_API_KEY`）
 - `mcpd` 正常返回 catalog
 - `mcpd` 能成功签发 session
 
-如果没配置 `DEEPSEEK_API_KEY`，CLI 和 GUI 都会直接失败，不存在本地 fallback 路由。
+如果没配置 API key，CLI 和 GUI 都会直接失败，不存在本地 fallback 路由。
 
 ## 可见字段
 
@@ -114,9 +114,32 @@ REPL 内置命令：
 - `--show-tools`
 - `--show-reasons`
 - `--show-payload`
-- `--deepseek-model ...`
-- `--deepseek-url ...`
-- `--deepseek-timeout-sec ...`
+- `--model-name ...`（历史别名：`--deepseek-model`）
+- `--model-url ...`（历史别名：`--deepseek-url`）
+- `--model-timeout-sec ...`（历史别名：`--deepseek-timeout-sec`）
+
+切换模型提供方的例子：
+
+```bash
+# OpenAI
+export LLM_API_KEY="sk-..."
+python3 llm-app/cli.py --model-url https://api.openai.com/v1/chat/completions \
+                       --model-name gpt-4o-mini --once "show system info"
+
+# Groq (免费额度 + 低延迟)
+export LLM_API_KEY="gsk-..."
+python3 llm-app/cli.py --model-url https://api.groq.com/openai/v1/chat/completions \
+                       --model-name llama-3.3-70b-versatile --once "..."
+
+# 本地 Ollama / vLLM / LM Studio (API key 任意字符串即可)
+export LLM_API_KEY="not-needed"
+python3 llm-app/cli.py --model-url http://localhost:11434/v1/chat/completions \
+                       --model-name llama3.1 --once "..."
+
+# DeepSeek (默认；保持向后兼容)
+export DEEPSEEK_API_KEY="sk-..."
+python3 llm-app/cli.py --once "..."
+```
 
 ## GUI
 
@@ -160,7 +183,7 @@ GUI 和 CLI 使用同一套共享选择逻辑，不是两套不同实现。
 ```bash
 bash scripts/run_tool_services.sh
 bash scripts/run_mcpd.sh
-export DEEPSEEK_API_KEY="your_key"
+export LLM_API_KEY="your_key"    # 或历史遗留的 DEEPSEEK_API_KEY
 ```
 
 如果跑 GUI，还需要 `PySide6`：
@@ -195,7 +218,7 @@ CLI/GUI 在 `dev` 模式下，通常会额外输出：
 
 ## 当前限制
 
-- plan 生成和 step payload 构造都依赖 DeepSeek
+- plan 生成和 step payload 构造都依赖一个 OpenAI 兼容的 Chat Completions 端点
 - 没有离线 fallback
 - 多步执行质量仍然取决于 manifest 语义和模型规划质量
 - `on_empty`、`selector`、`runtime_context` 都是显式执行语义，不会自动推导任意隐含工作流

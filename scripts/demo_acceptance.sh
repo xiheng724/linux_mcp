@@ -52,9 +52,9 @@ echo "[demo] step 6: start mcpd"
 export LINUX_MCP_MCPD_SUDO="${SUDO}"
 ${SUDO} bash scripts/run_mcpd.sh
 
-echo "[demo] step 7: verify DeepSeek API key is configured"
-run_as_user bash -lc 'test -n "${DEEPSEEK_API_KEY:-}"' || {
-  echo "[demo] missing DEEPSEEK_API_KEY"
+echo "[demo] step 7: verify LLM API key is configured"
+run_as_user bash -lc 'test -n "${LLM_API_KEY:-}" -o -n "${DEEPSEEK_API_KEY:-}"' || {
+  echo "[demo] missing LLM API key: set LLM_API_KEY (or legacy DEEPSEEK_API_KEY)"
   exit 1
 }
 

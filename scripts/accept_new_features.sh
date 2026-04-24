@@ -12,7 +12,7 @@
 #   - kernel call_log survives mcpd crash
 #
 # Unlike scripts/demo_acceptance.sh, this path does not invoke llm-app
-# and does not require DEEPSEEK_API_KEY.
+# and does not require an LLM API key (LLM_API_KEY / DEEPSEEK_API_KEY).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

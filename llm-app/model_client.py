@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Shared DeepSeek/model helpers for llm-app."""
+"""Shared helpers for talking to an OpenAI-compatible Chat Completions endpoint.
+
+The HTTP call shape (`POST {base}/chat/completions`, `Bearer` auth, `messages`
+array, `choices[0].message.content`) is the de-facto standard used by OpenAI,
+DeepSeek, Groq, Together, Fireworks, OpenRouter, Mistral, local Ollama/vLLM/
+LM Studio, and many others. As a result this module is provider-agnostic: the
+user picks an endpoint via `--model-url`, a model id via `--model-name`, and an
+API key via `LLM_API_KEY` (or the legacy `DEEPSEEK_API_KEY`).
+"""
 
 from __future__ import annotations
 
@@ -15,15 +23,22 @@ from typing import Any, Dict
 
 from rpc import mcpd_call
 
-DEFAULT_DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
-DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
+DEFAULT_MODEL_URL = os.getenv(
+    "LLM_MODEL_URL",
+    os.getenv("DEEPSEEK_API_URL", "https://api.deepseek.com/chat/completions"),
+)
+DEFAULT_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "deepseek-chat")
+
+# Backward-compatible aliases (older imports reference these names).
+DEFAULT_DEEPSEEK_URL = DEFAULT_MODEL_URL
+DEFAULT_DEEPSEEK_MODEL = DEFAULT_MODEL_NAME
 
 
 @dataclasses.dataclass(frozen=True)
 class SelectorConfig:
-    deepseek_url: str
-    deepseek_model: str
-    deepseek_timeout_sec: int
+    model_url: str
+    model_name: str
+    model_timeout_sec: int
 
 
 @dataclasses.dataclass
@@ -39,9 +54,11 @@ class SessionInfo:
 
 
 def require_api_key() -> str:
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
+    api_key = os.getenv("LLM_API_KEY", "") or os.getenv("DEEPSEEK_API_KEY", "")
     if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not set")
+        raise RuntimeError(
+            "no LLM API key found: set LLM_API_KEY (or legacy DEEPSEEK_API_KEY)"
+        )
     return api_key
 
 
@@ -66,7 +83,7 @@ def call_model(prompt: Dict[str, Any], system_text: str, api_key: str, cfg: Sele
 
 def call_model_text(prompt: Dict[str, Any], system_text: str, api_key: str, cfg: SelectorConfig) -> str:
     req_obj = {
-        "model": cfg.deepseek_model,
+        "model": cfg.model_name,
         "temperature": 0,
         "messages": [
             {"role": "system", "content": system_text},
@@ -75,7 +92,7 @@ def call_model_text(prompt: Dict[str, Any], system_text: str, api_key: str, cfg:
     }
     payload = json.dumps(req_obj, ensure_ascii=True).encode("utf-8")
     req = urllib.request.Request(
-        cfg.deepseek_url,
+        cfg.model_url,
         data=payload,
         headers={
             "Content-Type": "application/json",
@@ -84,22 +101,22 @@ def call_model_text(prompt: Dict[str, Any], system_text: str, api_key: str, cfg:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=cfg.deepseek_timeout_sec) as resp:
+        with urllib.request.urlopen(req, timeout=cfg.model_timeout_sec) as resp:
             raw = resp.read()
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"DeepSeek HTTP {exc.code}: {detail}") from exc
+        raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(f"DeepSeek request failed: {exc}") from exc
+        raise RuntimeError(f"LLM request failed: {exc}") from exc
 
     data = json.loads(raw.decode("utf-8"))
     choices = data.get("choices", [])
     if not isinstance(choices, list) or not choices:
-        raise RuntimeError(f"invalid DeepSeek response, missing choices: {data}")
+        raise RuntimeError(f"invalid LLM response, missing choices: {data}")
     msg = choices[0].get("message", {})
     content = msg.get("content", "")
     if not isinstance(content, str) or not content:
-        raise RuntimeError(f"invalid DeepSeek response content: {data}")
+        raise RuntimeError(f"invalid LLM response content: {data}")
     return content
 
 

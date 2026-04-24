@@ -178,7 +178,7 @@ It loads manifests, computes full SHA-256 semantic hashes, incrementally reconci
 
 ### `llm-app`
 
-`llm-app` provides both CLI and GUI frontends. It talks only to `mcpd` through `list_apps`, `list_tools`, `open_session`, and `tool:exec`. The current planner depends on `DEEPSEEK_API_KEY`.
+`llm-app` provides both CLI and GUI frontends. It talks only to `mcpd` through `list_apps`, `list_tools`, `open_session`, and `tool:exec`. The planner speaks to any OpenAI-compatible `/chat/completions` endpoint — OpenAI, DeepSeek, Groq, Together, OpenRouter, or a local Ollama/vLLM/LM Studio — selected via `--model-url` and `--model-name`; the API key is read from `LLM_API_KEY` (with `DEEPSEEK_API_KEY` accepted as a legacy fallback).
 
 ## Manifest Model
 
@@ -201,7 +201,7 @@ The manifest layer is the semantic source of truth for the system.
 | Build | `bash`, `make`, `gcc`, `python3` |
 | Kernel build | headers for `$(uname -r)` at `/lib/modules/$(uname -r)/build` |
 | Privileges | root for kernel module load/unload; `mcpd` needs `CAP_NET_ADMIN` + `CAP_SYS_PTRACE` (root or systemd `AmbientCapabilities`) |
-| LLM client | `DEEPSEEK_API_KEY` |
+| LLM client | any OpenAI-compatible endpoint; `LLM_API_KEY` (or legacy `DEEPSEEK_API_KEY`) |
 | GUI | `PySide6` |
 
 ### Quick start
@@ -215,9 +215,11 @@ sudo bash scripts/load_module.sh
 make schema-verify
 bash scripts/run_tool_services.sh
 sudo bash scripts/run_mcpd.sh
-export DEEPSEEK_API_KEY="your_key"
+export LLM_API_KEY="your_key"     # or legacy DEEPSEEK_API_KEY
 python3 llm-app/cli.py --once "show system info"
 ```
+
+The planner defaults to DeepSeek's endpoint for backward compatibility; point it elsewhere with `--model-url` + `--model-name` (e.g. `https://api.openai.com/v1/chat/completions` + `gpt-4o-mini`, or a local `http://localhost:11434/v1/chat/completions` + `llama3.1`).
 
 `run_tool_services.sh` will auto-build the bundled native demo binaries on first use if they are missing.
 
@@ -339,7 +341,7 @@ Purpose: reproduce the main userspace / seccomp / kernel comparison.
 Semantic-hash runtime substitution:
 
 ```bash
-export DEEPSEEK_API_KEY="your_key"
+export LLM_API_KEY="your_key"     # or legacy DEEPSEEK_API_KEY
 bash scripts/run_semantic_hash_prompt_injection.sh --output-dir experiment-results/semantic-hash-injection-a
 ```
 
@@ -366,7 +368,7 @@ Purpose: reproduce the supplementary microbenchmark separating bare Generic Netl
 
 ## Limitations
 
-- tool planning and payload construction depend on DeepSeek; there is no offline planner
+- tool planning and payload construction depend on an OpenAI-compatible Chat Completions endpoint (DeepSeek/OpenAI/Groq/Ollama/vLLM/etc.); there is no offline planner
 - kernel policy is a demo policy, not a general authorization framework
 - retained experiment snapshots were captured before `uds_abstract` entered the default demo flow; new runs exercise both `uds_rpc` and `uds_abstract`
 - `vsock_rpc` is a reserved transport name only — the dialer is deliberately not implemented and there is no peer-attestation story yet
@@ -375,15 +377,15 @@ Purpose: reproduce the supplementary microbenchmark separating bare Generic Netl
 
 ## Acceptance Workflow
 
-For the most complete local confidence check (includes an `llm-app` end-to-end call, so requires `DEEPSEEK_API_KEY`):
+For the most complete local confidence check (includes an `llm-app` end-to-end call, so requires `LLM_API_KEY` — or legacy `DEEPSEEK_API_KEY`):
 
 ```bash
 sudo bash scripts/demo_acceptance.sh
 ```
 
-It covers kernel/module lifecycle, tool and `mcpd` startup, DeepSeek-key validation, a small end-to-end CLI flow, sysfs inspection, shutdown, and reload validation.
+It covers kernel/module lifecycle, tool and `mcpd` startup, LLM-key validation, a small end-to-end CLI flow, sysfs inspection, shutdown, and reload validation.
 
-For the control-plane / runtime-hardening regressions on their own (no DeepSeek key, no planner; 14 focused steps):
+For the control-plane / runtime-hardening regressions on their own (no LLM key, no planner; 14 focused steps):
 
 ```bash
 sudo bash scripts/accept_new_features.sh
