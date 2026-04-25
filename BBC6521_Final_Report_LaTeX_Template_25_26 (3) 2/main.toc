@@ -19,7 +19,7 @@
 \contentsline {subsection}{\numberline {3.3}Control-Plane Workflow}{16}{subsection.3.3}%
 \contentsline {subsection}{\numberline {3.4}Wire Protocols}{18}{subsection.3.4}%
 \contentsline {paragraph}{llm-app to mcpd.}{18}{paragraph*.6}%
-\contentsline {paragraph}{mcpd to tool-app.}{19}{paragraph*.7}%
+\contentsline {paragraph}{mcpd to tool-app.}{18}{paragraph*.7}%
 \contentsline {paragraph}{mcpd to kernel\_mcp (Generic Netlink).}{19}{paragraph*.8}%
 \contentsline {paragraph}{Tool registration via manifests.}{20}{paragraph*.9}%
 \contentsline {subsection}{\numberline {3.5}Manifest Semantics and Tool Identity}{21}{subsection.3.5}%

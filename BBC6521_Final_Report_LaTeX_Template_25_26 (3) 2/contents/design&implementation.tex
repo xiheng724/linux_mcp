@@ -1,3 +1,4 @@
+% !TEX root = ../main.tex
 \section*{Chapter 3: Design and Implementation}
 \phantomsection \label{chap:design} \setcounter{section}{3} \setcounter{subsection}{0}
 \addcontentsline{toc}{section}{\textit{Chapter 3: Design and Implementation}}
@@ -57,9 +58,6 @@ The module does not parse manifests, execute tools, or implement a policy langua
 When a request is admitted, \texttt{mcpd} forwards the payload to the appropriate tool service, which executes in an ordinary user-space environment and returns its result to \texttt{mcpd}, which then reports completion back to the kernel.
 The directory \texttt{tool-app/\allowbreak manifests/} is the authoritative source of tool identity: \texttt{mcpd} reads manifests from here, hashes them, and registers the resulting digests with the kernel.
 
-The four components communicate over three transport channels.
-\texttt{llm-app} talks to \texttt{mcpd} via JSON-RPC over a Unix domain socket at \texttt{/\allowbreak tmp/\allowbreak mcpd.sock}; \texttt{mcpd} talks to \texttt{kernel\_\allowbreak mcp} via Generic Netlink on the \texttt{KERNEL\_\allowbreak MCP} family; and \texttt{mcpd} forwards admitted invocations to tool services over per-service Unix domain sockets under \texttt{/\allowbreak tmp/\allowbreak linux-mcp-apps/}.
-Kernel-held state is additionally exposed read-only via \texttt{sysfs} under \texttt{/\allowbreak sys/\allowbreak kernel/\allowbreak mcp/}, the only channel that does not require a live \texttt{mcpd}.
 
 To clarify the separation of responsibilities across layers, Table~\ref{tab:architecture_layers} summarises each component together with its intended scope and explicitly excluded functionality.
 
