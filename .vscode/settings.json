@@ -3,6 +3,10 @@
     {
       "name": "xelatex → bibtex → xelatex×2",
       "tools": ["xelatex", "bibtex", "xelatex", "xelatex"]
+    },
+    {
+      "name": "xelatex",
+      "tools": ["xelatex"]
     }
   ],
   "latex-workshop.latex.recipe.default": "xelatex → bibtex → xelatex×2",
