@@ -48,6 +48,7 @@
 /* BINDING */
 #define KERNEL_MCP_REASON_BINDING_MISMATCH         "binding_mismatch"
 #define KERNEL_MCP_REASON_CATALOG_STALE            "catalog_stale_rebind_required"
+#define KERNEL_MCP_REASON_PEER_CRED_MISMATCH       "peer_cred_mismatch"
 
 /* TICKET */
 #define KERNEL_MCP_REASON_TICKET_PENDING           "approval_pending"

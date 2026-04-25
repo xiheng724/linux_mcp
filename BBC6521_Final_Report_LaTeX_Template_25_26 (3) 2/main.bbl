@@ -201,11 +201,6 @@ Brimhall B, Garrard J, de~la Garza C, Coffman J.
 \newblock A Comparative Analysis of {Linux} Mandatory Access Control Policy Enforcement Mechanisms.
 \newblock In: Proceedings of the 16th European Workshop on System Security ({EuroSec}); 2023. .
 
-\bibitem{stevens2013unix}
-Stevens WR, Rago SA.
-\newblock Advanced Programming in the {UNIX} Environment.
-\newblock 3rd ed. Addison-Wesley; 2013.
-
 \bibitem{bishop2003computer}
 Bishop M.
 \newblock Computer Security: Art and Science.
@@ -215,6 +210,11 @@ Bishop M.
 Lee Y, Min C, Lee B.
 \newblock {ExpRace}: Exploiting Kernel Races through Raising Interrupts.
 \newblock In: Proceedings of the 30th {USENIX} Security Symposium. Vancouver, BC; 2021. p. 2363-80.
+
+\bibitem{stevens2013unix}
+Stevens WR, Rago SA.
+\newblock Advanced Programming in the {UNIX} Environment.
+\newblock 3rd ed. Addison-Wesley; 2013.
 
 \bibitem{klein2010sel4}
 Klein G, Andronick J, Elphinstone K, Heiser G, Cock D, Derrin P, et~al.

@@ -21,55 +21,54 @@
 \contentsline {paragraph}{llm-app to mcpd.}{18}{paragraph*.6}%
 \contentsline {paragraph}{mcpd to tool-app.}{18}{paragraph*.7}%
 \contentsline {paragraph}{mcpd to kernel\_mcp (Generic Netlink).}{19}{paragraph*.8}%
-\contentsline {paragraph}{Tool registration via manifests.}{20}{paragraph*.9}%
-\contentsline {subsection}{\numberline {3.5}Manifest Semantics and Tool Identity}{21}{subsection.3.5}%
-\contentsline {subsection}{\numberline {3.6}Session Management and Approval Binding}{22}{subsection.3.6}%
-\contentsline {paragraph}{Catalog-epoch rebind on manifest change.}{22}{paragraph*.10}%
+\contentsline {paragraph}{Tool registration via manifests.}{19}{paragraph*.9}%
+\contentsline {subsection}{\numberline {3.5}Manifest Semantics and Tool Identity}{20}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Session Management and Approval Binding}{21}{subsection.3.6}%
+\contentsline {paragraph}{Catalog-epoch rebind on manifest change.}{21}{paragraph*.10}%
 \contentsline {subsection}{\numberline {3.7}Kernel Module Design}{23}{subsection.3.7}%
 \contentsline {paragraph}{Trust-on-first-use backend binary pinning.}{24}{paragraph*.11}%
-\contentsline {paragraph}{Kernel-resident call log.}{25}{paragraph*.12}%
-\contentsline {paragraph}{Sysfs surface.}{25}{paragraph*.13}%
+\contentsline {paragraph}{Kernel-resident call log.}{24}{paragraph*.12}%
+\contentsline {paragraph}{Sysfs surface.}{24}{paragraph*.13}%
 \contentsline {subsection}{\numberline {3.8}Daemon Implementation}{25}{subsection.3.8}%
 \contentsline {paragraph}{Kernel state reconciliation.}{25}{paragraph*.14}%
-\contentsline {paragraph}{Probe-failure fail-closed.}{26}{paragraph*.15}%
-\contentsline {paragraph}{Netlink client.}{26}{paragraph*.16}%
+\contentsline {paragraph}{Probe-failure fail-closed.}{25}{paragraph*.15}%
+\contentsline {paragraph}{Netlink client.}{25}{paragraph*.16}%
 \contentsline {paragraph}{Deployment and fail-closed configuration.}{26}{paragraph*.17}%
-\contentsline {subsection}{\numberline {3.9}State Reconciliation and Recovery}{27}{subsection.3.9}%
-\contentsline {subsection}{\numberline {3.10}Rationale for the Kernel--User-Space Split}{28}{subsection.3.10}%
-\contentsline {subsection}{\numberline {3.11}Simplifications and Optimisation Opportunities}{28}{subsection.3.11}%
-\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{30}{subsection.3.11}%
-\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{30}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{35}{subsection.4.2}%
-\contentsline {subsection}{\numberline {4.3}Registry Scaling}{36}{subsection.4.3}%
-\contentsline {subsection}{\numberline {4.4}Security Evaluation}{37}{subsection.4.4}%
-\contentsline {subsection}{\numberline {4.5}Extended Threat Model}{40}{subsection.4.5}%
-\contentsline {paragraph}{TOCTOU on the approval window.}{40}{paragraph*.19}%
-\contentsline {paragraph}{Cross-UID session hijack.}{40}{paragraph*.20}%
-\contentsline {paragraph}{Generic Netlink dumb fuzzer.}{41}{paragraph*.21}%
-\contentsline {subsection}{\numberline {4.6}Daemon Failure and Recovery}{41}{subsection.4.6}%
-\contentsline {subsection}{\numberline {4.7}Discussion}{42}{subsection.4.7}%
-\contentsline {subsection}{\numberline {4.8}Threats to Validity}{43}{subsection.4.8}%
-\contentsline {section}{\textit {Chapter 5: Conclusion and Further Work}}{44}{section*.22}%
-\contentsline {subsection}{\numberline {5.1}Conclusion}{44}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Reflection}{45}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Further Work}{46}{subsection.5.3}%
-\contentsline {section}{\textit {References}}{48}{subsection.5.3}%
-\contentsline {section}{\textit {Acknowledgment}}{52}{section*.23}%
-\contentsline {section}{\textit {Appendices}}{53}{section*.24}%
-\contentsline {subsection}{Disclaimer}{53}{section*.25}%
-\contentsline {subsection}{Acknowledgement of using Generative AI}{54}{section*.26}%
-\contentsline {subsection}{Project specification}{55}{section*.27}%
-\contentsline {subsection}{Early-term progress report}{62}{section*.28}%
-\contentsline {subsection}{Mid-term progress report}{69}{section*.29}%
-\contentsline {subsection}{Supervision log}{76}{section*.30}%
-\contentsline {subsection}{Additional Appendices}{79}{section*.31}%
-\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{79}{section*.32}%
-\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{79}{paragraph*.33}%
-\contentsline {paragraph}{mcpd to tool-app message schema.}{79}{paragraph*.34}%
-\contentsline {paragraph}{Complete Netlink attribute encoding.}{80}{paragraph*.35}%
-\contentsline {paragraph}{Semantic hash computation.}{82}{paragraph*.36}%
-\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{85}{section*.37}%
-\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{85}{section*.38}%
-\contentsline {paragraph}{Noise-floor command: \texttt {KERNEL\_MCP\_CMD\_NOOP}.}{85}{paragraph*.39}%
-\contentsline {paragraph}{Peer-credential enforcement: \texttt {require\_peer\_cred}.}{86}{paragraph*.40}%
-\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{89}{section*.41}%
+\contentsline {subsection}{\numberline {3.9}State Reconciliation and Recovery}{26}{subsection.3.9}%
+\contentsline {subsection}{\numberline {3.10}Rationale for the Kernel--User-Space Split}{27}{subsection.3.10}%
+\contentsline {section}{\textit {Chapter 4: Results and Discussion}}{28}{subsection.3.10}%
+\contentsline {subsection}{\numberline {4.1}Latency and Control-Plane Overhead}{28}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Throughput and Scalability}{33}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Registry Scaling}{34}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Security Evaluation}{36}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Extended Threat Model}{38}{subsection.4.5}%
+\contentsline {paragraph}{TOCTOU on the approval window.}{38}{paragraph*.19}%
+\contentsline {paragraph}{Cross-UID session hijack.}{38}{paragraph*.20}%
+\contentsline {paragraph}{Generic Netlink dumb fuzzer.}{39}{paragraph*.21}%
+\contentsline {subsection}{\numberline {4.6}Daemon Failure and Recovery}{40}{subsection.4.6}%
+\contentsline {subsection}{\numberline {4.7}Discussion}{40}{subsection.4.7}%
+\contentsline {subsection}{\numberline {4.8}Threats to Validity}{41}{subsection.4.8}%
+\contentsline {section}{\textit {Chapter 5: Conclusion and Further Work}}{42}{section*.22}%
+\contentsline {subsection}{\numberline {5.1}Conclusion}{42}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Reflection}{43}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Further Work}{44}{subsection.5.3}%
+\contentsline {section}{\textit {References}}{46}{subsection.5.3}%
+\contentsline {section}{\textit {Acknowledgment}}{50}{section*.23}%
+\contentsline {section}{\textit {Appendices}}{51}{section*.24}%
+\contentsline {subsection}{Disclaimer}{51}{section*.25}%
+\contentsline {subsection}{Acknowledgement of using Generative AI}{52}{section*.26}%
+\contentsline {subsection}{Project specification}{53}{section*.27}%
+\contentsline {subsection}{Early-term progress report}{60}{section*.28}%
+\contentsline {subsection}{Mid-term progress report}{67}{section*.29}%
+\contentsline {subsection}{Supervision log}{74}{section*.30}%
+\contentsline {subsection}{Additional Appendices}{77}{section*.31}%
+\contentsline {subsubsection}{A.1\hskip 1em\relax Wire Protocol Reference}{77}{section*.32}%
+\contentsline {paragraph}{Complete llm-app to mcpd message reference.}{77}{paragraph*.33}%
+\contentsline {paragraph}{mcpd to tool-app message schema.}{77}{paragraph*.34}%
+\contentsline {paragraph}{Complete Netlink attribute encoding.}{78}{paragraph*.35}%
+\contentsline {paragraph}{Semantic hash computation.}{80}{paragraph*.36}%
+\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{83}{section*.37}%
+\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{83}{section*.38}%
+\contentsline {paragraph}{Noise-floor command: \texttt {KERNEL\_MCP\_CMD\_NOOP}.}{83}{paragraph*.39}%
+\contentsline {paragraph}{Peer-credential enforcement: \texttt {require\_peer\_cred}.}{84}{paragraph*.40}%
+\contentsline {section}{\textit {Risk and Environmental Impact Assessment}}{87}{section*.41}%

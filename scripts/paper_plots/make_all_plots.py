@@ -286,9 +286,15 @@ def plot_latency_panel() -> None:
         {"small": "100 B", "medium": "10 KiB", "large": "1 MiB"}
     )
 
-    fig, axes = plt.subplots(2, 2)
-    ax_mean, ax_p95 = axes[0, 0], axes[0, 1]
-    ax_ratio, ax_break = axes[1, 0], axes[1, 1]
+    fig = plt.figure()
+    gs = fig.add_gridspec(2, 2)
+    ax_mean = fig.add_subplot(gs[0, 0])
+    ax_p95 = fig.add_subplot(gs[0, 1])
+    ax_ratio = fig.add_subplot(gs[1, 0])
+    # Bottom-right cell is subdivided into 3 sub-axes (one per payload) for the
+    # per-payload stage stack that replaces the old cross-payload zoom.
+    gs_break = gs[1, 1].subgridspec(1, 3, wspace=0.65)
+    ax_breaks = [fig.add_subplot(gs_break[0, i]) for i in range(3)]
 
     x = np.arange(len(PAYLOADS))
     width = 0.26
@@ -342,52 +348,108 @@ def plot_latency_panel() -> None:
         for xi, r, eh in zip(x, ratio, err_hi):
             ax_ratio.text(xi + offset, r + eh + 0.01, f"{r:.2f}", ha="center", va="bottom", fontsize=6.5)
     ax_ratio.axhline(1.0, color="black", lw=0.6, ls="--")
-    ax_ratio.text(-0.05, 1.0, "parity", transform=ax_ratio.get_yaxis_transform(),
-                  ha="right", va="center", fontsize=7, color="#555555")
+    # Place "parity" label inside the plot, anchored to the right edge in axes
+    # coordinates and just above the dashed line. Right edge is empty (the 1 MiB
+    # kernel bar dips to ~0.97, well below). Avoids the y-axis label on the
+    # left, the subplot title at the top, and any data bars.
+    ax_ratio.text(0.985, 0.32, "parity", transform=ax_ratio.transAxes,
+                  ha="right", va="bottom", fontsize=6.5, color="#555555")
     ax_ratio.set_xticks(x); ax_ratio.set_xticklabels(PAYLOADS)
     ax_ratio.set_ylabel("mean-latency ratio")
     ax_ratio.set_ylim(0.88, 1.42)
     ax_ratio.set_title("(c) overhead ratio vs userspace", loc="left", fontsize=9, pad=3)
     ax_ratio.legend(loc="upper left", fontsize=7)
 
-    # (d) control-plane stage zoom (session_lookup + arbitration), linear μs
-    stages_zoom = ["session_lookup", "arbitration"]
-    xz = np.arange(len(stages_zoom))
-    for i, sysname in enumerate(SYSTEMS):
-        sub = b[b["system"] == sysname].set_index("payload_label_disp").loc[PAYLOADS]
-        vals_us = np.array([sub[f"{stage}_ms"].mean() * 1000.0 for stage in stages_zoom])
-        st = SYS_STYLE[sysname]
-        ax_break.bar(
-            xz + offsets[i - 1], vals_us, width=width,
-            facecolor=st["face"], edgecolor=st["edge"], hatch=st["hatch"],
-            linewidth=0.7,
+    # (d) per-payload stage stack — 3 sub-axes (one per payload), each showing
+    # 3 stacked bars (us/sc/kr) decomposed into session_lookup + arbitration +
+    # tool_exec. Linear y, auto-scaled per subplot, so the small-payload regime
+    # exposes the control-plane-vs-tool_exec ratio while the 1 MiB regime shows
+    # tool execution dwarfing everything else.
+    STAGE_ORDER = ["session_lookup", "arbitration", "tool_exec"]
+    STAGE_FACE = {
+        "session_lookup": "#e6e6e6",
+        "arbitration":    "#888888",
+        "tool_exec":      "#2d2d2d",
+    }
+    STAGE_HATCH = {
+        "session_lookup": "...",
+        "arbitration":    "///",
+        "tool_exec":      "",
+    }
+    STAGE_LABEL = {
+        "session_lookup": "session lookup",
+        "arbitration":    "arbitration",
+        "tool_exec":      "tool exec",
+    }
+    sys_short = {"userspace": "us", "seccomp": "sc", "kernel": "kr"}
+    sub_x = np.arange(len(SYSTEMS))
+    sub_w = 0.62
+    for pi, payload in enumerate(PAYLOADS):
+        ax = ax_breaks[pi]
+        rows = b[b["payload_label_disp"] == payload].set_index("system").loc[SYSTEMS]
+        # ms -> μs
+        stage_us = {st: rows[f"{st}_ms"].values * 1000.0 for st in STAGE_ORDER}
+        bottoms = np.zeros(len(SYSTEMS))
+        for st in STAGE_ORDER:
+            heights = stage_us[st]
+            ax.bar(
+                sub_x, heights, bottom=bottoms, width=sub_w,
+                facecolor=STAGE_FACE[st], edgecolor="black",
+                hatch=STAGE_HATCH[st], linewidth=0.5,
+            )
+            bottoms += heights
+        # Annotate kernel arbitration (the differentiator) above the kernel bar.
+        kernel_arb_us = stage_us["arbitration"][SYSTEMS.index("kernel")]
+        userspace_arb_us = stage_us["arbitration"][SYSTEMS.index("userspace")]
+        total_max = bottoms.max()
+        kr_top = bottoms[SYSTEMS.index("kernel")]
+        ax.text(
+            SYSTEMS.index("kernel"), kr_top + total_max * 0.03,
+            f"arb {kernel_arb_us:.0f}μs",
+            ha="center", va="bottom", fontsize=5.8, color="black",
         )
-        for xi, v in zip(xz, vals_us):
-            ax_break.text(xi + offsets[i - 1], v + 0.25, f"{v:.1f}", ha="center", va="bottom", fontsize=6.5)
-    ax_break.set_xticks(xz); ax_break.set_xticklabels(stages_zoom)
-    ax_break.set_ylabel("control-plane stage (μs, linear)")
-    arb_k = b[b["system"] == "kernel"]["arbitration_ms"].mean() * 1000
-    arb_u = b[b["system"] == "userspace"]["arbitration_ms"].mean() * 1000
-    ax_break.text(
-        0.98, 0.95,
-        f"kernel arbitration adds\n+{arb_k - arb_u:.1f} μs over userspace",
-        transform=ax_break.transAxes, fontsize=7, ha="right", va="top",
-        bbox=dict(facecolor="white", edgecolor="#888888", lw=0.4, pad=2.5),
+        ax.set_xticks(sub_x)
+        ax.set_xticklabels([sys_short[s] for s in SYSTEMS], fontsize=7)
+        ax.set_ylim(0, total_max * 1.22)
+        if pi == 0:
+            ax.set_ylabel("μs", fontsize=8)
+            ax.set_title(f"(d) {payload}", loc="left", fontsize=9, pad=3)
+        else:
+            ax.set_title(payload, loc="left", fontsize=8, pad=3)
+        ax.tick_params(axis="y", labelsize=6.5)
+    # Stage legend lives below the row of three subplots so it doesn't collide
+    # with per-bar annotations or with the bars themselves at 1 MiB.
+    stage_handles = [
+        Patch(facecolor=STAGE_FACE[st], edgecolor="black",
+              hatch=STAGE_HATCH[st], label=STAGE_LABEL[st])
+        for st in STAGE_ORDER
+    ]
+    # Push the stage legend well below the subplot row by adding bottom margin.
+    fig.subplots_adjust(bottom=0.14)
+    fig.legend(
+        handles=stage_handles, loc="lower center",
+        bbox_to_anchor=(0.5, 0.005), ncol=3, fontsize=8,
+        frameon=False, handlelength=1.6, handletextpad=0.5, columnspacing=2.4,
+        title="panel (d) stages", title_fontsize=7.5,
     )
-    ax_break.set_ylim(0, max(arb_k * 1.45, 40))
-    ax_break.set_title("(d) control-plane stage breakdown", loc="left", fontsize=9, pad=3)
 
     handles = [
         Patch(facecolor=SYS_STYLE[s2]["face"], edgecolor="black",
               hatch=SYS_STYLE[s2]["hatch"], label=s2)
         for s2 in SYSTEMS
     ]
-    fig.legend(handles=handles, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.02),
+    fig.legend(handles=handles, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.04),
                frameon=False, fontsize=8)
-    fig.supxlabel("payload size (panels a–c) / stage (panel d); error bars: 95% CI, $n=30$",
-                  fontsize=7.5, y=-0.02)
+    # supxlabel intentionally omitted — n=30 / error-bar info lives in the LaTeX caption.
 
-    save(fig, "figure_latency_panel.pdf", w=6.8, h=5.2)
+    # Inline save (bypassing the tight_layout in save()) so subplots_adjust(bottom=0.14)
+    # holds and the panel-d stage legend has clean room below the subplot row.
+    fig.set_size_inches(7.6, 6.0)
+    out_pdf = FIG_DIR / "figure_latency_panel.pdf"
+    fig.savefig(out_pdf, bbox_inches="tight", pad_inches=0.04)
+    fig.savefig(out_pdf.with_suffix(".png"), bbox_inches="tight", pad_inches=0.04)
+    plt.close(fig)
+    print(f"  wrote {out_pdf.name}")
 
 
 # ---------- 5. Latency ECDF (new, not referenced by paper but useful) ----------
@@ -691,10 +753,13 @@ def plot_ablation_stage_delta() -> None:
             )
 
     ax.axhline(full_kernel_us, color="black", ls="--", lw=0.6)
+    # Place the dashed-line label at the FAR LEFT of the chart (above the noop
+    # floor bar) so it cannot collide with the per-stage "+X.XX μs" annotation
+    # that sits at the top of the rightmost waterfall bar (reply-skb).
     ax.text(
-        len(stages) - 0.6, full_kernel_us + 0.15,
+        -0.45, full_kernel_us + 0.18,
         f"full kernel RTT $\\approx$ {full_kernel_us:.2f} μs",
-        ha="right", va="bottom", fontsize=7, color="black",
+        ha="left", va="bottom", fontsize=7, color="black",
     )
     ax.text(
         1.5, noop_us / 2.0,

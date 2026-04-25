@@ -15,7 +15,7 @@ Semantic parsing and tool execution stay in user space; the kernel module holds 
 This design requires no modification to existing tools beyond a declarative JSON manifest, and makes approval state durable across daemon failure and protected from unprivileged user-space interference.
 
 We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened seccomp variant, looking at both performance and behavior under attack and after daemon failure.
-The kernel module blocks every attack in the test suite, while the user-space and seccomp baselines leave bypass rates of 90.9\% and 36.4\%; an extended-attack rerun surfaced a missing peer-credential check in the stock module, closed by a six-line patch at no measurable latency cost.
+The kernel module blocks every attack in the test suite, while the user-space and seccomp baselines leave bypass rates of 84.6\% and 38.5\%; an extended-attack rerun surfaced a missing peer-credential check in the stock module, closed by a six-line patch at no measurable latency cost.
 Performance overhead is small: latency is within measurement noise at small and medium payloads and about 3.4\% lower at 1~MB, and a paired microbenchmark attributes only \num{4.334}~$\mu$s to the full kernel arbitration path above the measured Netlink noise floor.
 The prototype supports 43 tools across 14 applications and is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
 
