@@ -645,28 +645,34 @@ def plot_registry_register_curve() -> None:
     print("registry register curve...")
     s = pd.read_csv(REG / "registry_scaling_summary.csv").sort_values("N")
     N = s["N"].values.astype(float)
+    total_ms = s["register_total_ms_avg"].values
     cost_us = s["register_per_tool_us_avg"].values
     err_us = s["register_per_tool_us_ci95"].values
 
-    def model(N, a, b):
-        return a / N + b
-
-    A = np.vstack([1.0 / N, np.ones_like(N)]).T
-    ab, *_ = np.linalg.lstsq(A, cost_us, rcond=None)
-    a_fit, b_fit = ab
-    Ns = np.logspace(np.log10(N.min()), np.log10(N.max()), 120)
-    fit_vals = model(Ns, a_fit, b_fit)
+    # Asymptotic per-tool cost = slope of the linear fit total_ms = a + b*N
+    # (§4.3 in the paper). We do not draw the curve a/N+b on the per-tool view
+    # because the OLS-derived intercept a is slightly negative (an artefact of
+    # the fit being dominated by large-N residuals where total_ms is in the
+    # millisecond range); rendered as a/N+b it would approach the asymptote
+    # from BELOW while the data approaches from ABOVE, which is misleading.
+    # The horizontal asymptote line conveys b directly without that pitfall.
+    b_ms_per_tool, _ = np.polyfit(N, total_ms, 1)
+    b_us = b_ms_per_tool * 1000.0
 
     fig, ax = plt.subplots()
     ax.errorbar(
         N, cost_us, yerr=err_us,
         fmt="o", color="black", mfc="#2d2d2d", mec="black",
-        capsize=2, capthick=0.6, elinewidth=0.6, lw=0, label="measured",
+        capsize=2, capthick=0.6, elinewidth=0.6, lw=0, label="measured per-tool cost",
     )
-    ax.plot(Ns, fit_vals, color="black", lw=1.0, ls="-", label=f"fit $a/N+b$, $b={b_fit:.2f}$ μs")
-    ax.axhline(b_fit, color="#555555", ls=":", lw=0.7, label=f"asymptote $b={b_fit:.2f}$ μs")
+    ax.axhline(b_us, color="#555555", ls="--", lw=0.8,
+               label=f"asymptote $b = {b_us:.3f}$ μs (slope of total-time fit, §4.3)")
 
     ax.set_xscale("log", base=2)
+    # Auto-y bounds; the data sits within a tight band around the asymptote.
+    y_lo = max(0, cost_us.min() - 0.6)
+    y_hi = cost_us.max() + 0.6
+    ax.set_ylim(y_lo, y_hi)
     ax.set_xlabel("N (registered tools)")
     ax.set_ylabel("per-tool register cost (μs)")
     ax.legend(loc="upper right")
@@ -675,38 +681,64 @@ def plot_registry_register_curve() -> None:
 
 # ---------- 9. Kernel ablation: per-mode full RTT, log-y ----------
 def plot_ablation_mean_rtt() -> None:
-    print("ablation mean rtt...")
+    print("ablation median rtt...")
+    # The paper text refers to MEDIANS (p50_ms), not means, and includes the
+    # NOOP floor as the leftmost bar so the "kernel arbitration adds 4.334 μs
+    # above NOOP floor" claim is visually verifiable.
     m = pd.read_csv(ABL / "kernel_ablation_mode_summary.csv")
-    order = ["full", "skip_lookups", "ticket_trigger_full", "ticket_trigger_skip", "skip_hash", "skip_binding"]
-    m = m.set_index("mode").loc[order].reset_index()
+    noop = pd.read_csv(ABL / "kernel_ablation_noop.csv")
+    combined = pd.concat([noop, m], ignore_index=True)
+    order = ["noop", "full", "skip_lookups", "ticket_trigger_full",
+             "ticket_trigger_skip", "skip_hash", "skip_binding"]
+    combined = combined.set_index("mode").loc[order].reset_index()
     fig, ax = plt.subplots()
     x = np.arange(len(order))
-    vals = m["avg_ms"].values * 1000.0
-    ci = m["ci95_ms"].values * 1000.0
+    # Use medians (p50_ms) to match the paper text and to be robust to outliers
+    # — the raw mean has a few-millisecond tail from the VMware guest.
+    vals = combined["p50_ms"].values * 1000.0
+    # CI95 columns describe the mean, not the median; for the median we omit
+    # error bars (consistent with the report's "medians on a single axis").
     face = [
-        "#2d2d2d" if mode == "full" or mode == "ticket_trigger_full"
+        "#888888" if mode == "noop"
+        else "#2d2d2d" if mode in ("full", "ticket_trigger_full")
         else "#b8b8b8" if mode.startswith("ticket")
         else "#ffffff"
         for mode in order
     ]
-    for xi, v, e, fc in zip(x, vals, ci, face):
+    for xi, v, fc in zip(x, vals, face):
         ax.bar(
-            xi, v, yerr=e, width=0.6,
+            xi, v, width=0.6,
             facecolor=fc, edgecolor="black", linewidth=0.7,
-            error_kw={"elinewidth": 0.7, "capsize": 2, "capthick": 0.7, "ecolor": "black"},
         )
-        ax.text(xi, v + e + 0.2, f"{v:.2f}", ha="center", va="bottom", fontsize=7)
+        ax.text(xi, v + 0.15, f"{v:.3f}", ha="center", va="bottom", fontsize=7)
+    # NOOP floor reference line + delta annotation: visualises the
+    # "kernel arbitration adds 4.334 μs above NOOP floor" claim from §4.1.
+    noop_us = combined.loc[combined["mode"] == "noop", "p50_ms"].iloc[0] * 1000.0
+    full_us = combined.loc[combined["mode"] == "full", "p50_ms"].iloc[0] * 1000.0
+    ax.axhline(noop_us, color="#888888", ls=":", lw=0.6)
+    ax.text(
+        len(order) - 0.4, noop_us + 0.15,
+        f"NOOP floor = {noop_us:.3f} μs",
+        ha="right", va="bottom", fontsize=6.5, color="#666666",
+    )
+    ax.annotate(
+        f"+{full_us - noop_us:.3f} μs\n(arbitration)",
+        xy=(1, full_us), xytext=(1, full_us + 1.6),
+        ha="center", va="bottom", fontsize=6.5, color="#222222",
+        arrowprops=dict(arrowstyle="-[, widthB=1.0", lw=0.6, color="#444444"),
+    )
     ax.set_xticks(x)
     ax.set_xticklabels(order, rotation=25, ha="right")
-    ax.set_ylabel("mean RTT (μs)")
+    ax.set_ylabel("median RTT (μs)")
     ax.set_xlabel("ablation mode (lower = cheaper kernel path)")
-    ax.set_ylim(0, max(vals + ci) * 1.25)
+    ax.set_ylim(0, max(vals) * 1.30)
     legend_patches = [
+        Patch(facecolor="#888888", edgecolor="black", label="NOOP floor (Generic Netlink only)"),
         Patch(facecolor="#2d2d2d", edgecolor="black", label="baseline (no skip)"),
         Patch(facecolor="#b8b8b8", edgecolor="black", label="ticket-path baseline"),
         Patch(facecolor="#ffffff", edgecolor="black", label="skip variants"),
     ]
-    ax.legend(handles=legend_patches, loc="upper right", ncol=1)
+    ax.legend(handles=legend_patches, loc="upper right", ncol=1, fontsize=6.5)
     save(fig, "figure_ablation_mean_rtt.pdf")
 
 
@@ -892,48 +924,110 @@ def plot_fuzz_errno() -> None:
 
 # ---------- 13. E4 peer-credential A/B (new aux) ----------
 def plot_e4_peer_cred() -> None:
+    """E4 cross-UID A/B comparison.
+
+    Two-panel stacked bars: each panel n=500 attempts, partitioned by sub_case
+    (blind / guessed / leaked) and coloured by outcome (binding_mismatch /
+    ALLOW / peer_cred_mismatch). Left panel is the stock binary (which lets
+    174 'leaked' attacks reach tool execution); right panel is with the patch
+    enabled (all 500 blocked at the new peer-cred check). Footer reports the
+    DENY median latency to make the 'no measurable cost' claim visible.
+    """
     print("E4 peer-cred A/B...")
-    with_patch = pd.read_csv(ATK / "crossuid_result_with_patch.csv")
-    without = pd.read_csv(ATK / "crossuid_result_without_patch.csv")
-    fig, ax = plt.subplots()
-    for label, df, ls in [
-        ("without patch (pre-E4 module)", without, "--"),
-        ("with six-line peer_cred patch", with_patch, "-"),
-    ]:
-        vals = np.sort(df["latency_ms"].values * 1000.0)
-        y = np.arange(1, len(vals) + 1) / len(vals)
-        ax.step(vals, y, where="post", lw=1.1, color="black", ls=ls, label=label)
-    ax.set_xscale("log")
-    ax.set_xlim(1, 200)
-    ax.set_ylim(0, 1.02)
-    ax.set_xlabel("cross-UID attack latency (μs, log scale)")
-    ax.set_ylabel("ECDF")
-    ax.legend(loc="lower right")
+    no_p  = pd.read_csv(ATK / "crossuid_result_without_patch.csv")
+    yes_p = pd.read_csv(ATK / "crossuid_result_with_patch.csv")
 
-    def leak_frac(df):
-        n = len(df)
-        leaked = int((df["outcome"] != "blocked").sum())
-        return leaked, n
+    SUBCASES = ["blind", "guessed", "leaked"]
+    SUBCASE_LABELS = {
+        "blind":   "blind\n(binding=0)",
+        "guessed": "guessed\n(random binding)",
+        "leaked":  "leaked\n(correct binding)",
+    }
+    STYLE = {
+        "allow":              {"face": "#e63946", "hatch": "xxx"},
+        "binding_mismatch":   {"face": "#dddddd", "hatch": "//"},
+        "peer_cred_mismatch": {"face": "#666666", "hatch": ""},
+    }
 
-    leaked_w, n_w = leak_frac(without)
-    leaked_p, n_p = leak_frac(with_patch)
-    reasons_without = without["reason"].value_counts()
-    reasons_with = with_patch["reason"].value_counts()
-    top_without = reasons_without.index[0] if not reasons_without.empty else "n/a"
-    top_with = reasons_with.index[0] if not reasons_with.empty else "n/a"
-    note = (
-        f"both variants block all attempts:\n"
-        f"  without patch {n_w - leaked_w}/{n_w} blocked, rejection reason '{top_without}'\n"
-        f"  with    patch {n_p - leaked_p}/{n_p} blocked, rejection reason '{top_with}'\n"
-        "the six-line change shifts the reject path from a binding check to an OS-level peer-cred check\n"
-        "at no measurable latency cost"
+    def stack_for(df, sub):
+        sub_df = df[df["sub_case"] == sub]
+        return {r: int((sub_df["reason"] == r).sum())
+                for r in ("allow", "binding_mismatch", "peer_cred_mismatch")}
+
+    left_counts  = {s: stack_for(no_p,  s) for s in SUBCASES}
+    right_counts = {s: stack_for(yes_p, s) for s in SUBCASES}
+
+    fig, (axL, axR) = plt.subplots(1, 2, sharey=True, gridspec_kw={"wspace": 0.10})
+    x = np.arange(len(SUBCASES))
+    bar_w = 0.55
+
+    def draw_panel(ax, counts, title):
+        for i, sub in enumerate(SUBCASES):
+            c = counts[sub]
+            bottom = 0
+            for r in ("binding_mismatch", "allow", "peer_cred_mismatch"):
+                v = c.get(r, 0)
+                if v == 0:
+                    continue
+                ax.bar(i, v, bar_w, bottom=bottom,
+                       facecolor=STYLE[r]["face"], edgecolor="black",
+                       hatch=STYLE[r]["hatch"], linewidth=0.6)
+                ax.text(i, bottom + v / 2, str(v), ha="center", va="center",
+                        fontsize=8.5, color="white" if r == "peer_cred_mismatch" else "black",
+                        fontweight="bold")
+                bottom += v
+        ax.set_xticks(x)
+        ax.set_xticklabels([SUBCASE_LABELS[s] for s in SUBCASES], fontsize=8)
+        ax.set_ylim(0, 230)
+        ax.set_title(title, fontsize=9, pad=4, loc="left")
+        ax.tick_params(axis="y", labelsize=8)
+
+    draw_panel(axL, left_counts,  r"(a) stock binary  (require\_peer\_cred = 0)")
+    draw_panel(axR, right_counts, r"(b) with patch  (require\_peer\_cred = 1)")
+    axL.set_ylabel("attempts (n=500 per panel)", fontsize=9)
+
+    # Callout for the leaked-no-patch breach. Place text in the upper-left
+    # empty region (above blind/guessed bars which top out at ~165) and arrow
+    # down-right to the top of the leaked bar.
+    leaked_idx = SUBCASES.index("leaked")
+    allow_n = left_counts["leaked"]["allow"]
+    axL.annotate(
+        f"{allow_n} attacks\nadmitted",
+        xy=(leaked_idx - 0.30, allow_n),
+        xytext=(0.10, 215),
+        ha="left", va="center", fontsize=8, color="#a40000",
+        fontweight="bold",
+        arrowprops=dict(arrowstyle="->", color="#a40000", lw=1.0,
+                        connectionstyle="arc3,rad=-0.20"),
+        bbox=dict(facecolor="white", edgecolor="#a40000", lw=0.7, pad=2.5),
     )
-    ax.text(
-        0.02, 0.95, note,
-        transform=ax.transAxes, fontsize=7, va="top", color="#333333",
+    axR.text(
+        1.0, 215,
+        "all 500 blocked at\npeer-cred boundary",
+        ha="center", va="center", fontsize=7.5, color="#222222",
         bbox=dict(facecolor="white", edgecolor="#888888", lw=0.4, pad=2.5),
     )
-    save(fig, "figure_e4_peer_cred_ab.pdf", w=6.3, h=3.0)
+
+    legend_handles = [
+        Patch(facecolor=STYLE["binding_mismatch"]["face"], edgecolor="black",
+              hatch=STYLE["binding_mismatch"]["hatch"], label="DENY: binding mismatch"),
+        Patch(facecolor=STYLE["allow"]["face"], edgecolor="black",
+              hatch=STYLE["allow"]["hatch"], label="ALLOW (admitted)"),
+        Patch(facecolor=STYLE["peer_cred_mismatch"]["face"], edgecolor="black",
+              hatch=STYLE["peer_cred_mismatch"]["hatch"], label="DENY: peer-cred mismatch"),
+    ]
+    fig.legend(handles=legend_handles, loc="lower center",
+               bbox_to_anchor=(0.5, -0.02), ncol=3, fontsize=7.5,
+               frameon=False, handlelength=1.6, handletextpad=0.5, columnspacing=1.8)
+
+    # Inline save (bypassing tight_layout which would override our spacing).
+    fig.subplots_adjust(left=0.09, right=0.98, top=0.88, bottom=0.18)
+    fig.set_size_inches(6.8, 3.4)
+    out = FIG_DIR / "figure_e4_peer_cred_ab.pdf"
+    fig.savefig(out, bbox_inches="tight", pad_inches=0.05)
+    fig.savefig(out.with_suffix(".png"), bbox_inches="tight", pad_inches=0.05)
+    plt.close(fig)
+    print(f"  wrote {out.name}")
 
 
 def main() -> None:
@@ -952,7 +1046,8 @@ def main() -> None:
     plot_ablation_mean_rtt()
     plot_ablation_stage_delta()
     plot_netlink_rtt()
-    plot_fuzz_errno()
+    # plot_fuzz_errno()  # Figure removed from §4.5 (description-only). Function
+    # kept in case the per-opcode errno distribution is wanted back later.
     plot_e4_peer_cred()
     print("done.")
 

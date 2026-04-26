@@ -8,14 +8,26 @@ Reallocated global_strs (elt_size=200001) to 20 items from 10.
 Reallocated glb_str_end (elt_size=4) to 20 items from 10.
 Reallocated wiz_functions (elt_size=4) to 6000 items from 3000.
 Database file #1: reference.bib
+Warning--empty author and editor in yao2023react
+Warning--missing publisher in yao2023react
+Warning--empty author and editor in schick2023toolformer
+Warning--missing publisher in schick2023toolformer
 Warning--empty pages in park2023generative
+Warning--empty author and editor in qin2024toolllm
+Warning--missing publisher in qin2024toolllm
 Warning--empty author and editor in mcp2025
 Warning--missing publisher in mcp2025
+Warning--empty author and editor in packer2023memgpt
+Warning--missing publisher in packer2023memgpt
+Warning--empty author and editor in mei2024aios
+Warning--missing publisher in mei2024aios
 Warning--empty author and editor in openclaw2026
 Warning--missing publisher in openclaw2026
 Warning--empty author and editor in nousresearch2026hermesagent
 Warning--missing publisher in nousresearch2026hermesagent
 Warning--empty pages in peter2014arrakis
+Warning--empty author and editor in greshake2023prompt
+Warning--missing publisher in greshake2023prompt
 Warning--empty author and editor in langchain2022
 Warning--missing publisher in langchain2022
 Warning--empty author and editor in langgraph2024
@@ -26,6 +38,10 @@ Warning--empty author and editor in crewai2024
 Warning--missing publisher in crewai2024
 Warning--empty author and editor in semantickernel2023
 Warning--missing publisher in semantickernel2023
+Warning--empty author and editor in wu2024oscopilot
+Warning--missing publisher in wu2024oscopilot
+Warning--empty author and editor in liu2026agentos
+Warning--missing publisher in liu2026agentos
 Warning--empty author and editor in openharness2026
 Warning--missing publisher in openharness2026
 Warning--empty author and editor in harness2025
@@ -36,10 +52,26 @@ Warning--empty author and editor in mcp_anniversary_2025
 Warning--missing publisher in mcp_anniversary_2025
 Warning--empty author and editor in patil2023gorilla
 Warning--missing publisher in patil2023gorilla
+Warning--empty author and editor in liu2023prompt
+Warning--missing publisher in liu2023prompt
+Warning--empty author and editor in openclaw_security1
+Warning--missing publisher in openclaw_security1
+Warning--empty author and editor in openclaw_security2
+Warning--missing publisher in openclaw_security2
 Warning--empty author and editor in wang2023voyager
 Warning--missing publisher in wang2023voyager
 Warning--empty author and editor in yang2024swe
 Warning--missing publisher in yang2024swe
+Warning--empty author and editor in lim2024compartmentalization
+Warning--missing publisher in lim2024compartmentalization
+Warning--empty author and editor in schneider2022sok
+Warning--missing publisher in schneider2022sok
+Warning--empty author and editor in lefeuvre2024sok
+Warning--missing publisher in lefeuvre2024sok
+Warning--empty author and editor in ji2026seagent
+Warning--missing publisher in ji2026seagent
+Warning--empty author and editor in shi2025progent
+Warning--missing publisher in shi2025progent
 Warning--empty author and editor in seccomp2026
 Warning--missing publisher in seccomp2026
 Warning--empty author and editor in lsm2026
@@ -57,43 +89,43 @@ Warning--empty author and editor in netlink2026
 Warning--missing publisher in netlink2026
 You've used 49 entries,
             3507 wiz_defined-function locations,
-            910 strings with 12825 characters,
-and the built_in function-call counts, 64839 in all, are:
-= -- 7761
+            910 strings with 12745 characters,
+and the built_in function-call counts, 58327 in all, are:
+= -- 6641
 > -- 599
 < -- 76
 + -- 307
 - -- 145
-* -- 5049
-:= -- 7116
-add.period$ -- 154
+* -- 4633
+:= -- 6508
+add.period$ -- 122
 call.type$ -- 49
-change.case$ -- 27
+change.case$ -- 43
 chr.to.int$ -- 166
-cite$ -- 96
-duplicate$ -- 5411
-empty$ -- 6306
+cite$ -- 128
+duplicate$ -- 4275
+empty$ -- 5762
 format.name$ -- 169
-if$ -- 15245
+if$ -- 13581
 int.to.chr$ -- 0
 int.to.str$ -- 49
 missing$ -- 414
-newline$ -- 233
+newline$ -- 217
 num.names$ -- 49
-pop$ -- 1025
+pop$ -- 1057
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 950
+skip$ -- 934
 stack$ -- 0
-substring$ -- 11575
-swap$ -- 903
+substring$ -- 10487
+swap$ -- 967
 text.length$ -- 31
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
-warning$ -- 47
-while$ -- 344
+warning$ -- 79
+while$ -- 312
 width$ -- 51
-write$ -- 491
-(There were 47 warnings)
+write$ -- 475
+(There were 79 warnings)

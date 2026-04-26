@@ -44,39 +44,42 @@ All reported $p$-values are two-sided Welch's $t$-tests \cite{west2021welch} com
 \midrule
 \rowcolor{gray!8}
 100\,B & \textbf{0.854} & 0.867          & $+1.5\%$  & $0.48^{\text{ns}}$ & \textbf{0.854} & $\ \ 0.0\%$ & $0.98^{\text{ns}}$ \\
-10\,KB & \textbf{0.863} & 0.922          & $+6.8\%$  & $2.1{\times}10^{-4}$  & 0.899          & $+4.2\%$    & $0.10^{\text{ns}}$ \\
+10\,KiB & \textbf{0.863} & 0.922          & $+6.8\%$  & $2.1{\times}10^{-4}$  & 0.899          & $+4.2\%$    & $0.10^{\text{ns}}$ \\
 \rowcolor{gray!8}
-1\,MB  & 7.748          & 9.843          & $+27.0\%$ & $<10^{-4}$            & \textbf{7.487} & $-3.4\%$    & $2.7{\times}10^{-4}$ \\
+1\,MiB  & 7.748          & 9.843          & $+27.0\%$ & $<10^{-4}$            & \textbf{7.487} & $-3.4\%$    & $2.7{\times}10^{-4}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 Table~\ref{tab:latency} and panel~(a) of Figure~\ref{fig:chapter4-latency} report mean end-to-end latency for each system at three payload sizes.
-The 100~B and 10~KB points correspond to typical MCP tool invocations (short JSON commands and small structured responses); the 1~MB point is a contrived stress case, used solely to probe how the control plane behaves when the payload dominates the cost of a request, and is not intended to reflect everyday tool traffic.
+The 100~B and 10~KiB points correspond to typical MCP tool invocations (short JSON commands and small structured responses); the 1~MiB point is a contrived stress case, used solely to probe how the control plane behaves when the payload dominates the cost of a request, and is not intended to reflect everyday tool traffic.
 At 100~B, the kernel path and the user-space baseline are within measurement noise: both at \num{0.854}~ms ($p = 0.984$).
-At 10~KB the kernel path is nominally slower (\num{0.899}~ms versus \num{0.863}~ms, +4.2\%), but the difference does not reach significance ($p = 0.097$), a sub-millisecond effect lost in the timing noise of a VMware guest at $n = 30$.
+At 10~KiB the kernel path is nominally slower (\num{0.899}~ms versus \num{0.863}~ms, +4.2\%), but the difference does not reach significance ($p = 0.097$), a sub-millisecond effect lost in the timing noise of a VMware guest at $n = 30$.
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.95\linewidth]{figures/figure_latency_panel.pdf}
-\caption{Latency summary across the three systems at 100~B, 10~KiB, and 1~MiB payloads ($n = 30$ independent runs of 2000 requests, error bars 95\% CI). Panel (a): mean end-to-end latency on a log y-axis so sub-millisecond gaps at small payloads remain visible alongside the 1~MiB values. Panel (b): $p_{95}$ latency; the three systems are indistinguishable at 100~B and 10~KiB, and the kernel $p_{95}$ sits below both baselines at 1~MiB. Panel (c): mean-latency ratio against the \texttt{userspace} baseline, zoomed around the parity line; \texttt{seccomp} sits above parity at every payload size, while the kernel path only crosses below parity at 1~MiB. Panel (d): per-payload stage stack in $\mu$s, with three sub-axes auto-scaled per payload; each bar decomposes one system into session-lookup, arbitration, and tool-exec. The annotation above each kernel bar reports the absolute kernel arbitration cost (\num{28}~$\mu$s at 100~B and 10~KiB, \num{38}~$\mu$s at 1~MiB), which is the only stage with a meaningful inter-system delta and is two orders of magnitude smaller than tool execution at every payload size.}
+\caption{Latency summary across the three systems at 100~B, 10~KiB, and 1~MiB payloads ($n = 30$ independent runs of 2000 requests, error bars 95\% CI). Panel (a): mean end-to-end latency on a log y-axis so sub-millisecond gaps at small payloads remain visible alongside the 1~MiB values. Panel (b): $p_{95}$ latency; the three systems are indistinguishable at 100~B and 10~KiB, and the kernel $p_{95}$ sits below both baselines at 1~MiB. Panel (c): mean-latency ratio against the \texttt{userspace} baseline, zoomed around the parity line; \texttt{seccomp} sits above parity at every payload size, while the kernel path only crosses below parity at 1~MiB. Panel (d): per-payload stage stack in $\mu$s, with three sub-axes auto-scaled per payload; each bar decomposes one system into session-lookup, arbitration, and tool-exec. The annotation above each kernel bar reports the absolute kernel arbitration cost (\num{28}~$\mu$s at 100~B and 10~KiB, \num{38}~$\mu$s at 1~MiB), which is the only stage with a meaningful inter-system delta and remains roughly one order of magnitude below tool execution at small payloads (tool exec / arbitration $\approx$ 10$\times$) and at least two orders of magnitude below at 1~MiB ($\approx$ 102$\times$ against tool execution alone, and $\approx$ 197$\times$ against full end-to-end latency).}
 \label{fig:chapter4-latency}
 \end{figure}
 
-The 1~MB row provides the only statistically clean comparison in the table, with the kernel path at \num{7.487}~ms against \num{7.748}~ms for plain user-space (a 3.4\% reduction, $p = 0.00027$) and \num{9.843}~ms for the hardened variant.
+The 1~MiB row provides the only statistically clean comparison in the table, with the kernel path at \num{7.487}~ms against \num{7.748}~ms for plain user-space (a 3.4\% reduction, $p = 0.00027$) and \num{9.843}~ms for the hardened variant.
 This is counter-intuitive: adding a privilege boundary is usually expected to cost latency, not return it.
-Panel~(c) of Figure~\ref{fig:chapter4-latency} shows the same data as a ratio against the plain \texttt{userspace} baseline, with the y-axis zoomed around the parity line so that the sub-4\% effects at 100~B and 10~KB are visible in the same frame as the larger effect at 1~MB; read that way, \texttt{seccomp} sits above parity at every payload size while the kernel path crosses below parity only at 1~MB.
-The explanation has two parts.
-The seccomp penalty at large payloads is consistent with the accumulating cost of BPF per-syscall filtering across the heavier socket traffic that a megabyte payload forces through, a cost the kernel path does not incur. The modest speedup over plain user-space is consistent with arbitration happening before the payload is copied through the tool-forwarding socket, so a rejected request avoids a copy the user-space baseline would still have to perform between admission and forwarding.
+Panel~(c) of Figure~\ref{fig:chapter4-latency} shows the same data as a ratio against the plain \texttt{userspace} baseline, with the y-axis zoomed around the parity line so that the sub-4\% effects at 100~B and 10~KiB are visible in the same frame as the larger effect at 1~MiB; read that way, \texttt{seccomp} sits above parity at every payload size while the kernel path crosses below parity only at 1~MiB.
+The seccomp penalty at large payloads has a clean explanation: BPF per-syscall filtering pays a constant cost on every \texttt{sendmsg}/\texttt{recvmsg} crossing, and a megabyte payload forces many more such crossings through the tool-forwarding socket than the smaller payloads, a cost the kernel path does not incur.
+The 3.4\% speedup of the kernel path over plain user-space at 1~MiB is harder to attribute confidently from the available stage-level instrumentation: both paths admitted these requests (DENY would produce a different latency distribution) and both subsequently copied the same 1~MiB payload through the same \texttt{mcpd} $\to$ tool-app UDS, so an ``avoided copy'' explanation does not hold.
+Plausible contributors include scheduler effects (\texttt{mcpd} releases the CPU while waiting on the kernel Netlink reply, which may interact favourably with how the guest kernel schedules a 1~MiB \texttt{sendmsg}) and hypervisor-level timing jitter (a 3.4\% effect at the 7--8~ms scale falls within the noise envelope a VMware guest typically exhibits at this latency range); the present instrumentation does not separate them.
+We report the effect because it is statistically clean ($p = 2.7 \times 10^{-4}$ at $n = 30$) but treat it as evidence that the kernel path does not impose a measurable overhead at this payload size, not as evidence of a positive speedup mechanism.
 
-The $p_{95}$ picture, shown in panel~(b) of Figure~\ref{fig:chapter4-latency}, matches the means.
-At 100~B and 10~KB the three systems are statistically indistinguishable ($p = 0.51$ and $p = 0.16$).
-At 1~MB the kernel $p_{95}$ is \num{8.422}~ms, against \num{8.716}~ms for user-space ($p = 0.049$) and \num{10.903}~ms for seccomp.
-The tail does not widen under the enforcement boundary.
+The $p_{95}$ picture, shown in panel~(b) of Figure~\ref{fig:chapter4-latency}, matches the means for the kernel path: at both 100~B and 10~KiB the kernel $p_{95}$ is statistically indistinguishable from user-space ($p = 0.51$ and $p = 0.16$).
+The seccomp $p_{95}$ already separates from user-space at 10~KiB (\num{1.078}~ms vs \num{1.003}~ms; $p = 6.4 \times 10^{-3}$), so the seccomp tail is the first to widen under load even though the means are still close.
+At 1~MiB the kernel $p_{95}$ is \num{8.422}~ms, against \num{8.716}~ms for user-space ($p = 0.049$) and \num{10.903}~ms for seccomp ($p < 10^{-4}$).
+The kernel tail does not widen relative to user-space across any of the measured payloads.
 
 The stage-level breakdown in panel~(d) of Figure~\ref{fig:chapter4-latency} confirms that kernel arbitration is a minor contributor at all payload sizes.
-Mean arbitration time is \num{0.028}~ms at 100~B and 10~KB, and \num{0.038}~ms at 1~MB.
-At 1~MB, tool execution accounts for \num{89.3}\% of total end-to-end time on the kernel path (\num{89.9}\% on the user-space path); the entire control-plane machinery (Generic Netlink round-trip, session lookup, and arbitration) accounts for the remaining \num{10.7}\%, with the arbitration contribution within that fraction less than four hundredths of a millisecond.
+Mean arbitration time is \num{0.028}~ms at 100~B and 10~KiB, and \num{0.038}~ms at 1~MiB.
+At 1~MiB, tool execution accounts for \num{89.3}\% of the instrumented stage total (session lookup + arbitration + tool execution = \num{4.351}~ms on the kernel path) and \num{89.9}\% of the same total on the user-space path; arbitration contributes less than four hundredths of a millisecond within that bucket.
+Measured against the full end-to-end mean latency (\num{7.487}~ms on kernel, \num{7.748}~ms on user-space), tool execution itself is closer to half (\num{51.9}\% and \num{49.9}\% respectively) and the difference is unaccounted-for cost outside the instrumented stages --- chiefly the \texttt{mcpd} $\to$ tool-app UDS round-trip, JSON framing, and process scheduling --- which scales with payload size and dominates the absolute number at 1~MiB.
 
 \begin{figure}[!t]
 \centering
@@ -97,8 +100,8 @@ The total kernel arbitration cost is therefore \num{4.334}~$\mu$s above the nois
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.65\linewidth]{figures/figure_ablation_mean_rtt.pdf}
-\caption{Kernel path ablation at realistic registry scale ($N = 1024$ tools, $M = 64$ agents). The leftmost bar is the measured noise floor from the \texttt{KMCP\_\allowbreak CMD\_\allowbreak NOOP} handler, which establishes the irreducible Generic Netlink round-trip cost. The \texttt{full} bar is the complete \texttt{TOOL\_\allowbreak REQUEST} arbitration path; \texttt{skip\_\allowbreak lookups} disables the tool and agent registry walks. The two \texttt{ticket\_\allowbreak trigger} bars exercise a high-risk tool whose execution is gated by the approval-ticket machinery, with and without the approval branch bypassed. All error bars are 95\% bootstrap CIs across $n = 10$ repetitions.}
+\includegraphics[width=0.85\linewidth]{figures/figure_ablation_mean_rtt.pdf}
+\caption{Kernel path ablation at realistic registry scale ($N = 1024$ tools, $M = 64$ agents). Bar heights report median RTT ($p_{50}$) over $n = 10$ repetitions ($\geq$\,1000 requests per cell, $\geq$\,2000 for the NOOP floor); error bars are omitted because the CI95 column in the source data describes the mean rather than the median. The leftmost bar is the measured noise floor from the \texttt{KMCP\_\allowbreak CMD\_\allowbreak NOOP} handler, which establishes the irreducible Generic Netlink round-trip cost. The \texttt{full} bar is the complete \texttt{TOOL\_\allowbreak REQUEST} arbitration path; \texttt{skip\_\allowbreak lookups} disables the tool and agent registry walks; the two \texttt{ticket\_\allowbreak trigger} bars exercise a high-risk tool whose execution is gated by the approval-ticket machinery, with and without the approval branch bypassed; \texttt{skip\_\allowbreak hash} and \texttt{skip\_\allowbreak binding} bypass the hash and binding-mismatch guard bodies (dead code under benign workload). The dotted line and inline annotation visualise the +\num{4.334}~$\mu$s arbitration delta over the NOOP floor that paragraph above quantifies.}
 \label{fig:chapter4-ablation}
 \end{figure}
 
@@ -133,7 +136,7 @@ binding\_guard\_body     & 100\,000 & $\sim0.000$ & $[-0.027, +0.013]$ & $\sim0.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.65\linewidth]{figures/figure_ablation_stage_delta.pdf}
+\includegraphics[width=0.85\linewidth]{figures/figure_ablation_stage_delta.pdf}
 \caption{Paired per-stage deltas across the four ablation comparisons. The first two bars are the meaningful stage costs (registry+agent lookup and the approval-ticket body); the last two are methodology consistency checks against dead guard bodies and are expected to fall on zero.}
 \label{fig:chapter4-ablation-stages}
 \end{figure}
@@ -182,7 +185,7 @@ Table~\ref{tab:throughput} gives the per-cell peak throughput at one agent; the 
 \end{table}
 
 Plain user-space achieves the highest peak throughput across the full agent$\times$concurrency sweep (\num{1090}--\num{1219}~RPS, plotted in Figure~\ref{fig:chapter4-throughput-sweep}).
-The kernel path ranges from \num{1003} to \num{1137}~RPS, and the seccomp path from \num{1020} to \num{1200}~RPS.
+Over the same 5$\times$4 grid of agent counts and concurrency levels, the kernel path ranges from \num{1003} to \num{1137}~RPS and the seccomp path from \num{1020} to \num{1200}~RPS; Table~\ref{tab:throughput} reports only the agents=1 row, so its kernel column (\num{1009}--\num{1104}~RPS) is a tighter slice of this wider range.
 At a representative operating point of one agent and concurrency 50, the three systems sit at \num{1215.6}, \num{1123.5}, and \num{1096.2}~RPS respectively.
 The kernel path is roughly 10\% slower than the user-space peak, which is consistent with the additional Generic Netlink round-trip and with the serialisation of admission decisions through a single kernel module.
 Figure~\ref{fig:chapter4-throughput-sweep} plots the complete agent$\times$concurrency grid and shows that the relative ordering is stable across all five agent counts: the \texttt{userspace} line sits at the top, the \texttt{seccomp} and \texttt{kernel} lines track each other within a few percent, and none of the three curves bends downward as concurrency climbs from 1 to 100.
@@ -211,14 +214,15 @@ The register path is modelled as a one-time setup cost plus a per-tool steady-st
 \]
 fitted across the 12 values of $N$ by ordinary least squares.
 
-The fit produces $a = -0.123$~ms, $b = 6.011$~$\mu$s per tool, and $R^2 = 0.9996$.
-The asymptotic registration throughput is therefore $1/b \approx 166\,000$ tools/s; the 43-tool catalogue used in the main evaluation registers in approximately \num{0.26}~ms of wall-clock time, and even a \num{16384}-tool deployment completes its one-shot registration in under \num{100}~ms.
-The per-tool cost curve (Figure~\ref{fig:chapter4-registry-curve}) approaches the asymptote $b$ from above with no inflection point; there is no scaling degradation at large $N$, and the apparent variation at small $N$ is the intercept $a$ amortising away.
+The fit produces $a = -0.123$~ms and $b = 6.010$~$\mu$s per tool, with $R^2 = 0.9996$ on the linear total-time fit.
+That $R^2$ is close to 1 mostly because total\_ms varies over three orders of magnitude with $N$ and so reflects the dominance of the linear term, not the goodness of the per-tool view; a more direct test of the linear-scaling hypothesis is the log-log regression $\log(\text{total\_ms}) = \alpha + \beta \log N$, which gives $\beta = 0.986$ with a bootstrap 95\% CI of $[0.958, 1.014]$ that contains $1.0$. This supports the claim that total registration cost scales linearly with $N$ across the measured range, independent of the per-tool view.
+The asymptotic registration throughput is therefore $1/b \approx 166\,000$ tools/s; the 43-tool catalogue used in the main evaluation registers in approximately \num{0.14}~ms of wall-clock time (extrapolated from the linear fit), and even a \num{16384}-tool deployment completes its one-shot registration in under \num{100}~ms.
+The per-tool cost (Figure~\ref{fig:chapter4-registry-curve}) sits within roughly $\pm 1$~$\mu$s of the asymptote across three orders of magnitude of $N$, and is indistinguishable from a constant for $N \geq 2^7$. The apparent excursion at small $N$ is the intercept $a$ amortising away rather than a scaling degradation.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.65\linewidth]{figures/figure_registry_register_curve.pdf}
-\caption{Registry register-path per-tool cost as a function of registry size $N$. The dashed line is the asymptotic per-tool cost $b = 6.011$~$\mu$s from the linear fit $\text{total\_ms}(N) = a + b N$ ($R^2 = 0.9996$); the curve approaches this asymptote monotonically with no degradation at large $N$.}
+\includegraphics[width=0.85\linewidth]{figures/figure_registry_register_curve.pdf}
+\caption{Registry register-path per-tool cost as a function of registry size $N$, with $95\%$ CI error bars. The dashed line is the asymptotic per-tool cost $b = 6.010$~$\mu$s, taken as the slope of the linear fit $\text{total\_ms}(N) = a + b N$ used in Section~\ref{sec:registry-scaling}. We do not overlay the per-tool fit curve $a/N + b$: the OLS-derived intercept $a$ is slightly negative (an artefact of the fit being dominated by large-$N$ residuals in the millisecond range), so the curve would reach the asymptote from below while the data reaches it from above. Measured per-tool cost stays within roughly $\pm 1$~$\mu$s of the asymptote across three orders of magnitude of $N$ and is indistinguishable from a constant for $N \geq 2^7$.}
 \label{fig:chapter4-registry-curve}
 \end{figure}
 
@@ -229,7 +233,7 @@ Mean lookup latency stays within the 7.1--7.7~$\mu$s band across three orders of
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.65\linewidth]{figures/figure_registry_lookup_scaling.pdf}
+\includegraphics[width=0.85\linewidth]{figures/figure_registry_lookup_scaling.pdf}
 \caption{Steady-state \texttt{tool\_id} lookup latency as a function of registry size $N$, on a log-$N$ axis. The fitted log-linear slope is $2.9\times 10^{-5}$~ms per doubling (bootstrap 95\% CI $[-2\times 10^{-6}, +6.1\times 10^{-5}]$, containing zero), consistent with the $O(1)$ xarray lookup invariant.}
 \label{fig:chapter4-registry-lookup}
 \end{figure}
@@ -245,7 +249,7 @@ Outcomes are summarised in Table~\ref{tab:attacks} and Figure~\ref{fig:chapter4-
 
 \begin{table}[H]
 \centering
-\caption{Category-level attack outcomes by system (130 attempts each: 3 spoof $+$ 5 replay $+$ 3 substitution $+$ 2 escalation, $\times\,10$ repeats). ``Bypasses'' counts attempts that circumvented the intended control. 95\% Clopper--Pearson confidence intervals on the bypass rate are reported in the last column. User-space rates reflect the per-category instrumented weakening described in the text; they are \emph{not} the performance of a fully hardened user-space implementation. Per-case detail is plotted in Figure~\ref{fig:chapter4-security}.}
+\caption{Category-level attack outcomes by system (130 attempts each: 3 spoof $+$ 5 replay $+$ 3 substitution $+$ 2 escalation, $\times\,10$ repeats). ``Bypasses'' counts attempts that circumvented the intended control. 95\% Clopper--Pearson confidence intervals on the bypass rate are reported in the last column. The 84.6\% userspace rate is \emph{not} a uniform per-case bypass: 11 of the 13 case rows are admitted in full ($10/10$ each $= 110$), while two cases (\texttt{spoof / session\_token\_theft} and \texttt{replay / cross\_tool\_ticket\_reuse}) are blocked by orthogonal in-process checks even on the unhardened user-space mediator and contribute 0 admissions to the headline. The full per-case decomposition is plotted in Figure~\ref{fig:chapter4-security}. User-space rates reflect the per-category instrumented weakening described below; they are \emph{not} the performance of a fully hardened user-space implementation.}
 \label{tab:attacks}
 \setlength{\tabcolsep}{8pt}
 \renewcommand{\arraystretch}{1.25}
@@ -304,28 +308,28 @@ The absence of breaches is consistent with the lock ordering in \texttt{kernel\_
 A session is opened by UID $A$, and a second process running as UID $B$ attempts three replay variants: blind replay, replay with a guessed session identifier, and replay with a leaked session identifier.
 Across \num{500} attempts, this experiment surfaced a defect that a design-time review of the kernel module had missed.
 In the version merged from the main evaluation branch, \texttt{kernel\_\allowbreak mcp\_\allowbreak cmd\_\allowbreak tool\_\allowbreak request} never compares \texttt{NETLINK\_\allowbreak CB(skb)} peer credentials against the \texttt{uid} recorded at agent registration, so a crafted-credential replay from UID $B$ reaches the request handler as if it had been sent by UID $A$.
-Of the 500 attempts, 326 were still blocked by downstream checks (mostly hash or binding mismatch against the replayed request body), but 174 passed every kernel-side check that the stock binary enforces and would have been admitted to tool execution.
+Of the 500 attempts, 326 were still blocked by downstream \texttt{binding\_\allowbreak mismatch} at the kernel boundary against the replayed request body, but 174 passed every kernel-side check that the stock binary enforces and would have been admitted to tool execution.
 Those 174 are what the zero-bypass numbers in Table~\ref{tab:attacks} do not cover, because the category-level harness never probes a second UID.
 
 The fix is a six-line patch that walks \texttt{sock\_\allowbreak i\_\allowbreak uid(NETLINK\_\allowbreak CB(skb).sk)} on entry to the handler and rejects the request with \texttt{-EPERM} on mismatch, gated behind a new \texttt{require\_\allowbreak peer\_\allowbreak cred} module parameter so that the A/B comparison can be run against a single binary.
 With the gate enabled, all \num{500} attempts are blocked at peer-credential verification before any registry work runs; the Clopper--Pearson 95\% CIs for the two conditions do not overlap.
 The patch adds no measurable latency because the peer-credential read is on the same cache line as the existing \texttt{NETLINK\_\allowbreak CB} access that the handler already performs.
-We report this as an evaluation-discovered defect instead of burying it: the peer-credential check is exactly the kind of invariant a kernel-enforced control plane is supposed to hold, and the stock binary did not hold it until the E4 experiment ran.
+Figure~\ref{fig:chapter4-e4-peer-cred} visualises the A/B outcome: in the stock binary all 174 \texttt{leaked} attempts are admitted, while the same input set is uniformly blocked at \texttt{peer\_\allowbreak cred\_\allowbreak mismatch} once the gate is enabled.
+This evaluation-discovered defect changes the interpretation of the zero-bypass result in Table~\ref{tab:attacks}: the category-level harness did not cover cross-UID replay, and the stock binary did not enforce the peer-credential invariant until the E4 experiment exposed the gap.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\linewidth]{figures/figure_e4_peer_cred_ab.pdf}
+\caption{Cross-UID hijack outcomes by attack sub-case (\texttt{blind}, \texttt{guessed}, \texttt{leaked}) and binary state, $n = 500$ per panel. Panel (a) is the stock module: only the \texttt{leaked} sub-case (where UID $B$ has obtained UID $A$'s 64-bit binding-hash cookie) reaches the request handler unchallenged, admitting all 174 attempts to tool execution. Panel (b) is the same module rebuilt with \texttt{require\_\allowbreak peer\_\allowbreak cred = 1}: all 500 attempts are rejected at the new peer-credential check before the request reaches the registry walks. The DENY-path median latency is unchanged between the two conditions, so the additional check imposes no measurable runtime cost.}
+\label{fig:chapter4-e4-peer-cred}
+\end{figure}
 
 \paragraph{Generic Netlink dumb fuzzer.}
 The \texttt{KERNEL\_\allowbreak MCP} family was exercised with a coverage-free structured fuzzer that iterates every defined \texttt{KMCP\_\allowbreak CMD\_\allowbreak *} opcode and applies per-\texttt{nlattr} bit flipping, length mutations, and type substitutions.
 Over a \num{30}-minute fuzzing window, \num{880640} mutated messages were delivered to the kernel module.
 Monitoring the kernel log buffer across the run (\texttt{dmesg} delta plus \texttt{kmemleak} scan) produced zero \texttt{oops}, \texttt{WARN}, \texttt{BUG}, \texttt{GPF}, or memory-leak reports.
-Every malformed input was rejected with a deterministic \texttt{errno} drawn from a small set (\texttt{-EINVAL}, \texttt{-EBADMSG}, \texttt{-EPERM}).
-Figure~\ref{fig:chapter4-fuzz} shows the distribution of returned errnos across the mutated message population.
+Every malformed input was rejected with an \texttt{errno} drawn from a bounded set of five expected classes (\texttt{-EPERM}, \texttt{-ENOENT}, \texttt{-EFAULT}, \texttt{-EINVAL}, \texttt{-ERANGE}); we do not claim per-input determinism (the harness did not replay individual inputs to verify same-input/same-errno behaviour), only that no input fell outside this set.
 The fuzzer's design time was limited, so the result is a robustness smoke test, not evidence of adversarial hardness: it says the Generic Netlink dispatch layer does not crash on malformed input within the tested \num{30}-minute budget, not that the kernel module is free of latent memory-safety bugs under an unbounded adversary.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.8\linewidth]{figures/figure_fuzz_errno_distribution.pdf}
-\caption{Errno distribution for the Generic Netlink dumb fuzzer, binned by the \texttt{KMCP\_\allowbreak CMD\_\allowbreak *} opcode under test. Every rejection falls into one of three deterministic errno classes (\texttt{-EINVAL}, \texttt{-EBADMSG}, \texttt{-EPERM}); zero mutated messages produced a kernel oops, \texttt{WARN}, or \texttt{kmemleak} report across \num{880640} total inputs.}
-\label{fig:chapter4-fuzz}
-\end{figure}
 
 
 \subsection{Daemon Failure and Recovery}
@@ -341,27 +345,32 @@ Recovery means starting over or reloading from application-level logs, with no c
 
 The kernel path is different.
 Approval tickets, the tool registry, and agent registrations survive the crash intact and remain inspectable via \texttt{sysfs} without any daemon running.
-Session state is not preserved, since the binding context for active sessions is owned by the daemon process and is lost with it, but this is expected as session state is inherently tied to an active connection.
-The durability of deferred approvals and registry state allows \texttt{mcpd} to reconcile its manifest-derived view against the kernel-held view on restart and re-establish a consistent catalogue without issuing duplicate registrations.
+Session state is not preserved; the binding context lives in daemon memory and is inherently tied to an active connection.
 
-The reconciliation strategy on restart is conservative (described in Section~\ref{sec:reconciliation}): cold start clears and fully rebuilds the tool registry from manifests, without attempting to reuse residual kernel state, even when the manifest set has not changed.
-Incremental reconciliation is already used while the daemon is running (only tools whose semantic or binding fingerprint changed are re-registered); extending that behaviour to the cold-start path, gated on a divergence signal, would reduce restart overhead and is a natural direction for future work.
+The durability claim here is observability-oriented, not warm-continuation-oriented: while \texttt{mcpd} is down, \texttt{sysfs} stays readable so an operator can still inspect the surviving registry, ticket state, and per-agent \texttt{call\_\allowbreak log} entries.
+On daemon restart, the cold-start path described in Section~\ref{sec:reconciliation} issues \texttt{RESET\_\allowbreak TOOLS} and re-registers each manifest tool unconditionally, so the surviving kernel state serves audit rather than warm continuation; the conservative rebuild avoids relying on a residual view whose freshness the daemon cannot prove.
+Incremental reconciliation is already used while \texttt{mcpd} is running (only tools whose semantic or binding fingerprint changed are re-registered); extending that behaviour to the cold-start path, gated on a divergence signal, would reduce restart overhead and is a natural direction for future work.
 
 
 \subsection{Discussion}
 
-The security and performance results read together more clearly than apart. The seccomp baseline does strictly more work than the plain user-space mediator (tighter syscall filters, extra input validation, audit logging), yet still admits a substantial fraction of the attack attempts in Table~\ref{tab:attacks} and is the slowest system in Table~\ref{tab:latency} at megabyte-class payloads. The kernel path reaches a zero bypass rate by placing the admission state somewhere no unprivileged process can reach, while the seccomp baseline keeps filtering around the same mutable process that holds the decision.
+Seccomp does more work than plain user-space, including tighter syscall filters, extra validation, and audit logging, yet it still admits \num{38.5}\% of attacks (Table~\ref{tab:attacks}) and is the slowest system at megabyte payloads (Table~\ref{tab:latency}).
+The kernel path blocks every attempt because the admission state sits where no unprivileged process can reach it; seccomp keeps filtering around the same mutable process that holds the decision.
 
-The 1~MB latency inversion captures the same architecture on the performance side, since kernel arbitration runs on a fixed-size Generic Netlink message regardless of payload size while seccomp's BPF filter pays per-syscall. By the megabyte case, the stronger enforcement boundary is also the faster one. The ablation in Table~\ref{tab:ablation-stages} says the same thing from a different angle: of the \num{4.334}~$\mu$s that kernel arbitration adds over the NOOP floor, the registry+lookup stage costs \num{0.109}~$\mu$s and the rest is reply-skb construction. Nothing in the fast path scales with the number of tools or with the request body, and the registry scaling experiment extends this from microbench to catalogue size, showing that lookup latency stays within a \num{0.6}~$\mu$s band between $N = 8$ and $N = 16\,384$ tools and registration runs at roughly 166\,000 tools per second.
+The 1~MiB latency picture is the same architectural fact viewed from the performance side: kernel arbitration runs on a fixed-size Generic Netlink message regardless of payload, while seccomp's BPF filter pays per syscall and so accumulates cost across the heavier socket traffic a megabyte payload forces through.
+The kernel path's 3.4\% latency reduction over plain user-space at 1~MiB (Table~\ref{tab:latency}) is statistically clean but not clearly attributable from the available stage instrumentation; we read it as evidence of no measurable overhead at this payload size, not as evidence of a positive speedup mechanism.
+The ablation breakdown agrees: of the \num{4.334}~$\mu$s that kernel arbitration adds over the NOOP floor, registry+lookup costs \num{0.109}~$\mu$s and the rest is reply-skb construction.
+Nothing in the fast path scales with tool count or request body, and the registry scaling experiment extends this end-to-end: lookup latency stays within a \num{0.6}~$\mu$s band from $N = 8$ to $N = 16\,384$, and registration runs at roughly \num{166000} tools per second.
 
-The durability result is less dramatic to present, but arguably the most practically important. A forced daemon restart mid-workflow is, in practice, a far more common event than any of the controlled attack attempts in the security evaluation, and the kernel path treats it as a reconciliation pass against state that was never in the daemon to begin with rather than as data loss.
+Cross-UID (Section~\ref{sec:extended-attacks}) is the clearest reminder that the zero-bypass table measures only design-time invariants: it exposed a peer-credential gap the category-level harness never probed, closed by a six-line patch at no measurable latency cost; the design-time and extended-attack layers are complementary, and neither alone would have caught this.
 
-The cross-UID experiment in Section~\ref{sec:extended-attacks} is the clearest reminder that the zero-bypass table measures only design-time invariants: it exposed a peer-credential gap that the category-level harness did not probe, and that was closed by a six-line patch with no measurable latency cost. The design-time and extended-attack layers are complementary, and neither on its own would have caught this.
-
-Behaviour beyond the swept concurrency window is not characterised here. Inside the clean window up to 100 concurrent requests the kernel path stays within roughly 10\% of plain user-space throughput without diverging, but outside it, the global registry lock is an obvious suspect for a bottleneck. Per-tool or per-agent lock decomposition is the natural direction but sits outside the scope of this evaluation.
+Within the swept window of up to 100 concurrent requests the kernel path holds within roughly 10\% of plain user-space throughput; beyond it, the global registry lock is the obvious suspect and per-tool or per-agent lock decomposition the natural fix, but both lie outside the scope of this evaluation.
 
 
 
 \subsection{Threats to Validity}
 
-The results should be interpreted within four scope limitations: all experiments ran in a single VMware guest on an aarch64 host, so latency figures are environment-specific and generalisation to bare-metal or different kernel configurations is not established; the evaluation uses demonstration tools with predictable execution times and does not characterise tail latency under sustained load; the attack study is a controlled functional-correctness test of the four explicitly identified invariants and does not constitute a robustness assessment against unknown attacks, prompt injection, or privileged adversaries; and kernel-level admission control addresses only one layer of an AI-agent system, leaving semantic tool vulnerabilities, unsafe policy choices, and compromise outside the stated threat model unaddressed.
+The results should be interpreted within four scope limitations: all experiments ran in a single VMware guest on an aarch64 host, so latency figures are environment-specific and generalisation to bare-metal or different kernel configurations is not established;
+the evaluation uses demonstration tools with predictable execution times and does not characterise tail latency under sustained load;
+the attack study is a controlled functional-correctness test of the four explicitly identified invariants and does not constitute a robustness assessment against unknown attacks, prompt injection, or privileged adversaries;
+and kernel-level admission control addresses only one layer of an AI-agent system, leaving semantic tool vulnerabilities, unsafe policy choices, and compromise outside the stated threat model unaddressed.

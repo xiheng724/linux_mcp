@@ -61,61 +61,61 @@
   year      = {2023}
 }
 
-@misc{qin2024toolllm,
+@article{qin2024toolllm,
   author  = {Yujia Qin and Shihao Liang and Yining Ye and others},
   title   = {ToolLLM: Facilitating Large Language Models to Master 16000+ Real-world APIs},
-  note    = {Preprint, arXiv:2307.16789},
+  journal = {arXiv preprint arXiv:2307.16789},
   year    = {2024}
 }
 
-@misc{yao2023react,
+@article{yao2023react,
   title={ReAct: Synergizing reasoning and acting in language models},
   author={Yao, Shunyu and Zhao, Jeffrey and Yu, Dian and others},
-  note    = {Preprint, arXiv:2210.03629},
+  journal={arXiv preprint arXiv:2210.03629},
   year={2023}
 }
 
-@misc{schick2023toolformer,
+@article{schick2023toolformer,
   title={Toolformer: Language models can teach themselves to use tools},
   author={Schick, Timo and Dwivedi-Yu, Jane and others},
-  note    = {Preprint, arXiv:2302.04761},
+  journal={arXiv preprint arXiv:2302.04761},
   year={2023}
 }
 
-@misc{liu2024agentbench,
+@article{liu2024agentbench,
   title={AgentBench: Evaluating LLMs as agents},
   author={Liu, Xiao and Yu, Hao and Zhang, Hanchen and others},
-  note    = {Preprint, arXiv:2308.03688},
+  journal={arXiv preprint arXiv:2308.03688},
   year={2024}
 }
 
 %% AI Agent OS 
 
-@misc{mei2024aios,
+@article{mei2024aios,
   author  = {Kai Mei and others},
   title   = {AIOS: LLM Agent Operating System},
-  note    = {Preprint, arXiv:2403.16971},
+  journal = {arXiv preprint arXiv:2403.16971},
   year    = {2024}
 }
 
-@misc{packer2023memgpt,
+@article{packer2023memgpt,
   author  = {Charles Packer and Vivian Fang and Shishir G. Patil and Kevin Lin and Sarah Wooders and Joseph E. Gonzalez},
   title   = {MemGPT: Towards LLMs as Operating Systems},
-  note    = {Preprint, arXiv:2310.08560},
+  journal = {arXiv preprint arXiv:2310.08560},
   year    = {2023}
 }
 
-@misc{wu2024oscopilot,
+@article{wu2024oscopilot,
   author  = {Zhiyong Wu and others},
   title   = {OS-Copilot: Towards Generalist Computer Agents with Self-Improvement},
-  note    = {Preprint, arXiv:2402.07456},
+  journal = {arXiv preprint arXiv:2402.07456},
   year    = {2024}
 }
 
-@misc{liu2026agentos,
+@article{liu2026agentos,
   author  = {Rui Liu and Tao Zhe and Dong Wang and others},
   title   = {AgentOS: From Application Silos to a Natural Language-Driven Data Ecosystem},
-  note    = {Preprint, arXiv:2603.08938},
+  journal = {arXiv preprint arXiv:2603.08938},
   year    = {2026}
 }
 
@@ -147,17 +147,17 @@
 
 %% OpenClaw Security 
 
-@misc{openclaw_security1,
+@article{openclaw_security1,
   author  = {Zijun Wang and Haoqin Tu and Letian Zhang and others},
   title   = {Your Agent, Their Asset: A Real-World Safety Analysis of OpenClaw},
-  note    = {Preprint, arXiv:2604.04759},
+  journal = {arXiv preprint arXiv:2604.04759},
   year    = {2026}
 }
 
-@misc{openclaw_security2,
+@article{openclaw_security2,
   author  = {Yuhang Wang and Haichang Gao and others},
   title   = {A Systematic Security Evaluation of OpenClaw and Its Variants},
-  note    = {Preprint, arXiv:2604.03131},
+  journal = {arXiv preprint arXiv:2604.03131},
   year    = {2026}
 }
 
@@ -170,24 +170,24 @@
   howpublished = {\url{https://genai.owasp.org/llmrisk/llm01-prompt-injection/}}
 }
 
-@misc{liu2023prompt,
+@article{liu2023prompt,
   author  = {Yi Liu and others},
   title   = {Prompt Injection Attack against LLM-integrated Applications},
-  note    = {Preprint, arXiv:2306.05499},
+  journal = {arXiv preprint arXiv:2306.05499},
   year    = {2023}
 }
 
-@misc{greshake2023prompt,
+@article{greshake2023prompt,
   title={Not what you've signed up for: Compromising real-world LLM-integrated applications with Indirect Prompt Injection},
   author={Greshake, Kai and others},
-  note    = {Preprint, arXiv:2302.12173},
+  journal={arXiv preprint arXiv:2302.12173},
   year={2023}
 }
 
-@misc{zou2023universal,
+@article{zou2023universal,
   title={Universal and transferable adversarial attacks on aligned language models},
   author={Zou, Andy and others},
-  note    = {Preprint, arXiv:2307.15043},
+  journal={arXiv preprint arXiv:2307.15043},
   year={2023}
 }
 
@@ -323,11 +323,11 @@
 }
 
 %% Control-plane invariants: OS security foundations
-@misc{lim2024compartmentalization,
+@article{lim2024compartmentalization,
   author  = {Lim, Soo Yee and Agrawal, Sidhartha and Han, Xueyuan and
              Eyers, David and O'Keeffe, Dan and Pasquier, Thomas},
   title   = {Securing Monolithic Kernels using Compartmentalization},
-  note    = {Preprint, arXiv:2404.08716},
+  journal = {arXiv preprint arXiv:2404.08716},
   year    = {2024}
 }
 
@@ -348,6 +348,13 @@
   title     = {Capsicum: Practical Capabilities for {UNIX}},
   booktitle = {Proceedings of the USENIX Security Symposium},
   year      = {2010}
+}
+
+@inproceedings{mickens2019nightwatch,
+  title={Nightwatch: Efficient Access Control for Cloud Applications},
+  author={Mickens, James and others},
+  booktitle={Proceedings of the USENIX Annual Technical Conference},
+  year={2019}
 }
 
 @inproceedings{chen2016shreds,
@@ -381,36 +388,36 @@
   address   = {Vancouver, BC}
 }
 
-@misc{schneider2022sok,
+@article{schneider2022sok,
   author  = {Schneider, Moritz and Masti, Ramya Jayaram and Shinde, Shweta
              and Capkun, Srdjan and Perez, Ronald},
   title   = {{SoK}: Hardware-supported Trusted Execution Environments},
-  note    = {Preprint, arXiv:2205.12742},
+  journal = {arXiv preprint arXiv:2205.12742},
   year    = {2022}
 }
 
-@misc{lefeuvre2024sok,
+@article{lefeuvre2024sok,
   author  = {Lefeuvre, Hugo and Dautenhahn, Nathan and Chisnall, David
              and Olivier, Pierre},
   title   = {{SoK}: Software Compartmentalization},
-  note    = {Preprint, arXiv:2410.08434},
+  journal = {arXiv preprint arXiv:2410.08434},
   year    = {2024}
 }
 
-@misc{ji2026seagent,
+@article{ji2026seagent,
   author  = {Ji, Zimo and Wu, Daoyuan and Jiang, Wenyuan and Ma, Pingchuan
              and Li, Zongjie and Gao, Yudong and Wang, Shuai and Li, Yingjiu},
   title   = {Taming Various Privilege Escalation in {LLM}-Based Agent
              Systems: A Mandatory Access Control Framework},
-  note    = {Preprint, arXiv:2601.11893},
+  journal = {arXiv preprint arXiv:2601.11893},
   year    = {2026}
 }
 
-@misc{shi2025progent,
+@article{shi2025progent,
   author  = {Shi, Tianneng and He, Jingxuan and Wang, Zhun and Wu, Linyu
              and Li, Hongwei and Guo, Wenbo and Song, Dawn},
   title   = {Progent: Programmable Privilege Control for {LLM} Agents},
-  note    = {Preprint, arXiv:2504.11703},
+  journal = {arXiv preprint arXiv:2504.11703},
   year    = {2025}
 }
 

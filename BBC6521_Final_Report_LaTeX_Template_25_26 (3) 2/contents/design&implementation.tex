@@ -226,7 +226,6 @@ Defining tool identity at the right granularity is a balance between two failure
 Each tool is described by a JSON manifest, and the fields that fix its identity are tool identifier, tool name, application identifier, application name, risk tags, description, input schema, examples, path semantics, approval policy, and operation. These describe what the tool is intended to do, not where it runs.
 The \texttt{operation} field is the RPC method actually invoked on the backend, so a silent edit retargets execution to a different code path and must change the tool's identity.
 \texttt{mcpd} canonicalises these fields into a stable JSON serialisation and computes its SHA-256 digest, represented as a 64-character hexadecimal string.
-The full digest is used without truncation, since a 32-bit prefix would reach a 50\% collision probability at roughly $2^{16}$ registrations by the birthday bound, with meaningful risk appearing far earlier (even a few thousand tools push the collision probability well above acceptable thresholds for a primitive the kernel treats as a unique identity).
 
 The \texttt{endpoint} and \texttt{transport} fields are excluded from the semantic hash by design.
 Both describe \emph{where} a backend is reached, not \emph{what} it does, and routine operational moves (switching a service to a new socket path, or between transport variants such as \texttt{uds\_rpc} and \texttt{uds\_abstract}) should not cause a tool to look semantically different to planners or to kernel-side hash checks.
@@ -241,24 +240,20 @@ The semantic hash is the single artefact both sides check, computed in user spac
 
 \subsection{Session Management and Approval Binding}
 
-Binding an approval to the exact session, requester, and operation that triggered it requires explicit ticket-level state and precise matching logic, otherwise a TOCTOU window~\cite{bishop2003computer, lee2021exprace} opens between deferral and execution.
-Each session is bound to the real peer credentials of its Unix domain socket connection~\cite{stevens2013unix}. The daemon feeds \texttt{uid}, \texttt{gid}, \texttt{pid}, and a per-session random \texttt{session\_\allowbreak id} into BLAKE2b with an 8-byte output, and stores the resulting 64-bit digest as the binding hash alongside a session epoch.
-Including \texttt{pid} and the random \texttt{session\_\allowbreak id} ensures that two processes sharing a UID cannot reuse each other's session.
-The 64-bit output matches the width of the \texttt{AGENT\_\allowbreak BINDING} Netlink attribute, so \texttt{mcpd} re-submits the hash on every \texttt{TOOL\_\allowbreak REQUEST} and the kernel compares it against the value registered at \texttt{open\_\allowbreak session}.
-A \texttt{DEFER} response creates an approval ticket tagged with this binding context and a five-minute expiry, overridable per request, and the kernel re-checks the binding when \texttt{APPROVAL\_\allowbreak DECIDE} arrives.
-Session-scoped binding combined with per-request re-verification rules out approval replay across sessions, keeping the state validated at deferral identical to the state at execution.
+Approval would be straightforward if defer and execute were atomic, but they are not: the request that returns after the user decision has to prove it is the same request, in the same session, against the same tool, or a TOCTOU window~\cite{bishop2003computer, lee2021exprace} opens between the two events.
+Each session is bound to the real peer credentials of its Unix domain socket connection~\cite{stevens2013unix}.
+\texttt{mcpd} hashes \texttt{(uid, gid, pid, session\_id)}, where \texttt{session\_id} is per-session random, through BLAKE2b to an 8-byte output and stores the 64-bit digest as the binding hash alongside a session epoch.
+Including \texttt{pid} and a random \texttt{session\_\allowbreak id} stops two processes sharing a UID from reusing each other's session.
+The width matches the \texttt{AGENT\_\allowbreak BINDING} Netlink attribute, so \texttt{mcpd} resubmits the hash on every \texttt{TOOL\_\allowbreak REQUEST} and the kernel compares it against what was registered at \texttt{open\_\allowbreak session}.
+A \texttt{DEFER} response creates an approval ticket tagged with this binding context and a five-minute expiry (overridable per request), and the kernel re-checks the binding when \texttt{APPROVAL\_\allowbreak DECIDE} arrives.
+Session-scoped binding plus per-request re-verification rules out replay across sessions: the state at deferral is the state at execution.
 
 \paragraph{Catalog-epoch rebind on manifest change.}
-A second form of staleness arises when the catalog changes while a session is open.
-Without further mechanism, a client could keep invoking a re-registered tool under its pre-change binding.
-The check is scoped per tool.
+A second form of staleness arises when the catalog changes while a session is open: without further mechanism, a client could keep invoking a re-registered tool under its pre-change binding.
 Each tool records a \texttt{registered\_\allowbreak at\_\allowbreak epoch} at (re-)registration, each session records an \texttt{opened\_\allowbreak at\_\allowbreak epoch} at open time, and a \texttt{TOOL\_\allowbreak REQUEST} is denied with \texttt{catalog\_\allowbreak stale\_\allowbreak rebind\_\allowbreak required} when the targeted tool's \texttt{registered\_\allowbreak at\_\allowbreak epoch} exceeds the session's \texttt{opened\_\allowbreak at\_\allowbreak epoch}.
-Only the affected tool's re-registration invalidates pending sessions.
-Editing an unrelated manifest advances the shared \texttt{tool\_\allowbreak catalog\_\allowbreak epoch} counter without breaking other sessions.
+Because the check is per tool, only the affected tool's re-registration invalidates a pending session; editing an unrelated manifest advances the shared \texttt{tool\_\allowbreak catalog\_\allowbreak epoch} counter without disturbing anything else.
 
-Beyond the kernel-side ticket flow, \texttt{linux-mcp} supports two independent approval mechanisms driven by different manifest fields and enforced at different layers.
-The kernel remains the sole arbiter on the control-plane path.
-The user-space mechanism is a client-side pre-check that either terminates a request before it reaches \texttt{mcpd} or lets it proceed unchanged.
+Beyond the kernel ticket flow, \texttt{linux-mcp} supports two independent approval mechanisms: one in the kernel and one in the client, driven by different manifest fields and enforced at different layers.
 
 \textbf{(1) Kernel-mediated approval (DEFER ticket flow).}
 The kernel decides between \texttt{ALLOW}, \texttt{DENY}, and \texttt{DEFER} on every \texttt{TOOL\_\allowbreak REQUEST} based on the tool's \texttt{risk\_\allowbreak flags}, a bitmask derived from the manifest's \texttt{risk\_\allowbreak tags} at registration time.
@@ -277,12 +272,14 @@ A declined local prompt terminates the request in user space.
 No \texttt{tool:exec} is sent to \texttt{mcpd} and no kernel ticket is created.
 
 \textbf{Relationship between the two mechanisms.}
-The two mechanisms gate on different things rather than competing for the same checks. Kernel \texttt{DEFER} is \emph{payload-agnostic}, gating every invocation of a high-risk-flagged tool regardless of arguments, while the local prompt is \emph{payload-aware} and only gates requests whose specific arguments meet the declared condition. A single tool can trigger both, in which case execution proceeds only after the local prompt is approved, an \texttt{APPROVAL\_\allowbreak DECIDE} succeeds, and the ticket-bearing second \texttt{TOOL\_\allowbreak REQUEST} is admitted.
+The two mechanisms gate on different things, not the same checks.
+Kernel \texttt{DEFER} is \emph{payload-agnostic}: every invocation of a high-risk-flagged tool is gated regardless of arguments.
+The local prompt is \emph{payload-aware}: only requests whose arguments meet the declared condition are gated.
+A single tool can trigger both, in which case execution proceeds only after the local prompt is approved, an \texttt{APPROVAL\_\allowbreak DECIDE} succeeds, and the ticket-bearing second \texttt{TOOL\_\allowbreak REQUEST} is admitted.
 
 Figure~\ref{fig:chapter3-approval} illustrates the kernel-side state machine.
-Approval resolution always happens \emph{before} tool execution, so no deferred request bypasses the approval gate and every deferred execution consumes an explicit ticket.
-The kernel need not understand the full meaning of a request.
-It verifies that the binding context is preserved, the ticket is valid and unconsumed, and the \texttt{DEFER} $\rightarrow$ \texttt{ALLOW} transition is explicitly authorised~\cite{klein2010sel4}.
+Approval always resolves \emph{before} tool execution, so no deferred request bypasses the gate and every deferred execution consumes an explicit ticket.
+The kernel verifies only what it needs to: binding context preserved, ticket valid and unconsumed, and the \texttt{DEFER} $\rightarrow$ \texttt{ALLOW} transition explicitly authorised~\cite{klein2010sel4}.
 
 \begin{figure}[t]
 \centering
@@ -338,42 +335,39 @@ An operator can read what the kernel regards as authoritative without relying on
 \subsection{Daemon Implementation}
 \label{sec:daemon-implementation}
 
-The kernel enforces the critical state transitions, but \texttt{mcpd} does most of the actual work, and its code splits across four concerns. \texttt{manifest\_\allowbreak loader.py} handles manifest loading and semantic hashing, \texttt{session\_\allowbreak store.py} manages session storage and binding context, \texttt{netlink\_\allowbreak client.py} carries Netlink traffic to the kernel, and \texttt{server.py} dispatches requests and runs the backend probe.
+Most runtime work happens in \texttt{mcpd}; the kernel module is consulted only on admission decisions.
+The daemon splits across four files: \texttt{manifest\_\allowbreak loader.py} (manifest parsing and semantic hashing), \texttt{session\_\allowbreak store.py} (session bindings), \texttt{netlink\_\allowbreak client.py} (kernel Netlink traffic), and \texttt{server.py} (JSON-RPC dispatcher and backend probe).
 
 \paragraph{Kernel state reconciliation.}
-The manifest directory is the source of truth, but kernel registry state persists across \texttt{mcpd} restarts.
-A cold start or a manifest edit must neither drift silently from the on-disk manifests nor invalidate existing sessions unnecessarily.
-On every reload, the daemon computes a per-tool diff between the previous and new registries and collapses it into one of five reconcile actions.
-\texttt{KEEP} applies when both fingerprints match and makes no kernel call.
-\texttt{ADD} and \texttt{REMOVE} handle tools that appear or disappear between reloads.
-\texttt{RE\_\allowbreak REGISTER\_\allowbreak SEMANTIC} covers a changed semantic hash on an unchanged backend, and the in-place re-register preserves the kernel-side TOFU \texttt{binary\_\allowbreak hash} slot.
-\texttt{RE\_\allowbreak REGISTER\_\allowbreak BINDING\_\allowbreak MOVE} fires when \texttt{transport} or \texttt{endpoint} changed and the backend may therefore be a different process, so the daemon first unregisters to clear the TOFU slot before re-registering, ensuring the next probe pins a fresh digest.
+The manifest directory is the source of truth, but the kernel registry survives across \texttt{mcpd} restarts.
+The reload path has to keep the two in sync without invalidating existing sessions unnecessarily.
+On each reload \texttt{mcpd} diffs the previous and new registries per tool and picks one of five reconcile actions.
+\texttt{KEEP} applies when both fingerprints match, so no kernel call is issued.
+\texttt{ADD} and \texttt{REMOVE} handle tools that appear or disappear.
+\texttt{RE\_\allowbreak REGISTER\_\allowbreak SEMANTIC} covers a changed semantic hash on an unchanged backend; the in-place re-register preserves the kernel's TOFU \texttt{binary\_\allowbreak hash} slot.
+\texttt{RE\_\allowbreak REGISTER\_\allowbreak BINDING\_\allowbreak MOVE} fires when \texttt{transport} or \texttt{endpoint} changed: the backend may now be a different process, so \texttt{mcpd} unregisters first to clear the TOFU slot, then re-registers so the next probe pins a fresh digest.
 
 \paragraph{Probe-failure fail-closed.}
-The TOFU \texttt{binary\_\allowbreak hash} mechanism only works if the daemon never quietly substitutes an empty digest for a failed probe.
-If \texttt{mcpd} cannot reach the backend, cannot read \texttt{/\allowbreak proc/\allowbreak <pid>/\allowbreak exe}, or does not recognise the transport, the probe returns a non-live result and the exec path refuses the invocation.
-No empty \texttt{BINARY\_\allowbreak HASH} flows upward. A fresh probe that cannot read the live binary will not reset a pinned slot and let a swapped backend start clean, and a cold registration before the backend comes up will not install a blanket empty pin that a later swap could inherit.
-Audit records for probe refusals carry \texttt{source=probe}, which separates them from kernel-side denials (\texttt{source=arb}) and client-side declines (\texttt{source=user\_\allowbreak decline}).
+The TOFU \texttt{binary\_\allowbreak hash} mechanism only works if \texttt{mcpd} never quietly substitutes an empty digest for a failed probe.
+When \texttt{mcpd} cannot reach the backend, cannot read \texttt{/\allowbreak proc/\allowbreak <pid>/\allowbreak exe}, or does not recognise the transport, the probe returns a non-live result and the exec path refuses the invocation.
+No empty \texttt{BINARY\_\allowbreak HASH} flows upward. A failed probe will not reset a pinned slot and let a swapped backend start clean, and a cold registration before the backend comes up will not install a blank pin a later swap could inherit.
+Audit records for probe refusals carry \texttt{source=probe}, distinct from kernel denials (\texttt{source=arb}) and client declines (\texttt{source=user\_\allowbreak decline}).
 
 \paragraph{Netlink client.}
-\texttt{mcpd} keeps a single long-lived Netlink socket to \texttt{kernel\_\allowbreak mcp} instead of reopening one per request.
-Socket setup adds measurable overhead on an otherwise microsecond-scale path, and a persistent connection simplifies the ordering of \texttt{APPROVAL\_\allowbreak DECIDE} against its eventual \texttt{TOOL\_\allowbreak REQUEST} replay.
-Optional per-stage latency counters (session lookup, kernel arbitration, tool execution, end-to-end) are available on this path for the overhead analysis in Chapter~\ref{chap:evaluation}.
+\texttt{mcpd} keeps one long-lived Netlink socket to \texttt{kernel\_\allowbreak mcp} rather than reopening one per request.
+Socket setup is measurable on a microsecond-scale path, and a persistent connection simplifies ordering \texttt{APPROVAL\_\allowbreak DECIDE} against its eventual \texttt{TOOL\_\allowbreak REQUEST} replay.
+Optional per-stage latency counters (session lookup, kernel arbitration, tool execution, end-to-end) plug into this path for the overhead analysis in Chapter~\ref{chap:evaluation}.
 
 \paragraph{Deployment and fail-closed configuration.}
 \texttt{mcpd} needs \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} for Netlink administration and \texttt{CAP\_\allowbreak SYS\_\allowbreak PTRACE} for reading \texttt{/\allowbreak proc/\allowbreak <pid>/\allowbreak exe} across uid boundaries during the backend probe.
-The supplied systemd unit runs the daemon as a dedicated unprivileged \texttt{mcpd} user and grants both capabilities via \texttt{Ambient\allowbreak Capabilities}.
-The same two capabilities also appear in \texttt{Capability\allowbreak Bounding\allowbreak Set}, so an \texttt{execve}-launched child cannot regain anything beyond what \texttt{mcpd} itself uses.
-\texttt{Protect\allowbreak System=strict} with a \texttt{Read\allowbreak Write\allowbreak Paths} allowlist of \texttt{/\allowbreak tmp} and \texttt{/\allowbreak tmp/\allowbreak linux-mcp-apps} renders the rest of the filesystem, including the manifest directory, read-only to the daemon, with no explicit bind mount required.
+The supplied systemd unit runs \texttt{mcpd} as a dedicated unprivileged user, grants both caps via \texttt{Ambient\allowbreak Capabilities}, and bounds them in \texttt{Capability\allowbreak Bounding\allowbreak Set} so an \texttt{execve}'d child cannot widen the cap set.
+Two further directives close gaps the threat model would otherwise leave open: \texttt{No\allowbreak New\allowbreak Privileges=true} blocks SUID-based privilege escalation in any child, and \texttt{Memory\allowbreak Deny\allowbreak Write\allowbreak Execute=true} rejects writable executable pages and so blunts a memory-corruption exploit class.
+The remaining systemd hardening (\texttt{Protect\allowbreak System=strict} with a \texttt{/\allowbreak tmp} allowlist, \texttt{Protect\allowbreak Kernel\allowbreak Tunables}, \texttt{Protect\allowbreak Kernel\allowbreak Modules}, \texttt{Protect\allowbreak Control\allowbreak Groups}, \texttt{Restrict\allowbreak SUIDSGID}, \texttt{Lock\allowbreak Personality}, \texttt{Private\allowbreak Devices}) shrinks the blast radius of a compromised daemon at no operational cost.
 
-\texttt{No\allowbreak New\allowbreak Privileges=true} blocks any child \texttt{execve} from picking up capabilities \texttt{mcpd} lacks, and \texttt{Memory\allowbreak Deny\allowbreak Write\allowbreak Execute=true} prevents a memory-corruption exploit from mapping writable executable pages, blunting an attack class the threat model otherwise excludes. \texttt{Protect\allowbreak Kernel\allowbreak Tunables}, \texttt{Protect\allowbreak Kernel\allowbreak Modules}, and \texttt{Protect\allowbreak Control\allowbreak Groups} block kernel-state probing if \texttt{mcpd} is compromised, while \texttt{Restrict\allowbreak SUIDSGID} and \texttt{Lock\allowbreak Personality} cut off SUID and personality-flag tricks and \texttt{Private\allowbreak Devices} strips the \texttt{/dev} access \texttt{mcpd} never uses.
-
-\texttt{mcpd} also has to decide which UIDs are valid tool backends, checked via \texttt{SO\_\allowbreak PEERCRED} against the configured \texttt{allowed\_\allowbreak backend\_\allowbreak uids} list on every probe and exec dial. An unprivileged \texttt{mcpd} defaults to its own UID, but a privileged \texttt{mcpd} has no safe default.
-Trusting only UID~0 rejects every realistic non-root backend and leaves \texttt{binary\_\allowbreak hash} unpinned.
-Trusting \texttt{\$SUDO\_\allowbreak UID} folds the correctness of the launcher script into the daemon's trust boundary.
-\texttt{mcpd} therefore refuses to start unless the list is declared in the TOML, or the operator explicitly opts in via \texttt{LINUX\_\allowbreak MCP\_\allowbreak TRUST\_\allowbreak SUDO\_\allowbreak UID}.
-The supplied systemd unit sets \texttt{LINUX\_\allowbreak MCP\_\allowbreak CONFIG} to a TOML path and leaves \texttt{LINUX\_\allowbreak MCP\_\allowbreak TRUST\_\allowbreak SUDO\_\allowbreak UID} unset.
-Production deployments therefore name backend UIDs in configuration; they do not inherit them from the launch environment.
+A separate question is which UIDs may serve as tool backends.
+\texttt{mcpd} checks \texttt{SO\_\allowbreak PEERCRED} against \texttt{allowed\_\allowbreak backend\_\allowbreak uids} on every probe and exec dial.
+Defaulting to \texttt{\{0\}} (root only) rejects every realistic non-root backend and leaves \texttt{binary\_\allowbreak hash} unpinned; defaulting to \texttt{\$SUDO\_\allowbreak UID} folds the launcher script's correctness into the daemon's trust boundary.
+\texttt{mcpd} therefore refuses to start without an explicit TOML list or an explicit \texttt{LINUX\_\allowbreak MCP\_\allowbreak TRUST\_\allowbreak SUDO\_\allowbreak UID} opt-in; backend UIDs come from configuration, never from the launch environment.
 
 
 
@@ -391,7 +385,8 @@ The cold-start procedure follows directly from this partition.
 At startup, \texttt{mcpd} issues \texttt{RESET\_\allowbreak TOOLS} to clear the kernel tool registry and then re-registers each manifest tool unconditionally, which guarantees the kernel and the on-disk manifest set agree before any client is accepted.
 \texttt{RESET\_\allowbreak TOOLS} alone does not bump the catalog epoch; the per-tool register calls that follow do.
 A surviving session holding a pre-restart \texttt{opened\_\allowbreak at\_\allowbreak epoch} will therefore receive \texttt{catalog\_\allowbreak stale\_\allowbreak rebind\_\allowbreak required} on its next request against any re-registered tool.
-The per-tool diff-based reconciliation described in Section~\ref{sec:daemon-implementation} applies to later manifest edits, not to this cold-start path.
+Cold start deliberately does not attempt diff-based reconciliation against the surviving kernel registry: the per-tool diff path described in Section~\ref{sec:daemon-implementation} applies only to live manifest reloads while \texttt{mcpd} is running.
+Optimising cold start to reuse residual kernel state under an explicit divergence signal is left to future work (Section~\ref{sec:further-work}).
 
 This split preserves audit and admission state without pretending that a crashed daemon can safely continue pre-existing sessions.
 Approval tickets and registry history stay inspectable through \texttt{sysfs} across the restart, so an operator can still read what recent activity occurred while \texttt{mcpd} was down or unresponsive.
@@ -408,10 +403,14 @@ Unloading \texttt{kernel\_\allowbreak mcp} drops all kernel-held state (registry
 \subsection{Rationale for the Kernel--User-Space Split}
 \label{sec:design-alternatives}
 
-The first alternative considered was eBPF, which looked lightweight and needed no full kernel module. eBPF LSM hooks fire on kernel operations like \texttt{security\_\allowbreak socket\_\allowbreak recvmsg} and \texttt{security\_\allowbreak file\_\allowbreak open}, not on parsed JSON-RPC messages, so an in-kernel enforcer would re-parse MCP framing from raw socket bytes on every hook invocation before it could see a \texttt{tool\_\allowbreak hash} or a \texttt{ticket\_\allowbreak id}, all under the eBPF verifier's bounded-loop and instruction-count constraints. State management itself is tractable, since \texttt{bpf\_\allowbreak timer} and pinned maps cover approval tickets and expiry, but rebuilding the application-layer protocol state machine inside verifier-constrained programs is what made eBPF unattractive for this control plane.
+Section~\ref{sec:related-work} established the main layer mismatch: MCP admission decisions depend on parsed request state and manifest-derived tool identity, while eBPF/LSM hooks observe kernel objects and syscall events.
+In implementation terms, this ruled out an eBPF-only design because it would have required reconstructing MCP framing and request identity from raw socket bytes under verifier constraints.
+Direct LSM hooks had the same attachment-point problem: no hook naturally carries both the request body and the registered tool identity.
 
-LSM hooks were the next candidate but fire at the syscall boundary, the wrong layer for this work. Tool identity here is a SHA-256 hash of a JSON manifest, not a file path or a socket operation, and no syscall naturally sees a tool hash alongside a request, so correlating the two would inject application-layer semantics into a mechanism designed for OS-object-level policy.
+A capability-style design was also considered, but it would have changed the programming model for tool services.
+Each backend would need to obtain, store, and present kernel-facing capabilities during invocation.
+That conflicts with the design goal that tool authors only provide a JSON manifest and continue to speak ordinary user-space RPC.
 
-A capability-based design in the style of Capsicum was also considered, but would have required tool services to interact with a kernel-facing API to obtain and present capabilities, breaking the goal that tool authors need only write a JSON manifest with no kernel-facing obligations.
-
-Generic Netlink avoids all three problems by supporting structured TLV messages, dump-style enumeration for registry introspection, and arbitrary internal state management inside a loadable module. The cost is that a full kernel module is needed where a policy hook or a BPF program would have sufficed for simpler designs, but for a prototype targeting a narrow set of admission invariants this is an acceptable trade-off, and the module's role stayed scoped enough that the added complexity remained manageable.
+Generic Netlink was chosen because it gives \texttt{mcpd} a structured kernel interface for exactly the state transitions this design needs: tool registration, agent registration, request arbitration, approval decisions, completion reporting, and registry dumps.
+It keeps JSON parsing, schema validation, and tool execution in user space, while letting the kernel hold the small amount of durable state needed for admission.
+The cost is a loadable kernel module rather than a policy hook or BPF program, but the module remains limited to registry membership, ticket state, session binding, and audit records.

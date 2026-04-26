@@ -12,12 +12,12 @@ That leaves a set of properties one would normally expect the kernel to guarante
 
 We present \texttt{linux-mcp}, a kernel-assisted control plane for LLM tool invocation on Linux.
 Semantic parsing and tool execution stay in user space; the kernel module holds only a narrow slice of control-plane state (which tools and agents are registered, which approval tickets are live, and which session a request belongs to).
-This design requires no modification to existing tools beyond a declarative JSON manifest, and makes approval state durable across daemon failure and protected from unprivileged user-space interference.
+This design requires no modification to existing tools beyond a declarative JSON manifest and a corresponding adapter layer, and makes approval state durable across daemon failure and protected from unprivileged user-space interference.
 
-We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened seccomp variant, looking at both performance and behavior under attack and after daemon failure.
-The kernel module blocks every attack in the test suite, while the user-space and seccomp baselines leave bypass rates of 84.6\% and 38.5\%; an extended-attack rerun surfaced a missing peer-credential check in the stock module, closed by a six-line patch at no measurable latency cost.
-Performance overhead is small: latency is within measurement noise at small and medium payloads and about 3.4\% lower at 1~MB, and a paired microbenchmark attributes only \num{4.334}~$\mu$s to the full kernel arbitration path above the measured Netlink noise floor.
-The prototype supports 43 tools across 14 applications and is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
+We evaluate \texttt{linux-mcp} against a pure user-space baseline and a hardened seccomp variant, covering performance, behaviour under attack, and behaviour after daemon failure.
+The kernel module blocks every attack in our targeted control-plane test suite, against an 84.6\% bypass rate for the user-space baseline, while keeping end-to-end latency within measurement noise at typical payloads.
+An extended-attack rerun further surfaced a missing peer-credential check in the stock module, closed without measurable cost.
+The prototype is publicly available at \url{https://github.com/xiheng724/linux_mcp}.
 
 }
 \vspace{0.5cm}

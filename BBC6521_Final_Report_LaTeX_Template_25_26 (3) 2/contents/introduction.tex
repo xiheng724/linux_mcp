@@ -27,9 +27,9 @@ This leads to a concrete question: which control-plane invariants in MCP-style t
 
 \subsection{Our Solution}
 
-The design of \texttt{linux-mcp} is shaped by a single observation: there is a small, specific set of control-plane properties that a user-space gateway cannot hold against its own failure, and a much larger set of concerns (manifest semantics, schema validation, tool execution itself) where user-space flexibility is genuinely valuable.
+The design of \texttt{linux-mcp} starts from a boundary between two classes of responsibility: control-plane properties that a user-space gateway cannot hold against its own failure, and concerns such as manifest semantics, schema validation, and tool execution where user-space flexibility remains useful.
 We therefore push only the first set into a Linux kernel module (admission decisions, approval-ticket state, session binding, and kernel-resident audit records that survive gateway restart), and leave the rest alone.
-The kernel role is narrow by design: it enforces invariants, not policy, and does not attempt to replace the OS abstractions the rest of the system already relies on.
+The kernel module is limited to checking registered identities, session bindings, approval-ticket state, and crash-visible audit records; policy interpretation and tool execution remain in user space.
 
 The architecture has four layers: an LLM client (\texttt{llm-app}), a manifest-aware gateway (\texttt{mcpd}), a Generic-Netlink-based kernel control plane (\texttt{kernel\_\allowbreak mcp}), and resident tool services over Unix domain sockets.
 Every tool invocation follows a fixed path through all four layers; no request reaches a tool service without first obtaining an explicit kernel admission decision.
@@ -47,52 +47,7 @@ At the other end, user-space frameworks such as OpenClaw and Hermes Agent preser
 The kernel is changed only where the gateway provably cannot protect an invariant against itself; the rest of the stack, including existing Linux security primitives such as seccomp and LSM, stays untouched and continues to work alongside the new module.
 The central hypothesis that follows from this placement is that binding safety and failure resilience can be improved at acceptable performance cost, and \hyperref[chap:evaluation]{Chapter~4} tests that claim empirically.
 
-\paragraph{Comparison with user-space systems.}
-Table~\ref{tab:comparison} contextualises the design against two representative user-space tool-invocation frameworks: the monolithic-gateway OpenClaw~\cite{openclaw2026} and the in-process Hermes Agent~\cite{nousresearch2026hermesagent}.
-\begin{table}[t]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{5pt}
-\renewcommand{\arraystretch}{1.25}
-\begin{tabularx}{\textwidth}{@{}l >{\columncolor{gray!8}}X X X@{}}
-\toprule
-\textbf{Property}
-  & \textbf{\texttt{linux-mcp} (this work)}
-  & \textbf{OpenClaw~\cite{openclaw2026}}
-  & \textbf{Hermes Agent~\cite{nousresearch2026hermesagent}} \\
-\midrule
-Control-plane placement
-  & Split: manifest logic in user space; admission and tickets in kernel module
-  & Standalone user-space gateway
-  & In-process: same PID as the agent loop \\
-Trust boundary of admission
-  & Kernel-enforced, gated by \texttt{CAP\_NET\_ADMIN}
-  & Gateway process only
-  & Python runtime; optional Docker sandbox \\
-Approval state
-  & Kernel-resident tickets with explicit state machine
-  & In-memory gateway state
-  & Per-session module state in the agent process \\
-Session $\leftrightarrow$ identity binding
-  & Hash over \texttt{SO\_PEERCRED} re-checked every request
-  & Gateway-managed session table
-  & Session-id token; no OS-level binding \\
-State on gateway crash
-  & Registry, tickets, audit log persist in kernel
-  & Lost with the gateway process
-  & Lost with the agent process \\
-Audit availability post-crash
-  & Readable through \texttt{sysfs} without a running daemon
-  & Application log only
-  & Application log only \\
-\bottomrule
-\end{tabularx}
-\caption{Control-plane properties of \texttt{linux-mcp} compared with two representative user-space tool-invocation frameworks. The grey column marks the system proposed in this work.}
-\label{tab:comparison}
-\end{table}
-\noindent
-
-
+A side-by-side comparison of \texttt{linux-mcp} against two representative user-space frameworks (OpenClaw and Hermes Agent) is given in Section~\ref{sec:related-work} (Table~\ref{tab:comparison}).
 
 \subsection{Main Contributions}
 This paper makes the following contributions:
