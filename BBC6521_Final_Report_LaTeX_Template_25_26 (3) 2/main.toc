@@ -1,4 +1,5 @@
 \@ifundefined {etoctocstyle}{\let \etoc@startlocaltoc \@gobble \let \etoc@settocdepth \@gobble \let \etoc@depthtag \@gobble \let \etoc@setlocaltop \@gobble }{}
+\thispagestyle {fancy}
 \contentsline {section}{\textit {Abstract}}{3}{section*.1}%
 \contentsline {section}{\textit {Keywords}}{3}{section*.1}%
 \contentsline {section}{\textit {Chapter 1: Introduction}}{5}{section*.2}%

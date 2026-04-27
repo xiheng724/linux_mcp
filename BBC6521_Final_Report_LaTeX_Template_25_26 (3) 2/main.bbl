@@ -1,11 +1,13 @@
 \begin{thebibliography}{10}
 
 \bibitem{yao2023react}
-Yao S, Zhao J, Yu D, et~al.. ReAct: Synergizing reasoning and acting in language models; 2023.
+Yao S, Zhao J, Yu D, et~al.. ReAct: Synergizing reasoning and acting in
+  language models; 2023.
 \newblock Preprint, arXiv:2210.03629.
 
 \bibitem{schick2023toolformer}
-Schick T, Dwivedi-Yu J, et~al.. Toolformer: Language models can teach themselves to use tools; 2023.
+Schick T, Dwivedi-Yu J, et~al.. Toolformer: Language models can teach
+  themselves to use tools; 2023.
 \newblock Preprint, arXiv:2302.04761.
 
 \bibitem{park2023generative}
@@ -14,15 +16,18 @@ Park JS, O'Brien J, Cai CJ, Morris MR, Liang P, Bernstein MS.
 \newblock In: UIST; 2023. .
 
 \bibitem{qin2024toolllm}
-Qin Y, Liang S, Ye Y, et~al.. ToolLLM: Facilitating Large Language Models to Master 16000+ Real-world APIs; 2024.
+Qin Y, Liang S, Ye Y, et~al.. ToolLLM: Facilitating Large Language Models to
+  Master 16000+ Real-world APIs; 2024.
 \newblock Preprint, arXiv:2307.16789.
 
 \bibitem{mcp2025}
 {Model Context Protocol}. Architecture Specification; 2025.
-\newblock \url{https://modelcontextprotocol.io/specification/2025-06-18/architecture}.
+\newblock
+  \url{https://modelcontextprotocol.io/specification/2025-06-18/architecture}.
 
 \bibitem{packer2023memgpt}
-Packer C, Fang V, Patil SG, Lin K, Wooders S, Gonzalez JE. MemGPT: Towards LLMs as Operating Systems; 2023.
+Packer C, Fang V, Patil SG, Lin K, Wooders S, Gonzalez JE. MemGPT: Towards LLMs
+  as Operating Systems; 2023.
 \newblock Preprint, arXiv:2310.08560.
 
 \bibitem{mei2024aios}
@@ -44,7 +49,8 @@ Peter S, Li J, Zhang I, et~al.
 \newblock In: OSDI; 2014. .
 
 \bibitem{greshake2023prompt}
-Greshake K, et~al.. Not what you've signed up for: Compromising real-world LLM-integrated applications with Indirect Prompt Injection; 2023.
+Greshake K, et~al.. Not what you've signed up for: Compromising real-world
+  LLM-integrated applications with Indirect Prompt Injection; 2023.
 \newblock Preprint, arXiv:2302.12173.
 
 \bibitem{tanenbaum2022}
@@ -58,7 +64,8 @@ Chase H. {LangChain}; 2022.
 \newblock \url{https://github.com/langchain-ai/langchain}.
 
 \bibitem{langgraph2024}
-{LangChain AI}. {LangGraph}: A Framework for Building Stateful Multi-Actor {LLM} Applications; 2024.
+{LangChain AI}. {LangGraph}: A Framework for Building Stateful Multi-Actor
+  {LLM} Applications; 2024.
 \newblock Open-source agent orchestration framework.
 \newblock \url{https://github.com/langchain-ai/langgraph}.
 
@@ -68,81 +75,102 @@ Gravitas S. {AutoGPT}: An Autonomous {GPT}-4 Experiment; 2023.
 \newblock \url{https://github.com/Significant-Gravitas/AutoGPT}.
 
 \bibitem{crewai2024}
-{CrewAI Inc }. {CrewAI}: Framework for Orchestrating Role-Playing Autonomous {AI} Agents; 2024.
+{CrewAI Inc }. {CrewAI}: Framework for Orchestrating Role-Playing Autonomous
+  {AI} Agents; 2024.
 \newblock Open-source multi-agent collaboration platform.
 \newblock \url{https://crewai.com}.
 
 \bibitem{semantickernel2023}
-{Microsoft Corporation}. Semantic Kernel: Open-Source {SDK} for {LLM} Integration; 2023.
+{Microsoft Corporation}. Semantic Kernel: Open-Source {SDK} for {LLM}
+  Integration; 2023.
 \newblock Released publicly March 2023; reached v1.0 in early 2024.
 \newblock \url{https://github.com/microsoft/semantic-kernel}.
 
 \bibitem{wu2024oscopilot}
-Wu Z, et~al.. OS-Copilot: Towards Generalist Computer Agents with Self-Improvement; 2024.
+Wu Z, et~al.. OS-Copilot: Towards Generalist Computer Agents with
+  Self-Improvement; 2024.
 \newblock Preprint, arXiv:2402.07456.
 
 \bibitem{liu2026agentos}
-Liu R, Zhe T, Wang D, et~al.. AgentOS: From Application Silos to a Natural Language-Driven Data Ecosystem; 2026.
+Liu R, Zhe T, Wang D, et~al.. AgentOS: From Application Silos to a Natural
+  Language-Driven Data Ecosystem; 2026.
 \newblock Preprint, arXiv:2603.08938.
 
 \bibitem{openharness2026}
-{HKUDS}. {OpenHarness}: Open Agent Harness with a Built-in Personal Agent---Ohmo!; 2026.
+{HKUDS}. {OpenHarness}: Open Agent Harness with a Built-in Personal
+  Agent---Ohmo!; 2026.
 \newblock Initial open-source release v0.1.0: April 1, 2026.
 \newblock \url{https://github.com/HKUDS/OpenHarness}.
 
 \bibitem{harness2025}
 {Harness Inc }. Harness {AI} {DevOps} Agent; 2025.
 \newblock AI-powered autonomous workers embedded in governed CI/CD pipelines.
-\newblock \url{https://developer.harness.io/docs/platform/harness-aida/ai-devops/}.
+\newblock
+  \url{https://developer.harness.io/docs/platform/harness-aida/ai-devops/}.
 
 \bibitem{apple2024pcc}
-{Apple Inc }. Private Cloud Compute: A new frontier for {AI} privacy in the cloud; 2024.
+{Apple Inc }. Private Cloud Compute: A new frontier for {AI} privacy in the
+  cloud; 2024.
 \newblock \url{https://security.apple.com/blog/private-cloud-compute/}.
 
 \bibitem{mcp_anniversary_2025}
 {MCP Core Maintainers}. One Year of MCP: November 2025 Spec Release; 2025.
 \newblock Model Context Protocol Blog, accessed April 13, 2026.
-\newblock \url{https://blog.modelcontextprotocol.io/posts/2025-11-25-first-mcp-anniversary/}.
+\newblock
+  \url{https://blog.modelcontextprotocol.io/posts/2025-11-25-first-mcp-anniversary/}.
 
 \bibitem{patil2023gorilla}
-Patil SG, Zhang T, Wang X, Gonzalez JE. Gorilla: Large Language Model Connected with Massive {API}s; 2023.
+Patil SG, Zhang T, Wang X, Gonzalez JE. Gorilla: Large Language Model Connected
+  with Massive {API}s; 2023.
 
 \bibitem{liu2023prompt}
-Liu Y, et~al.. Prompt Injection Attack against LLM-integrated Applications; 2023.
+Liu Y, et~al.. Prompt Injection Attack against LLM-integrated Applications;
+  2023.
 \newblock Preprint, arXiv:2306.05499.
 
 \bibitem{openclaw_security1}
-Wang Z, Tu H, Zhang L, et~al.. Your Agent, Their Asset: A Real-World Safety Analysis of OpenClaw; 2026.
+Wang Z, Tu H, Zhang L, et~al.. Your Agent, Their Asset: A Real-World Safety
+  Analysis of OpenClaw; 2026.
 \newblock Preprint, arXiv:2604.04759.
 
 \bibitem{openclaw_security2}
-Wang Y, Gao H, et~al.. A Systematic Security Evaluation of OpenClaw and Its Variants; 2026.
+Wang Y, Gao H, et~al.. A Systematic Security Evaluation of OpenClaw and Its
+  Variants; 2026.
 \newblock Preprint, arXiv:2604.03131.
 
 \bibitem{wang2023voyager}
-Wang G, Xie Y, Jiang Y, Mandlekar A, Xiao C, Zhu Y, et~al.. Voyager: An Open-Ended Embodied Agent with Large Language Models; 2023.
+Wang G, Xie Y, Jiang Y, Mandlekar A, Xiao C, Zhu Y, et~al.. Voyager: An
+  Open-Ended Embodied Agent with Large Language Models; 2023.
 
 \bibitem{yang2024swe}
-Yang J, Jimenez CE, Wettig A, Lieret K, Yao S, Narasimhan K, et~al.. {SWE}-agent: Agent-Computer Interfaces Enable Automated Software Engineering; 2024.
+Yang J, Jimenez CE, Wettig A, Lieret K, Yao S, Narasimhan K, et~al..
+  {SWE}-agent: Agent-Computer Interfaces Enable Automated Software Engineering;
+  2024.
 
 \bibitem{lim2024compartmentalization}
-Lim SY, Agrawal S, Han X, Eyers D, O'Keeffe D, Pasquier T. Securing Monolithic Kernels using Compartmentalization; 2024.
+Lim SY, Agrawal S, Han X, Eyers D, O'Keeffe D, Pasquier T. Securing Monolithic
+  Kernels using Compartmentalization; 2024.
 \newblock Preprint, arXiv:2404.08716.
 
 \bibitem{schneider2022sok}
-Schneider M, Masti RJ, Shinde S, Capkun S, Perez R. {SoK}: Hardware-supported Trusted Execution Environments; 2022.
+Schneider M, Masti RJ, Shinde S, Capkun S, Perez R. {SoK}: Hardware-supported
+  Trusted Execution Environments; 2022.
 \newblock Preprint, arXiv:2205.12742.
 
 \bibitem{lefeuvre2024sok}
-Lefeuvre H, Dautenhahn N, Chisnall D, Olivier P. {SoK}: Software Compartmentalization; 2024.
+Lefeuvre H, Dautenhahn N, Chisnall D, Olivier P. {SoK}: Software
+  Compartmentalization; 2024.
 \newblock Preprint, arXiv:2410.08434.
 
 \bibitem{ji2026seagent}
-Ji Z, Wu D, Jiang W, Ma P, Li Z, Gao Y, et~al.. Taming Various Privilege Escalation in {LLM}-Based Agent Systems: A Mandatory Access Control Framework; 2026.
+Ji Z, Wu D, Jiang W, Ma P, Li Z, Gao Y, et~al.. Taming Various Privilege
+  Escalation in {LLM}-Based Agent Systems: A Mandatory Access Control
+  Framework; 2026.
 \newblock Preprint, arXiv:2601.11893.
 
 \bibitem{shi2025progent}
-Shi T, He J, Wang Z, Wu L, Li H, Guo W, et~al.. Progent: Programmable Privilege Control for {LLM} Agents; 2025.
+Shi T, He J, Wang Z, Wu L, Li H, Guo W, et~al.. Progent: Programmable Privilege
+  Control for {LLM} Agents; 2025.
 \newblock Preprint, arXiv:2504.11703.
 
 \bibitem{seccomp2026}
@@ -167,8 +195,10 @@ Shi T, He J, Wang Z, Wu L, Li H, Guo W, et~al.. Progent: Programmable Privilege 
 
 \bibitem{wright2002lsm}
 Wright C, Cowan C, Smalley S, Morris J, Kroah-Hartman G.
-\newblock Linux Security Modules: General Security Support for the {Linux} Kernel.
-\newblock In: Proceedings of the 11th {USENIX} Security Symposium. USENIX Association; 2002. p. 17-31.
+\newblock Linux Security Modules: General Security Support for the {Linux}
+  Kernel.
+\newblock In: Proceedings of the 11th {USENIX} Security Symposium. USENIX
+  Association; 2002. p. 17-31.
 
 \bibitem{salaun2017landlock}
 Salaün M.
@@ -182,8 +212,10 @@ Watson RNM, Anderson J, Laurie B, Kennaway K.
 
 \bibitem{brimhall2023mac}
 Brimhall B, Garrard J, de~la Garza C, Coffman J.
-\newblock A Comparative Analysis of {Linux} Mandatory Access Control Policy Enforcement Mechanisms.
-\newblock In: Proceedings of the 16th European Workshop on System Security ({EuroSec}); 2023. .
+\newblock A Comparative Analysis of {Linux} Mandatory Access Control Policy
+  Enforcement Mechanisms.
+\newblock In: Proceedings of the 16th European Workshop on System Security
+  ({EuroSec}); 2023. .
 
 \bibitem{bishop2003computer}
 Bishop M.
@@ -193,7 +225,8 @@ Bishop M.
 \bibitem{lee2021exprace}
 Lee Y, Min C, Lee B.
 \newblock {ExpRace}: Exploiting Kernel Races through Raising Interrupts.
-\newblock In: Proceedings of the 30th {USENIX} Security Symposium. Vancouver, BC; 2021. p. 2363-80.
+\newblock In: Proceedings of the 30th {USENIX} Security Symposium. Vancouver,
+  BC; 2021. p. 2363-80.
 
 \bibitem{stevens2013unix}
 Stevens WR, Rago SA.
@@ -211,7 +244,8 @@ Klein G, Andronick J, Elphinstone K, Heiser G, Cock D, Derrin P, et~al.
 
 \bibitem{west2021welch}
 West RM.
-\newblock Best practice in statistics: {U}se the {W}elch $t$-test when testing the difference between two groups.
+\newblock Best practice in statistics: {U}se the {W}elch $t$-test when testing
+  the difference between two groups.
 \newblock Annals of Clinical Biochemistry. 2021;58(4):267-9.
 
 \end{thebibliography}
