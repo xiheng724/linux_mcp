@@ -3,7 +3,7 @@
 \phantomsection \label{chap:design} \setcounter{section}{3} \setcounter{subsection}{0}
 \addcontentsline{toc}{section}{\textit{Chapter 3: Design and Implementation}}
 
-The design question for \texttt{linux-mcp} is a question of placement: which parts of the control plane should the gateway not be solely responsible for holding?
+The design question for linux-mcp is a question of placement: which parts of the control plane should the gateway not be solely responsible for holding?
 \texttt{mcpd} keeps everything that needs semantic flexibility; \texttt{kernel\_\allowbreak mcp} owns the state that must survive gateway failure and stay unreachable from unprivileged processes.
 
 
@@ -12,7 +12,7 @@ The design question for \texttt{linux-mcp} is a question of placement: which par
 \label{sec:design-goals}
 
 Chapter~\ref{chap:background} established that MCP-style control planes need enforcement beyond user-space self-policing. 
-\texttt{linux-mcp} translates that conclusion into three design commitments.
+linux-mcp translates that conclusion into three design commitments.
 
 \textbf{(1) Kernel-resident admission.}
 Every tool invocation is admitted against kernel-resident state only: the registration of the requesting agent, the presence of the target tool in the registry, and the consistency of its semantic identity with the registered manifest.
@@ -35,11 +35,11 @@ What these commitments cover, and what they leave out (runtime semantic verifica
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.9\linewidth]{figures/linux-mcp-overview.pdf}
-\caption{Layered architecture of \texttt{linux-mcp}, showing the four runtime components and the wire protocols connecting them.}
+\caption{Layered architecture of linux-mcp, showing the four runtime components and the wire protocols connecting them.}
 \label{fig:linux-mcp-overview}
 \end{figure}
 
-The overall architecture of \texttt{linux-mcp}, shown in Figure~\ref{fig:linux-mcp-overview}, comprises four runtime components.
+The overall architecture of linux-mcp, shown in Figure~\ref{fig:linux-mcp-overview}, comprises four runtime components.
 
 \texttt{llm-app} is the user-facing client.
 It queries \texttt{mcpd} for the tool catalog, constructs invocation payloads from tool schemas, and submits requests.
@@ -51,7 +51,7 @@ It is responsible for loading and validating tool manifests, computing manifest-
 
 \texttt{kernel\_\allowbreak mcp} is the durable back-end of the control plane: a loadable kernel module implementing the \texttt{KERNEL\_\allowbreak MCP} Generic Netlink family.
 It maintains the tool and agent registries, arbitrates invocation requests, manages approval ticket lifecycles, verifies the session binding hash on every request, pins a trust-on-first-use \texttt{binary\_\allowbreak hash} for each backend process, and records per-agent invocation history in a fixed-size \texttt{call\_\allowbreak log} ring buffer.
-All kernel-held state is exposed read-only through \texttt{sysfs} under \texttt{/\allowbreak sys/\allowbreak kernel/\allowbreak mcp/}, which remains readable even when \texttt{mcpd} is not running.
+All kernel-held state is exposed read-only through sysfs under \texttt{/\allowbreak sys/\allowbreak kernel/\allowbreak mcp/}, which remains readable even when \texttt{mcpd} is not running.
 The module does not parse manifests, execute tools, or implement a policy language; its only job is enforcing the admission-control invariants.
 
 \texttt{tool-app} is the execution side: a collection of resident user-space services, each bound to a Unix domain socket.
@@ -82,7 +82,7 @@ Gateway layer
 
 Kernel layer
 & \texttt{kernel\_\allowbreak mcp}
-& Maintain registries, perform admission decisions, manage approval tickets, verify session bindings, pin \texttt{binary\_\allowbreak hash}, expose \texttt{sysfs} state
+& Maintain registries, perform admission decisions, manage approval tickets, verify session bindings, pin \texttt{binary\_\allowbreak hash}, expose sysfs state
 & JSON parsing, tool execution, LLM-specific logic \\
 
 Execution layer
@@ -93,7 +93,7 @@ Execution layer
 \bottomrule
 \end{tabular}
 \end{spacing}
-\caption{Concrete layers in \texttt{linux-mcp}.}
+\caption{Concrete layers in linux-mcp.}
 \label{tab:architecture_layers}
 \end{table}
 
@@ -104,7 +104,7 @@ Execution layer
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/linux-mcp-workload.pdf}
-\caption{Invocation lifecycle in \texttt{linux-mcp}.}
+\caption{Invocation lifecycle in linux-mcp.}
 \label{fig:chapter3-lifecycle}
 \end{figure}
 
@@ -136,8 +136,8 @@ The detailed semantics of these decisions are described in Figure~\ref{fig:chapt
 Depending on the kernel's decision, \texttt{mcpd} either forwards the request to the tool service, transitions the request into a pending state awaiting explicit approval, or terminates the invocation with an error.
 After the tool service returns (with a normal result, an error, a timeout, or a crash caught by \texttt{mcpd}), \texttt{mcpd} issues \texttt{TOOL\_\allowbreak COMPLETE} to the kernel, referencing the ticket issued at admission; the kernel records the outcome in the per-agent \texttt{call\_\allowbreak log} and closes the invocation lifecycle from the control plane's perspective.
 
-This workflow has a concrete observability consequence: the kernel both opens and closes every invocation.
-An invocation that never reaches \texttt{TOOL\_\allowbreak COMPLETE}, whether due to daemon failure or tool timeout, persists as an open entry in kernel state and remains inspectable via \texttt{sysfs}.
+This workflow has an observability consequence: the kernel both opens and closes every invocation.
+An invocation that never reaches \texttt{TOOL\_\allowbreak COMPLETE}, whether due to daemon failure or tool timeout, persists as an open entry in kernel state and remains inspectable via sysfs.
 This contrasts with a purely user-space design, in which the lifecycle of a request is only as durable as the daemon's own in-memory representation.
 
 
@@ -145,7 +145,7 @@ This contrasts with a purely user-space design, in which the lifecycle of a requ
 \subsection{Wire Protocols}
 \label{sec:wire-protocols}
 
-User-space communication in \texttt{linux-mcp} runs over Unix domain sockets, while the kernel control-plane path uses Generic Netlink. The default UDS variant is filesystem-path (\texttt{uds\_rpc}). An abstract-namespace variant (\texttt{uds\_abstract}) is also implemented and exercised end-to-end by one demo manifest, and a VSOCK variant (\texttt{vsock\_rpc}) is reserved but not yet wired up. All UDS paths between \texttt{llm-app}, \texttt{mcpd}, and each tool service share the same framing of a 4-byte big-endian length prefix followed by a UTF-8-encoded JSON object, so a single framing routine serves both user-space endpoints. The Netlink path uses TLV-encoded attributes rather than JSON and is described at the end of this subsection.
+User-space communication in linux-mcp runs over Unix domain sockets, while the kernel control-plane path uses Generic Netlink. The default UDS variant is filesystem-path (\texttt{uds\_rpc}). An abstract-namespace variant (\texttt{uds\_abstract}) is also implemented and exercised end-to-end by one demo manifest, and a VSOCK variant (\texttt{vsock\_rpc}) is reserved but not yet wired up. All UDS paths between \texttt{llm-app}, \texttt{mcpd}, and each tool service share the same framing of a 4-byte big-endian length prefix followed by a UTF-8-encoded JSON object, so a single framing routine serves both user-space endpoints. The Netlink path uses TLV-encoded attributes rather than JSON and is described at the end of this subsection.
 
 \paragraph{llm-app to mcpd.}
 \texttt{llm-app} sends two categories of message to \texttt{mcpd}: system control messages keyed by \texttt{"sys"} (covering \texttt{list\_\allowbreak apps}, \texttt{list\_\allowbreak tools}, \texttt{open\_\allowbreak session}, and \texttt{approval\_\allowbreak reply}) and tool execution requests keyed by \texttt{"kind": "tool:exec"}.
@@ -222,7 +222,7 @@ The complete field specification and a representative manifest are given in \hyp
 
 Defining tool identity at the right granularity is a balance between two failure modes. Binding identity too tightly to transport details such as socket paths or process identifiers means that routine operational changes (redeployments, restarts, reconfiguration) invalidate registry state even when the tool itself has not changed. Defining it too coarsely makes the system unable to distinguish a semantically modified tool from one that has merely been redeployed at a different address.
 
-\texttt{linux-mcp} resolves this tension by separating semantic identity from transport location.
+linux-mcp resolves this tension by separating semantic identity from transport location.
 Each tool is described by a JSON manifest, and the fields that fix its identity are tool identifier, tool name, application identifier, application name, risk tags, description, input schema, examples, path semantics, approval policy, and operation. These describe what the tool is intended to do, not where it runs.
 The \texttt{operation} field is the RPC method actually invoked on the backend, so a silent edit retargets execution to a different code path and must change the tool's identity.
 \texttt{mcpd} canonicalises these fields into a stable JSON serialisation and computes its SHA-256 digest, represented as a 64-character hexadecimal string.
@@ -253,7 +253,7 @@ A second form of staleness arises when the catalog changes while a session is op
 Each tool records a \texttt{registered\_\allowbreak at\_\allowbreak epoch} at (re-)registration, each session records an \texttt{opened\_\allowbreak at\_\allowbreak epoch} at open time, and a \texttt{TOOL\_\allowbreak REQUEST} is denied with \texttt{catalog\_\allowbreak stale\_\allowbreak rebind\_\allowbreak required} when the targeted tool's \texttt{registered\_\allowbreak at\_\allowbreak epoch} exceeds the session's \texttt{opened\_\allowbreak at\_\allowbreak epoch}.
 Because the check is per tool, only the affected tool's re-registration invalidates a pending session; editing an unrelated manifest advances the shared \texttt{tool\_\allowbreak catalog\_\allowbreak epoch} counter without disturbing anything else.
 
-Beyond the kernel ticket flow, \texttt{linux-mcp} supports two independent approval mechanisms: one in the kernel and one in the client, driven by different manifest fields and enforced at different layers.
+Beyond the kernel ticket flow, linux-mcp supports two independent approval mechanisms: one in the kernel and one in the client, driven by different manifest fields and enforced at different layers.
 
 \textbf{(1) Kernel-mediated approval (DEFER ticket flow).}
 The kernel decides between \texttt{ALLOW}, \texttt{DENY}, and \texttt{DEFER} on every \texttt{TOOL\_\allowbreak REQUEST} based on the tool's \texttt{risk\_\allowbreak flags}, a bitmask derived from the manifest's \texttt{risk\_\allowbreak tags} at registration time.
@@ -284,7 +284,7 @@ The kernel verifies only what it needs to: binding context preserved, ticket val
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\linewidth]{figures/linux-mcp-approval.pdf}
-\caption{Approval-ticket flow in \texttt{linux-mcp}: the \texttt{ALLOW}/\texttt{DENY}/\texttt{DEFER} state machine enforced by the kernel module.}
+\caption{Approval-ticket flow in linux-mcp: the \texttt{ALLOW}/\texttt{DENY}/\texttt{DEFER} state machine enforced by the kernel module.}
 \label{fig:chapter3-approval}
 \end{figure}
 
@@ -321,7 +321,7 @@ A record is a flat struct holding a monotonic sequence number, a nanosecond time
 Completed invocations log from \texttt{cmd\_\allowbreak tool\_\allowbreak complete}; denied or deferred ones log from \texttt{cmd\_\allowbreak tool\_\allowbreak request}, so nothing escapes the audit buffer.
 The kernel parses no JSON.
 \texttt{mcpd} precomputes the hashes and passes them as fixed-width attributes.
-The buffer is exposed through \texttt{sysfs} as a binary attribute and stays readable after a \texttt{mcpd} crash.
+The buffer is exposed through sysfs as a binary attribute and stays readable after a \texttt{mcpd} crash.
 This provides crash-visible audit, not tamper-evident provenance: the buffer is bounded and the hashes are 8-byte prefixes.
 
 \paragraph{Sysfs surface.}
@@ -374,7 +374,7 @@ Defaulting to \texttt{\{0\}} (root only) rejects every realistic non-root backen
 \subsection{State Reconciliation and Recovery}
 \label{sec:reconciliation}
 
-\texttt{linux-mcp} treats a daemon restart as a recovery problem, not a process-management detail.
+linux-mcp treats a daemon restart as a recovery problem, not a process-management detail.
 The three layers of state it keeps sit on different sides of the crash boundary.
 The kernel holds the tool registry, approval tickets, the \texttt{tool\_\allowbreak catalog\_\allowbreak epoch} counter, and each agent's \texttt{call\_\allowbreak log}.
 All of that survives a \texttt{mcpd} crash.
@@ -389,7 +389,7 @@ Cold start deliberately does not attempt diff-based reconciliation against the s
 Optimising cold start to reuse residual kernel state under an explicit divergence signal is left to future work (Section~\ref{sec:further-work}).
 
 This split preserves audit and admission state without pretending that a crashed daemon can safely continue pre-existing sessions.
-Approval tickets and registry history stay inspectable through \texttt{sysfs} across the restart, so an operator can still read what recent activity occurred while \texttt{mcpd} was down or unresponsive.
+Approval tickets and registry history stay inspectable through sysfs across the restart, so an operator can still read what recent activity occurred while \texttt{mcpd} was down or unresponsive.
 Any surviving ticket whose referenced session no longer has a live \texttt{mcpd}-side binding simply expires at its TTL.
 Clients reopen any session that pre-dates the restart on their first post-restart request.
 The client library handles this rebind automatically when it sees the \texttt{catalog\_\allowbreak stale\_\allowbreak rebind\_\allowbreak required} reason.

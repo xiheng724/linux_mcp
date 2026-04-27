@@ -33,7 +33,7 @@ MCP rapidly achieved broad ecosystem adoption, with implementations in Python, T
 This separation simplifies interoperability and modularity.
 However, it also concentrates responsibility in the host: identity management, approval decisions, and consistency between tool descriptions and execution all depend on correct host behavior.
 MCP defines how components communicate, but does not specify how a local system should enforce these properties.
-\texttt{linux-mcp} implements the enforcement layer that MCP leaves unspecified: it provides the local mechanism that turns the protocol's abstract trust model into a set of kernel-verified invariants.
+linux-mcp implements the enforcement layer that MCP leaves unspecified: it provides the local mechanism that turns the protocol's abstract trust model into a set of kernel-verified invariants.
 
 
 
@@ -77,7 +77,7 @@ This gap motivates introducing a dedicated control layer that validates semantic
 \begin{tabularx}{\textwidth}{@{}l >{\columncolor{gray!8}}X X X@{}}
 \toprule
 \textbf{Property}
-  & \textbf{\texttt{linux-mcp} (this work)}
+  & \textbf{linux-mcp (this work)}
   & \textbf{OpenClaw~\cite{openclaw2026}}
   & \textbf{Hermes Agent~\cite{nousresearch2026hermesagent}} \\
 \midrule
@@ -102,12 +102,12 @@ State on gateway crash
   & Lost with the gateway process
   & Lost with the agent process \\
 Audit availability post-crash
-  & Readable through \texttt{sysfs} without a running daemon
+  & Readable through sysfs without a running daemon
   & Application log only
   & Application log only \\
 \bottomrule
 \end{tabularx}
-\caption{Control-plane properties of \texttt{linux-mcp} compared with two representative user-space tool-invocation frameworks, as configured in their default upstream documentation without external sandboxing layers. Production deployments commonly stack additional isolation on top: OpenClaw is often paired with NVIDIA NemoClaw and OpenShell sandboxing, and Hermes Agent's gateway architecture also offers Docker, SSH, Daytona, Singularity, and Modal terminal backends with container hardening. Such deployments would shift the right two columns toward stronger admission and execution boundaries; the comparison here is against the bare framework. The grey column marks the system proposed in this work.}
+\caption{Control-plane properties of linux-mcp compared with two representative user-space tool-invocation frameworks, as configured in their default upstream documentation without external sandboxing layers. Production deployments commonly stack additional isolation on top: OpenClaw is often paired with NVIDIA NemoClaw and OpenShell sandboxing, and Hermes Agent's gateway architecture also offers Docker, SSH, Daytona, Singularity, and Modal terminal backends with container hardening. Such deployments would shift the right two columns toward stronger admission and execution boundaries; the comparison here is against the bare framework. The grey column marks the system proposed in this work.}
 \label{tab:comparison}
 \end{table}
 
@@ -115,7 +115,8 @@ Audit availability post-crash
 \subsection{Related Work}
 \label{sec:related-work}
 
-Suppose an attacker replaces a registered tool's JSON-RPC payload at runtime so that the \texttt{operation} field now targets a different backend handler, while the socket address and the enclosing syscalls stay identical.
+Suppose an attacker replaces a registered tool's JSON-RPC payload at runtime, so that the \texttt{operation} field now targets a different backend handler.
+The socket address and the enclosing syscalls stay identical.
 An LSM hook at \texttt{security\_\allowbreak socket\_\allowbreak recvmsg} fires on the same kernel operation as before; a seccomp filter sees the same syscall numbers; a Landlock policy sees the same file descriptors.
 None of them has a place to hang a check that says ``this tool's manifest hash no longer matches what was registered''.
 That is the gap this section is about.
@@ -134,11 +135,11 @@ Industrial deployments such as Harness~\cite{harness2025} add platform-level Rol
 Recent systems on application-layer mandatory access control including privilege-escalation defences for LLM agents~\cite{ji2026seagent} and programmable privilege control for tool-calling agents~\cite{shi2025progent} have enforced policy inside a modified agent runtime, so invariant correctness depends on the runtime itself remaining intact.
 Most of these approaches keep the trust anchor in user-space or in a cloud-hosted control plane; their correctness degrades when the runtime or gateway is compromised.
 Apple Intelligence is a partial exception: its Private Cloud Compute design relies on Apple-controlled hardware, a hardware root of trust, and attestation mechanisms, rather than a general-purpose Linux host control plane.~\cite{apple2024pcc}.
-Table~\ref{tab:comparison} contextualises \texttt{linux-mcp} against two representative user-space frameworks, the monolithic-gateway OpenClaw~\cite{openclaw2026} and the in-process Hermes Agent~\cite{nousresearch2026hermesagent}, across the control-plane properties most relevant to this work.
+Table~\ref{tab:comparison} contextualises linux-mcp against two representative user-space frameworks, the monolithic-gateway OpenClaw~\cite{openclaw2026} and the in-process Hermes Agent~\cite{nousresearch2026hermesagent}, across the control-plane properties most relevant to this work.
 
 
 AIOS-style proposals such as AIOS, OS-Copilot, MemGPT, and AgentOS~\cite{mei2024aios, liu2026agentos, packer2023memgpt, wu2024oscopilot} pursue a broader scope: they embed LLM-specific abstractions (scheduling, memory management, tool access) into a new OS substrate.
-These proposals broaden scope by redesigning OS infrastructure; \texttt{linux-mcp} instead adds a narrow kernel role to an otherwise unchanged Linux system, targeting a bounded set of MCP-style control-plane invariants.
+These proposals broaden scope by redesigning OS infrastructure; linux-mcp instead adds a narrow kernel role to an otherwise unchanged Linux system, targeting a bounded set of MCP-style control-plane invariants.
 
 
 \begin{table}[t]
@@ -147,7 +148,7 @@ These proposals broaden scope by redesigning OS infrastructure; \texttt{linux-mc
 \setlength{\tabcolsep}{5pt}\renewcommand{\arraystretch}{1.15}
 \begin{tabularx}{\linewidth}{@{}l X X@{}}
 \toprule
-\textbf{Attack class} & \textbf{Representative attack} & \textbf{Defence in \texttt{linux-mcp}} \\
+\textbf{Attack class} & \textbf{Representative attack} & \textbf{Defence in linux-mcp} \\
 \midrule
 
 Spoofing
@@ -168,7 +169,7 @@ Escalation
 
 Audit loss
 & Kill \texttt{mcpd} to erase recent call history.
-& Per-agent \texttt{call\_log} is a fixed-size kernel ring buffer, exposed read-only via \texttt{sysfs}; survives daemon termination. \\
+& Per-agent \texttt{call\_log} is a fixed-size kernel ring buffer, exposed read-only via sysfs; survives daemon termination. \\
 
 \bottomrule
 \end{tabularx}
@@ -189,13 +190,13 @@ Second, \texttt{mcpd} exposes no network interface but only a Unix domain socket
 Third, two threats frequently raised in the AI agent setting fall outside this model because they live at other layers, namely prompt injection at the model's reasoning layer and supply-chain compromise of manifests at the filesystem integrity layer; neither is an appropriate target for kernel-level admission control, and both are addressed by complementary defences at those layers, as discussed later in this section.
 The threat model therefore focuses on what kernel enforcement can actually address: a co-located unprivileged process that can observe, forge, or replay control-plane messages exchanged with the gateway.
 
-Concretely, the adversary model grants the attacker four capabilities: (1) arbitrary code execution under an unprivileged uid distinct from the one under which \texttt{mcpd} runs; (2) access to any Unix domain socket the gateway exposes to unprivileged processes; (3) the ability to craft and replay arbitrary JSON-RPC messages on that socket, including messages observed in prior interactions; and (4) full knowledge of the MCP protocol, tool manifests, and \texttt{linux-mcp} implementation.
-Correspondingly, the attacker interacts with \texttt{linux-mcp} exclusively through the \texttt{mcpd} JSON-RPC surface and holds none of the three elevated capabilities that would bypass this interface: no \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}, no \texttt{ptrace} access to \texttt{mcpd}, and no write access to the manifest directory.
+Concretely, the adversary model grants the attacker four capabilities: (1) arbitrary code execution under an unprivileged uid distinct from the one under which \texttt{mcpd} runs; (2) access to any Unix domain socket the gateway exposes to unprivileged processes; (3) the ability to craft and replay arbitrary JSON-RPC messages on that socket, including messages observed in prior interactions; and (4) full knowledge of the MCP protocol, tool manifests, and linux-mcp implementation.
+Correspondingly, the attacker interacts with linux-mcp exclusively through the \texttt{mcpd} JSON-RPC surface and holds none of the three elevated capabilities that would bypass this interface: no \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}, no \texttt{ptrace} access to \texttt{mcpd}, and no write access to the manifest directory.
 Each boundary closes a distinct bypass path: \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} would let the attacker talk to the kernel module directly via Netlink, skipping \texttt{mcpd} entirely; \texttt{ptrace} would let the attacker read or modify \texttt{mcpd}'s address space and forge control-plane state from within the gateway; and manifest write would poison the kernel registry at the next registration, since manifests are the trusted input from which tool identity is derived.
 
 Two dominant attack categories in AI agent systems fall outside this scope.
 \emph{Prompt injection} operates at the model's reasoning layer, before any \texttt{tool:exec} request is submitted; kernel admission control has no visibility into the planning process \cite{greshake2023prompt, liu2023prompt}.
-\emph{Supply-chain compromise of manifests} requires file-system-level defences such as Integrity Measurement Architecture or device-mapper verity; \texttt{linux-mcp} treats on-disk manifests as trusted input and assumes the adversary lacks write access to \texttt{tool-app/\allowbreak manifests/}.
+\emph{Supply-chain compromise of manifests} requires file-system-level defences such as Integrity Measurement Architecture or device-mapper verity; linux-mcp treats on-disk manifests as trusted input and assumes the adversary lacks write access to \texttt{tool-app/\allowbreak manifests/}.
 
 Trust in \texttt{mcpd} is structural, not continuous.
 The daemon is trusted to perform two translations correctly: at startup, converting manifest contents into SHA-256 hashes and registering them with the kernel; and at each session open, converting the client's \texttt{SO\_\allowbreak PEERCRED} into a binding hash anchored in the kernel.

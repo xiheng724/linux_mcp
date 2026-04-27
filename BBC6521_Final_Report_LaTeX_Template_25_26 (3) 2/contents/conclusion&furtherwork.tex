@@ -5,15 +5,15 @@
 
 \subsection{Conclusion}
 
-The broader question behind this project is what a traditional Linux system needs in order to host AI agents well, asked narrowly through MCP: which parts of a tool-invocation control plane genuinely need operating-system support, and which are fine in user space?
+The broader question behind this project is what a traditional Linux system needs in order to host AI agents well, asked narrowly through MCP: which parts of a tool-invocation control plane need operating-system support, and which are fine in user space?
 For the control-plane side the answer is a small set of invariants (semantic consistency between a registered tool and the one actually executed, identity binding between a request and its session, approval validity across the defer-approve-execute lifecycle, and state durability across gateway failure), each structurally hard to hold in a user-space gateway, because each has to survive the failure or compromise of the very process that enforces it.
 
-\texttt{linux-mcp} is one concrete shape this split can take: a small kernel module holds registries, admission decisions, and the approval-ticket lifecycle behind a \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-gated Netlink interface, while \texttt{mcpd} handles manifests, semantic hashes, session binding, and forwarding.
+linux-mcp is one concrete shape this split can take: a small kernel module holds registries, admission decisions, and the approval-ticket lifecycle behind a \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-gated Netlink interface, while \texttt{mcpd} handles manifests, semantic hashes, session binding, and forwarding.
 \texttt{mcpd} is trusted to populate the kernel's view at initialisation and to forward Netlink frames faithfully thereafter, but its runtime logic (session state, ticket routing, request forwarding) is no longer load-bearing for individual request validation; a memory-safety compromise of the daemon itself remains out of scope, since \texttt{mcpd} still holds \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}, and we discuss a minimal split of that capability in Section~\ref{sec:further-work}.
 In the tested prototype, the kernel path enforced all specified control-plane invariants across the targeted attack set while both user-space baselines permitted meaningful bypass rates, with latency and throughput close to the user-space baseline throughout; a subsequent extended-attack rerun surfaced a missing peer-credential check in the stock module, closed by a six-line patch at no measurable latency cost.
 
 The position is narrower than AIOS-style proposals that rebuild OS infrastructure around LLM abstractions, and less trusting than user-space frameworks that accept gateway correctness as given.
-Whether AI agents eventually deserve an operating system of their own is probably a long way off; in the meantime, a conventional Linux system extended with a few carefully scoped agent-aware mechanisms can already carry an MCP control plane that neither a user-space gateway nor existing Linux security primitives can match alone.
+Whether AI agents will eventually warrant an operating system of their own remains an open question; in the meantime, a conventional Linux system extended with a few carefully scoped agent-aware mechanisms can already carry an MCP control plane that neither a user-space gateway nor existing Linux security primitives can match alone.
 
 These control-plane benefits are not free at deployment time, and an honest account should name the costs that do not show up in the latency and throughput numbers.
 Shipping a loadable kernel module introduces operational overhead that a user-space daemon avoids: a target-kernel version to track (the prototype is built against 6.8 and compatibility across 5.15--6.12 has not been characterised), module-signing and loader-policy requirements on locked-down distributions, and a debugging path (\texttt{dmesg}, \texttt{kdb}, crash dumps) that most application engineers are unfamiliar with.
@@ -61,7 +61,7 @@ A stronger claim would establish a lower bound: under a stated threat model that
 The second is in-kernel, agent-attributed accounting and cooperative scheduling for tool execution.
 The present prototype arbitrates whether a request runs but does not constrain how it runs once approved.
 A natural next step is to extend the per-agent state already held in the kernel into a cgroup-style accounting domain that tracks tool-execution budgets (wall time, fan-out, tool-class quotas) and enforces them at request admission rather than after the fact, with multi-agent fairness guarantees backed by the same kernel state that already binds sessions.
-This connects directly to the operating-system literature on resource-attribution containers, real-time scheduling, and BPF-CPU, and produces a concrete measurable claim of the form ``two agents sharing a host see tool-execution latency that diverges by no more than $\Delta$ under contention''.
+This connects directly to the operating-system literature on resource-attribution containers, real-time scheduling, and BPF-CPU, and yields a falsifiable claim of the form ``two agents sharing a host see tool-execution latency that diverges by no more than $\Delta$ under contention''.
 
 The third is attested arbitration.
 At present, the kernel trusts \texttt{mcpd}'s view of the manifest set at registration time, and any remote party trusts the kernel's word on what was registered.

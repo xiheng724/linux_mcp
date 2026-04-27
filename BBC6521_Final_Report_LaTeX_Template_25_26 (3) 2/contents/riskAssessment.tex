@@ -7,7 +7,7 @@
 
 \textbf{Risk and Environmental Impact Assessment}
 
-This project develops \texttt{linux-mcp}, a kernel-assisted control plane for AI tool invocation that splits semantic interpretation and tool execution in user space from admission control in the kernel.
+This project develops linux-mcp, a kernel-assisted control plane for AI tool invocation that splits semantic interpretation and tool execution in user space from admission control in the kernel.
 Because the system spans an LLM-facing application, a user-space gateway, a kernel module, and external tools, it carries technical, security, and resource-related risks.
 Following the prescribed method, each risk is assigned a likelihood $L$ and a consequence $C$, and scored as $R = L \cdot C$.
 Table~\ref{tab:risk_assessment} summarises the assessment.
@@ -34,7 +34,7 @@ Finally, dependence on external tooling such as LLM APIs, proxies, or virtualiza
 \begin{table}[h]
 \centering
 \small
-\caption{Summary of identified risks and mitigations for \texttt{linux-mcp}.}
+\caption{Summary of identified risks and mitigations for linux-mcp.}
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.05}
 \begin{tabular}{p{3.9cm} c c c p{1.8cm} p{5.9cm}}

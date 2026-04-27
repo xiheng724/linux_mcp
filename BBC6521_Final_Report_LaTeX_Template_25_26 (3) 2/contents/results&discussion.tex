@@ -11,29 +11,29 @@
 \renewcommand{\textfraction}{0.15}
 \renewcommand{\floatpagefraction}{0.9}
 
-\texttt{linux-mcp} is evaluated along four dimensions: control-plane latency and its breakdown across invocation stages, throughput under concurrent load, resistance to a representative set of control-plane attacks, and system behaviour under daemon failure and restart.
+linux-mcp is evaluated along four dimensions: control-plane latency and its breakdown across invocation stages, throughput under concurrent load, resistance to a representative set of control-plane attacks, and system behaviour under daemon failure and restart.
 The central claim under test is that relocating admission-control state into the kernel strengthens enforcement without making the tool invocation path prohibitively expensive.
-Two baselines isolate this effect from user-space hardening alone: a conventional user-space mediator (\textbf{userspace}), in which registration, admission, and approval all reside in the daemon, and a hardened variant (\textbf{seccomp}) that augments the same control path with stricter syscall filtering, additional validation, and audit logging.
+Two baselines isolate this effect from user-space hardening alone: a conventional user-space mediator (\textbf{user-space}), in which registration, admission, and approval all reside in the daemon, and a hardened variant (\textbf{seccomp}) that augments the same control path with stricter syscall filtering, additional validation, and audit logging.
 
 The prototype under test comprises 43 tools across 14 applications; all three systems operate over this same tool deployment throughout the evaluation.
 All experiments were conducted on a VMware guest (Apple aarch64 host, 4 vCPU, 8 GB RAM) in a headless configuration with no concurrent user-space workloads.
 Latency results are reported over $n = 30$ independent runs of 2000 requests each, giving a standard error of the mean small enough to support Welch's $t$-test comparisons at $\alpha = 0.05$ while remaining within the hypervisor timing noise of a virtualised guest.
 Throughput and the category-level security evaluation are drawn from the same run, using the harness's built-in concurrency sweep and ten repeats of each attack case.
-All reported $p$-values are two-sided Welch's $t$-tests \cite{west2021welch} comparing per-repetition mean latency against the \texttt{userspace} baseline.
+All reported $p$-values are two-sided Welch's $t$-tests \cite{west2021welch} comparing per-repetition mean latency against the \texttt{user-space} baseline.
 
 
 \subsection{Latency and Control-Plane Overhead}
 
 \begin{table}[!b]
 \centering
-\caption{Mean end-to-end latency by payload ($n = 30$ runs $\times$ 2000 requests). $\Delta$ columns report the relative change against the \texttt{userspace} baseline on the same row; $p$-values are two-sided Welch's $t$-tests against that baseline, \textsuperscript{ns} $= p > 0.05$. Bold marks the row minimum.}
+\caption{Mean end-to-end latency by payload ($n = 30$ runs $\times$ 2000 requests). $\Delta$ columns report the relative change against the \texttt{user-space} baseline on the same row; $p$-values are two-sided Welch's $t$-tests against that baseline, \textsuperscript{ns} $= p > 0.05$. Bold marks the row minimum.}
 \label{tab:latency}
 \setlength{\tabcolsep}{5pt}
 \renewcommand{\arraystretch}{1.2}
 \footnotesize
 \begin{tabular}{l r @{\hspace{12pt}} r r l @{\hspace{12pt}} r r l}
 \toprule
-& \multicolumn{1}{c}{\textbf{userspace}}
+& \multicolumn{1}{c}{\textbf{user-space}}
 & \multicolumn{3}{c}{\textbf{seccomp}}
 & \multicolumn{3}{c}{\textbf{kernel}} \\
 \cmidrule(lr){2-2}\cmidrule(lr){3-5}\cmidrule(lr){6-8}
@@ -59,13 +59,13 @@ At 10~KiB the kernel path is nominally slower (\num{0.899}~ms versus \num{0.863}
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.95\linewidth]{figures/figure_latency_panel.pdf}
-\caption{Latency summary across the three systems at 100~B, 10~KiB, and 1~MiB payloads ($n = 30$ independent runs of 2000 requests, error bars 95\% CI). Panel (a): mean end-to-end latency on a log y-axis so sub-millisecond gaps at small payloads remain visible alongside the 1~MiB values. Panel (b): $p_{95}$ latency; the three systems are indistinguishable at 100~B and 10~KiB, and the kernel $p_{95}$ sits below both baselines at 1~MiB. Panel (c): mean-latency ratio against the \texttt{userspace} baseline, zoomed around the parity line; \texttt{seccomp} sits above parity at every payload size, while the kernel path only crosses below parity at 1~MiB. Panel (d): per-payload stage stack in $\mu$s, with three sub-axes auto-scaled per payload; each bar decomposes one system into session-lookup, arbitration, and tool-exec. The annotation above each kernel bar reports the absolute kernel arbitration cost (\num{28}~$\mu$s at 100~B and 10~KiB, \num{38}~$\mu$s at 1~MiB), which is the only stage with a meaningful inter-system delta and remains roughly one order of magnitude below tool execution at small payloads (tool exec / arbitration $\approx$ 10$\times$) and at least two orders of magnitude below at 1~MiB ($\approx$ 102$\times$ against tool execution alone, and $\approx$ 197$\times$ against full end-to-end latency).}
+\caption{Latency summary across the three systems at 100~B, 10~KiB, and 1~MiB payloads ($n = 30$ independent runs of 2000 requests, error bars 95\% CI). Panel (a): mean end-to-end latency on a log y-axis so sub-millisecond gaps at small payloads remain visible alongside the 1~MiB values. Panel (b): $p_{95}$ latency; the three systems are indistinguishable at 100~B and 10~KiB, and the kernel $p_{95}$ sits below both baselines at 1~MiB. Panel (c): mean-latency ratio against the \texttt{user-space} baseline, zoomed around the parity line; \texttt{seccomp} sits above parity at every payload size, while the kernel path only crosses below parity at 1~MiB. Panel (d): per-payload stage stack in $\mu$s, with three sub-axes auto-scaled per payload; each bar decomposes one system into session-lookup, arbitration, and tool-exec. The annotation above each kernel bar reports the absolute kernel arbitration cost (\num{28}~$\mu$s at 100~B and 10~KiB, \num{38}~$\mu$s at 1~MiB), which is the only stage with a meaningful inter-system delta and remains roughly one order of magnitude below tool execution at small payloads (tool exec / arbitration $\approx$ 10$\times$) and at least two orders of magnitude below at 1~MiB ($\approx$ 102$\times$ against tool execution alone, and $\approx$ 197$\times$ against full end-to-end latency).}
 \label{fig:chapter4-latency}
 \end{figure}
 
 The 1~MiB row provides the only statistically clean comparison in the table, with the kernel path at \num{7.487}~ms against \num{7.748}~ms for plain user-space (a 3.4\% reduction, $p = 0.00027$) and \num{9.843}~ms for the hardened variant.
 This is counter-intuitive: adding a privilege boundary is usually expected to cost latency, not return it.
-Panel~(c) of Figure~\ref{fig:chapter4-latency} shows the same data as a ratio against the plain \texttt{userspace} baseline, with the y-axis zoomed around the parity line so that the sub-4\% effects at 100~B and 10~KiB are visible in the same frame as the larger effect at 1~MiB; read that way, \texttt{seccomp} sits above parity at every payload size while the kernel path crosses below parity only at 1~MiB.
+Panel~(c) of Figure~\ref{fig:chapter4-latency} shows the same data as a ratio against the plain \texttt{user-space} baseline, with the y-axis zoomed around the parity line so that the sub-4\% effects at 100~B and 10~KiB are visible in the same frame as the larger effect at 1~MiB; read that way, \texttt{seccomp} sits above parity at every payload size while the kernel path crosses below parity only at 1~MiB.
 The seccomp penalty at large payloads has a clean explanation: BPF per-syscall filtering pays a constant cost on every \texttt{sendmsg}/\texttt{recvmsg} crossing, and a megabyte payload forces many more such crossings through the tool-forwarding socket than the smaller payloads, a cost the kernel path does not incur.
 The 3.4\% speedup of the kernel path over plain user-space at 1~MiB is harder to attribute confidently from the available stage-level instrumentation: both paths admitted these requests (DENY would produce a different latency distribution) and both subsequently copied the same 1~MiB payload through the same \texttt{mcpd} $\to$ tool-app UDS, so an ``avoided copy'' explanation does not hold.
 Plausible contributors include scheduler effects (\texttt{mcpd} releases the CPU while waiting on the kernel Netlink reply, which may interact favourably with how the guest kernel schedules a 1~MiB \texttt{sendmsg}) and hypervisor-level timing jitter (a 3.4\% effect at the 7--8~ms scale falls within the noise envelope a VMware guest typically exhibits at this latency range); the present instrumentation does not separate them.
@@ -79,24 +79,24 @@ The kernel tail does not widen relative to user-space across any of the measured
 The stage-level breakdown in panel~(d) of Figure~\ref{fig:chapter4-latency} confirms that kernel arbitration is a minor contributor at all payload sizes.
 Mean arbitration time is \num{0.028}~ms at 100~B and 10~KiB, and \num{0.038}~ms at 1~MiB.
 At 1~MiB, tool execution accounts for \num{89.3}\% of the instrumented stage total (session lookup + arbitration + tool execution = \num{4.351}~ms on the kernel path) and \num{89.9}\% of the same total on the user-space path; arbitration contributes less than four hundredths of a millisecond within that bucket.
-Measured against the full end-to-end mean latency (\num{7.487}~ms on kernel, \num{7.748}~ms on user-space), tool execution itself is closer to half (\num{51.9}\% and \num{49.9}\% respectively) and the difference is unaccounted-for cost outside the instrumented stages --- chiefly the \texttt{mcpd} $\to$ tool-app UDS round-trip, JSON framing, and process scheduling --- which scales with payload size and dominates the absolute number at 1~MiB.
+Measured against the full end-to-end mean latency (\num{7.487}~ms on kernel, \num{7.748}~ms on user-space), tool execution itself is closer to half (\num{51.9}\% and \num{49.9}\% respectively) and the difference is unaccounted-for cost outside the instrumented stages (chiefly the \texttt{mcpd} $\to$ tool-app UDS round-trip, JSON framing, and process scheduling), which scales with payload size and dominates the absolute number at 1~MiB.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.95\linewidth]{figures/figure_latency_ecdf.pdf}
-\caption{Empirical CDF of per-run mean latency ($n = 30$ runs per payload per system), with each subplot auto-scaled in x so the relevant regime is visible. Overlapping curves at 100~B and 10~KiB indicate that the per-run means are indistinguishable across systems; at 1~MiB the \texttt{seccomp} curve shifts rightward and the \texttt{kernel} curve lies to the left of \texttt{userspace}, with no heavy right tail on the kernel path.}
+\caption{Empirical CDF of per-run mean latency ($n = 30$ runs per payload per system), with each subplot auto-scaled in x so the relevant regime is visible. Overlapping curves at 100~B and 10~KiB indicate that the per-run means are indistinguishable across systems; at 1~MiB the \texttt{seccomp} curve shifts rightward and the \texttt{kernel} curve lies to the left of \texttt{user-space}, with no heavy right tail on the kernel path.}
 \label{fig:chapter4-latency-ecdf}
 \end{figure}
 
 Figure~\ref{fig:chapter4-latency-ecdf} complements the summary statistics with the empirical distribution of per-run mean latency at each payload size.
-The ECDF view shows the same three regimes as distributions instead of point estimates: at 100~B and 10~KiB the three curves overlap almost completely, indicating that the per-run means fall into the same distribution; at 1~MiB the \texttt{seccomp} curve shifts rightward by roughly 2~ms while the \texttt{kernel} curve lies to the left of \texttt{userspace}.
+The ECDF view shows the same three regimes as distributions instead of point estimates: at 100~B and 10~KiB the three curves overlap almost completely, indicating that the per-run means fall into the same distribution; at 1~MiB the \texttt{seccomp} curve shifts rightward by roughly 2~ms while the \texttt{kernel} curve lies to the left of \texttt{user-space}.
 No heavy right tail appears on the kernel path at any payload size, consistent with the $p_{95}$ result.
 
 
 A supplementary microbenchmark isolates the Generic Netlink layer using a minimum-cost \texttt{KMCP\_\allowbreak CMD\_\allowbreak NOOP} handler added to the kernel module.
 The NOOP path returns immediately after Generic Netlink demultiplexing, without touching any tool or agent registry, and therefore measures the irreducible floor of a round-trip against which all per-stage arbitration costs can be anchored.
 Figure~\ref{fig:chapter4-ablation} reports the medians on a single axis: the NOOP floor sits at \num{3.125}~$\mu$s, the full \texttt{TOOL\_\allowbreak REQUEST} path measured at a realistic registry scale of 1024 tools and 64 agents sits at \num{7.459}~$\mu$s, and the \texttt{skip\_\allowbreak lookups} and \texttt{ticket\_\allowbreak trigger} bars bracket the per-stage contributions that the next paragraph decomposes.
-The total kernel arbitration cost is therefore \num{4.334}~$\mu$s above the noise floor, against the \num{28}--\num{38}~$\mu$s figure that the end-to-end stage breakdown attributes to ``kernel arbitration'' in panel~(d). The order-of-magnitude gap reflects what each measurement covers: the microbenchmark times only the kernel-side handler, while the end-to-end breakdown also captures the userspace--kernel--userspace Generic Netlink round-trip, the Python framing inside \texttt{mcpd}, and the socket I/O for both the request and the reply. The dominant cost on the kernel path therefore comes from user-space components, not from the kernel module itself.
+The total kernel arbitration cost is therefore \num{4.334}~$\mu$s above the noise floor, against the \num{28}--\num{38}~$\mu$s figure that the end-to-end stage breakdown attributes to ``kernel arbitration'' in panel~(d). The order-of-magnitude gap reflects what each measurement covers: the microbenchmark times only the kernel-side handler, while the end-to-end breakdown also captures the user-space\,$\to$\,kernel\,$\to$\,user-space Generic Netlink round-trip, the Python framing inside \texttt{mcpd}, and the socket I/O for both the request and the reply. The dominant cost on the kernel path therefore comes from user-space components, not from the kernel module itself.
 
 \begin{figure}[!htbp]
 \centering
@@ -153,19 +153,19 @@ This is flagged as a simple future-work optimisation, not a characteristic of th
 
 \subsection{Throughput and Scalability}
 
-Throughput was measured across agent counts $\{1, 5, 10, 20, 50\}$ and concurrency levels $\{1, 10, 50, 100\}$ to check whether the kernel-assisted control plane becomes a bottleneck once multiple requests are in flight simultaneously.
+Throughput was measured across five agent counts (1, 5, 10, 20, and 50) and four concurrency levels (1, 10, 50, and 100) to check whether the kernel-assisted control plane becomes a bottleneck once multiple requests are in flight simultaneously.
 Table~\ref{tab:throughput} gives the per-cell peak throughput at one agent; the complete sweep across agent counts produces the same shape and is summarised in prose below.
 
 \begin{table}[!htbp]
 \centering
-\caption{Peak throughput at one agent, across concurrency levels ($n = 5$ repetitions per cell). Ratio columns report throughput relative to \texttt{userspace} on the same row. The kernel path tracks the user-space baseline within $\sim$10\% at every concurrency level and does not collapse inside the tested window.}
+\caption{Peak throughput at one agent, across concurrency levels ($n = 5$ repetitions per cell). Ratio columns report throughput relative to \texttt{user-space} on the same row. The kernel path tracks the user-space baseline within $\sim$10\% at every concurrency level and does not collapse inside the tested window.}
 \label{tab:throughput}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.2}
 \footnotesize
 \begin{tabular}{r r @{\hspace{10pt}} r r @{\hspace{10pt}} r r}
 \toprule
-& \multicolumn{1}{c}{\textbf{userspace}}
+& \multicolumn{1}{c}{\textbf{user-space}}
 & \multicolumn{2}{c}{\textbf{seccomp}}
 & \multicolumn{2}{c}{\textbf{kernel}} \\
 \cmidrule(lr){2-2}\cmidrule(lr){3-4}\cmidrule(lr){5-6}
@@ -188,7 +188,7 @@ Plain user-space achieves the highest peak throughput across the full agent$\tim
 Over the same 5$\times$4 grid of agent counts and concurrency levels, the kernel path ranges from \num{1003} to \num{1137}~RPS and the seccomp path from \num{1020} to \num{1200}~RPS; Table~\ref{tab:throughput} reports only the agents=1 row, so its kernel column (\num{1009}--\num{1104}~RPS) is a tighter slice of this wider range.
 At a representative operating point of one agent and concurrency 50, the three systems sit at \num{1215.6}, \num{1123.5}, and \num{1096.2}~RPS respectively.
 The kernel path is roughly 10\% slower than the user-space peak, which is consistent with the additional Generic Netlink round-trip and with the serialisation of admission decisions through a single kernel module.
-Figure~\ref{fig:chapter4-throughput-sweep} plots the complete agent$\times$concurrency grid and shows that the relative ordering is stable across all five agent counts: the \texttt{userspace} line sits at the top, the \texttt{seccomp} and \texttt{kernel} lines track each other within a few percent, and none of the three curves bends downward as concurrency climbs from 1 to 100.
+Figure~\ref{fig:chapter4-throughput-sweep} plots the complete agent$\times$concurrency grid and shows that the relative ordering is stable across all five agent counts: the \texttt{user-space} line sits at the top, the \texttt{seccomp} and \texttt{kernel} lines track each other within a few percent, and none of the three curves bends downward as concurrency climbs from 1 to 100.
 
 \begin{figure}[!htbp]
 \centering
@@ -246,10 +246,11 @@ The security evaluation targets four categories from the threat model in \hyperr
 
 Each system received 130 attack attempts in total (13 distinct cases $\times$ 10 repeats: 3 spoof, 5 replay, 3 substitution, 2 escalation).
 Outcomes are summarised in Table~\ref{tab:attacks} and Figure~\ref{fig:chapter4-security}.
+Before reading the headline numbers, one methodology note bears emphasis: the user-space rates reported here reflect the per-category instrumented weakening described later in this section; they are \emph{not} the performance of a fully hardened user-space implementation.
 
 \begin{table}[H]
 \centering
-\caption{Category-level attack outcomes by system (130 attempts each: 3 spoof $+$ 5 replay $+$ 3 substitution $+$ 2 escalation, $\times\,10$ repeats). ``Bypasses'' counts attempts that circumvented the intended control. 95\% Clopper--Pearson confidence intervals on the bypass rate are reported in the last column. The 84.6\% userspace rate is \emph{not} a uniform per-case bypass: 11 of the 13 case rows are admitted in full ($10/10$ each $= 110$), while two cases (\texttt{spoof / session\_token\_theft} and \texttt{replay / cross\_tool\_ticket\_reuse}) are blocked by orthogonal in-process checks even on the unhardened user-space mediator and contribute 0 admissions to the headline. The full per-case decomposition is plotted in Figure~\ref{fig:chapter4-security}. User-space rates reflect the per-category instrumented weakening described below; they are \emph{not} the performance of a fully hardened user-space implementation.}
+\caption{Category-level attack outcomes by system (130 attempts each: 3 spoof $+$ 5 replay $+$ 3 substitution $+$ 2 escalation, $\times\,10$ repeats). ``Bypasses'' counts attempts that circumvented the intended control. 95\% Clopper--Pearson confidence intervals on the bypass rate are reported in the last column. The 84.6\% user-space rate is \emph{not} a uniform per-case bypass: 11 of the 13 case rows are admitted in full ($10/10$ each $= 110$), while two cases (\texttt{spoof / session\_token\_theft} and \texttt{replay / cross\_tool\_ticket\_reuse}) are blocked by orthogonal in-process checks even on the unhardened user-space mediator and contribute 0 admissions to the headline. The full per-case decomposition is plotted in Figure~\ref{fig:chapter4-security}.}
 \label{tab:attacks}
 \setlength{\tabcolsep}{8pt}
 \renewcommand{\arraystretch}{1.25}
@@ -259,7 +260,7 @@ Outcomes are summarised in Table~\ref{tab:attacks} and Figure~\ref{fig:chapter4-
 \textbf{System} & \textbf{Bypasses} & \textbf{Attempts} & \textbf{Bypass rate} & \textbf{95\% CI} \\
 \midrule
 \rowcolor{red!10}
-\texttt{userspace} & 110 & 130 & $84.6\%$ & $[77.2,\,90.3]$ \\
+\texttt{user-space} & 110 & 130 & $84.6\%$ & $[77.2,\,90.3]$ \\
 \rowcolor{orange!10}
 \texttt{seccomp}   &  50 & 130 & $38.5\%$ & $[30.1,\,47.4]$ \\
 \rowcolor{green!10}
@@ -344,10 +345,10 @@ When it dies, they are gone.
 Recovery means starting over or reloading from application-level logs, with no consistency guarantee.
 
 The kernel path is different.
-Approval tickets, the tool registry, and agent registrations survive the crash intact and remain inspectable via \texttt{sysfs} without any daemon running.
+Approval tickets, the tool registry, and agent registrations survive the crash intact and remain inspectable via sysfs without any daemon running.
 Session state is not preserved; the binding context lives in daemon memory and is inherently tied to an active connection.
 
-The durability claim here is observability-oriented, not warm-continuation-oriented: while \texttt{mcpd} is down, \texttt{sysfs} stays readable so an operator can still inspect the surviving registry, ticket state, and per-agent \texttt{call\_\allowbreak log} entries.
+The durability claim here is observability-oriented, not warm-continuation-oriented: while \texttt{mcpd} is down, sysfs stays readable so an operator can still inspect the surviving registry, ticket state, and per-agent \texttt{call\_\allowbreak log} entries.
 On daemon restart, the cold-start path described in Section~\ref{sec:reconciliation} issues \texttt{RESET\_\allowbreak TOOLS} and re-registers each manifest tool unconditionally, so the surviving kernel state serves audit rather than warm continuation; the conservative rebuild avoids relying on a residual view whose freshness the daemon cannot prove.
 Incremental reconciliation is already used while \texttt{mcpd} is running (only tools whose semantic or binding fingerprint changed are re-registered); extending that behaviour to the cold-start path, gated on a divergence signal, would reduce restart overhead and is a natural direction for future work.
 
@@ -370,7 +371,8 @@ Within the swept window of up to 100 concurrent requests the kernel path holds w
 
 \subsection{Threats to Validity}
 
-The results should be interpreted within four scope limitations: all experiments ran in a single VMware guest on an aarch64 host, so latency figures are environment-specific and generalisation to bare-metal or different kernel configurations is not established;
-the evaluation uses demonstration tools with predictable execution times and does not characterise tail latency under sustained load;
-the attack study is a controlled functional-correctness test of the four explicitly identified invariants and does not constitute a robustness assessment against unknown attacks, prompt injection, or privileged adversaries;
-and kernel-level admission control addresses only one layer of an AI-agent system, leaving semantic tool vulnerabilities, unsafe policy choices, and compromise outside the stated threat model unaddressed.
+The results should be interpreted within four scope limitations.
+First, all experiments ran in a single VMware guest on an aarch64 host, so latency figures are environment-specific and generalisation to bare-metal or different kernel configurations is not established.
+Second, the evaluation uses demonstration tools with predictable execution times and does not characterise tail latency under sustained load.
+Third, the attack study is a controlled functional-correctness test of the four explicitly identified invariants and does not constitute a robustness assessment against unknown attacks, prompt injection, or privileged adversaries.
+Fourth, kernel-level admission control addresses only one layer of an AI-agent system, leaving semantic tool vulnerabilities, unsafe policy choices, and compromise outside the stated threat model unaddressed.

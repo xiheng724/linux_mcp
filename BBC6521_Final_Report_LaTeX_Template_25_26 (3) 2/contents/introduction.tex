@@ -3,63 +3,62 @@
 \setcounter{section}{1} \setcounter{subsection}{0}
 \phantomsection \label{chap:introduction} \addcontentsline{toc}{section}{\textit{Chapter 1: Introduction}}
 
-Recent advances in Large Language Models (LLMs) have enabled instruction following, reasoning, and interaction with external environments, forming the foundation for autonomous agentic systems \cite{yao2023react, schick2023toolformer}.
-LLM-based agents are now deployed across a wide range of applications, from direct-acting assistants to sophisticated multi-step reasoning and problem-solving systems \cite{park2023generative, qin2024toolllm}.
-Model Context Protocol (MCP) has emerged as a common interface between LLM agents and external tools \cite{mcp2025}.
+Recent advances in Large Language Models (LLMs) have enabled instruction following, multi-step reasoning, and interaction with external environments, providing the foundation for autonomous agentic systems \cite{yao2023react, schick2023toolformer}.
+LLM-based agents are now deployed across applications ranging from direct-acting assistants to multi-step reasoning and problem-solving pipelines~\cite{park2023generative, qin2024toolllm}, and the Model Context Protocol (MCP) has emerged as a common interface between agents and external tools~\cite{mcp2025}.
 
 \subsection{Problem Statement}
 
-Consider what happens when an LLM agent is asked to delete a file.
-A single user-space gateway reads the request, looks up the tool manifest, decides whether the operation needs approval, records the outcome, and forwards the call.
-If that gateway crashes between the approval and the execution, or if a co-located process talks to its socket at the right moment, there is no other authority on the host that can say whether the request was ever admitted in the first place.
+Consider an LLM agent asked to delete a file: a single user-space gateway reads the request, consults the tool manifest, decides whether the operation needs human approval, records the outcome, and forwards the call.
+If the gateway crashes between approval and execution, or if a co-located process contacts its socket at the right moment, no other authority on the host can testify whether the request was ever admitted in the first place.
 This is the gap between what modern agent frameworks assume about their runtime and what conventional Linux actually guarantees~\cite{packer2023memgpt, mei2024aios}.
 
 MCP-style workflows are organised around higher-level concepts (semantic tool descriptions, session context, approval boundaries, and cross-step state) that the process, file, and socket abstractions of a conventional OS do not directly capture.
-When enforcement stays entirely in user space, the resulting control plane is fragile.
-Frameworks such as OpenClaw~\cite{openclaw2026} and Hermes Agent~\cite{nousresearch2026hermesagent} show that giving agents execution capability and persistent context opens the door to prompt injection, privilege escalation, and cross-step exploitation.
-Prompt injection originates at the model-input boundary and is a separate problem from control-plane integrity; this work focuses on the latter two, where the integrity of approval, identity binding, and cross-step state decides whether a compromised or manipulated request can actually take effect.
+When enforcement remains entirely in user space, the resulting control plane is fragile.
+Frameworks such as OpenClaw~\cite{openclaw2026} and Hermes Agent~\cite{nousresearch2026hermesagent} demonstrate that giving agents execution capability and persistent context opens the door to prompt injection, privilege escalation, and cross-step exploitation.
+Prompt injection originates at the model-input boundary and is a separate problem from control-plane integrity; this work focuses on the latter two, namely privilege escalation and cross-step exploitation, where the integrity of approval, identity binding, and cross-step state determines whether a manipulated request can take effect.
 
-A single gateway process is typically responsible for interpreting tool manifests, binding requests to identities, and authorizing execution, effectively placing the control plane in user space.
-Such a design introduces a single point of failure and expands the trusted computing base, making it vulnerable to crashes, logic bugs, or compromised control paths~\cite{peter2014arrakis}.
-Under such a design, three properties become difficult to guarantee reliably: (1) semantic consistency between declared tool behaviour and executed operations, (2) durability of approval state across gateway crashes, and (3) robust identity binding in the presence of replay and session confusion~\cite{qin2024toolllm,greshake2023prompt}.
+In typical deployments a single gateway process is responsible for interpreting tool manifests, binding requests to identities, and authorising execution, which effectively places the entire control plane in user space.
+Such a design introduces a single point of failure and expands the trusted computing base, exposing it to crashes, logic bugs, and compromised control paths~\cite{peter2014arrakis}.
+Three properties are then difficult to guarantee reliably: (i) semantic consistency between declared tool behaviour and executed operations, (ii) durability of approval state across gateway crashes, and (iii) robust identity binding under replay and session confusion~\cite{qin2024toolllm,greshake2023prompt}.
 
-This leads to a concrete question: which control-plane invariants in MCP-style tool invocation benefit from kernel-level enforcement, and can that enforcement improve security and resilience without making the system unacceptably slow?
+This raises the question: which control-plane invariants in MCP-style tool invocation benefit from kernel-level enforcement, and can that enforcement improve security and resilience without making the system unacceptably slow?
 
 \subsection{Our Solution}
 
-The design of \texttt{linux-mcp} starts from a boundary between two classes of responsibility: control-plane properties that a user-space gateway cannot hold against its own failure, and concerns such as manifest semantics, schema validation, and tool execution where user-space flexibility remains useful.
-We therefore push only the first set into a Linux kernel module (admission decisions, approval-ticket state, session binding, and kernel-resident audit records that survive gateway restart), and leave the rest alone.
-The kernel module is limited to checking registered identities, session bindings, approval-ticket state, and crash-visible audit records; policy interpretation and tool execution remain in user space.
+The design of linux-mcp starts from a boundary between two classes of responsibility: control-plane properties that a user-space gateway cannot hold against its own failure, and concerns such as manifest semantics, schema validation, and tool execution where user-space flexibility remains useful.
+Only the first set is pushed into a Linux kernel module (admission decisions, approval-ticket state, session binding, and crash-visible audit records), while the rest is left untouched.
+The kernel module is restricted to checking registered identities, session bindings, approval-ticket state, and audit records that survive gateway restart; policy interpretation and tool execution remain in user space.
 
-The architecture has four layers: an LLM client (\texttt{llm-app}), a manifest-aware gateway (\texttt{mcpd}), a Generic-Netlink-based kernel control plane (\texttt{kernel\_\allowbreak mcp}), and resident tool services over Unix domain sockets.
-Every tool invocation follows a fixed path through all four layers; no request reaches a tool service without first obtaining an explicit kernel admission decision.
+The architecture comprises four layers: an LLM client (\texttt{llm-app}), a manifest-aware gateway (\texttt{mcpd}), a Generic-Netlink-based kernel control plane (\texttt{kernel\_\allowbreak mcp}), and resident tool services exposed over Unix domain sockets.
+Every tool invocation traverses all four layers; no request reaches a tool service without first obtaining an explicit kernel admission decision.
 The component responsibilities are detailed in Section~\ref{sec:system-architecture}, and the rationale for the kernel--user-space split is developed in Section~\ref{sec:design-alternatives}.
 
-This split partitions the gateway's trust along a time axis.
+This split partitions the gateway's trust along a temporal axis.
 At initialisation, \texttt{mcpd} is trusted to populate the kernel registries with manifest-derived tool identities and to bind sessions to peer credentials.
-At run time, it is no longer fully trusted: every \texttt{TOOL\_\allowbreak REQUEST} is independently re-checked in the kernel, so a session-id mismatch, a skipped ticket transition, or a TOCTOU race in the daemon produces a rejection at the kernel boundary.
+At run time, however, it is no longer fully trusted: every \texttt{TOOL\_\allowbreak REQUEST} is independently re-checked in the kernel, so a session-id mismatch, a skipped ticket transition, or a TOCTOU race in the daemon results in a rejection at the kernel boundary.
 Registry entries, approval tickets, and binding checks therefore reside in the kernel, gated by \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-protected Generic Netlink access, durable across daemon failure, and inaccessible to unprivileged processes.
 
-Two bodies of prior work frame the trade-off space.
-At one end, AIOS-style proposals argue for reimagining OS abstractions around LLM workloads \cite{mei2024aios}; this is genuinely ambitious research, but it carries a deployability cost, because none of the existing Linux tooling, userbase, or security mechanisms carries over unchanged.
-At the other end, user-space frameworks such as OpenClaw and Hermes Agent preserve full deployment flexibility (they run on any Linux distribution), but, as \hyperref[chap:background]{Chapter~2} discusses, they inherit the structural weaknesses of a monolithic user-space control plane.
-\texttt{linux-mcp} sits between these two.
-The kernel is changed only where the gateway provably cannot protect an invariant against itself; the rest of the stack, including existing Linux security primitives such as seccomp and LSM, stays untouched and continues to work alongside the new module.
-The central hypothesis that follows from this placement is that binding safety and failure resilience can be improved at acceptable performance cost, and \hyperref[chap:evaluation]{Chapter~4} tests that claim empirically.
+Two strands of prior work frame the trade-off space.
+At one extreme, AIOS-style proposals argue for reimagining OS abstractions around LLM workloads~\cite{mei2024aios}; this is an ambitious research direction, but it imposes a substantial deployability cost, since none of the existing Linux tooling, userbase, or security mechanisms carries over unchanged.
+At the other extreme, user-space frameworks such as OpenClaw and Hermes Agent preserve full deployment flexibility (they run on any Linux distribution), but, as \hyperref[chap:background]{Chapter~2} will discuss, they inherit the structural weaknesses of a monolithic user-space control plane.
+linux-mcp occupies the middle ground.
+The kernel is modified only where the gateway provably cannot defend an invariant against itself; the rest of the stack, including existing Linux security primitives such as seccomp and LSM, remains untouched and continues to operate alongside the new module.
+The central hypothesis arising from this placement is that binding safety and failure resilience can be improved at acceptable performance cost, a claim that \hyperref[chap:evaluation]{Chapter~4} tests empirically.
 
-A side-by-side comparison of \texttt{linux-mcp} against two representative user-space frameworks (OpenClaw and Hermes Agent) is given in Section~\ref{sec:related-work} (Table~\ref{tab:comparison}).
+A side-by-side comparison of linux-mcp against two representative user-space frameworks (OpenClaw and Hermes Agent) is given in Section~\ref{sec:related-work} (Table~\ref{tab:comparison}).
 
 \subsection{Main Contributions}
-This paper makes the following contributions:
+This thesis makes the following contributions:
 \begin{itemize}
-    \item \textbf{A kernel-resident control-plane for tool invocation.}
+    \item \textbf{A kernel-resident control plane for tool invocation.}
     We implement \texttt{kernel\_\allowbreak mcp}, a Linux kernel module that maintains tool and agent registries, arbitrates invocation decisions, and manages the approval-ticket lifecycle, all behind a \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}-gated Generic Netlink interface.
-    The module holds no JSON parser and executes no tool code; its sole role is to keep admission state durable across daemon failure and unreachable from unprivileged processes.
-    
-    \item \textbf{A manifest-aware gateway that bridges semantics and enforcement.}
+    The module contains no JSON parser and executes no tool code; its sole responsibility is to keep admission state durable across daemon failure and unreachable from unprivileged processes.
+
+    \item \textbf{A manifest-aware gateway bridging semantics and enforcement.}
     We build \texttt{mcpd}, a user-space daemon that derives semantic hash identifiers from tool manifests, reconciles them with the kernel registry, anchors sessions to UDS peer credentials, and validates every request against its declared JSON schema before routing it through the kernel mediation path.
-    \texttt{mcpd} concentrates all manifest-handling complexity in one place, leaving both the kernel and the LLM client unaware of it.
-    
+    \texttt{mcpd} concentrates all manifest-handling complexity in a single component, leaving both the kernel and the LLM client unaware of it.
+
     \item \textbf{An empirical evaluation of kernel placement as a design choice.}
-    We compare \texttt{linux-mcp} against pure and hardened (seccomp) user-space baselines across latency, throughput, attack resistance, and daemon failure, showing that the specified control-plane invariants hold under the targeted attack set while both user-space baselines permit meaningful bypass rates, at latency close to the user-space baseline throughout.
+    We compare linux-mcp against pure and hardened (seccomp) user-space baselines on latency, throughput, attack resistance, and daemon failure.
+    The specified control-plane invariants hold under the targeted attack set, while both user-space baselines admit meaningful bypass rates; latency remains close to the user-space baseline throughout.
 \end{itemize}
