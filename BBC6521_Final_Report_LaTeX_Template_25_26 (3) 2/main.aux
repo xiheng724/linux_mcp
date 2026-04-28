@@ -96,9 +96,9 @@
 \@writefile{toc}{\contentsline {paragraph}{mcpd to kernel\_mcp (Generic Netlink).}{19}{paragraph*.7}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces \texttt  {KERNEL\_\allowbreak  MCP} Generic Netlink command set. All commands except \texttt  {LIST\_\allowbreak  TOOLS} require \texttt  {CAP\_\allowbreak  NET\_\allowbreak  ADMIN}.}}{19}{table.4}\protected@file@percent }
 \newlabel{tab:netlink-cmds}{{4}{19}{\texttt {KERNEL\_\allowbreak MCP} Generic Netlink command set. All commands except \texttt {LIST\_\allowbreak TOOLS} require \texttt {CAP\_\allowbreak NET\_\allowbreak ADMIN}}{table.4}{}}
-\@writefile{toc}{\contentsline {paragraph}{Tool registration via manifests.}{19}{paragraph*.8}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces The six \texttt  {KERNEL\_\allowbreak  MCP} attributes on the admission-decision path, each tied to one defence in the Background threat model (Table~\ref {tab:threat_in_scope}). Routing-level attributes (\texttt  {REQ\_ID}, \texttt  {TOOL\_ID}, \texttt  {AGENT\_ID}, \texttt  {APPROVAL\_\allowbreak  DECISION}) and the per-tool catalog epoch are documented in \hyperref  [sec:appendix-protocols]{Appendix~A.1}.}}{20}{table.5}\protected@file@percent }
 \newlabel{tab:netlink-attrs}{{5}{20}{The six \texttt {KERNEL\_\allowbreak MCP} attributes on the admission-decision path, each tied to one defence in the Background threat model (Table~\ref {tab:threat_in_scope}). Routing-level attributes (\texttt {REQ\_ID}, \texttt {TOOL\_ID}, \texttt {AGENT\_ID}, \texttt {APPROVAL\_\allowbreak DECISION}) and the per-tool catalog epoch are documented in \hyperref [sec:appendix-protocols]{Appendix~A.1}}{table.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{Tool registration via manifests.}{20}{paragraph*.8}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Manifest Semantics and Tool Identity}{20}{subsection.3.5}\protected@file@percent }
 \newlabel{sec:manifest-semantics}{{3.5}{20}{Manifest Semantics and Tool Identity}{subsection.3.5}{}}
 \citation{bishop2003computer,lee2021exprace}
@@ -189,8 +189,8 @@
 \bibcite{langchain2022}{{13}{}{{}}{{}}}
 \bibcite{langgraph2024}{{14}{}{{}}{{}}}
 \bibcite{autogpt2023}{{15}{}{{}}{{}}}
-\bibcite{crewai2024}{{16}{}{{}}{{}}}
 \@writefile{toc}{\contentsline {section}{\textit  {References}}{47}{subsection.5.3}\protected@file@percent }
+\bibcite{crewai2024}{{16}{}{{}}{{}}}
 \bibcite{semantickernel2023}{{17}{}{{}}{{}}}
 \bibcite{wu2024oscopilot}{{18}{}{{}}{{}}}
 \bibcite{liu2026agentos}{{19}{}{{}}{{}}}
@@ -257,8 +257,8 @@
 \citation{apple2024pcc}
 \@writefile{toc}{\contentsline {subsubsection}{A.2\hskip 1em\relax System Comparison Table}{84}{section*.36}\protected@file@percent }
 \newlabel{sec:appendix-comparison}{{5.3}{84}{}{section*.36}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Comparison of representative agent systems. The key differentiator for \texttt  {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{84}{table.13}\protected@file@percent }
-\newlabel{tab:system_comparison}{{13}{84}{Comparison of representative agent systems. The key differentiator for \texttt {linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.13}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Comparison of representative agent systems. The key differentiator for linux-mcp is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}}{84}{table.13}\protected@file@percent }
+\newlabel{tab:system_comparison}{{13}{84}{Comparison of representative agent systems. The key differentiator for linux-mcp is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks}{table.13}{}}
 \@writefile{toc}{\contentsline {subsubsection}{A.3\hskip 1em\relax Experiment Kernel Interface}{84}{section*.37}\protected@file@percent }
 \newlabel{sec:appendix-experiment-uapi}{{5.3}{84}{}{section*.37}{}}
 \@writefile{toc}{\contentsline {paragraph}{Noise-floor command: \texttt  {KERNEL\_MCP\_CMD\_NOOP}.}{84}{paragraph*.38}\protected@file@percent }
@@ -267,8 +267,8 @@
 \@writefile{lol}{\contentsline {lstlisting}{\numberline {6}Peer-credential enforcement patch in \texttt  {kernel\_mcp\_main.c}, gated behind the \texttt  {require\_peer\_cred} module parameter.}{86}{lstlisting.6}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Experiment-only kernel switches added for the \hyperref  [chap:evaluation]{Chapter~4} rerun. All four \texttt  {SKIP\_*} bits are ignored when the kernel is built without \texttt  {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt  {require\_peer\_cred} is runtime-toggleable on any build.}}{87}{table.14}\protected@file@percent }
 \newlabel{tab:experiment-switches}{{14}{87}{Experiment-only kernel switches added for the \hyperref [chap:evaluation]{Chapter~4} rerun. All four \texttt {SKIP\_*} bits are ignored when the kernel is built without \texttt {CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt {require\_peer\_cred} is runtime-toggleable on any build}{table.14}{}}
-\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{88}{section*.40}\protected@file@percent }
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
+\@writefile{toc}{\contentsline {section}{\textit  {Risk and Environmental Impact Assessment}}{88}{section*.40}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {15}{\ignorespaces Summary of identified risks and mitigations for linux-mcp.}}{89}{table.15}\protected@file@percent }
 \newlabel{tab:risk_assessment}{{15}{89}{Summary of identified risks and mitigations for linux-mcp}{table.15}{}}
 \gdef \@abspage@last{90}

@@ -1,24 +1,28 @@
 \begin{thebibliography}{10}
 
 \bibitem{yao2023react}
-Yao S, Zhao J, Yu D, et~al.. ReAct: Synergizing reasoning and acting in language models; 2023.
-\newblock Preprint, arXiv:2210.03629.
+Yao S, Zhao J, Yu D, Du N, Shafran I, Narasimhan K, et~al.
+\newblock {ReAct}: Synergizing Reasoning and Acting in Language Models.
+\newblock In: ICLR; 2023. ArXiv:2210.03629.
 
 \bibitem{schick2023toolformer}
-Schick T, Dwivedi-Yu J, et~al.. Toolformer: Language models can teach themselves to use tools; 2023.
-\newblock Preprint, arXiv:2302.04761.
+Schick T, Dwivedi-Yu J, Dessì R, Raileanu R, Lomeli M, Hambro E, et~al.
+\newblock Toolformer: Language Models Can Teach Themselves to Use Tools.
+\newblock In: NeurIPS; 2023. ArXiv:2302.04761.
 
 \bibitem{park2023generative}
 Park JS, O'Brien J, Cai CJ, Morris MR, Liang P, Bernstein MS.
 \newblock Generative Agents: Interactive Simulacra of Human Behavior.
-\newblock In: UIST; 2023. .
+\newblock In: UIST; 2023. p. 1-22.
 
 \bibitem{qin2024toolllm}
-Qin Y, Liang S, Ye Y, et~al.. ToolLLM: Facilitating Large Language Models to Master 16000+ Real-world APIs; 2024.
-\newblock Preprint, arXiv:2307.16789.
+Qin Y, Liang S, Ye Y, Zhu K, et~al.
+\newblock {ToolLLM}: Facilitating Large Language Models to Master {16000+} Real-world {APIs}.
+\newblock In: ICLR; 2024. ArXiv:2307.16789.
 
 \bibitem{mcp2025}
 {Model Context Protocol}. Architecture Specification; 2025.
+\newblock MCP specification revision 2025-06-18; accessed April 2026.
 \newblock \url{https://modelcontextprotocol.io/specification/2025-06-18/architecture}.
 
 \bibitem{packer2023memgpt}
@@ -26,11 +30,12 @@ Packer C, Fang V, Patil SG, Lin K, Wooders S, Gonzalez JE. MemGPT: Towards LLMs 
 \newblock Preprint, arXiv:2310.08560.
 
 \bibitem{mei2024aios}
-Mei K, et~al.. AIOS: LLM Agent Operating System; 2024.
+Mei K, Zhu X, Xu W, Hua W, Jin M, Li Z, et~al.. {AIOS}: {LLM} Agent Operating System; 2024.
 \newblock Preprint, arXiv:2403.16971.
 
 \bibitem{openclaw2026}
-Steinberger P. OpenClaw: Open-source Autonomous AI Agent; 2026.
+Steinberger P. {OpenClaw}: Open-source Autonomous {AI} Agent; 2026.
+\newblock Project website; accessed April 2026.
 \newblock \url{https://openclaw.ai}.
 
 \bibitem{nousresearch2026hermesagent}
@@ -41,11 +46,12 @@ Steinberger P. OpenClaw: Open-source Autonomous AI Agent; 2026.
 \bibitem{peter2014arrakis}
 Peter S, Li J, Zhang I, et~al.
 \newblock Arrakis: The operating system is the control plane.
-\newblock In: OSDI; 2014. .
+\newblock In: OSDI; 2014. p. 1-16.
 
 \bibitem{greshake2023prompt}
-Greshake K, et~al.. Not what you've signed up for: Compromising real-world LLM-integrated applications with Indirect Prompt Injection; 2023.
-\newblock Preprint, arXiv:2302.12173.
+Abdelnabi S, Greshake K, Mishra S, Endres C, Holz T, Fritz M.
+\newblock Not What You've Signed Up For: Compromising Real-World {LLM}-Integrated Applications with Indirect Prompt Injection.
+\newblock In: AISec @ CCS; 2023. p. 79-90.
 
 \bibitem{tanenbaum2022}
 Tanenbaum AS, Bos H.
@@ -54,31 +60,31 @@ Tanenbaum AS, Bos H.
 
 \bibitem{langchain2022}
 Chase H. {LangChain}; 2022.
-\newblock Open-source LLM application framework.
+\newblock Open-source LLM application framework; accessed April 2026.
 \newblock \url{https://github.com/langchain-ai/langchain}.
 
 \bibitem{langgraph2024}
 {LangChain AI}. {LangGraph}: A Framework for Building Stateful Multi-Actor {LLM} Applications; 2024.
-\newblock Open-source agent orchestration framework.
+\newblock Open-source agent orchestration framework; accessed April 2026.
 \newblock \url{https://github.com/langchain-ai/langgraph}.
 
 \bibitem{autogpt2023}
 Gravitas S. {AutoGPT}: An Autonomous {GPT}-4 Experiment; 2023.
-\newblock Open-source autonomous agent framework.
+\newblock Open-source autonomous agent framework; accessed April 2026.
 \newblock \url{https://github.com/Significant-Gravitas/AutoGPT}.
 
 \bibitem{crewai2024}
 {CrewAI Inc }. {CrewAI}: Framework for Orchestrating Role-Playing Autonomous {AI} Agents; 2024.
-\newblock Open-source multi-agent collaboration platform.
+\newblock Open-source multi-agent collaboration platform; accessed April 2026.
 \newblock \url{https://crewai.com}.
 
 \bibitem{semantickernel2023}
 {Microsoft Corporation}. Semantic Kernel: Open-Source {SDK} for {LLM} Integration; 2023.
-\newblock Released publicly March 2023; reached v1.0 in early 2024.
+\newblock Released publicly March 2023; reached v1.0 in early 2024; accessed April 2026.
 \newblock \url{https://github.com/microsoft/semantic-kernel}.
 
 \bibitem{wu2024oscopilot}
-Wu Z, et~al.. OS-Copilot: Towards Generalist Computer Agents with Self-Improvement; 2024.
+Wu Z, Han C, Ding Z, Weng Z, Liu Z, Yao S, et~al.. {OS-Copilot}: Towards Generalist Computer Agents with Self-Improvement; 2024.
 \newblock Preprint, arXiv:2402.07456.
 
 \bibitem{liu2026agentos}
@@ -87,25 +93,28 @@ Liu R, Zhe T, Wang D, et~al.. AgentOS: From Application Silos to a Natural Langu
 
 \bibitem{openharness2026}
 {HKUDS}. {OpenHarness}: Open Agent Harness with a Built-in Personal Agent---Ohmo!; 2026.
-\newblock Initial open-source release v0.1.0: April 1, 2026.
+\newblock Initial open-source release v0.1.0 April 1, 2026; accessed April 2026.
 \newblock \url{https://github.com/HKUDS/OpenHarness}.
 
 \bibitem{harness2025}
 {Harness Inc }. Harness {AI} {DevOps} Agent; 2025.
-\newblock AI-powered autonomous workers embedded in governed CI/CD pipelines.
+\newblock AI-powered autonomous workers embedded in governed CI/CD pipelines; accessed April 2026.
 \newblock \url{https://developer.harness.io/docs/platform/harness-aida/ai-devops/}.
 
 \bibitem{apple2024pcc}
 {Apple Inc }. Private Cloud Compute: A new frontier for {AI} privacy in the cloud; 2024.
+\newblock Apple Security blog post; accessed April 2026.
 \newblock \url{https://security.apple.com/blog/private-cloud-compute/}.
 
 \bibitem{mcp_anniversary_2025}
 {MCP Core Maintainers}. One Year of MCP: November 2025 Spec Release; 2025.
-\newblock Model Context Protocol Blog, accessed April 13, 2026.
+\newblock Model Context Protocol Blog; accessed April 2026.
 \newblock \url{https://blog.modelcontextprotocol.io/posts/2025-11-25-first-mcp-anniversary/}.
 
 \bibitem{patil2023gorilla}
-Patil SG, Zhang T, Wang X, Gonzalez JE. Gorilla: Large Language Model Connected with Massive {API}s; 2023.
+Patil SG, Zhang T, Wang X, Gonzalez JE.
+\newblock Gorilla: Large Language Model Connected with Massive {API}s.
+\newblock In: NeurIPS; 2024. ArXiv:2305.15334.
 
 \bibitem{liu2023prompt}
 Liu Y, et~al.. Prompt Injection Attack against LLM-integrated Applications; 2023.
@@ -121,9 +130,12 @@ Wang Y, Gao H, et~al.. A Systematic Security Evaluation of OpenClaw and Its Vari
 
 \bibitem{wang2023voyager}
 Wang G, Xie Y, Jiang Y, Mandlekar A, Xiao C, Zhu Y, et~al.. Voyager: An Open-Ended Embodied Agent with Large Language Models; 2023.
+\newblock Preprint, arXiv:2305.16291.
 
 \bibitem{yang2024swe}
-Yang J, Jimenez CE, Wettig A, Lieret K, Yao S, Narasimhan K, et~al.. {SWE}-agent: Agent-Computer Interfaces Enable Automated Software Engineering; 2024.
+Yang J, Jimenez CE, Wettig A, Lieret K, Yao S, Narasimhan K, et~al.
+\newblock {SWE}-agent: Agent-Computer Interfaces Enable Automated Software Engineering.
+\newblock In: NeurIPS; 2024. ArXiv:2405.15793.
 
 \bibitem{lim2024compartmentalization}
 Lim SY, Agrawal S, Han X, Eyers D, O'Keeffe D, Pasquier T. Securing Monolithic Kernels using Compartmentalization; 2024.
@@ -134,8 +146,9 @@ Schneider M, Masti RJ, Shinde S, Capkun S, Perez R. {SoK}: Hardware-supported Tr
 \newblock Preprint, arXiv:2205.12742.
 
 \bibitem{lefeuvre2024sok}
-Lefeuvre H, Dautenhahn N, Chisnall D, Olivier P. {SoK}: Software Compartmentalization; 2024.
-\newblock Preprint, arXiv:2410.08434.
+Lefeuvre H, Dautenhahn N, Chisnall D, Olivier P.
+\newblock {SoK}: Software Compartmentalization.
+\newblock In: IEEE S\&P; 2025. p. 3107-26.
 
 \bibitem{ji2026seagent}
 Ji Z, Wu D, Jiang W, Ma P, Li Z, Gao Y, et~al.. Taming Various Privilege Escalation in {LLM}-Based Agent Systems: A Mandatory Access Control Framework; 2026.
@@ -146,23 +159,28 @@ Shi T, He J, Wang Z, Wu L, Li H, Guo W, et~al.. Progent: Programmable Privilege 
 \newblock Preprint, arXiv:2504.11703.
 
 \bibitem{seccomp2026}
-{Linux Kernel Documentation}. Seccomp BPF; 2026.
+{Linux Kernel Documentation}. Seccomp BPF;.
+\newblock Accessed April 2026.
 \newblock \url{https://docs.kernel.org/userspace-api/seccomp_filter.html}.
 
 \bibitem{lsm2026}
-{Linux Kernel Documentation}. Linux Security Modules (LSM); 2026.
+{Linux Kernel Documentation}. Linux Security Modules (LSM);.
+\newblock Accessed April 2026.
 \newblock \url{https://docs.kernel.org/admin-guide/LSM/index.html}.
 
 \bibitem{apparmor2026}
-{Linux Kernel Documentation}. AppArmor; 2026.
+{Linux Kernel Documentation}. AppArmor;.
+\newblock Accessed April 2026.
 \newblock \url{https://docs.kernel.org/admin-guide/LSM/apparmor.html}.
 
 \bibitem{selinux2026}
-{Linux Kernel Documentation}. SELinux; 2026.
+{Linux Kernel Documentation}. SELinux;.
+\newblock Accessed April 2026.
 \newblock \url{https://docs.kernel.org/admin-guide/LSM/SELinux.html}.
 
 \bibitem{landlock2026}
-{Linux Kernel Documentation}. Landlock; 2026.
+{Linux Kernel Documentation}. Landlock;.
+\newblock Accessed April 2026.
 \newblock \url{https://docs.kernel.org/userspace-api/landlock.html}.
 
 \bibitem{wright2002lsm}
@@ -171,19 +189,18 @@ Wright C, Cowan C, Smalley S, Morris J, Kroah-Hartman G.
 \newblock In: Proceedings of the 11th {USENIX} Security Symposium. USENIX Association; 2002. p. 17-31.
 
 \bibitem{salaun2017landlock}
-Salaün M.
-\newblock Landlock {LSM}: Toward Unprivileged Sandboxing.
-\newblock In: Linux Security Summit; 2017. .
+Salaün M. Landlock {LSM}: Toward Unprivileged Sandboxing; 2017.
+\newblock Linux Security Summit talk.
 
 \bibitem{watson2010capsicum}
 Watson RNM, Anderson J, Laurie B, Kennaway K.
 \newblock Capsicum: Practical Capabilities for {UNIX}.
-\newblock In: Proceedings of the USENIX Security Symposium; 2010. .
+\newblock In: Proceedings of the USENIX Security Symposium; 2010. p. 29-46.
 
 \bibitem{brimhall2023mac}
 Brimhall B, Garrard J, de~la Garza C, Coffman J.
 \newblock A Comparative Analysis of {Linux} Mandatory Access Control Policy Enforcement Mechanisms.
-\newblock In: Proceedings of the 16th European Workshop on System Security ({EuroSec}); 2023. .
+\newblock In: Proceedings of the 16th European Workshop on System Security ({EuroSec}); 2023. p. 1-7.
 
 \bibitem{bishop2003computer}
 Bishop M.
@@ -206,7 +223,8 @@ Klein G, Andronick J, Elphinstone K, Heiser G, Cock D, Derrin P, et~al.
 \newblock Communications of the {ACM}. 2010;53(6):107-15.
 
 \bibitem{netlink2026}
-{Linux Kernel Documentation}. Netlink Socket Family; 2026.
+{Linux Kernel Documentation}. Netlink Socket Family;.
+\newblock Accessed April 2026.
 \newblock \url{https://docs.kernel.org/userspace-api/netlink/intro.html}.
 
 \bibitem{west2021welch}

@@ -5,29 +5,27 @@
 % Please use only \subsection*{} and \subsubsection*{} in this section. This suppresses the subsection numbering in the Table of Contents.
 
 
-\textbf{Risk and Environmental Impact Assessment}
-
 This project develops linux-mcp, a kernel-assisted control plane for AI tool invocation that splits semantic interpretation and tool execution in user space from admission control in the kernel.
 Because the system spans an LLM-facing application, a user-space gateway, a kernel module, and external tools, it carries technical, security, and resource-related risks.
 Following the prescribed method, each risk is assigned a likelihood $L$ and a consequence $C$, and scored as $R = L \cdot C$.
 Table~\ref{tab:risk_assessment} summarises the assessment.
 
 \textbf{Technical risks.}
-The dominant technical risk is kernel-level instability: faults in Netlink handling, synchronization, or state management could cause crashes or inconsistent behaviour ($L=3$, $C=4$, $R=12$).
-This is mitigated by keeping the kernel scope deliberately narrow, relying on strict interfaces, and applying staged and stress testing.
-A related risk is that the design fails to demonstrate a convincing advantage over hardened user-space baselines ($L=4$, $C=3$, $R=12$); it is mitigated by evaluating against both conventional and hardened baselines under performance and adversarial workloads.
-Cross-component integration failure between \texttt{llm-app}, \texttt{mcpd}, the kernel module, and tool services ($L=3$, $C=2$, $R=6$) is controlled through explicit protocols, schema synchronization, and end-to-end validation.
+The dominant technical risk is kernel-level instability: faults in Netlink handling, synchronisation, or state management could cause crashes or inconsistent behaviour ($L=3$, $C=4$, $R=12$).
+This is mitigated by keeping the kernel scope deliberately narrow, relying on strict interfaces, and applying staged integration tests and adversarial stress runs.
+A related risk is that the design fails to demonstrate a measurable advantage over hardened user-space baselines ($L=4$, $C=3$, $R=12$); it is mitigated by evaluating against both conventional and hardened baselines under performance and adversarial workloads.
+Cross-component integration failure between \texttt{llm-app}, \texttt{mcpd}, the kernel module, and tool services ($L=3$, $C=2$, $R=6$) is controlled through explicit protocols, schema synchronisation, and end-to-end validation.
 
 \textbf{Security and operational risks.}
 The central operational risk is unsafe or unauthorized tool invocation, where a fault in the admission path allows an action that should have been denied or deferred ($L=3$, $C=4$, $R=12$).
 Mitigations include deny-by-default admission, explicit approval binding, auditable state transitions, and attack-oriented testing.
 A closely related risk is overstating the security guarantees: kernel placement strengthens specific invariants but does not eliminate threats from semantic errors in user space or unsafe tool implementations ($L=3$, $C=3$, $R=9$).
 This is addressed by stating the threat model precisely and distinguishing kernel-enforced from out-of-scope properties.
-Additional arbitration and approval steps may also degrade responsiveness under concurrent load ($L=3$, $C=2$, $R=6$), which is mitigated by latency analysis, concurrency benchmarking, and fast-path optimization for common low-risk calls.
+Additional arbitration and approval steps may also degrade responsiveness under concurrent load ($L=3$, $C=2$, $R=6$), which is mitigated by latency analysis, concurrency benchmarking, and fast-path optimisation for common low-risk calls.
 
 \textbf{Environmental and resource impact.}
 Direct environmental impact is limited because the project is software-based, but repeated benchmarking, adversarial testing, and kernel debugging in virtual machines consume CPU time and electricity ($L=4$, $C=2$, $R=8$).
-This is reduced through careful experiment planning, automation of result collection, and avoidance of redundant reruns.
+This is reduced through pre-planned experiment schedules, automated result collection, and avoidance of redundant reruns.
 The same workflow discipline also mitigates the related risk of development time lost to unstable experiments or failed integration ($L=4$, $C=2$, $R=8$), together with reproducible scripts and checkpointing of experiment outputs.
 Finally, dependence on external tooling such as LLM APIs, proxies, or virtualization infrastructure ($L=3$, $C=2$, $R=6$) is reduced by separating the core evaluation from optional cloud dependencies and by supporting local or mocked execution paths where possible.
 
@@ -46,7 +44,7 @@ Weak advantage over user-space baselines & 4 & 3 & 12 & Significant & Strong bas
 Cross-component integration failure & 3 & 2 & 6 & Moderate & Explicit protocols; schema sync; end-to-end validation \\
 Unsafe or unauthorized tool invocation & 3 & 4 & 12 & Significant & Deny-by-default; approval binding; auditability; misuse testing \\
 Overestimated security guarantees & 3 & 3 & 9 & Significant & Precise threat model; clear scope of kernel-enforced properties \\
-Added latency or reduced throughput & 3 & 2 & 6 & Moderate & Latency analysis; concurrency evaluation; fast-path optimization \\
+Added latency or reduced throughput & 3 & 2 & 6 & Moderate & Latency analysis; concurrency evaluation; fast-path optimisation \\
 Additional compute and energy use & 4 & 2 & 8 & Significant & Efficient experiment planning; automation; fewer reruns \\
 Lost development time and compute & 4 & 2 & 8 & Significant & Reproducible workflows; checkpointing; staged deployment \\
 External dependency failure & 3 & 2 & 6 & Moderate & Local or mocked backends; dependency isolation \\

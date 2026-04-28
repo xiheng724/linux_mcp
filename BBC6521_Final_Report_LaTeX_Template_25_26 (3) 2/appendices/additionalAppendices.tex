@@ -54,7 +54,10 @@ The \texttt{operation} field is the dispatch string a tool service routes on and
 
 \needspace{16\baselineskip}
 \begin{table}[H]
-\centering\small
+\centering
+\caption{\texttt{mcpd}--\texttt{tool-app} JSON-RPC message fields.}
+\label{tab:mcpd-toolapp}
+\small
 \begin{tabular}{@{}lll p{5.5cm}@{}}
 \toprule
 \textbf{Field} & \textbf{Dir} & \textbf{Type} & \textbf{Description} \\
@@ -72,8 +75,6 @@ The \texttt{operation} field is the dispatch string a tool service routes on and
 \texttt{t\_ms}     & resp & \textit{u32}    & Tool-side execution time in milliseconds \\
 \bottomrule
 \end{tabular}
-\caption{\texttt{mcpd}--\texttt{tool-app} JSON-RPC message fields.}
-\label{tab:mcpd-toolapp}
 \end{table}
 
 \paragraph{Complete Netlink attribute encoding.}
@@ -118,7 +119,10 @@ The full family also defines auxiliary attributes for registration, status repor
 
 \needspace{20\baselineskip}
 \begin{table}[H]
-\centering\small
+\centering
+\caption{Core \texttt{KERNEL\_\allowbreak MCP} TLV attributes on the admission path. All strings are NUL-terminated and 4-byte aligned. Registration and reconciliation paths additionally carry a \texttt{CATALOG\_\allowbreak EPOCH} attribute (id 34) that advances when a tool's manifest is re-registered; \texttt{mcpd} reads it back after each \texttt{TOOL\_REGISTER} to compare against a session's \texttt{opened\_\allowbreak at\_\allowbreak epoch}.}
+\label{tab:netlink-attrs-full}
+\small
 \begin{tabular}{@{}lcl p{5.8cm}@{}}
 \toprule
 \textbf{Attribute} & \textbf{\#} & \textbf{Type} & \textbf{Description} \\
@@ -135,8 +139,6 @@ The full family also defines auxiliary attributes for registration, status repor
 \texttt{AGENT\_\allowbreak EPOCH}       & 29 & \textit{u64}    & Session opened-at epoch, gating cross-session replay \\
 \bottomrule
 \end{tabular}
-\caption{Core \texttt{KERNEL\_\allowbreak MCP} TLV attributes on the admission path. All strings are NUL-terminated and 4-byte aligned. Registration and reconciliation paths additionally carry a \texttt{CATALOG\_\allowbreak EPOCH} attribute (id 34) that advances when a tool's manifest is re-registered; \texttt{mcpd} reads it back after each \texttt{TOOL\_REGISTER} to compare against a session's \texttt{opened\_\allowbreak at\_\allowbreak epoch}.}
-\label{tab:netlink-attrs-full}
 \end{table}
 
 \paragraph{Semantic hash computation.}
@@ -166,6 +168,8 @@ def semantic_hash(tool_manifest: dict) -> str:
 \needspace{30\baselineskip}
 \begin{table}[H]
 \centering
+\caption{Manifest field specification. \ding{51}~= included in the SHA-256 semantic identity hash; \ding{55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt{app\_id}; tool-level fields appear once per tool entry.}
+\label{tab:manifest-fields}
 \footnotesize
 \renewcommand{\arraystretch}{1.3}
 \setlength{\tabcolsep}{6pt}
@@ -199,8 +203,6 @@ def semantic_hash(tool_manifest: dict) -> str:
 \texttt{timeout\_ms}      & \ding{55} & Per-invocation execution timeout (operational metadata) \\
 \bottomrule
 \end{tabular}
-\caption{Manifest field specification. \ding{51}~= included in the SHA-256 semantic identity hash; \ding{55}~= excluded (operational metadata whose change should not invalidate a tool registration). Fields are grouped by level: application-level fields appear once per \texttt{app\_id}; tool-level fields appear once per tool entry.}
-\label{tab:manifest-fields}
 \end{table}
 
 \clearpage
@@ -211,6 +213,8 @@ def semantic_hash(tool_manifest: dict) -> str:
 
 \begin{table}[H]
 \centering
+\caption{Comparison of representative agent systems. The key differentiator for linux-mcp is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}
+\label{tab:system_comparison}
 \footnotesize
 \renewcommand{\arraystretch}{1.35}
 \setlength{\tabcolsep}{5pt}
@@ -224,7 +228,7 @@ def semantic_hash(tool_manifest: dict) -> str:
 \midrule
 
 \rowcolor{gray!12}
-\textbf{\texttt{linux-mcp}} \newline\textbf{(this work)}
+\textbf{linux-mcp} \newline\textbf{(this work)}
   & Kernel module + user-space gateway
   & SHA-256 of JSON manifest; kernel-verified at every invocation
   & Approval tickets and registry survive daemon crash (kernel-held)
@@ -264,8 +268,6 @@ Apple Intelligence \cite{apple2024pcc}
 
 \bottomrule
 \end{tabular}
-\caption{Comparison of representative agent systems. The key differentiator for \texttt{linux-mcp} is the combination of cryptographic tool identity and kernel-held durable state, both absent from all user-space frameworks.}
-\label{tab:system_comparison}
 \end{table}
 
 
@@ -328,6 +330,8 @@ The check reads the peer credential on the same cache line that the existing \te
 \needspace{20\baselineskip}
 \begin{table}[H]
 \centering
+\caption{Experiment-only kernel switches added for the \hyperref[chap:evaluation]{Chapter~4} rerun. All four \texttt{SKIP\_*} bits are ignored when the kernel is built without \texttt{CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt{require\_peer\_cred} is runtime-toggleable on any build.}
+\label{tab:experiment-switches}
 \footnotesize
 \renewcommand{\arraystretch}{1.25}
 \setlength{\tabcolsep}{6pt}
@@ -346,6 +350,4 @@ The check reads the peer credential on the same cache line that the existing \te
 \texttt{require\_\allowbreak peer\_\allowbreak cred} & Module parameter (\texttt{bool}, 0644) & Enables the \texttt{NETLINK\_CB} peer-UID check in \texttt{kernel\_mcp\_\allowbreak cmd\_\allowbreak tool\_\allowbreak request}. Default \texttt{false} so that the cross-UID experiment can toggle it at runtime; should be set to \texttt{true} in production. \\
 \bottomrule
 \end{tabular}
-\caption{Experiment-only kernel switches added for the \hyperref[chap:evaluation]{Chapter~4} rerun. All four \texttt{SKIP\_*} bits are ignored when the kernel is built without \texttt{CONFIG\_KERNEL\_MCP\_EXPERIMENT=y}; \texttt{require\_peer\_cred} is runtime-toggleable on any build.}
-\label{tab:experiment-switches}
 \end{table}

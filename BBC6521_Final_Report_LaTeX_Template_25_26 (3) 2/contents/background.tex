@@ -31,7 +31,7 @@ The host coordinates sessions and mediates access, while servers implement capab
 MCP rapidly achieved broad ecosystem adoption, with implementations in Python, TypeScript, C\#, and Java, and integration across major LLM providers and agent frameworks~\cite{mcp_anniversary_2025}.
 
 This separation simplifies interoperability and modularity.
-However, it also concentrates responsibility in the host: identity management, approval decisions, and consistency between tool descriptions and execution all depend on correct host behavior.
+However, it also concentrates responsibility in the host: identity management, approval decisions, and consistency between tool descriptions and execution all depend on correct host behaviour.
 MCP defines how components communicate, but does not specify how a local system should enforce these properties.
 linux-mcp implements the enforcement layer that MCP leaves unspecified: it provides the local mechanism that turns the protocol's abstract trust model into a set of kernel-verified invariants.
 
@@ -71,6 +71,8 @@ This gap motivates introducing a dedicated control layer that validates semantic
 
 \begin{table}[t]
 \centering
+\caption{Control-plane properties of linux-mcp compared with two representative user-space tool-invocation frameworks, as configured in their default upstream documentation without external sandboxing layers. Production deployments commonly stack additional isolation on top: OpenClaw is often paired with NVIDIA NemoClaw and OpenShell sandboxing, and Hermes Agent's gateway architecture also offers Docker, SSH, Daytona, Singularity, and Modal terminal backends with container hardening. Such deployments would shift the right two columns toward stronger admission and execution boundaries; the comparison here is against the bare framework. The grey column marks the system proposed in this work.}
+\label{tab:comparison}
 \footnotesize
 \setlength{\tabcolsep}{5pt}
 \renewcommand{\arraystretch}{1.25}
@@ -107,8 +109,6 @@ Audit availability post-crash
   & Application log only \\
 \bottomrule
 \end{tabularx}
-\caption{Control-plane properties of linux-mcp compared with two representative user-space tool-invocation frameworks, as configured in their default upstream documentation without external sandboxing layers. Production deployments commonly stack additional isolation on top: OpenClaw is often paired with NVIDIA NemoClaw and OpenShell sandboxing, and Hermes Agent's gateway architecture also offers Docker, SSH, Daytona, Singularity, and Modal terminal backends with container hardening. Such deployments would shift the right two columns toward stronger admission and execution boundaries; the comparison here is against the bare framework. The grey column marks the system proposed in this work.}
-\label{tab:comparison}
 \end{table}
 
 
@@ -144,6 +144,8 @@ These proposals broaden scope by redesigning OS infrastructure; linux-mcp instea
 
 \begin{table}[t]
 \centering
+\caption{Control-plane threats and defences (in scope). The last row is an observability property, not a classical attack class.}
+\label{tab:threat_in_scope}
 \footnotesize
 \setlength{\tabcolsep}{5pt}\renewcommand{\arraystretch}{1.15}
 \begin{tabularx}{\linewidth}{@{}l X X@{}}
@@ -173,8 +175,6 @@ Audit loss
 
 \bottomrule
 \end{tabularx}
-\caption{Control-plane threats and defences (in scope). The last row is an observability property, not a classical attack class.}
-\label{tab:threat_in_scope}
 \end{table}
 
 

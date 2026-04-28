@@ -34,7 +34,7 @@ What these commitments cover, and what they leave out (runtime semantic verifica
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.9\linewidth]{figures/linux-mcp-overview.pdf}
+\includegraphics[width=0.95\linewidth]{figures/linux-mcp-overview.pdf}
 \caption{Layered architecture of linux-mcp, showing the four runtime components and the wire protocols connecting them.}
 \label{fig:linux-mcp-overview}
 \end{figure}
@@ -63,6 +63,8 @@ To clarify the separation of responsibilities across layers, Table~\ref{tab:arch
 
 \begin{table}[htbp]
 \centering
+\caption{Concrete layers in linux-mcp.}
+\label{tab:architecture_layers}
 \small
 \begin{spacing}{1.1}
 \begin{tabular}{l p{3cm} p{4.8cm} p{4.5cm}}
@@ -93,8 +95,6 @@ Execution layer
 \bottomrule
 \end{tabular}
 \end{spacing}
-\caption{Concrete layers in linux-mcp.}
-\label{tab:architecture_layers}
 \end{table}
 
 
@@ -103,7 +103,7 @@ Execution layer
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/linux-mcp-workload.pdf}
+\includegraphics[width=0.95\linewidth]{figures/linux-mcp-workload.pdf}
 \caption{Invocation lifecycle in linux-mcp.}
 \label{fig:chapter3-lifecycle}
 \end{figure}
@@ -166,7 +166,10 @@ The command set covering registration, invocation, approval, and registry observ
 The attributes carrying the invariants the kernel actually checks on the critical \texttt{TOOL\_\allowbreak REQUEST}/\texttt{TOOL\_\allowbreak DECISION} path are shown in Table~\ref{tab:netlink-attrs}; the full attribute set and a reference Python framing routine are given in \hyperref[sec:appendix-protocols]{Appendix~A.1} (Table~\ref{tab:netlink-attrs-full}).
 
 \begin{table}[H]
-\centering\footnotesize
+\centering
+\caption{\texttt{KERNEL\_\allowbreak MCP} Generic Netlink command set. All commands except \texttt{LIST\_\allowbreak TOOLS} require \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}.}
+\label{tab:netlink-cmds}
+\footnotesize
 \setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.0}
 \begin{tabular}{@{}lc p{8.2cm}@{}}
 \toprule
@@ -182,12 +185,13 @@ The attributes carrying the invariants the kernel actually checks on the critica
 \texttt{LIST\_\allowbreak TOOLS}      & 8  & Dump all registered tools (\texttt{NLM\_\allowbreak F\_\allowbreak DUMP} mode) \\
 \bottomrule
 \end{tabular}
-\caption{\texttt{KERNEL\_\allowbreak MCP} Generic Netlink command set. All commands except \texttt{LIST\_\allowbreak TOOLS} require \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN}.}
-\label{tab:netlink-cmds}
 \end{table}
 
 \begin{table}[!t]
-\centering\footnotesize
+\centering
+\caption{The six \texttt{KERNEL\_\allowbreak MCP} attributes on the admission-decision path, each tied to one defence in the Background threat model (Table~\ref{tab:threat_in_scope}). Routing-level attributes (\texttt{REQ\_ID}, \texttt{TOOL\_ID}, \texttt{AGENT\_ID}, \texttt{APPROVAL\_\allowbreak DECISION}) and the per-tool catalog epoch are documented in \hyperref[sec:appendix-protocols]{Appendix~A.1}.}
+\label{tab:netlink-attrs}
+\footnotesize
 \setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.0}
 \begin{tabular}{@{}lcl p{5.8cm}@{}}
 \toprule
@@ -201,8 +205,6 @@ The attributes carrying the invariants the kernel actually checks on the critica
 \texttt{TICKET\_ID}             & 22 & \textit{u64}    & Approval ticket handle returned on DEFER and replayed on consume \\
 \bottomrule
 \end{tabular}
-\caption{The six \texttt{KERNEL\_\allowbreak MCP} attributes on the admission-decision path, each tied to one defence in the Background threat model (Table~\ref{tab:threat_in_scope}). Routing-level attributes (\texttt{REQ\_ID}, \texttt{TOOL\_ID}, \texttt{AGENT\_ID}, \texttt{APPROVAL\_\allowbreak DECISION}) and the per-tool catalog epoch are documented in \hyperref[sec:appendix-protocols]{Appendix~A.1}.}
-\label{tab:netlink-attrs}
 \end{table}
 
 The \texttt{BINARY\_\allowbreak HASH} attribute warrants specific mention because its production is hybrid.

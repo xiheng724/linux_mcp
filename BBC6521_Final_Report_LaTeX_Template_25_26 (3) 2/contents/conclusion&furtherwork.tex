@@ -16,31 +16,48 @@ The position is narrower than AIOS-style proposals that rebuild OS infrastructur
 Whether AI agents will eventually warrant an operating system of their own remains an open question; in the meantime, a conventional Linux system extended with a few carefully scoped agent-aware mechanisms can already carry an MCP control plane that neither a user-space gateway nor existing Linux security primitives can match alone.
 
 These control-plane benefits are not free at deployment time, and an honest account should name the costs that do not show up in the latency and throughput numbers.
-Shipping a loadable kernel module introduces operational overhead that a user-space daemon avoids: a target-kernel version to track (the prototype is built against 6.8 and compatibility across 5.15--6.12 has not been characterised), module-signing and loader-policy requirements on locked-down distributions, and a debugging path (\texttt{dmesg}, \texttt{kdb}, crash dumps) that most application engineers are unfamiliar with.
+Shipping a loadable kernel module introduces operational overhead that a user-space daemon avoids: a target-kernel version to track (the prototype is built against Linux 6.8 and compatibility across the active LTS range 5.15--6.12 has not been characterised), module-signing and loader-policy requirements on locked-down distributions, and a debugging path (\texttt{dmesg}, \texttt{kdb}, crash dumps) that most application engineers are unfamiliar with.
 For deployments where user-space hardening is already sufficient, these overheads may outweigh the microsecond-scale gains reported here, and a realistic adoption path would likely require distribution-packaged modules, a documented kernel-version support matrix, and the \texttt{CAP\_\allowbreak NET\_\allowbreak ADMIN} split discussed in Section~\ref{sec:further-work} before the design is operationally comparable to pure user-space alternatives.
 
 \subsection{Reflection}
 
-The hardest part of the project, and the one that took longest to get right, was scoping.
-For roughly the first six weeks the project was framed around ``AI-native OS support'' as a general proposition, and the design kept absorbing more in-kernel state, more policy hooks, broader claims about what the kernel ought to do for agents, without anything actually closing.
-What pulled it back was eventually listing four specific properties a user-space gateway cannot hold on its own (tool identity, the approval-ticket lifecycle, session binding, and state durability across daemon failure) and ruling everything else out; the visibly faster rewrite that followed reads, in retrospect, as evidence that the original framing was trying to satisfy a confused goal rather than a difficult one.
+The hardest part of this project was not writing the kernel code, but deciding what the kernel should not do.
+For about the first six weeks, I treated AI-native OS support as a broad goal.
+As a result, the design kept expanding: more in-kernel state, more policy hooks, and broader claims about what the kernel should provide for agents.
+The project only became manageable when I narrowed it to four properties that a user-space gateway cannot reliably preserve on its own: tool identity, the approval-ticket lifecycle, session binding, and state durability across daemon failure.
+Everything else had to stay out.
+The rewrite after that decision was much faster, which in hindsight was a sign that the earlier version was not solving a harder problem, but a less clearly defined one.
 
-Choosing the kernel interface itself also took longer than expected.
-The first serious candidate was eBPF, not Netlink, and a couple of weeks went by before that path was clearly wrong: state storage was fine (\texttt{bpf\_\allowbreak timer} plus pinned maps could have carried the lifecycle), but eBPF LSM fires on kernel operations rather than parsed JSON-RPC, so any in-kernel arbitrator would have had to re-parse MCP framing out of raw socket bytes inside a verifier-bounded program on every invocation.
-Plain LSM hooks had the inverse problem of firing at the syscall boundary, where there is no concept of a tool yet.
-Generic Netlink was the first interface with the granularity the design needed, and a loadable module became the accepted cost.
-That choice was not without its own hazards: attribute-layout mismatches between the two sides produced silently malformed requests with no compiler warning and no log signal, and per-command Python harnesses constructing each frame by hand became standard practice after one such mismatch cost close to two days.
+I also spent roughly two weeks on the wrong kernel interface.
+The first serious candidate was eBPF rather than Generic Netlink.
+At first it looked attractive: pinned maps and \texttt{bpf\_\allowbreak timer} could have represented the required state.
+The problem was the attachment point.
+eBPF LSM hooks fire on kernel operations, not on parsed JSON-RPC messages, so an in-kernel arbitrator would have had to reconstruct MCP framing from raw socket traffic inside a verifier-bounded program on every invocation.
+Plain LSM hooks had a similar problem: they run at the syscall boundary, where the notion of a tool does not yet exist.
+Generic Netlink was the first interface that matched the granularity of the design, so I accepted the cost of a loadable kernel module.
+That choice introduced its own problems.
+Attribute-layout mismatches between the Python side and the kernel side produced malformed requests without compiler warnings or useful logs.
+After losing nearly two days to one such mismatch, I started writing small per-command Python harnesses to construct and test each Netlink frame explicitly.
 
-A persistent design temptation was to migrate more checks into the kernel.
-Each time some validation looked like it could be skipped by a compromised \texttt{mcpd}, the reflex was to mirror that check inside the module.
-I gave in to this once, on partial schema validation at registration time; the check worked until the schema needed to change, at which point a five-line user-space edit had become a kernel rebuild-and-reload, and the kernel copy was duplicating logic \texttt{mcpd} had to run anyway.
-The rule that emerged from removing it, that the kernel verifies \emph{membership} but never computes \emph{content}, was not a planned design principle so much as residue from undoing a concrete mistake; without a rule of that shape the module would gradually have grown into a second tool-execution engine inside kernel space, because every individual incident report does locally suggest one more kernel check.
+Another recurring temptation was to move more validation into the kernel.
+Whenever I saw a check that a compromised \texttt{mcpd} might skip, the natural reaction was to duplicate it inside the module.
+I made that mistake once with partial schema validation at registration time.
+It worked until the schema changed; then a simple user-space update turned into a kernel rebuild and reload, while still duplicating logic that \texttt{mcpd} needed anyway.
+Removing that code led to one of the more important design rules of the project: the kernel should verify \emph{membership}, but it should not compute \emph{content}.
+This rule was not planned from the beginning.
+It came from undoing a concrete mistake.
+Without it, the module would have slowly grown into a second tool-execution engine inside the kernel, because every individual bug seemed to justify just one more kernel check.
 
-The evaluation phase was where the project's claims looked least solid.
-An early version of the attack suite reported clean passes on the cross-UID hijack cases, and those numbers looked good for several days before it became clear that the kernel had no peer-credential check on the \texttt{TOOL\_\allowbreak REQUEST} path at all; the cases were passing because the harness was not exercising the path its name advertised.
-The fix added on 14 April was six lines comparing the request's peer uid against the session-bound uid, with latency unaffected within noise; the more uncomfortable part was the week during which the earlier number had passed without scrutiny.
-A separate overload incident pointed the opposite way, reading for some time as a kernel-side limit before turning out to be \texttt{SOMAXCONN=128} saturation inside the harness itself.
-The habit worth carrying into a next project is treating a clean pass on a security test as a reason to instrument the path and confirm it is being reached, rather than as a reason to feel reassured.
+The evaluation phase was the part that most changed how I think about systems experiments.
+An early attack suite reported clean passes for the cross-UID hijack cases.
+The result looked encouraging for several days, until I found that the kernel was not checking peer credentials on the \texttt{TOOL\_\allowbreak REQUEST} path at all.
+The tests were passing because the harness was not exercising the path its name claimed to test.
+The actual fix was small: compare the request peer uid with the uid bound to the session.
+It added no measurable latency, but the uncomfortable lesson was that the earlier result had looked plausible enough to escape scrutiny.
+A separate overload issue taught the same lesson in the opposite direction.
+I initially blamed a kernel-side limit, but the real cause was \texttt{SOMAXCONN=128} saturation in the harness.
+The habit I would carry into a future project is simple: a clean security-test pass is not enough.
+I should first instrument the path and confirm that the intended check was actually reached.
 
 \subsection{Further Work}
 \label{sec:further-work}

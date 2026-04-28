@@ -21,7 +21,7 @@
 \contentsline {paragraph}{llm-app to mcpd.}{18}{paragraph*.5}%
 \contentsline {paragraph}{mcpd to tool-app.}{18}{paragraph*.6}%
 \contentsline {paragraph}{mcpd to kernel\_mcp (Generic Netlink).}{19}{paragraph*.7}%
-\contentsline {paragraph}{Tool registration via manifests.}{19}{paragraph*.8}%
+\contentsline {paragraph}{Tool registration via manifests.}{20}{paragraph*.8}%
 \contentsline {subsection}{\numberline {3.5}Manifest Semantics and Tool Identity}{20}{subsection.3.5}%
 \contentsline {subsection}{\numberline {3.6}Session Management and Approval Binding}{21}{subsection.3.6}%
 \contentsline {paragraph}{Catalog-epoch rebind on manifest change.}{21}{paragraph*.9}%
