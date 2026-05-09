@@ -14,6 +14,7 @@
       ],
       "operation": "note_create",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Create a note in a named notebook with title, body, and optional tags.",
       "input_schema": {
         "type": "object",
@@ -68,6 +69,7 @@
       ],
       "operation": "note_list",
       "timeout_ms": 30000,
+      "output_collection_path": "items",
       "description": "Browse recent notes with optional notebook, free-text query, tag filter, and result limit.",
       "input_schema": {
         "type": "object",
@@ -116,6 +118,7 @@
       ],
       "operation": "note_read",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Read one note by exact note identifier and return full content and metadata. Use a note identifier from note_list or note_search when the user did not provide an exact ID.",
       "input_schema": {
         "type": "object",
@@ -150,6 +153,7 @@
       ],
       "operation": "note_search",
       "timeout_ms": 30000,
+      "output_collection_path": "items",
       "description": "Find notes by free-text query across titles, tags, and bodies, optionally scoped to one notebook. Returns note identifiers and excerpts for follow-up note_read steps.",
       "input_schema": {
         "type": "object",

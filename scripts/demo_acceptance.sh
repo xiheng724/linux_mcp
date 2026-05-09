@@ -16,7 +16,10 @@ fi
 
 run_as_user() {
   if [[ "$(id -u)" -eq 0 && "$NORMAL_USER" != "root" ]]; then
-    sudo -u "$NORMAL_USER" "$@"
+    # Preserve LLM credentials across the inner sudo. Without this, a
+    # user who exported LLM_API_KEY in the parent shell hits step 7's
+    # "missing LLM API key" check and has no obvious explanation.
+    sudo --preserve-env=LLM_API_KEY,DEEPSEEK_API_KEY -u "$NORMAL_USER" "$@"
   else
     "$@"
   fi

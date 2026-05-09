@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
@@ -19,6 +20,7 @@ from plan_support import (
     normalize_plan,
     resolve_payload_template,
     validate_payload_against_schema,
+    validate_plan_refs,
 )
 from rpc import mcpd_call
 # plan_support above inserts the repo root onto sys.path, so this import
@@ -26,7 +28,6 @@ from rpc import mcpd_call
 from client.kernel_mcp import reasons as reason_taxonomy
 
 MAX_PLAN_STEPS = 4
-MAX_PLAN_CANDIDATE_TOOLS = 6
 DEFAULT_APPROVAL_TTL_MS = 5 * 60 * 1000
 ToolDict = Dict[str, Any]
 ApprovalEvaluator = Callable[[ToolDict, Dict[str, Any], Dict[str, Any]], str | None]
@@ -110,18 +111,6 @@ def _index_tools(tools: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
     return out
 
 
-def _compact_tool(tool: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        "tool_id": tool.get("tool_id"),
-        "name": tool.get("name", ""),
-        "app_id": tool.get("app_id", ""),
-        "app_name": tool.get("app_name", ""),
-        "description": tool.get("description", ""),
-        "path_semantics": tool.get("path_semantics", {}),
-        "approval_policy": tool.get("approval_policy", {}),
-    }
-
-
 def _call_payload_builder_with_seed(
     *,
     user_text: str,
@@ -156,7 +145,8 @@ def _call_payload_builder_with_seed(
             "return exactly one strict JSON object representing the payload to send. "
             "Do not use markdown. Do not wrap the payload in extra fields. "
             "Preserve the explicit values from seed_payload unless they are invalid for the schema. "
-            "Fill in any missing required or implied fields needed to satisfy the user request. "
+            "Fill in any missing required or implied fields needed to satisfy the user request, "
+            "including content fields — generate code, markdown, or text as appropriate. "
             "If the schema uses absolute timestamp fields such as start_time or end_time, "
             "convert relative expressions like today/tomorrow/next Monday into valid ISO-8601 strings "
             "using the provided time_context."
@@ -231,16 +221,22 @@ def _call_plan_builder(
                 "examples": tool.get("examples", []),
                 "path_semantics": tool.get("path_semantics", {}),
                 "approval_policy": tool.get("approval_policy", {}),
+                "output_collection_path": tool.get("output_collection_path", ""),
             }
             for tool in tools
             if isinstance(tool.get("tool_id"), int)
         ],
         "reference_syntax": {
-            "description": "Prefer explicit selector objects to read values from prior step results.",
+            "description": (
+                "Use selector objects to read values from prior step results. "
+                "mode=first/only is ONLY valid when the upstream tool's output_collection_path "
+                "is non-empty AND the selector's path equals that value; otherwise use mode=value "
+                "(or omit mode) to consume the whole upstream result."
+            ),
             "examples": [
                 "$context.workspace_root_rel",
-                {"$select": {"step": "matches", "path": "items", "mode": "first", "field": "note_id"}},
-                {"$select": {"step": "events", "path": "items", "mode": "first", "field": "event_id"}},
+                {"$select": {"step": "search_notes", "path": "items", "mode": "first", "field": "note_id"}},
+                {"$select": {"step": "system_info", "mode": "value"}},
             ],
         },
         "output_format": {
@@ -260,12 +256,22 @@ def _call_plan_builder(
                 }
             ],
         },
-        "rule": "Return one JSON object only. No markdown. Use 1-4 steps.",
+        "rule": "Return one JSON object only. No markdown. Use 0-4 steps; 0 means decline with an explanatory reason.",
     }
     obj = call_model(
         prompt,
         (
             "You are a planning router for tool execution. Build the smallest valid sequential plan. "
+            "If the user input is a meta question about this CLI itself (e.g. 'list the tool catalog', "
+            "'what apps are available', 'how does this work') OR you cannot find a tool whose description "
+            "and input_schema confidently match the user's intent, return "
+            "{\"reason\":\"<short user-facing message that suggests --catalog for catalog inspection or asks the user to rephrase>\",\"steps\":[]}. "
+            "Declining with steps=[] is strictly preferred over inventing a tool call you are not confident about. "
+            "Refuse only when no tool fits the user's intent at the tool level — never refuse over "
+            "missing payload fields (URLs, identifiers, content), as the downstream payload builder fills those. "
+            "When chaining steps, consult each upstream tool's output_collection_path: "
+            "use mode=first only on tools whose output_collection_path is set, "
+            "and use mode=value (or omit mode) to reference a single-object upstream result. "
             "A runtime_context object is available for environment values such as the current workspace root. "
             "When the user refers to the current project folder or current workspace, use $context.workspace_root_rel "
             "instead of inventing a lookup step. "
@@ -294,94 +300,41 @@ def _call_plan_builder(
     return obj
 
 
-def _call_tool_selector(
-    user_text: str,
-    apps: List[Dict[str, Any]],
-    tools: List[Dict[str, Any]],
-    api_key: str,
-    cfg: SelectorConfig,
-) -> Dict[str, Any]:
-    prompt = {
-        "user_input": user_text,
-        "runtime_context": runtime_context(),
-        "apps": [
-            {
-                "app_id": app.get("app_id", ""),
-                "app_name": app.get("app_name", ""),
-            }
-            for app in apps
-            if isinstance(app.get("app_id"), str)
-        ],
-        "tools": [_compact_tool(tool) for tool in tools if isinstance(tool.get("tool_id"), int)],
-        "output_format": {
-            "reason": "string",
-            "tool_ids": ["int"],
-        },
-        "rule": f"Return one JSON object only. Choose 1-{MAX_PLAN_CANDIDATE_TOOLS} tool_ids.",
-    }
-    obj = call_model(
-        prompt,
-        (
-            "You are a lightweight tool selector. Choose the smallest set of tools needed to satisfy the user request and any identifier-resolution steps implied by the selected tool schemas. "
-            "Use each tool's path_semantics metadata to match explicit user path scope. "
-            "repo_rel tools are for repository-root paths. "
-            "host_any tools are for real host filesystem paths. "
-            "When the user specifies a non-repository path, prefer a host-path tool instead of a repo_rel tool. "
-            "Do not invent tool ids. Return strict JSON only in the format "
-            "{\"reason\":\"...\",\"tool_ids\":[1,2]}."
-        ),
-        api_key,
-        cfg,
-    )
-    if not isinstance(obj, dict):
-        raise RuntimeError(f"tool selector returned non-object: {obj!r}")
-    return obj
-
-
-def _select_candidate_tools(
-    user_text: str,
-    apps: List[Dict[str, Any]],
-    tools: List[Dict[str, Any]],
-    cfg: SelectorConfig,
-) -> Tuple[str, List[Dict[str, Any]]]:
-    api_key = require_api_key()
-    tools_by_id = _index_tools(tools)
-    selector_obj = _call_tool_selector(user_text, apps, tools, api_key, cfg)
-    reason = str(selector_obj.get("reason", "")).strip() or "model-selected"
-    raw_ids = selector_obj.get("tool_ids", [])
-    if not isinstance(raw_ids, list) or not raw_ids:
-        return reason, tools
-    selected: List[Dict[str, Any]] = []
-    seen_ids: set[int] = set()
-    for raw_id in raw_ids:
-        if isinstance(raw_id, bool) or not isinstance(raw_id, int):
-            continue
-        if raw_id in seen_ids:
-            continue
-        tool = tools_by_id.get(raw_id)
-        if tool is None:
-            continue
-        selected.append(tool)
-        seen_ids.add(raw_id)
-        if len(selected) >= MAX_PLAN_CANDIDATE_TOOLS:
-            break
-    return (reason, selected or tools)
-
-
 def build_execution_plan(
     user_text: str,
     apps: List[Dict[str, Any]],
     tools: List[Dict[str, Any]],
     cfg: SelectorConfig,
 ) -> Dict[str, Any]:
-    selector_reason, candidate_tools = _select_candidate_tools(user_text, apps, tools, cfg)
-    tools_by_id = _index_tools(candidate_tools)
-    if not tools_by_id:
+    # Single-stage planner over the full catalog. The previous selector
+    # stage was a token-saving filter that became net-negative once
+    # descriptions were compact: dropping it removes a serial round-trip
+    # to the LLM API (typically 15-25s saved per request) and keeps the
+    # refusal path intact (planner already returns steps:[] for
+    # meta queries / no-match cases).
+    if not tools:
         raise RuntimeError("no valid tools discovered from mcpd")
-    plan_obj = _call_plan_builder(user_text, apps, candidate_tools, require_api_key(), cfg)
-    reason, steps = normalize_plan(plan_obj, tools_by_id, max_plan_steps=MAX_PLAN_STEPS)
-    plan_reason = reason if selector_reason == "model-selected" else f"{selector_reason}; {reason}"
-    return {"reason": plan_reason, "steps": steps}
+    tools_by_id = _index_tools(tools)
+
+    # Retry the planner up to 3 times when validate_plan_refs catches a
+    # bad cross-step reference (e.g. mode=first on a single-object
+    # upstream). Same retry shape as build_payload_for_step.
+    api_key = require_api_key()
+    feedback = ""
+    last_error: Exception | None = None
+    for _attempt in range(3):
+        user_for_planner = user_text if not feedback else f"{user_text}\n\nPrevious plan was rejected: {feedback}"
+        plan_obj = _call_plan_builder(user_for_planner, apps, tools, api_key, cfg)
+        reason, steps = normalize_plan(plan_obj, tools_by_id, max_plan_steps=MAX_PLAN_STEPS)
+        try:
+            validate_plan_refs(steps)
+        except ValueError as exc:
+            last_error = exc
+            feedback = str(exc)
+            continue
+        return {"reason": reason, "steps": steps}
+
+    raise RuntimeError(f"planner produced invalid plan after retries: {last_error}")
 
 
 def _rebind_session_in_place(session: SessionInfo, sock_path: str) -> bool:
@@ -397,7 +350,11 @@ def _rebind_session_in_place(session: SessionInfo, sock_path: str) -> bool:
         from .model_client import open_session as _model_open_session
     try:
         fresh = _model_open_session(sock_path, session.client_name, session.ttl_ms)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        # Surface why catalog_stale_rebind_required recovery failed —
+        # the caller will return the *original* tool:exec error, so
+        # without this the rebind failure mode is invisible.
+        print(f"[mcp] session rebind failed: {exc}", file=sys.stderr, flush=True)
         return False
     session.session_id = fresh.session_id
     session.agent_id = fresh.agent_id

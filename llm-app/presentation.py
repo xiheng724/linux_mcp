@@ -83,6 +83,12 @@ def render_execution_user_lines(execution: Dict[str, Any]) -> List[str]:
     status = response.get("status")
 
     steps = execution.get("steps", [])
+    # Planner declined to plan (empty steps): surface its reason as the
+    # assistant's reply instead of falling through to "Done." with no
+    # context.
+    if isinstance(steps, list) and not steps:
+        reason = str(execution.get("plan_reason", "")).strip()
+        return [reason] if reason else ["No matching tool. Try `--catalog` to inspect what's available, or rephrase."]
     if status == "ok" and isinstance(steps, list) and steps:
         if len(steps) == 1:
             lines.append("Request completed.")
@@ -98,6 +104,32 @@ def render_execution_user_lines(execution: Dict[str, Any]) -> List[str]:
 
 def _summarize_result(result: Any) -> List[str]:
     if isinstance(result, dict):
+        # Browser / launcher / open_url-shaped results: prefer the URL.
+        if result.get("opened") is True:
+            url = result.get("url")
+            if isinstance(url, str) and url:
+                return [f"Opened {url}"]
+
+        # delete_host_file: {path, deleted: true}
+        if result.get("deleted") is True:
+            path = result.get("path")
+            if isinstance(path, str) and path:
+                return [f"Deleted `{path}`."]
+
+        # show_notification: {shown: true, title, body, ...}
+        if result.get("shown") is True:
+            title = result.get("title")
+            if isinstance(title, str) and title:
+                return [f"Notification shown: {title}"]
+
+        # gnome_event_create: {event_uid, title, ics_path, opened, note}
+        event_uid = result.get("event_uid")
+        if isinstance(event_uid, str) and event_uid:
+            ev_title = result.get("title", "(untitled)")
+            note = result.get("note", "")
+            line = f"Calendar event prepared: {ev_title}"
+            return [line, note] if note else [line]
+
         path = result.get("path")
         if isinstance(path, str) and path:
             if result.get("created") is True:

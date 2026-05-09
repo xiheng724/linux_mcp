@@ -110,28 +110,6 @@ manifest：
 - `show_notification` 依赖 `notify-send`
 - 更像桌面伴随型 app，而不是调试工具集合
 
-### calendar_app
-
-manifest：
-
-- [05_calendar_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/05_calendar_app.json)
-
-服务：
-
-- [calendar_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/calendar_app.py)
-
-工具：
-
-- `event_create`
-- `event_list`
-- `event_update`
-
-说明：
-
-- 数据存放在 `tool-app/demo_data/calendar/events.json`
-- `event_list` 现在支持 `query`，更适合作为 `event_update` 前的解析步骤
-- 更像一个轻量本地日历应用
-
 ### contacts_app
 
 manifest：
@@ -152,28 +130,6 @@ manifest：
 
 - 数据存放在 `tool-app/demo_data/contacts/contacts.json`
 - 更像一个轻量本地联系人应用
-
-### launcher_app
-
-manifest：
-
-- [07_launcher_app.json](/home/lxh/Code/linux-mcp/tool-app/manifests/07_launcher_app.json)
-
-服务：
-
-- [launcher_app.py](/home/lxh/Code/linux-mcp/tool-app/demo_apps/launcher_app.py)
-
-工具：
-
-- `list_launchable_apps`
-- `launch_app`
-- `open_with_app`
-
-说明：
-
-- 直接桥接 Linux 系统中已有的 `.desktop` 应用和可执行文件
-- 更像一个真实应用入口桥接层，而不是本地数据型 demo app
-- `launch_app` / `open_with_app` 依赖图形桌面会话
 
 ### bridge_app
 

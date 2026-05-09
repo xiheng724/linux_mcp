@@ -59,8 +59,17 @@ class SecurityConfig:
         SO_PEERCRED on both the probe dial and the exec dial.
       - `None` sentinel means "resolve at load time". Resolution depends
         on euid and environment — see _resolve_security_defaults.
+
+    allowed_client_uids:
+      - Tuple of UIDs permitted to drive mcpd via the frontend UDS
+        (sys:list_*, sys:open_session, tool:exec). Enforced via
+        SO_PEERCRED on the accepted connection. The socket file is
+        chmoded 0o666 so cross-uid demo flows work; this allowlist is
+        the actual security boundary, not the file mode.
+      - Same `None`/resolve-at-load-time semantics as backend uids.
     """
     allowed_backend_uids: tuple[int, ...] | None = None
+    allowed_client_uids: tuple[int, ...] | None = None
 
 
 def _coerce_str_list(value: Any, field: str) -> list[str]:
@@ -112,6 +121,16 @@ def _load_security_config_from_toml(data: Dict[str, Any]) -> SecurityConfig:
                 f"integers, got {uids!r}"
             )
         cfg.allowed_backend_uids = tuple(uids)
+    client_uids = section.get("allowed_client_uids")
+    if client_uids is not None:
+        if not isinstance(client_uids, list) or not all(
+            isinstance(u, int) and not isinstance(u, bool) and u >= 0 for u in client_uids
+        ):
+            raise ValueError(
+                "security.allowed_client_uids must be a list of non-negative "
+                f"integers, got {client_uids!r}"
+            )
+        cfg.allowed_client_uids = tuple(client_uids)
     _resolve_security_defaults(cfg)
     return cfg
 
@@ -144,34 +163,34 @@ def _resolve_security_defaults(cfg: SecurityConfig) -> None:
         about who mcpd trusts should live in the daemon's config/env,
         not in whichever launcher script happened to exec it.
     """
-    if cfg.allowed_backend_uids is not None:
-        return
-
     euid = os.geteuid()
-    if euid != 0:
-        cfg.allowed_backend_uids = (euid,)
-        return
 
-    if os.environ.get(TRUST_SUDO_UID_ENV, "").strip() in ("1", "true", "yes"):
-        sudo_uid_raw = os.environ.get("SUDO_UID", "").strip()
-        try:
-            sudo_uid = int(sudo_uid_raw) if sudo_uid_raw else -1
-        except ValueError:
-            sudo_uid = -1
-        if sudo_uid > 0:
-            cfg.allowed_backend_uids = (0, sudo_uid)
-            return
+    def _resolve_uid_set(field_name: str) -> tuple[int, ...]:
+        if euid != 0:
+            return (euid,)
+        if os.environ.get(TRUST_SUDO_UID_ENV, "").strip() in ("1", "true", "yes"):
+            sudo_uid_raw = os.environ.get("SUDO_UID", "").strip()
+            try:
+                sudo_uid = int(sudo_uid_raw) if sudo_uid_raw else -1
+            except ValueError:
+                sudo_uid = -1
+            if sudo_uid > 0:
+                return (0, sudo_uid)
+        raise ConfigError(
+            f"mcpd runs as root but security.{field_name} is not "
+            "configured. Refusing to start with the implicit allowlist "
+            "{0} because that silently rejects every non-root peer. "
+            "Fix one of:\n"
+            f"  (a) set [security].{field_name} in ${CONFIG_ENV} "
+            f"or {DEFAULT_CONFIG_PATH};\n"
+            f"  (b) set {TRUST_SUDO_UID_ENV}=1 to trust $SUDO_UID (demo "
+            "launcher path)."
+        )
 
-    raise ConfigError(
-        "mcpd runs as root but security.allowed_backend_uids is not "
-        "configured. Refusing to start with the implicit allowlist "
-        "{0} because that silently rejects every non-root tool "
-        "backend and leaves binary_hash unpinned. Fix one of:\n"
-        f"  (a) set [security].allowed_backend_uids in ${CONFIG_ENV} "
-        f"or {DEFAULT_CONFIG_PATH};\n"
-        f"  (b) set {TRUST_SUDO_UID_ENV}=1 to trust $SUDO_UID (demo "
-        "launcher path)."
-    )
+    if cfg.allowed_backend_uids is None:
+        cfg.allowed_backend_uids = _resolve_uid_set("allowed_backend_uids")
+    if cfg.allowed_client_uids is None:
+        cfg.allowed_client_uids = _resolve_uid_set("allowed_client_uids")
 
 
 def _resolve_config_path() -> Path | None:

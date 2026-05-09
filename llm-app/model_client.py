@@ -27,7 +27,7 @@ DEFAULT_MODEL_URL = os.getenv(
     "LLM_MODEL_URL",
     os.getenv("DEEPSEEK_API_URL", "https://api.deepseek.com/chat/completions"),
 )
-DEFAULT_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "deepseek-chat")
+DEFAULT_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "deepseek-v4-flash")
 
 # Backward-compatible aliases (older imports reference these names).
 DEFAULT_DEEPSEEK_URL = DEFAULT_MODEL_URL

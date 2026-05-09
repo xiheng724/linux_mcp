@@ -893,6 +893,26 @@ def _check_peer_uid(peer_uid: int, tool_id: int, context: str) -> bool:
     return False
 
 
+def _check_peer_uid_client(peer_uid: int) -> bool:
+    """True iff SO_PEERCRED peer uid on the frontend UDS is allowed.
+
+    The mcpd socket is chmoded 0o666 so cross-uid demo flows (mcpd
+    root + llm-app under $SUDO_USER) work without chown ceremony.
+    World-writable file mode means any local uid can connect; this
+    check is what actually gates who can drive the daemon — list the
+    catalog, open sessions, or fire tool:exec.
+    """
+    sec = _get_security_config()
+    allowed = sec.allowed_client_uids or ()
+    if peer_uid in allowed:
+        return True
+    LOGGER.warning(
+        "client uid rejected peer_uid=%d allowed=%s",
+        peer_uid, sorted(allowed),
+    )
+    return False
+
+
 def _read_peercred(conn: socket.socket) -> Tuple[int, int] | None:
     """Return (pid, uid) from SO_PEERCRED on an AF_UNIX connection, or
     None if the option cannot be read."""
@@ -1783,6 +1803,8 @@ def _handle_sys_approval_reply(
 def _handle_connection(conn: socket.socket) -> None:
     with conn:
         peer = _read_peer_identity(conn)
+        if not _check_peer_uid_client(peer.uid):
+            return
         while True:
             req_id = 0
             agent_id = "unknown"
@@ -1951,8 +1973,10 @@ def main() -> int:
         LOGGER.error("event=startup_refused reason=%s", exc)
         return 2
     LOGGER.info(
-        "security: allowed_backend_uids=%s (euid=%d)",
-        list(sec.allowed_backend_uids or ()), os.geteuid(),
+        "security: allowed_backend_uids=%s allowed_client_uids=%s (euid=%d)",
+        list(sec.allowed_backend_uids or ()),
+        list(sec.allowed_client_uids or ()),
+        os.geteuid(),
     )
 
     try:

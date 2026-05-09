@@ -107,6 +107,14 @@ class ToolManifest:
     examples: List[Any]
     path_semantics: Dict[str, str]
     approval_policy: Dict[str, Any]
+    # Dot-path to the collection inside this tool's response, e.g.
+    # "items" or "entries". Empty string means the tool returns a
+    # single object (or scalar). Used by the planner to decide
+    # whether $select{mode:"first"} is legal against this step's
+    # output, and by the static plan validator to reject bad refs
+    # before runtime. Intentionally NOT in the semantic hash —
+    # it's an LLM hint, not part of tool identity.
+    output_collection_path: str
     transport: str
     endpoint: str
     operation: str
@@ -200,6 +208,15 @@ def _compute_script_digest(demo_entrypoint: str | None, manifest_path: Path) -> 
         return "", ""
     repo_root = manifest_path.resolve().parent.parent.parent
     script_path = (repo_root / demo_entrypoint).resolve()
+    # Reject `..` traversal that escapes the repo. _ensure_rel_tool_path
+    # already blocks absolute paths; this catches the symmetric case
+    # so a future relaxation of the manifest source (e.g. operator-
+    # supplied catalogs) can't pivot to hashing /etc/* via a crafted
+    # demo_entrypoint.
+    if not script_path.is_relative_to(repo_root):
+        raise ValueError(
+            f"{manifest_path}: demo_entrypoint escapes repo root: {demo_entrypoint!r}"
+        )
     try:
         h = hashlib.sha256()
         with open(script_path, "rb") as fh:
@@ -262,6 +279,9 @@ def _load_tool(
         if not isinstance(field_mode, str) or not field_mode:
             raise ValueError(f"{path}: path_semantics values must be non-empty strings")
         normalized_path_semantics[field_name] = field_mode
+    output_collection_path = raw.get("output_collection_path", "")
+    if not isinstance(output_collection_path, str):
+        raise ValueError(f"{path}: output_collection_path must be string")
     user_confirmation = approval_policy.get("user_confirmation", {})
     if user_confirmation not in ({}, None) and not isinstance(user_confirmation, dict):
         raise ValueError(f"{path}: approval_policy.user_confirmation must be object")
@@ -329,6 +349,7 @@ def _load_tool(
         examples=examples,
         path_semantics=normalized_path_semantics,
         approval_policy=normalized_approval_policy,
+        output_collection_path=output_collection_path,
         transport=transport,
         endpoint=endpoint,
         operation=operation,

@@ -13,6 +13,7 @@
       ],
       "operation": "open_directory",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Open a real directory in the system file manager using the standard org.freedesktop.FileManager1 D-Bus interface.",
       "input_schema": {
         "type": "object",
@@ -47,6 +48,7 @@
       ],
       "operation": "reveal_path",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Reveal a specific file or directory in the system file manager using the standard org.freedesktop.FileManager1 D-Bus interface.",
       "input_schema": {
         "type": "object",
@@ -81,6 +83,7 @@
       ],
       "operation": "show_item_properties",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Open the properties dialog for a file or directory through the standard org.freedesktop.FileManager1 interface.",
       "input_schema": {
         "type": "object",

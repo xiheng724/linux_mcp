@@ -14,7 +14,8 @@
       ],
       "operation": "open_tab",
       "timeout_ms": 30000,
-      "description": "Open a URL in a new Firefox browser tab.",
+      "output_collection_path": "",
+      "description": "Open a URL in a new Firefox tab. For brand-only references (github, bilibili, chatgpt, youtube), use the canonical https URL — see examples.",
       "input_schema": {
         "type": "object",
         "required": [
@@ -28,11 +29,11 @@
         "additionalProperties": false
       },
       "examples": [
-        {
-          "payload": {
-            "url": "https://github.com"
-          }
-        }
+        {"payload": {"url": "https://github.com"}},
+        {"payload": {"url": "https://www.bilibili.com"}},
+        {"payload": {"url": "https://chat.openai.com"}},
+        {"payload": {"url": "https://www.youtube.com"}},
+        {"payload": {"url": "https://www.zhihu.com"}}
       ]
     },
     {
@@ -44,6 +45,7 @@
       ],
       "operation": "open_private_window",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Open Firefox in a private window, optionally with a starting URL.",
       "input_schema": {
         "type": "object",
@@ -74,6 +76,7 @@
       ],
       "operation": "search_web",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Search the web in Firefox using the default search engine.",
       "input_schema": {
         "type": "object",

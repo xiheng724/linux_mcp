@@ -11,6 +11,7 @@
       "risk_tags": [],
       "operation": "abstract_echo",
       "timeout_ms": 5000,
+      "output_collection_path": "",
       "description": "Ping the abstract-UDS demo backend. Returns the supplied note along with a flag proving the call traversed the uds_abstract transport path.",
       "input_schema": {
         "type": "object",

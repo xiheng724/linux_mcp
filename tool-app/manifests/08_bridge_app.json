@@ -13,6 +13,7 @@
       ],
       "operation": "list_desktop_entries",
       "timeout_ms": 30000,
+      "output_collection_path": "items",
       "description": "Discover installed Linux desktop applications from .desktop files, optionally filtered by query.",
       "input_schema": {
         "type": "object",
@@ -48,6 +49,7 @@
       ],
       "operation": "launch_desktop_entry",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Launch a real desktop application through its .desktop entry using gio launch, with an optional target path or URL.",
       "input_schema": {
         "type": "object",
@@ -89,6 +91,7 @@
       ],
       "operation": "run_cli_entry",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Invoke a real installed CLI entrypoint by executable name with explicit argument list.",
       "input_schema": {
         "type": "object",
@@ -135,6 +138,7 @@
       ],
       "operation": "call_dbus_method",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Call a D-Bus or Freedesktop method using gdbus on the session or system bus with explicit string arguments.",
       "input_schema": {
         "type": "object",

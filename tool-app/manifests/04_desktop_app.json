@@ -11,6 +11,7 @@
       "risk_tags": [],
       "operation": "desktop_snapshot",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Get practical desktop and host status including time, uptime, load, memory, and disk usage.",
       "input_schema": {
         "type": "object",
@@ -41,7 +42,8 @@
       ],
       "operation": "open_url",
       "timeout_ms": 30000,
-      "description": "Open a web URL in the default desktop browser or handler.",
+      "output_collection_path": "",
+      "description": "Open a web URL in the default desktop browser. For brand-only references (github, bilibili, chatgpt, youtube), use the canonical https URL — see examples.",
       "input_schema": {
         "type": "object",
         "required": [
@@ -55,16 +57,9 @@
         "additionalProperties": false
       },
       "examples": [
-        {
-          "payload": {
-            "url": "https://example.com"
-          }
-        },
-        {
-          "payload": {
-            "url": "https://github.com"
-          }
-        }
+        {"payload": {"url": "https://github.com"}},
+        {"payload": {"url": "https://www.bilibili.com"}},
+        {"payload": {"url": "https://chat.openai.com"}}
       ]
     },
     {
@@ -75,6 +70,7 @@
       ],
       "operation": "show_notification",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Show a desktop notification with title and optional body text.",
       "input_schema": {
         "type": "object",
@@ -115,7 +111,8 @@
       ],
       "operation": "write_host_text_file",
       "timeout_ms": 30000,
-      "description": "Create or overwrite a text file on the real Linux host filesystem, including paths under ~/Desktop or other home directories outside the repo root.",
+      "output_collection_path": "",
+      "description": "Create or overwrite a text file at any host path (including ~/Desktop, ~/Documents). 'content' accepts any UTF-8 text — Python, markdown, JSON, shell, prose; the LLM generates content itself, no other tool needed. File extension is just a label. Use whenever user wants to save text/code to a host file.",
       "path_semantics": {
         "path": "host_any"
       },
@@ -152,17 +149,57 @@
       "examples": [
         {
           "payload": {
-            "path": "~/Desktop/lxh.txt",
-            "content": ""
+            "path": "~/Desktop/notes.txt",
+            "content": "buy milk",
+            "overwrite": true
           }
         },
         {
           "payload": {
-            "path": "~/Documents/todo.txt",
-            "content": "buy milk",
+            "path": "~/Desktop/hello.py",
+            "content": "def main():\n    print('hello')\n\nif __name__ == '__main__':\n    main()\n",
+            "overwrite": true
+          }
+        },
+        {
+          "payload": {
+            "path": "~/Desktop/notes.md",
+            "content": "# Reading list\n\n- The Annotated Transformer\n- Attention Is All You Need\n",
             "overwrite": true
           }
         }
+      ]
+    },
+    {
+      "tool_id": 46,
+      "name": "delete_host_file",
+      "risk_tags": [
+        "filesystem_delete",
+        "system_mutation",
+        "irreversible"
+      ],
+      "operation": "delete_host_file",
+      "timeout_ms": 30000,
+      "output_collection_path": "",
+      "description": "Permanently delete one regular file on the real Linux host filesystem. Refuses directories, symlinks, and missing files. There is no trash bin — the deletion is irreversible.",
+      "path_semantics": {
+        "path": "host_any"
+      },
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {"payload": {"path": "~/Desktop/lxh.txt"}},
+        {"payload": {"path": "~/Desktop/scratch.md"}}
       ]
     }
   ]

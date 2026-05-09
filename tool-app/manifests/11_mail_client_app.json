@@ -13,6 +13,7 @@
       ],
       "operation": "open_inbox",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Open the real Thunderbird mail client to its mail view.",
       "input_schema": {
         "type": "object",
@@ -33,6 +34,7 @@
       ],
       "operation": "compose_email",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Open the real Thunderbird compose window with semantic email fields such as recipients, subject, body, and an optional attachment.",
       "input_schema": {
         "type": "object",

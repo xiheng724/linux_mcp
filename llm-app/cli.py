@@ -11,6 +11,15 @@ import sys
 import time
 from typing import Any, Dict, List, Literal
 
+# Importing readline transparently upgrades input() to support arrow
+# keys (cursor movement + history), Ctrl+A/E/W/R, etc. stdlib on Unix,
+# zero new deps. Without this, arrow keys leak escape sequences as
+# literal text into the prompt buffer.
+try:
+    import readline  # noqa: F401
+except ImportError:  # pragma: no cover - non-POSIX
+    pass
+
 from app_logic import ApprovalRequest, execute_plan, load_catalog
 from debug_render import render_execution_debug_lines
 from model_client import (
@@ -26,9 +35,7 @@ from rpc import mcpd_call
 try:
     from rich import box as rich_box
     from rich.console import Console
-    from rich.live import Live
     from rich.panel import Panel
-    from rich.spinner import Spinner
     from rich.table import Table
     from rich.text import Text
 
@@ -89,6 +96,22 @@ def _apps_signature(apps: List[Dict[str, Any]]) -> str:
     return hashlib.sha256(encoded).hexdigest()[:12]
 
 
+# ANSI fallback palette for the no-rich path. Subtle dim on the
+# system-line prefix lets the main conversation content visually
+# dominate even on terminals without rich installed.
+_ANSI_RESET = "\033[0m"
+_ANSI_DIM = "\033[2m"
+_ANSI_GREEN = "\033[32m"
+_ANSI_YELLOW = "\033[33m"
+_ANSI_RED = "\033[31m"
+_ANSI_BOLD = "\033[1m"
+_ANSI_MAGENTA = "\033[35m"
+
+
+def _ansi(text: str, code: str) -> str:
+    return f"{code}{text}{_ANSI_RESET}" if sys.stdout.isatty() else text
+
+
 def _sysline(msg: str) -> None:
     if HAVE_RICH:
         text = Text()
@@ -96,7 +119,7 @@ def _sysline(msg: str) -> None:
         text.append(msg)
         console.print(text)
         return
-    print(f"[llm-app] {msg}", flush=True)
+    print(f"{_ansi('[llm-app]', _ANSI_DIM)} {msg}", flush=True)
 
 
 def _okline(msg: str) -> None:
@@ -107,7 +130,7 @@ def _okline(msg: str) -> None:
         text.append(msg, style="green")
         console.print(text)
         return
-    print(f"[llm-app] OK {msg}", flush=True)
+    print(f"{_ansi('[llm-app]', _ANSI_DIM)} {_ansi('OK', _ANSI_BOLD + _ANSI_GREEN)} {_ansi(msg, _ANSI_GREEN)}", flush=True)
 
 
 def _warnline(msg: str) -> None:
@@ -118,7 +141,7 @@ def _warnline(msg: str) -> None:
         text.append(msg, style="yellow")
         console.print(text)
         return
-    print(f"[llm-app] WARN {msg}", flush=True)
+    print(f"{_ansi('[llm-app]', _ANSI_DIM)} {_ansi('WARN', _ANSI_BOLD + _ANSI_YELLOW)} {_ansi(msg, _ANSI_YELLOW)}", flush=True)
 
 
 def _errline(msg: str) -> None:
@@ -129,7 +152,7 @@ def _errline(msg: str) -> None:
         text.append(msg, style="red")
         console.print(text)
         return
-    print(f"[llm-app] ERROR: {msg}", flush=True)
+    print(f"{_ansi('[llm-app]', _ANSI_DIM)} {_ansi('ERROR', _ANSI_BOLD + _ANSI_RED)} {_ansi(msg, _ANSI_RED)}", flush=True)
 
 
 def _separator() -> None:
@@ -140,22 +163,25 @@ def _separator() -> None:
 
 
 def _spinner_context(message: str):
-    if HAVE_RICH:
-        return Live(
-            Spinner("dots", text=f"[yellow]{message}[/yellow]"),
-            console=console,
-            refresh_per_second=12,
-        )
+    """Print a static status line. Importantly, this does NOT use
+    rich.Live / rich.Spinner — those take over the screen via a
+    refresh loop, which overwrites characters as the user types
+    them into the approval prompt that lives inside the wrapped
+    execute_plan() call. Static prints don't fight stdin echo.
+    """
 
-    class _NoopSpinner:
-        def __enter__(self) -> "_NoopSpinner":
-            print(f"[llm-app] {message}...", flush=True)
+    class _StaticStatus:
+        def __enter__(self) -> "_StaticStatus":
+            if HAVE_RICH:
+                console.print(f"[dim][llm-app][/dim] [yellow]{message}...[/yellow]")
+            else:
+                print(f"{_ansi('[llm-app]', _ANSI_DIM)} {_ansi(message + '...', _ANSI_YELLOW)}", flush=True)
             return self
 
         def __exit__(self, *_exc: object) -> None:
             return None
 
-    return _NoopSpinner()
+    return _StaticStatus()
 
 
 def _list_apps(sock_path: str) -> List[Dict[str, Any]]:
@@ -255,13 +281,13 @@ def _print_repl_banner(apps: List[Dict[str, Any]], tools: List[Dict[str, Any]], 
         )
         console.print(panel)
         return
-    print("[llm-app] REPL ready", flush=True)
-    print(f"[llm-app] mode: {mode}", flush=True)
-    print(f"[llm-app] catalog: apps={len(apps)} tools={len(tools)}", flush=True)
-    if mode == "user":
-        print("[llm-app] tip: concise replies enabled; use /mode dev for full traces", flush=True)
-    else:
-        print("[llm-app] tip: dev mode shows planning and execution traces", flush=True)
+    title = _ansi("linux-mcp REPL", _ANSI_BOLD)
+    stats = f"{len(apps)} apps · {len(tools)} tools · mode {_ansi(mode, _ANSI_BOLD)}"
+    hint = _ansi("type /help for commands · /exit to quit", _ANSI_DIM)
+    print(_ansi("─" * 60, _ANSI_DIM), flush=True)
+    print(f" {title}   {_ansi(stats, _ANSI_DIM)}", flush=True)
+    print(f" {hint}", flush=True)
+    print(_ansi("─" * 60, _ANSI_DIM), flush=True)
 
 
 def _ensure_session(sock_path: str, client_name: str, session: SessionInfo | None) -> SessionInfo:
@@ -271,45 +297,130 @@ def _ensure_session(sock_path: str, client_name: str, session: SessionInfo | Non
     return open_session(sock_path, client_name, DEFAULT_SESSION_TTL_MS)
 
 
+_PAYLOAD_PREVIEW_HEAD = 4   # lines shown from start of long string
+_PAYLOAD_PREVIEW_TAIL = 2   # lines shown from end of long string
+_PAYLOAD_INLINE_MAX = 80    # single-line strings get full display up to this
+_PAYLOAD_LINE_MAX = 100     # any preview line longer than this gets … truncated
+
+
+def _truncate(line: str, max_len: int = _PAYLOAD_LINE_MAX) -> str:
+    if len(line) <= max_len:
+        return line
+    return line[:max_len - 1] + "…"
+
+
+def _format_payload_value(value: Any) -> List[str]:
+    """One-or-more display lines for a payload field value.
+
+    Long strings are summarized (<N chars, M lines>) and shown as a
+    head/tail preview rather than dumped raw — otherwise the approval
+    prompt scrolls a multi-KB code blob past the user every time.
+    """
+    if isinstance(value, bool):
+        return ["true" if value else "false"]
+    if isinstance(value, (int, float)) or value is None:
+        return [json.dumps(value)]
+    if isinstance(value, str):
+        n_chars = len(value)
+        lines = value.splitlines() or [""]
+        n_lines = len(lines)
+        plural = "" if n_lines == 1 else "s"
+        if "\n" not in value and n_chars <= _PAYLOAD_INLINE_MAX:
+            return [json.dumps(value, ensure_ascii=False)]
+        if n_chars <= _PAYLOAD_INLINE_MAX * 4 and n_lines <= 6:
+            return [f"({n_chars} chars)"] + [f"  {_truncate(ln)}" for ln in lines]
+        head = lines[:_PAYLOAD_PREVIEW_HEAD]
+        tail = lines[-_PAYLOAD_PREVIEW_TAIL:] if n_lines > _PAYLOAD_PREVIEW_HEAD else []
+        out = [f"({n_chars} chars, {n_lines} line{plural})"]
+        out += [f"  {_truncate(ln)}" for ln in head]
+        if tail:
+            elided = n_lines - _PAYLOAD_PREVIEW_HEAD - _PAYLOAD_PREVIEW_TAIL
+            out += [f"  ... ({elided} more line{'' if elided == 1 else 's'} elided) ..."]
+            out += [f"  {_truncate(ln)}" for ln in tail]
+        return out
+    # list / dict: one-line JSON, capped
+    rendered = json.dumps(value, ensure_ascii=False)
+    if len(rendered) > _PAYLOAD_INLINE_MAX * 2:
+        return [f"{rendered[:_PAYLOAD_INLINE_MAX*2]}… ({len(rendered)} chars total)"]
+    return [rendered]
+
+
+def _format_payload_block(payload: Dict[str, Any]) -> List[str]:
+    if not payload:
+        return ["(empty)"]
+    key_w = max(len(str(k)) for k in payload.keys())
+    out: List[str] = []
+    # Stable order: required-looking fields first (path, url, ...), rest alphabetical.
+    front = [k for k in ("path", "url", "query", "title", "name") if k in payload]
+    rest = sorted(k for k in payload.keys() if k not in front)
+    for key in front + rest:
+        lines = _format_payload_value(payload[key])
+        out.append(f"  {key.ljust(key_w)} : {lines[0]}")
+        for cont in lines[1:]:
+            out.append(f"  {' ' * key_w}   {cont}")
+    return out
+
+
 def _approval_prompt(request: ApprovalRequest) -> bool:
-    ticket_text = f" ticket_id={request.ticket_id}" if request.ticket_id > 0 else ""
+    ticket_text = f" #{request.ticket_id}" if request.ticket_id > 0 else ""
+    payload_lines = _format_payload_block(request.payload)
+
     if HAVE_RICH:
-        panel = Panel(
-            (
-                f"[bold yellow]step[/bold yellow] {request.step_id}\n"
-                f"[bold yellow]tool[/bold yellow] {request.tool_name}{ticket_text}\n"
-                f"[bold yellow]reason[/bold yellow] {request.reason}\n"
-                f"[dim]{json.dumps(request.payload, ensure_ascii=True, sort_keys=True)}[/dim]"
-            ),
-            title="Approval Required",
-            border_style="yellow",
-            padding=(0, 1),
+        body = (
+            f"[bold yellow]tool[/bold yellow]   {request.tool_name}{ticket_text}\n"
+            f"[bold yellow]step[/bold yellow]   {request.step_id}\n"
+            f"[bold yellow]reason[/bold yellow] {request.reason}\n\n"
+            "[bold]payload:[/bold]\n"
+            + "\n".join(payload_lines)
         )
-        console.print(panel)
+        console.print(
+            Panel(
+                body,
+                title="[bold yellow]Approval Required[/bold yellow]",
+                border_style="yellow",
+                padding=(0, 1),
+            )
+        )
     else:
-        print(
-            (
-                f"[llm-app] approval required: step={request.step_id} "
-                f"tool={request.tool_name}{ticket_text} reason={request.reason}"
-            ),
-            flush=True,
-        )
-        print(
-            f"[llm-app] approval payload: {json.dumps(request.payload, ensure_ascii=True, sort_keys=True)}",
-            flush=True,
-        )
+        print("", flush=True)
+        print("─── Approval Required " + "─" * 38, flush=True)
+        print(f"  tool   : {request.tool_name}{ticket_text}", flush=True)
+        print(f"  step   : {request.step_id}", flush=True)
+        print(f"  reason : {request.reason}", flush=True)
+        print("  payload:", flush=True)
+        for line in payload_lines:
+            print(line, flush=True)
+        print("─" * 60, flush=True)
 
     if not sys.stdin.isatty():
         _warnline("stdin is not a tty; auto-denying approval")
         return False
+
+    # Drop anything typed-but-not-yet-submitted in stdin before
+    # prompting. Without this, characters the user typed during
+    # planning (e.g. continuing a multi-line REPL paste) would be
+    # consumed as the y/N answer, silently turning into a decline.
     try:
-        if HAVE_RICH:
-            answer = console.input("[bold green]approve?[/bold green] [dim][y/N][/dim] ").strip().lower()
-        else:
-            answer = input("[llm-app] approve? [y/N] ").strip().lower()
-        return answer in {"y", "yes"}
-    except (EOFError, KeyboardInterrupt):
-        return False
+        import termios
+        termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)
+    except Exception:  # noqa: BLE001 - non-POSIX or no tty: best-effort only
+        pass
+
+    for _ in range(3):
+        try:
+            if HAVE_RICH:
+                answer = console.input("[bold green]approve?[/bold green] [dim][y/N][/dim] ").strip().lower()
+            else:
+                answer = input("[llm-app] approve? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return False
+        if answer in {"y", "yes"}:
+            return True
+        if answer in {"n", "no", ""}:
+            return False
+        # Unrecognized input — ask again instead of silently denying.
+        print(f"[llm-app] please answer y or n (got: {answer!r})", flush=True)
+    return False
 
 
 def _execute_once_with_apps(
@@ -355,7 +466,7 @@ def _execute_once_with_apps(
                 text.append(line)
                 console.print(text)
             else:
-                print(f"assistant> {line}", flush=True)
+                print(f"{_ansi('assistant>', _ANSI_BOLD + _ANSI_MAGENTA)} {line}", flush=True)
     if show_reasons and mode == "dev":
         _sysline("plan_source: model")
     resp = execution.get("response", {})
@@ -480,8 +591,6 @@ def _repl_loop(
         raise CliError("no apps returned by mcpd")
 
     _print_repl_banner(apps, tools, mode)
-    _print_help(mode)
-    _separator()
     last_apps_sig = _apps_signature(apps)
     last_sig = _tools_signature(tools)
     prompt_session = _build_prompt_session()
@@ -566,6 +675,30 @@ def _repl_loop(
         _separator()
 
 
+def _print_catalog(sock_path: str) -> int:
+    """Dump mcpd's app/tool catalog without going through the LLM.
+
+    Meta queries ('what tools are there', 'show the catalog') hit this
+    instead of the planner, so the user isn't at the mercy of the LLM
+    picking a closest-match tool when the answer is just metadata.
+    """
+    apps, tools = load_catalog(sock_path)
+    print(f"apps={len(apps)} tools={len(tools)}")
+    for a in apps:
+        a_id = a.get("app_id", "")
+        a_tools = [t for t in tools if t.get("app_id") == a_id]
+        print(f"\n  [{a_id}] {a.get('app_name', '')}  -- {len(a_tools)} tool(s)")
+        for t in a_tools:
+            risks = ",".join(t.get("risk_tags", []) or []) or "-"
+            tid = t.get("tool_id")
+            name = t.get("name", "")
+            desc = (t.get("description") or "").splitlines()[0]
+            if len(desc) > 60:
+                desc = desc[:57] + "..."
+            print(f"      tool#{tid:>3} {name:30s} risk=[{risks}]  {desc}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="LLM-app CLI with REPL and single-shot mode",
@@ -574,11 +707,17 @@ def main() -> int:
             "examples:\n"
             "  %(prog)s --repl\n"
             "  %(prog)s --once \"open github on firefox\"\n"
+            "  %(prog)s --catalog\n"
             "  %(prog)s --repl --mode dev --show-payload"
         ),
     )
     parser.add_argument("--once", help="single prompt to run")
     parser.add_argument("--repl", action="store_true", help="interactive loop mode")
+    parser.add_argument(
+        "--catalog",
+        action="store_true",
+        help="print mcpd's app/tool catalog and exit (no LLM, no session)",
+    )
     # Primary model flags (provider-neutral). Defaults target any OpenAI-compatible
     # endpoint; the legacy --deepseek-* aliases below are retained so existing
     # scripts continue to work.
@@ -601,7 +740,8 @@ def main() -> int:
         "--deepseek-timeout-sec",
         dest="model_timeout_sec",
         type=int,
-        default=20,
+        default=90,
+        help="HTTP timeout per LLM call. 90s default covers planner+payload-builder over a 47-tool catalog plus content generation; raise further with this flag if you consistently time out",
     )
     parser.add_argument("--agent-id", default="a1", help="client name hint for session opening")
     parser.add_argument("--sock", default=SOCK_PATH, help="mcpd unix socket path")
@@ -634,6 +774,10 @@ def main() -> int:
     show_payload = args.show_payload or _env_flag(SHOW_PAYLOAD_ENV)
 
     try:
+        if args.catalog:
+            if args.once or args.repl:
+                raise CliError("--catalog is exclusive with --once/--repl")
+            return _print_catalog(sock_path)
         if args.once and args.repl:
             raise CliError("use either --once or --repl, not both")
         if args.once:

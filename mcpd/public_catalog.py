@@ -22,6 +22,7 @@ def tool_to_public(tool: ToolManifest) -> Dict[str, Any]:
         "examples": tool.examples,
         "path_semantics": tool.path_semantics,
         "approval_policy": tool.approval_policy,
+        "output_collection_path": tool.output_collection_path,
         "risk_tags": tool.risk_tags,
         "risk_flags": tool.risk_flags,
         "hash": tool.manifest_hash,

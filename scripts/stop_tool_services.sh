@@ -60,6 +60,10 @@ for p in sorted(glob.glob("tool-app/manifests/*.json")):
 PY
 )
 
-rm -f /tmp/linux-mcp-tools/*.sock 2>/dev/null || true
+# Belt-and-suspenders: kill any orphan demo backends whose pidfile was
+# lost (overwritten by a re-launch, never written, etc.). Without this,
+# old processes keep their socket binds and confuse the next start_*.
+pkill -f 'tool-app/demo_apps/' 2>/dev/null || true
+pkill -f 'tool-app/demo_apps/.*/bin/' 2>/dev/null || true
 
 echo "app services stopped"

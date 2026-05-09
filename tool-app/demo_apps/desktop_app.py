@@ -185,6 +185,20 @@ def write_host_text_file(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def delete_host_file(payload: Dict[str, Any]) -> Dict[str, Any]:
+    raw_path = payload.get("path", "")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise ValueError("delete_host_file payload.path must be non-empty string")
+    target = resolve_host_path(raw_path, allow_missing=False)
+    # Refuse symlinks (lstat doesn't follow) and anything that's not a
+    # regular file. Linux unlink(2) on a directory needs rmdir; we only
+    # do single-file deletions here on purpose.
+    if target.is_symlink() or not target.is_file():
+        raise ValueError(f"refuses to delete: not a regular file ({target})")
+    target.unlink()
+    return {"path": str(target), "deleted": True}
+
+
 def main() -> int:
     args = parse_args()
     return serve(
@@ -194,6 +208,7 @@ def main() -> int:
             "open_url": open_url,
             "show_notification": show_notification,
             "write_host_text_file": write_host_text_file,
+            "delete_host_file": delete_host_file,
         },
     )
 

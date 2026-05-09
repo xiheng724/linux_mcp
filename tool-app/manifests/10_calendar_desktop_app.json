@@ -13,6 +13,7 @@
       ],
       "operation": "open_calendar",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Activate the real GNOME Calendar desktop application using its org.freedesktop.Application D-Bus interface.",
       "input_schema": {
         "type": "object",
@@ -33,6 +34,7 @@
       ],
       "operation": "open_calendar_file",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Open a local calendar file, such as an ICS file, in the real GNOME Calendar desktop application through its org.freedesktop.Application interface.",
       "input_schema": {
         "type": "object",
@@ -50,6 +52,60 @@
         {
           "payload": {
             "path": "/tmp/demo.ics"
+          }
+        }
+      ]
+    },
+    {
+      "tool_id": 47,
+      "name": "gnome_event_create",
+      "risk_tags": [
+        "filesystem_write",
+        "system_mutation"
+      ],
+      "operation": "gnome_event_create",
+      "timeout_ms": 30000,
+      "output_collection_path": "",
+      "description": "Add an event to the user's REAL GNOME Calendar (not demo data). Generates an .ics file and opens it in GNOME Calendar; user clicks Add in the dialog to commit. Prefer over event_create whenever the user wants events to show up in their actual desktop calendar.",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "title",
+          "start_time"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "start_time": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "payload": {
+            "title": "Design review",
+            "start_time": "2026-04-02T10:00:00+00:00",
+            "end_time": "2026-04-02T11:00:00+00:00"
+          }
+        },
+        {
+          "payload": {
+            "title": "Dentist appointment",
+            "start_time": "2026-05-15T14:30:00+08:00",
+            "location": "Downtown Clinic",
+            "notes": "Bring insurance card"
           }
         }
       ]

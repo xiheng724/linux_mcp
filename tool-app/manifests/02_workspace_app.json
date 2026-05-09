@@ -13,6 +13,7 @@
       ],
       "operation": "workspace_overview",
       "timeout_ms": 30000,
+      "output_collection_path": "entries",
       "description": "Summarize files and directories under a repository path with safe path checks.",
       "path_semantics": {
         "path": "repo_rel"
@@ -51,6 +52,7 @@
       ],
       "operation": "read_document",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Read a text document from the repository with line limits and optional start line.",
       "path_semantics": {
         "path": "repo_rel"
@@ -98,6 +100,7 @@
       ],
       "operation": "write_document",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Create or overwrite a text document under the repository root with safe path checks.",
       "path_semantics": {
         "path": "repo_rel"
@@ -149,6 +152,7 @@
       ],
       "operation": "move_document",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Rename or move a text file under the repository root with safe path checks.",
       "path_semantics": {
         "src_path": "repo_rel",

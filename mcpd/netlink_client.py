@@ -52,6 +52,11 @@ NLMSG_HDR_LEN = struct.calcsize(NLMSG_HDR_FMT)
 GENL_HDR_LEN = struct.calcsize(GENL_HDR_FMT)
 NLA_HDR_LEN = struct.calcsize(NLA_HDR_FMT)
 
+# Netlink ops to kernel_mcp are local and finish in microseconds. A
+# few seconds is generous; the point is that an rmmod or a dropped
+# message can never wedge a handler thread forever.
+NETLINK_RECV_TIMEOUT_S = 5.0
+
 
 def _align4(length: int) -> int:
     return (length + 3) & ~3
@@ -130,6 +135,7 @@ class KernelMcpNetlinkClient:
         self._seq = 0
         self._sock = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, NETLINK_GENERIC)
         self._sock.bind((os.getpid(), 0))
+        self._sock.settimeout(NETLINK_RECV_TIMEOUT_S)
         self._family_id = self._resolve_family_id()
 
     def close(self) -> None:
@@ -160,7 +166,13 @@ class KernelMcpNetlinkClient:
 
     def _recv_one(self, expected_seq: int) -> Tuple[int, int, bytes]:
         while True:
-            raw = self._sock.recv(65535)
+            try:
+                raw = self._sock.recv(65535)
+            except socket.timeout as exc:
+                raise RuntimeError(
+                    f"netlink recv timed out after {NETLINK_RECV_TIMEOUT_S}s "
+                    f"(seq={expected_seq}); kernel_mcp may be unloaded or wedged"
+                ) from exc
             offset = 0
             while offset + NLMSG_HDR_LEN <= len(raw):
                 nlmsg_len, msg_type, msg_flags, msg_seq, _msg_pid = struct.unpack_from(
@@ -185,7 +197,13 @@ class KernelMcpNetlinkClient:
     def _recv_multi(self, expected_seq: int) -> List[Tuple[int, int, bytes]]:
         messages: List[Tuple[int, int, bytes]] = []
         while True:
-            raw = self._sock.recv(65535)
+            try:
+                raw = self._sock.recv(65535)
+            except socket.timeout as exc:
+                raise RuntimeError(
+                    f"netlink recv timed out after {NETLINK_RECV_TIMEOUT_S}s "
+                    f"(seq={expected_seq}); kernel_mcp may be unloaded or wedged"
+                ) from exc
             offset = 0
             while offset + NLMSG_HDR_LEN <= len(raw):
                 nlmsg_len, msg_type, msg_flags, msg_seq, _msg_pid = struct.unpack_from(

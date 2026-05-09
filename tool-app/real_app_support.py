@@ -124,6 +124,9 @@ def run_cmd(args: List[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, text=True, capture_output=True, check=False)  # noqa: S603
 
 
+GDBUS_CALL_TIMEOUT_SEC = 10
+
+
 def run_gdbus_method(
     *,
     bus: str,
@@ -134,26 +137,47 @@ def run_gdbus_method(
     arguments: Iterable[str] = (),
 ) -> Dict[str, Any]:
     gdbus = find_executable("gdbus")
-    proc = run_cmd(
-        [
-            gdbus,
-            "call",
-            f"--{bus}",
-            "--dest",
-            destination,
-            "--object-path",
-            object_path,
-            "--method",
-            f"{interface}.{method}",
-            *list(arguments),
-        ]
-    )
-    return {
+    args = [
+        gdbus,
+        "call",
+        f"--{bus}",
+        "--dest",
+        destination,
+        "--object-path",
+        object_path,
+        "--method",
+        f"{interface}.{method}",
+        *list(arguments),
+    ]
+    common = {
         "bus": bus,
         "destination": destination,
         "object_path": object_path,
         "interface": interface,
         "method": method,
+    }
+    try:
+        proc = subprocess.run(  # noqa: S603
+            args,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=GDBUS_CALL_TIMEOUT_SEC,
+        )
+    except subprocess.TimeoutExpired:
+        # Without this, a hung GNOME service (e.g. Calendar still
+        # activating, or no D-Bus session bus reachable) would freeze
+        # the entire tool:exec chain. Fail fast with a structured
+        # error so llm-app surfaces it as a normal tool failure.
+        return {
+            **common,
+            "returncode": -1,
+            "stdout": "",
+            "stderr": f"gdbus call timed out after {GDBUS_CALL_TIMEOUT_SEC}s",
+            "ok": False,
+        }
+    return {
+        **common,
         "returncode": proc.returncode,
         "stdout": proc.stdout,
         "stderr": proc.stderr,

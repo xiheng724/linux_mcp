@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 try:
     from PySide6.QtCore import QObject, QThread, Qt, QTimer, Signal
-    from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
+    from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut, QTextCursor
     from PySide6.QtWidgets import (
         QApplication,
         QComboBox,
@@ -328,6 +328,16 @@ class ExecWorker(QObject):
 
     def resolve_approval(self, approved: bool) -> None:
         self._approval_result = approved
+        self._approval_event.set()
+
+    def cancel(self) -> None:
+        """Unblock _approval_prompt with a deny so the worker can finish.
+
+        Called from the GUI thread when the window is closing while an
+        approval dialog is still pending. Without this, the worker
+        thread would stay parked on _approval_event.wait() forever.
+        """
+        self._approval_result = False
         self._approval_event.set()
 
     def _approval_prompt(self, request: ApprovalRequest) -> bool:
@@ -753,6 +763,15 @@ class MainWindow(QMainWindow):
         if self._worker is not None:
             self._worker.resolve_approval(choice == QMessageBox.StandardButton.Yes)
 
+    def closeEvent(self, event: QCloseEvent) -> None:
+        # If the user closes the window while an approval dialog is up,
+        # the worker thread is parked on _approval_event.wait(). Cancel
+        # it so the run() returns through the normal denied-approval
+        # path and the QThread shuts down cleanly.
+        if self._worker is not None:
+            self._worker.cancel()
+        super().closeEvent(event)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Linux MCP GUI client")
@@ -775,7 +794,7 @@ def main() -> int:
         "--deepseek-timeout-sec",
         dest="model_timeout_sec",
         type=int,
-        default=20,
+        default=90,
     )
     parser.add_argument("--mode", choices=("user", "dev"), default="user")
     args = parser.parse_args()

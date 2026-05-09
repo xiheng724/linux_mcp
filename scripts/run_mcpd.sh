@@ -195,6 +195,13 @@ if [[ -f "$PID_PATH" ]]; then
     fi
     echo "mcpd running pid=$old_pid but catalog is stale; restarting"
     bash scripts/stop_mcpd.sh >/dev/null
+    # Old mcpd unlinks the socket in its finally block; if we race
+    # past it the new bind() lands on a still-existing path and
+    # fails EADDRINUSE. Wait up to 3s for the socket to disappear.
+    for _ in $(seq 1 30); do
+      [[ -S "$SOCK_PATH" ]] || break
+      sleep 0.1
+    done
   fi
   rm -f "$PID_PATH"
 fi

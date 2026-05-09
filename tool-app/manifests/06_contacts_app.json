@@ -14,6 +14,7 @@
       ],
       "operation": "contact_add",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Create a contact with name plus optional email, phone, company, and notes.",
       "input_schema": {
         "type": "object",
@@ -63,6 +64,7 @@
       ],
       "operation": "contact_list",
       "timeout_ms": 30000,
+      "output_collection_path": "items",
       "description": "List saved contacts with optional company filter and result limit.",
       "input_schema": {
         "type": "object",
@@ -97,6 +99,7 @@
       ],
       "operation": "contact_find",
       "timeout_ms": 30000,
+      "output_collection_path": "items",
       "description": "Find contacts by matching a keyword against name, email, phone, company, or notes.",
       "input_schema": {
         "type": "object",

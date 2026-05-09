@@ -13,6 +13,7 @@
       ],
       "operation": "open_path",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Open a local file or directory in Visual Studio Code.",
       "input_schema": {
         "type": "object",
@@ -47,6 +48,7 @@
       ],
       "operation": "open_file_at_line",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Open a local file in Visual Studio Code at a specific line and optional column.",
       "input_schema": {
         "type": "object",
@@ -84,6 +86,7 @@
       ],
       "operation": "compare_files",
       "timeout_ms": 30000,
+      "output_collection_path": "",
       "description": "Open a side-by-side diff of two local files in Visual Studio Code.",
       "input_schema": {
         "type": "object",

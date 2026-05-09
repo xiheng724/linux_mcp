@@ -102,7 +102,13 @@ def normalize_plan(
     max_plan_steps: int,
 ) -> Tuple[str, List[PlannedStep]]:
     reason = _as_string(plan_obj.get("reason", "")).strip() or "model-planned"
-    raw_steps = _require_list(plan_obj.get("steps", []), err=f"plan missing steps: {plan_obj}")
+    raw_steps = plan_obj.get("steps", [])
+    # Empty steps is a deliberate no-tool refusal, not an error: it lets
+    # the planner decline meta queries / low-confidence matches instead
+    # of hallucinating a tool call. The caller surfaces `reason` to the
+    # user.
+    if not isinstance(raw_steps, list):
+        raise RuntimeError(f"plan steps must be a list: {plan_obj}")
     if len(raw_steps) > max_plan_steps:
         raise RuntimeError(f"plan has too many steps ({len(raw_steps)} > {max_plan_steps})")
 
@@ -244,6 +250,60 @@ def resolve_payload_template(payload: Any, context: Dict[str, Any]) -> Any:
     if isinstance(payload, str) and payload.startswith("$"):
         return _resolve_legacy_ref(payload, context)
     return payload
+
+
+def _walk_selectors(payload: Any) -> List[Dict[str, Any]]:
+    """Yield every `$select` spec embedded in a payload template."""
+    out: List[Dict[str, Any]] = []
+    if isinstance(payload, dict):
+        if set(payload.keys()) == {"$select"} and isinstance(payload["$select"], dict):
+            out.append(payload["$select"])
+            return out
+        for value in payload.values():
+            out.extend(_walk_selectors(value))
+    elif isinstance(payload, list):
+        for item in payload:
+            out.extend(_walk_selectors(item))
+    return out
+
+
+def validate_plan_refs(steps: List[PlannedStep]) -> None:
+    """Static-check `$select` refs against each upstream tool's declared
+    output_collection_path. Catches the most common LLM mistake — using
+    mode=first/only on a step that returns a single object — at plan
+    time, so the planner's retry loop can ask for a fix instead of the
+    user seeing a runtime ValueError.
+
+    Raises ValueError with a feedback string suitable for re-prompting.
+    """
+    by_step_id: Dict[str, PlannedStep] = {step.step_id: step for step in steps}
+    for step in steps:
+        for spec in _walk_selectors(step.payload_template):
+            ref_step = _as_string(spec.get("step", "")).strip()
+            if not ref_step:
+                continue
+            if ref_step == "context":
+                continue
+            upstream = by_step_id.get(ref_step)
+            if upstream is None:
+                raise ValueError(
+                    f"step '{step.step_id}' references unknown step '{ref_step}'"
+                )
+            mode = _as_string(spec.get("mode", "value")).strip() or "value"
+            if mode in ("first", "only"):
+                ocp = _as_string(upstream.tool.get("output_collection_path", "")).strip()
+                if not ocp:
+                    raise ValueError(
+                        f"step '{step.step_id}' uses mode={mode} on '{ref_step}', "
+                        f"but tool '{upstream.tool_name}' returns a single object — "
+                        f"use mode=value (or omit mode) to reference the whole result"
+                    )
+                ref_path = _as_string(spec.get("path", "")).strip()
+                if ref_path and ref_path != ocp:
+                    raise ValueError(
+                        f"step '{step.step_id}' selector path='{ref_path}' does not match "
+                        f"upstream '{upstream.tool_name}' collection path '{ocp}'"
+                    )
 
 
 def collection_empty_state(result: Dict[str, Any], collection_path: str) -> bool | None:
